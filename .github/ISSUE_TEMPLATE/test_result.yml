@@ -1,0 +1,44 @@
+name: Test result
+description: You tried LoRA Studio on your computer (thank you!)
+labels: [test]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: LoRA Studio version
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      options: [Linux, Windows (WSL2), Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: gpu
+    attributes:
+      label: Graphics card
+      options: [NVIDIA, AMD Radeon, Both (laptop with two GPUs), No usable GPU]
+    validations:
+      required: true
+  - type: checkboxes
+    id: done
+    attributes:
+      label: What worked
+      options:
+        - label: The installer finished
+        - label: LoRA Studio started and the setup page worked
+        - label: Settings › Version › Check this machine passed (with the tiny training)
+        - label: A real training ran to the end
+  - type: textarea
+    id: reports
+    attributes:
+      label: Install report and machine check
+      description: Paste them or drop the files here (they have tokens and your home folder removed).
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything unclear or odd?
