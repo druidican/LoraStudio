@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.251026m"  # LoRA Studio version, see version.py
+__version__ = "1.251026o"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -27,7 +27,14 @@ import traceback
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+if not (HERE / "program" / "lspaths.py").is_file():          # an update from the old one-folder layout
+    print("LoRA Studio self-test\n  ✕ the folder program/ is missing: this version has a new folder layout. "
+          "Install it once with ./install.sh (your settings move to userdata/ by themselves).")
+    sys.exit(1)
+sys.path.insert(0, str(HERE / "program"))
+import lspaths  # noqa: E402
+lspaths.bootstrap()
+sys.path.insert(len(lspaths.folders()), str(HERE))             # version.py (after the program folders)
 os.chdir(HERE)
 VERBOSE = "-v" in sys.argv
 RESULTS = []
@@ -83,8 +90,8 @@ def _imports():
     import sdgui  # noqa: F401  (first: the parts need it)
     n = 0
     for name, _ in version.PARTS:
-        if name.endswith(".py") and name not in SKIP_IMPORT:
-            importlib.import_module(name[:-3])
+        if name.endswith(".py") and Path(name).name not in SKIP_IMPORT:
+            importlib.import_module(Path(name).stem)
             n += 1
     return f"{n} modules"
 

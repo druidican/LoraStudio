@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.251026n
+# LoRA Studio version 1.251026o
 # Start LoRA Studio (Training LoRA + Personal Data + Settings) and open it in the browser.
 #
 # Installed with ./install.sh (recommended): uses the shared ./venv (Python 3.12 + PyTorch + sd-scripts +
@@ -28,9 +28,14 @@ SHARED="$VENV/.lorastudio-shared"      # written by install.sh
 CONS=()
 [ -f constraints.txt ] && CONS=(-c constraints.txt)
 
-for f in lora_studio.py sdgui.py lora_library.py setup.py completed.py model_guide.py captioner.py housekeeping.py datacheck.py picgallery.py updater.py backup.py firstrun.py statusbar.py savepoint.py launchopts.py consistency.py picker.py trim.py ollamactl.py ticker.py settings_ui.py training_ui.py datasets_ui.py dsflow.py studio_css.py lora_studio.css comfytest.py pictools.py pictools_worker.py version.py sd_script.py sd_prepare.py sd_settings.py selftest.py machinecheck.py selfupdate.py failcodes.py report.py manual.py features.py venvcheck.py notice.py Lora_Datatypes.py Training_Recommendations.py requirements.txt; do
+for f in lora_studio.py version.py selftest.py requirements.txt program/lspaths.py program/Training/sdgui.py; do
     if [ ! -f "$f" ]; then
-        echo "Missing $f - put all the files from LoraStudio.zip in the same folder."
+        if [ "$f" = program/lspaths.py ] && [ -f sdgui.py ]; then
+            echo "This LoRA Studio has the new folder layout (program/, userdata/), but the program/ folder is missing."
+            echo "Unpack the whole LoraStudio.zip and run ./install.sh once: your settings move to userdata/ by themselves."
+        else
+            echo "Missing $f - put all the files from LoraStudio.zip in the same folder."
+        fi
         exit 1
     fi
 done
@@ -85,7 +90,7 @@ if [ "$WANT" != "$HAVE" ] || ! "$PY" -c "import gradio, pandas, PIL" >/dev/null 
 fi
 
 # 3. First start (no settings yet) or --setup: LoRA Studio opens its setup page in the browser
-#    (folders, token, Ollama, or import a backup). Without a browser: python setup.py asks in the terminal.
+#    (folders, token, Ollama, or import a backup). Without a browser: venv/bin/python program/Settings/setup.py asks in the terminal.
 
 echo "Starting LoRA Studio with $("$PY" -c 'import sys, gradio; print(f"Python {sys.version.split()[0]}, Gradio {gradio.__version__}")')"
 exec "$PY" lora_studio.py "${ARGS[@]}"

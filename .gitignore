@@ -33,3 +33,4 @@ __pycache__/
 LoraStudio*.zip
 notice_accepted.json
 .lorastudio-notice
+userdata/

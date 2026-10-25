@@ -12,16 +12,16 @@ One window for your LoRA collection, your datasets and training:
 
 A status strip on every page shows the training run and the machine (GPU, VRAM, CPU, RAM).
 
-This program's folder (LoraStudio, put it anywhere) holds all of its own files: library_settings.txt,
-training_settings.txt, launch_settings.json, huggingtoken.txt, caches and the venv. sd-scripts, your datasets and
-your LoRAs can each be anywhere else; link them in Settings.
+This program's folder (LoraStudio, put it anywhere): this launcher, program/ (the program by topic: Gallery, Data,
+Training, Settings, Other), userdata/ (your settings, token, caches and logs) and the venv; see program/lspaths.py.
+sd-scripts, your datasets and your LoRAs can each be anywhere else; link them in Settings.
 
 Run:  ./start.sh            (or: python lora_studio.py)   -> http://127.0.0.1:7860
 Options typed on the command line (--port, --host, --auth, --no-browser) win over Settings > Launch options.
 """
 
 from __future__ import annotations
-__version__ = "1.251026n"  # LoRA Studio version, see version.py
+__version__ = "1.251026o"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -30,7 +30,14 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+if not (HERE / "program" / "lspaths.py").is_file():
+    sys.exit("LoRA Studio: the folder program/ is missing next to lora_studio.py. Unpack the whole LoraStudio.zip, "
+             "or run ./install.sh (an update from 1.251026n or older to the new folder layout needs it once).")
+sys.path.insert(0, str(HERE / "program"))
+import lspaths  # noqa: E402
+lspaths.bootstrap()                    # program/Gallery, Data, Training, Settings, Other on the path
+lspaths.migrate()                      # an older install (everything in one folder): your files move to userdata/
+USER, PROG = lspaths.USER, lspaths.PROG
 
 import gradio as gr  # noqa: E402
 import version  # noqa: E402
@@ -40,7 +47,7 @@ def login_html() -> str:
     """The login page: the painted logo as a card behind the login fields (not the whole screen). Gradio shows this
     as HTML above the fields and loads no other style there, so the look comes along inline."""
     import base64
-    f = HERE / "logo" / "lorastudio_login.jpg"
+    f = PROG / "logo" / "lorastudio_login.jpg"
     if not f.is_file():
         return "LoRA Studio"
     url = "data:image/jpeg;base64," + base64.b64encode(f.read_bytes()).decode()
@@ -80,7 +87,7 @@ body:has(.ls-login) .main, body:has(.ls-login) .contain {
 def logo_img(px: int = 40) -> str:
     """The logo as a small inline picture (logo/lorastudio_logo_80.png, the middle of the painted logo)."""
     import base64
-    f = HERE / "logo" / ("lorastudio_logo_80.png" if px <= 40 else "lorastudio_logo_128.png")
+    f = PROG / "logo" / ("lorastudio_logo_80.png" if px <= 40 else "lorastudio_logo_128.png")
     if not f.is_file():
         return ""
     return (f'<img class="ls-logo" alt="" width="{px}" height="{px}" '
@@ -133,7 +140,7 @@ def use_own_config_folder():
     """Keep the training settings and the Hugging Face token in this program's folder (next to
     library_settings.txt) instead of inside sd-scripts. Existing files are imported by setup.py
     (first start, or ./start.sh --setup), never copied silently."""
-    sdgui.CONFIG_DIR = HERE
+    sdgui.CONFIG_DIR = USER
     sdgui.SETTINGS_FILE = TRAINING_SETTINGS
 
 
@@ -383,7 +390,7 @@ def main():
     allowed += [os.path.expanduser(p) for p in args.allow_path]
     ll.THUMB_DIR.mkdir(exist_ok=True)
     allowed.append(str(ll.THUMB_DIR))      # Gallery / Library thumbnails
-    allowed += [str(HERE / "reports"), str(HERE / "manual"), str(HERE / "logo")]     # reports, the manual, the logo
+    allowed += [str(USER / "reports"), str(PROG / "manual"), str(PROG / "logo")]     # reports, the manual, the logo
     try:                                   # the pictures on the Datasets pages: links to small files, not inline data
         import datacheck
         datacheck.URL_DIR["dir"] = ll.THUMB_DIR / "pages"
@@ -437,7 +444,7 @@ def main():
 
     if os.environ.get("LS_PROFILE"):          # LS_PROFILE=1 ./start.sh: every event that takes 0.2 s or more is printed
         _profile(app)
-    fav = HERE / "logo" / "favicon.png"
+    fav = PROG / "logo" / "favicon.png"
     if fav.is_file() and "favicon_path" in inspect.signature(gr.Blocks.launch).parameters:
         kw["favicon_path"] = str(fav)
     if args.host not in ("127.0.0.1", "localhost", "::1"):

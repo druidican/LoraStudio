@@ -208,22 +208,39 @@ How LoRA Studio starts, saved in `launch_settings.json` (readable only by you):
 
 ## One folder for the program, everything else anywhere
 
-Put the program in its own folder, called `LoraStudio`, wherever you like. That folder holds the
-program and all of its own files. sd-scripts, your datasets and your LoRAs can each live anywhere else,
-on other folders or drives: you link them in **Settings > Folders**.
+Put the program in its own folder, called `LoraStudio`, wherever you like. Inside it, the program, your own files and
+the Python environment each have their place; sd-scripts, your datasets and your LoRAs can live anywhere else, on
+other folders or drives: you link them in **Settings > Folders**.
 
 ```
-LoraStudio/                  (anywhere)
-  start.sh, *.py, requirements.txt
-  library_settings.txt      folders, style, library options
-  training_settings.txt     training settings (model files, venv, GPU, subtypes)
-  launch_settings.json      launch options (port, network, login, start page, ...)
-  huggingtoken.txt          your Hugging Face token
-  venv/                     created by start.sh
-~/sd-scripts/               linked in Settings > Folders
-/some/drive/datasets/       linked in Settings > Folders
-~/ComfyUI/models/loras/     linked in Settings > Folders
+LoraStudio/                   (anywhere)
+  start.sh, install.sh        start and install (and the Windows installer)
+  lora_studio.py              the launcher
+  version.py, selftest.py     the version of every part, the self-test
+  README.md, REFERENCE.md, LICENSE, NOTICE, requirements.txt
+  program/                    the program, by topic
+    Gallery/                  the Collection, the picture gallery, Completed marks, model files
+    Data/                     the dataset steps, captions, picture check and tools
+    Training/                 launch scripts, LoRA types, the queue and runs, results
+    Settings/                 settings, setup page, updates, backup, the venv check, the notice
+    Other/                    the look (lora_studio.css), the top bar, the Manual tab, reports
+    manual/, logo/            the Manual's chapters and pictures, the logo
+  userdata/                   everything that is yours
+    library_settings.txt      folders, style, library options
+    training_settings.txt     training settings (model files, venv, GPU, subtypes)
+    launch_settings.json      launch options (port, network, login, start page, ...)
+    huggingtoken.txt          your Hugging Face token
+    completed.json, *_cache, picture_index.json, features.json, ...
+    gui_logs/, reports/, update_backups/, custom.css
+  venv/, constraints.txt      the Python environment (install.sh or start.sh)
+  sd-scripts/, musubi-tuner/  the trainers, when install.sh installed them
+~/datasets, ~/ComfyUI/...     linked in Settings > Folders
 ```
+
+An install from before 1.011126 had everything in one folder. The first start of the new version (or `./install.sh`)
+moves your files into `userdata/` by itself and puts the old program files aside in
+`userdata/update_backups/old_layout_<time>/`. An update in Settings › Updates from such an old version stops with a
+clear message instead: run `./install.sh` from the new zip once.
 
 Folders are saved as `~/...`, so they follow whoever is logged in.
 
@@ -275,7 +292,7 @@ trainer libraries), the model files of every LoRA type, Ollama, ComfyUI and the 
 training* then trains a 10-step LoRA at 512 px on 8 made-up pictures with the same launch script LoRA Studio would
 write for your SDXL-family type (in a temporary folder that is deleted afterwards; Ollama is stopped first, as for a
 real run), and reports whether it ran, its speed and its loss. The report is saved as `lorastudio_check_<time>.md` in
-the program folder (no token, your home folder shown as `~`, no dataset names): upload it when something is wrong.
+`userdata/` (no token, your home folder shown as `~`, no dataset names): upload it when something is wrong.
 `--no-train` skips the training.
 
 **Self-test:** `./venv/bin/python selftest.py` (add `-v` for details) checks in a few seconds, without training and
@@ -298,7 +315,7 @@ a failed download, stopped, a crash, many errors, an unknown Python error, an ex
 **Report for Claude** (on a run's page in Results, and in Settings › Version) makes one Markdown file with the version
 and parts, the machine, the newest machine check, the run, LoRA Studio's diagnosis, the launch script and the end of
 the log (progress bars shortened). The Hugging Face token and anything that looks like a token are removed and your
-home folder is shown as `~`. It is saved in `reports/` and copied: paste it into a chat with Claude or drop the file
+home folder is shown as `~`. It is saved in `userdata/reports/` and copied: paste it into a chat with Claude or drop the file
 there. (A program cannot post into a claude.ai chat by itself; this is the next best thing.)
 
 ## The Manual tab
@@ -322,61 +339,17 @@ All pages share one look: the same buttons (bordered, one height; orange = the m
 with the main action at the bottom of each Datasets step, cards with the same corners, and tables with light lines.
 Datasets › 6 starts with the watermarks and lists only the pictures that change size; the others are folded away.
 
-The look of the LoRA Studio pages is in `lora_studio.css` next to the program (an update replaces it). For your own
+The look of the LoRA Studio pages is in `program/Other/lora_studio.css` (an update replaces it). For your own
 changes make `custom.css` in the same folder: it is loaded after `lora_studio.css` and an update never touches it.
 Restart LoRA Studio after a change.
 
 ## Files
 
-| File | What it is |
-|---|---|
-| `start.sh` | Starts everything. Double-click or run `./start.sh` |
-| `lora_studio.py` | Puts the two programs together in one window |
-| `sdgui.py` | The training engine: runs, the queue, run history and the page layout of the training parts (also runs on its own) |
-| `sd_script.py` | Launch scripts: LoRA types, the recommended plan, the explanation, versions and `_old_runs/`, the step 9 page |
-| `sd_prepare.py` | Preparing a dataset: captions with Ollama, the picture check, watermarks, automatic preparation, consistency |
-| `sd_settings.py` | Trainer settings: Hugging Face token, library scan, repeat folders, model files, subtypes, GPU / GFX values |
-| `version.py` | The program version and the list of its parts (Settings › Version) |
-| `selftest.py` | The self-test: `./venv/bin/python selftest.py` (`--machine`: the machine check) |
-| `machinecheck.py` | The machine check (Settings › Version): GPU, trainers, model files, helpers, a tiny training |
-| `selfupdate.py` | Updates of LoRA Studio itself from a LoraStudio.zip (Settings › Updates) |
-| `failcodes.py` | What went wrong in a failed run, in a few words |
-| `report.py` | Report for Claude: one redacted file with everything needed to ask about a problem |
-| `manual.py`, `manual/` | The Manual tab and its chapters and pictures |
-| `features.py` | What is installed (Ollama, sd-scripts, musubi-tuner; `features.json`): a missing part is greyed out |
-| `install-windows.ps1`, `Install LoRA Studio.cmd` | The Windows installer (WSL2), only in the zip |
-| `logo/` | The painted logo, its middle as the icon (PNG, WebP, ICO, favicon) and the login page picture |
-| `lora_library.py` | The Collection |
-| `firstrun.py` | The **setup page** shown in the browser on the first start (or `./start.sh --setup`) |
-| `backup.py` | Backup and restore of settings and databases (Settings > Backup, and the setup page) |
-| `updater.py` | Updates for sd-scripts and musubi-tuner (Settings > Updates) |
-| `picgallery.py` | The picture index of the LoRA page (which pictures were made with which LoRA) |
-| `statusbar.py` | The top bar of every page (run, GPU, VRAM, CPU, RAM, Ollama) |
-| `savepoint.py` | The save point to try first, from the TensorBoard loss per epoch (Training › Results, the top bar) |
-| `launchopts.py` | Settings › Start and network and `launch_settings.json` |
-| `trim.py` | Moving pictures to `_reserve/` and back |
-| `dsflow.py` | Datasets: what each of the nine steps does to a dataset folder (state in `<dataset>/.lsflow/`) |
-| `datasets_ui.py` | Datasets: New dataset, Edit existing, Improvements and the nine steps |
-| `training_ui.py` | Training: Run and Results |
-| `settings_ui.py` | Settings: the grouped list and the Health check |
-| `ollamactl.py` | Ollama models: installed, running, start, stop, download, remove |
-| `studio_css.py`, `lora_studio.css` | The look of the pages above (`custom.css`: your own changes, never replaced) |
-| `ticker.py` | The one timer of the page (status bar, queue, live run, batch progress, downloads) |
-| `comfytest.py` | Test pictures with ComfyUI: reads your workflow, makes the epoch comparison (Training › Results) |
-| `pictools.py`, `pictools_worker.py` | The picture tools: quality, look-alikes, person boxes, watermark removal, upscaling (the worker runs in the sd-scripts venv) |
-| `picker.py` | Edit existing › Add pictures from a folder |
-| `consistency.py` | Datasets › 7 Tags › Consistency: contradicting traits in the captions |
-| `setup.py` | The same questions in a terminal, for a computer without a browser: `venv/bin/python setup.py` |
-| `completed.py` | The shared "Completed" marks (saved in `completed.json`) |
-| `Training_Recommendations.py` | **Tuned settings** per model family, purpose (character / style / concept) and priority (balanced / best quality / fastest), scaled by the number of images. Replaced as a whole when renewed |
-| `model_guide.py` | Recognises model files and suggests which ones belong together (Settings › Model files) |
-| `Lora_Datatypes.py` | **All LoRA types** (SDXL, Illustrious, Anima, SD 1.5, SD3, FLUX, Chroma, Lumina, HunyuanImage): settings, flags and notes per type, used by Datasets › 9 Launch script. Add new types here |
-| `library_settings.txt` | Folders, style, library options (written by the setup page) |
-| `training_settings.txt` | Training settings (written by install.sh, the setup page, Settings › Trainers + GPU and Settings › Model files) |
-| `huggingtoken.txt` | Hugging Face token (setup page or Settings › AI helpers; readable only by you) |
+Where each part lives is in the picture under *One folder for the program*; Settings › Version lists every part
+with its path, its version and what it does.
 
 **Giving LoRA Studio to someone else:** give them the zip, never your LoRA Studio folder. The zip holds only the
-program; your folder also holds your settings, your Hugging Face token (`huggingtoken.txt`), your LoRA and dataset
+program; your folder also holds your settings, your Hugging Face token (`userdata/huggingtoken.txt`), your LoRA and dataset
 names, the picture index, logs and the 15 GB venv. They run `./install.sh` and get their own setup page.
 
 ## Install with install.sh (recommended)

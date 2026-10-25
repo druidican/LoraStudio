@@ -1,5 +1,5 @@
 ﻿# SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio for Windows. LoRA Studio version 1.251026n
+# LoRA Studio for Windows. LoRA Studio version 1.251026o
 #
 # LoRA Studio and the trainers are Linux programs. On Windows they run inside WSL2 (Windows' own Linux, from
 # Microsoft), which is the way sd-scripts, musubi-tuner and PyTorch work best on Windows. This script:
@@ -155,7 +155,7 @@ Say "Running install.sh in Ubuntu (it asks about sd-scripts, musubi-tuner and Ol
 $extra = ($olArgs | ForEach-Object { "'$_'" }) -join " "
 & wsl.exe -d $Distro -- bash -lc "cd '$src' && sed -i 's/\r$//' install.sh start.sh 2>/dev/null; bash ./install.sh --dir $Dir $extra"
 $rc = $LASTEXITCODE
-$linux = (& wsl.exe -d $Distro -- bash -lc "ls -t $Dir/reports/install_report_*.md 2>/dev/null | head -1 | xargs -r cat") -join "`r`n"
+$linux = (& wsl.exe -d $Distro -- bash -lc "ls -t $Dir/userdata/reports/install_report_*.md 2>/dev/null | head -1 | xargs -r cat") -join "`r`n"
 if ($rc -ne 0) {
     $script:Rpt.Add(""); $script:Rpt.Add("**Stopped:** install.sh inside $Distro stopped (exit code $rc)")
     Write-Report "stopped in install.sh" $linux

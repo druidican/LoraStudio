@@ -13,6 +13,12 @@ for you. Ollama (optional) looks at the pictures and writes captions.
 
 <p align="center"><img src="manual/img/workflow.jpg" width="820" alt="From pictures to a LoRA"></p>
 
+> **Made on Linux with an AMD Radeon (ROCm).** LoRA Studio was built and tested on Fedora with an RX 9070 XT. It is
+> written to work on NVIDIA cards and on Windows (through WSL2) too, but those have not been tried on real hardware
+> yet. **Testers wanted** for every other combination: NVIDIA on Linux, Windows with NVIDIA or AMD, laptops with two
+> GPUs. The Manual chapter *Testing LoRA Studio* says what to try; send the result with the
+> [Test result form](../../issues/new?template=test_result.yml). Thank you!
+
 ## What it does
 
 - **Datasets**: nine steps from a folder of pictures to a launch script: a check for unusable pictures, sorting,
@@ -65,6 +71,9 @@ skipped. More: the Manual chapter *Installing*, and [REFERENCE.md](REFERENCE.md#
 files, tests the new version and goes back by itself if the test fails. Your settings and data are never part of an
 update. Versions are `release.ddmmyy` with a letter for later updates of that release (`1.261026`, `1.261026b`, …);
 Settings › Version shows the version of every part.
+
+Your own files (settings, token, marks, caches, logs) are all in `userdata/`, apart from the program in `program/`;
+**Settings › Backup** puts them in one zip that the setup page of a new install can import.
 
 ## Your data stays yours
 

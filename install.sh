@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.251026n
+# LoRA Studio version 1.251026o
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh
@@ -57,11 +57,8 @@ MU_REPO="https://github.com/kohya-ss/musubi-tuner.git"
 ADAPTER_REPO="ostris/zimage_turbo_training_adapter"
 ADAPTER_FILE="zimage_turbo_training_adapter_v2.safetensors"
 
-APP_FILES="lora_studio.py sdgui.py lora_library.py setup.py completed.py model_guide.py captioner.py housekeeping.py datacheck.py picgallery.py updater.py backup.py firstrun.py statusbar.py savepoint.py launchopts.py consistency.py picker.py trim.py
-ollamactl.py ticker.py settings_ui.py training_ui.py datasets_ui.py dsflow.py studio_css.py lora_studio.css comfytest.py pictools.py pictools_worker.py
-version.py sd_script.py sd_prepare.py sd_settings.py selftest.py machinecheck.py selfupdate.py failcodes.py report.py manual.py features.py venvcheck.py notice.py
-Lora_Datatypes.py Training_Recommendations.py requirements.txt start.sh install.sh README.md REFERENCE.md LICENSE NOTICE"
-APP_DIRS="manual logo"                      # folders copied as a whole (the manual with its pictures, the logo)
+APP_FILES="lora_studio.py version.py selftest.py requirements.txt start.sh install.sh README.md REFERENCE.md LICENSE NOTICE"
+APP_DIRS="program"                          # the program by topic (Gallery Data Training Settings Other), manual, logo
 DATA_FILES="library_settings.txt training_settings.txt huggingtoken.txt completed.json library_data.json
 model_ids.json hash_cache.json picture_index.json launch_settings.json"
 
@@ -81,7 +78,7 @@ die()  { printf '\n\033[31mStopped:\033[0m %s\n' "$*"; [ -n "${LOG:-}" ] && prin
 write_report() {   # write_report "result": reports/install_report_<time>.md (token and home folder removed), and print it
     trap - ERR; set +e +o pipefail                # nothing in here may stop the installer
     [ -d "${TARGET:-/nonexistent}" ] || return 0
-    local dir="$TARGET/reports" f ver gpu
+    local dir="$TARGET/userdata/reports" f ver gpu
     mkdir -p "$dir" 2>/dev/null || return 0
     f="$dir/install_report_$(date +%Y%m%d_%H%M%S).md"
     ver="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' "$SRC/version.py" 2>/dev/null | head -1)"
@@ -382,24 +379,35 @@ if [ "$SRC" != "$(readlink -f "$TARGET")" ]; then
         [ -f "$SRC/$f" ] || die "$f is missing in $SRC (unpack the whole zip)"
         cp -f "$SRC/$f" "$TARGET/$f"
     done
-    for d in $APP_DIRS; do
-        if [ -d "$SRC/$d" ]; then mkdir -p "$TARGET/$d" && cp -rf "$SRC/$d/." "$TARGET/$d/"; fi
+    for d in $APP_DIRS; do                   # replaced as a whole, so no old file is left behind in it
+        [ -d "$SRC/$d" ] || die "the folder $d is missing in $SRC (unpack the whole zip)"
+        rm -rf "$TARGET/$d.new" && cp -r "$SRC/$d" "$TARGET/$d.new" && rm -rf "$TARGET/$d" && mv "$TARGET/$d.new" "$TARGET/$d"
     done
     chmod +x "$TARGET/start.sh" "$TARGET/install.sh"
-    ok "copied $(echo $APP_FILES | wc -w) files and the manual to $TARGET (your settings there are not touched)"
+    ok "copied the program to $TARGET (your settings in $TARGET/userdata are not touched)"
 else
     ok "running inside $TARGET: files are already in place"
 fi
 
+# An install from before 1.011126 (everything in one folder): your files move to userdata/, the old program aside
+"$PY_SYS" - "$TARGET" <<'EOF' || warn "could not move the old layout (LoRA Studio does it at its next start)"
+import sys
+sys.path.insert(0, sys.argv[1] + "/program")
+import lspaths
+moved = lspaths.migrate(say=lambda m: print("   " + m))
+EOF
+mkdir -p "$TARGET/userdata"
+
 # Settings from an older LoRA Studio folder (only when this one has none yet)
-if [ ! -f "$TARGET/library_settings.txt" ]; then
+if [ ! -f "$TARGET/userdata/library_settings.txt" ]; then
     CANDS=()
     if [ -n "$IMPORT" ]; then CANDS=("$IMPORT")
     else
         while IFS= read -r f; do
-            d="$(dirname "$f")"
-            [ "$d" != "$(readlink -f "$TARGET")" ] && [ -f "$d/lora_studio.py" ] && CANDS+=("$d")
-        done < <(find "$HOME" -maxdepth 5 -name library_settings.txt -not -path "*/venv/*" -not -path "$TARGET/*" 2>/dev/null | head -8)
+            d="$(dirname "$f")"; app="$d"; [ "$(basename "$d")" = userdata ] && app="$(dirname "$d")"
+            [ "$app" != "$(readlink -f "$TARGET")" ] && [ -f "$app/lora_studio.py" ] && CANDS+=("$d")
+        done < <(find "$HOME" -maxdepth 6 -name library_settings.txt -not -path "*/venv/*" -not -path "$TARGET/*" \
+                      -not -path "*/update_backups/*" -not -path "*/restore_backups/*" 2>/dev/null | head -8)
     fi
     PICK=""
     if [ ${#CANDS[@]} -gt 0 ]; then
@@ -410,8 +418,8 @@ if [ ! -f "$TARGET/library_settings.txt" ]; then
         [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -ge 1 ] && [ "$n" -le ${#CANDS[@]} ] && PICK="${CANDS[$((n-1))]}"
     fi
     if [ -n "$PICK" ]; then
-        for f in $DATA_FILES; do if [ -f "$PICK/$f" ]; then cp -p "$PICK/$f" "$TARGET/$f"; fi; done
-        [ -d "$PICK/gui_logs" ] && cp -rp "$PICK/gui_logs" "$TARGET/" 2>/dev/null || true
+        for f in $DATA_FILES; do if [ -f "$PICK/$f" ]; then cp -p "$PICK/$f" "$TARGET/userdata/$f"; fi; done
+        [ -d "$PICK/gui_logs" ] && cp -rp "$PICK/gui_logs" "$TARGET/userdata/" 2>/dev/null || true
         ok "copied settings from $PICK (the old folder is not changed)"
     else
         ok "no old settings imported: LoRA Studio asks its setup questions at the end"
@@ -643,12 +651,16 @@ fi
 # ------------------------------------------------------------------ 8. settings
 step "LoRA Studio settings"
 FRESH=0
-if [ ! -f "$TARGET/library_settings.txt" ]; then
+if [ ! -f "$TARGET/userdata/library_settings.txt" ]; then
     FRESH=1
     ok "new install: the first ./start.sh opens a setup page in the browser (folders, models, ComfyUI,"
     say "     Hugging Face token, Ollama, backups; every step can be skipped), or imports a backup"
 fi
-"$PY" - "$TARGET" "$SD_MODE" "$EX_SD" "$EX_MU" "$EX_VENV" "$MU_MODE" "$OL_MODE" "$OL_URL" "$IS_WSL" <<'EOF'
+GPU_KIND="$GPU"                                   # which settings LoRA Studio shows: ROCm (amd) or CUDA (nvidia)
+if [ "$GPU_KIND" = auto ]; then
+    if [ -e /dev/kfd ]; then GPU_KIND=amd; elif command -v nvidia-smi >/dev/null || [ -x /usr/lib/wsl/lib/nvidia-smi ]; then GPU_KIND=nvidia; fi
+fi
+"$PY" - "$TARGET" "$SD_MODE" "$EX_SD" "$EX_MU" "$EX_VENV" "$MU_MODE" "$OL_MODE" "$OL_URL" "$IS_WSL" "$GPU_KIND" <<'EOF'
 import re, shutil, sys
 from pathlib import Path
 T = Path(sys.argv[1]); home = str(Path.home())
@@ -672,23 +684,27 @@ def set_keys(path: Path, section: str, values: dict, sep=" = "):
             lines[hit] = f"{k}{sep}{v}"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 import json
-sd_mode, ex_sd, ex_mu, ex_venv, mu_mode, ol_mode, ol_url, wsl = (sys.argv[2:10] + [""] * 8)[:8]
+sd_mode, ex_sd, ex_mu, ex_venv, mu_mode, ol_mode, ol_url, wsl, gpu = (sys.argv[2:11] + [""] * 9)[:9]
 if sd_mode == "existing":        # your own sd-scripts: launch scripts activate its venv
     sd, venv_val = Path(ex_sd), str(Path(ex_venv))
 else:                            # installed here (the shared venv is linked in as sd-scripts/venv), or none:
     sd, venv_val = T / "sd-scripts", "none"      # scripts are still written for this folder
 mu = Path(ex_mu) if mu_mode == "existing" and ex_mu else T / "musubi-tuner"
-lib = T / "library_settings.txt"
+UD = T / "userdata"
+UD.mkdir(exist_ok=True)
+lib = UD / "library_settings.txt"
 if lib.is_file():
     set_keys(lib, "folders", {"sd_scripts_dir": tilde(sd)})
 keys = {"SDGUI_SD_SCRIPTS": tilde(sd), "SDGUI_WORKDIR": str(sd), "SDGUI_VENV": venv_val, "SDGUI_MUSUBI": tilde(mu)}
 if ol_mode in ("install", "remote") and ol_url:
     keys["OLLAMA_URL"] = ol_url
-set_keys(T / "training_settings.txt", "general", keys)
+set_keys(UD / "training_settings.txt", "general", keys)
 word = {"install": "installed", "existing": "existing", "none": "none", "remote": "remote", "": "installed"}
 feat = {"ollama": word.get(ol_mode, "installed"), "sd_scripts": word.get(sd_mode, "installed"),
         "musubi": word.get(mu_mode, "installed"), "platform": "wsl" if wsl == "1" else "linux"}
-(T / "features.json").write_text(json.dumps(feat, indent=1), encoding="utf-8")
+if gpu in ("amd", "nvidia"):
+    feat["gpu"] = gpu
+(UD / "features.json").write_text(json.dumps(feat, indent=1), encoding="utf-8")
 show = lambda m, p: "none (launch scripts are made, not run here)" if m == "none" else tilde(p)
 print(f"   sd-scripts:   {show(sd_mode, sd)}\n   musubi-tuner: {show(mu_mode, mu)}\n"
       f"   Ollama:       {ol_url if ol_mode in ('install', 'remote') else 'none'}\n"
@@ -705,7 +721,7 @@ elif [ "$MODELS" = 1 ]; then
     MDIR="$("$PY" - "$TARGET" <<'EOF'
 import re, sys
 from pathlib import Path
-p = Path(sys.argv[1]) / "library_settings.txt"
+p = Path(sys.argv[1]) / "userdata" / "library_settings.txt"
 m = re.search(r"^\s*models_dir\s*=\s*(.+)$", p.read_text(encoding="utf-8"), re.M) if p.is_file() else None
 print(str(Path(m.group(1).strip()).expanduser()) if m and m.group(1).strip() else str(Path(sys.argv[1]) / "models"))
 EOF
@@ -727,7 +743,7 @@ EOF
         then ok "downloaded"; else warn "download failed; get it later from https://huggingface.co/$ADAPTER_REPO"; fi
     fi
     if [ -f "$DEST/$ADAPTER_FILE" ]; then
-        "$PY" - "$TARGET/training_settings.txt" "$DEST/$ADAPTER_FILE" <<'EOF'
+        "$PY" - "$TARGET/userdata/training_settings.txt" "$DEST/$ADAPTER_FILE" <<'EOF'
 import re, sys
 from pathlib import Path
 p, f = Path(sys.argv[1]), sys.argv[2]
@@ -753,7 +769,9 @@ mapfile -t OLD_SCRIPTS < <(cd "$TARGET" && "$PY" - "$TARGET" 2>/dev/null <<'EOF'
 import re, sys
 from pathlib import Path
 T = Path(sys.argv[1]); home = Path.home()
-sys.path.insert(0, str(T))
+sys.path.insert(0, str(T / "program"))
+import lspaths
+lspaths.bootstrap()
 try:
     import lora_library as ll                      # LoRA Studio's own reader of library_settings.txt
     s = ll.load_settings()
