@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.251026i"  # LoRA Studio version, see version.py
+__version__ = "1.251026n"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -266,6 +266,8 @@ def main():
 
     ticker.ACTIVE["on"] = True                 # the parts register their refreshes; one timer does them all
     with gr.Blocks(**blocks_kwargs) as app:
+        import notice                       # the very first page, confirmed once: who owns sd-scripts / musubi-tuner
+        notice.build_gate(app, notice.logo_data_url())
         with gr.Row(elem_id="ls_top"):
             gr.HTML(f'<div class="ls-title">{logo_img(40)}<h1>LoRA Studio</h1><span class="ls-ver">{version.VERSION}</span></div>')
             gr.Button("Dark / Normal", size="sm", scale=0).click(None, None, None, js=ll.TOGGLE_JS)

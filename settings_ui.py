@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.251026k"  # LoRA Studio version, see version.py
+__version__ = "1.251026n"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -668,6 +668,10 @@ def version_panel(app):
         yield from machine_check(True)
     quick.click(run_quick, None, log)
     full.click(run_full, None, log)
+    import notice
+    with gr.Accordion("Licences and credits", open=False, elem_classes=["ls-card"]):
+        gr.Markdown(f"### {notice.TITLE}\n\n{notice.TEXT}\n\nThe full GPL-3.0 text is in `LICENSE`, this text in "
+                    "`NOTICE`, both in the program folder.")
     with gr.Column(elem_classes=["ls-card"]):
         gr.Markdown("**Report for Claude.** One file with the version, the machine and the newest machine check "
                     "(token and home folder removed), copied so you can paste it into a chat. For a failed run, use "

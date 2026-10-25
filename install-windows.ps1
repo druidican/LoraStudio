@@ -1,5 +1,5 @@
 ﻿# SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio for Windows. LoRA Studio version 1.251026m
+# LoRA Studio for Windows. LoRA Studio version 1.251026n
 #
 # LoRA Studio and the trainers are Linux programs. On Windows they run inside WSL2 (Windows' own Linux, from
 # Microsoft), which is the way sd-scripts, musubi-tuner and PyTorch work best on Windows. This script:

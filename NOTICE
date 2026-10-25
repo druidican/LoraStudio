@@ -1,0 +1,19 @@
+LoRA Studio and the programs it uses
+
+LoRA Studio is a graphical front end, © 2026 L. G. H. Druidican, free software under the GNU General Public License
+version 3. It comes with no warranty.
+
+LoRA Studio trains with sd-scripts and musubi-tuner. They are made by kohya-ss and their contributors and
+are licensed under the Apache License 2.0 (some parts under the licences named in their own README). They are
+separate programs: LoRA Studio does not include, own or license them, and L. G. H. Druidican has no rights in them.
+LoRA Studio only starts them, and the installer only downloads them from their own repositories:
+
+- sd-scripts: https://github.com/kohya-ss/sd-scripts
+- musubi-tuner: https://github.com/kohya-ss/musubi-tuner
+
+The same goes for PyTorch, ROCm, CUDA, Gradio, Ollama and ComfyUI, and for every model you train with or download:
+each keeps its own owner and licence, and you use them under their terms.
+
+The LoRAs you make, and the pictures you train them on, are yours and your responsibility.
+
+This notice is shown once by the installer and on the first page of LoRA Studio.

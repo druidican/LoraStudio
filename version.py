@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.251026m"
-VERSION = "1.251026m"
+__version__ = "1.251026n"
+VERSION = "1.251026n"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.251026i",
-    "version.py": "1.251026m",
+    "lora_studio.py": "1.251026n",
+    "version.py": "1.251026n",
     "sdgui.py": "1.251026g",
     "sd_script.py": "1.251026g",
     "sd_prepare.py": "1.251026g",
@@ -27,7 +27,7 @@ RELEASE: dict = {
     "datasets_ui.py": "1.251026g",
     "dsflow.py": "1.251026g",
     "training_ui.py": "1.251026g",
-    "settings_ui.py": "1.251026k",
+    "settings_ui.py": "1.251026n",
     "lora_library.py": "1.251026g",
     "comfytest.py": "1.251026g",
     "captioner.py": "1.251026g",
@@ -46,27 +46,29 @@ RELEASE: dict = {
     "statusbar.py": "1.251026g",
     "savepoint.py": "1.251026g",
     "launchopts.py": "1.251026g",
-    "firstrun.py": "1.251026g",
+    "firstrun.py": "1.251026n",
     "setup.py": "1.251026g",
     "updater.py": "1.251026g",
     "backup.py": "1.251026g",
     "selftest.py": "1.251026m",
     "machinecheck.py": "1.251026h",
-    "selfupdate.py": "1.251026g",
+    "selfupdate.py": "1.251026n",
     "failcodes.py": "1.251026h",
     "report.py": "1.251026g",
     "manual.py": "1.251026g",
+    "notice.py": "1.251026n",
     "venvcheck.py": "1.251026m",
     "features.py": "1.251026g",
     "studio_css.py": "1.251026g",
     "Lora_Datatypes.py": "1.251026g",
     "Training_Recommendations.py": "1.251026g",
     "lora_studio.css": "1.251026g",
-    "install.sh": "1.251026k",
-    "start.sh": "1.251026i",
+    "install.sh": "1.251026n",
+    "start.sh": "1.251026n",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.251026n", "The notice about sd-scripts and musubi-tuner (made by kohya-ss, Apache License 2.0; LoRA Studio does not own or include them): confirmed once in install.sh and on the very first page in the browser; also in the NOTICE file and Settings › Version › Licences and credits."),
     ("1.251026m", "Self-test fix: the training venv check is tested with made-up packages only, so it also passes on a computer whose venv has real ROCm packages (1.251026l failed its self-test there and was rolled back)."),
     ("1.251026l", "The PyTorch upgrade installs ROCm itself (rocm[libraries,devel,device-gfx…]) in the same pip run, at exactly the version the new PyTorch is built for."),
     ("1.251026k", "Settings › Updates › The training venv › Look for a newer PyTorch: asks AMD's server (ROCm) or PyPI (CUDA) for a newer stable PyTorch build and upgrades on a click (old versions kept, GPU test, back when it fails, locks and requirements renewed); install.sh keeps a PyTorch that is newer than its own."),
@@ -124,6 +126,7 @@ PARTS = [
     ("failcodes.py", "what went wrong in a failed run, in a few words"),
     ("report.py", "Report for Claude"),
     ("manual.py", "the Manual tab"),
+    ("notice.py", "the notice about sd-scripts / musubi-tuner (first page, once)"),
     ("venvcheck.py", "the training venv: PyTorch and its ROCm / CUDA parts belong together"),
     ("features.py", "what is installed (Ollama, sd-scripts, musubi-tuner): missing parts are greyed out"),
     ("studio_css.py", "the look (loads lora_studio.css)"),

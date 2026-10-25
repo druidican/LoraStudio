@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.251026k
+# LoRA Studio version 1.251026n
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh
@@ -32,6 +32,7 @@
 #   --ollama install|remote|none    Ollama: install it (Linux only), use one that runs (give --ollama-url), or none
 #   --ollama-url URL    Ollama's address (default http://127.0.0.1:11434)
 #   --ask               ask every question again (the answers of the last run are remembered otherwise)
+#   --accept-notice     confirm the notice about sd-scripts / musubi-tuner without a question (--yes does too)
 #   --yes               answer every question with its default (no questions asked)
 #   --help
 
@@ -58,8 +59,8 @@ ADAPTER_FILE="zimage_turbo_training_adapter_v2.safetensors"
 
 APP_FILES="lora_studio.py sdgui.py lora_library.py setup.py completed.py model_guide.py captioner.py housekeeping.py datacheck.py picgallery.py updater.py backup.py firstrun.py statusbar.py savepoint.py launchopts.py consistency.py picker.py trim.py
 ollamactl.py ticker.py settings_ui.py training_ui.py datasets_ui.py dsflow.py studio_css.py lora_studio.css comfytest.py pictools.py pictools_worker.py
-version.py sd_script.py sd_prepare.py sd_settings.py selftest.py machinecheck.py selfupdate.py failcodes.py report.py manual.py features.py venvcheck.py
-Lora_Datatypes.py Training_Recommendations.py requirements.txt start.sh install.sh README.md REFERENCE.md LICENSE"
+version.py sd_script.py sd_prepare.py sd_settings.py selftest.py machinecheck.py selfupdate.py failcodes.py report.py manual.py features.py venvcheck.py notice.py
+Lora_Datatypes.py Training_Recommendations.py requirements.txt start.sh install.sh README.md REFERENCE.md LICENSE NOTICE"
 APP_DIRS="manual logo"                      # folders copied as a whole (the manual with its pictures, the logo)
 DATA_FILES="library_settings.txt training_settings.txt huggingtoken.txt completed.json library_data.json
 model_ids.json hash_cache.json picture_index.json launch_settings.json"
@@ -67,7 +68,7 @@ model_ids.json hash_cache.json picture_index.json launch_settings.json"
 # ------------------------------------------------------------------ helpers
 SRC="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 TARGET="$HOME/LoraStudio"; GPU="auto"; GFX=""; IMPORT=""; REINSTALL_TORCH=0; MODELS=1; YES=0
-TRAINERS=""; EX_SD=""; EX_VENV=""; EX_MU=""; ASK=0; A_SD=""; A_MU=""; A_OL=""; A_OLURL=""
+TRAINERS=""; EX_SD=""; EX_VENV=""; EX_MU=""; ASK=0; ACCEPT_NOTICE=0; A_SD=""; A_MU=""; A_OL=""; A_OLURL=""
 STEP=0
 
 RPT=()                                     # the install report: every step, ok and warning, written at the end
@@ -135,6 +136,7 @@ while [ $# -gt 0 ]; do
         --ollama) A_OL="$2"; shift ;;
         --ollama-url) A_OLURL="$2"; A_OL="${A_OL:-remote}"; shift ;;
         --ask) ASK=1 ;;
+        --accept-notice) ACCEPT_NOTICE=1 ;;
         --yes|-y) YES=1 ;;
         --help|-h) sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die "unknown option $1 (see ./install.sh --help)" ;;
@@ -152,6 +154,24 @@ LOG="$TARGET/install.log"
 exec > >(tee -a "$LOG") 2>&1
 say ""
 say "LoRA Studio installer, $(date '+%Y-%m-%d %H:%M'), from $SRC into $TARGET"
+
+# ------------------------------------------------------------------ the notice (once): who owns sd-scripts / musubi-tuner
+NOTICE_FILE="$TARGET/.lorastudio-notice"
+if [ ! -f "$NOTICE_FILE" ] && [ -f "$SRC/NOTICE" ]; then
+    say ""
+    sed 's/^/   /' "$SRC/NOTICE"
+    say ""
+    if [ "$YES" = 1 ] || [ "$ACCEPT_NOTICE" = 1 ]; then
+        ok "notice confirmed ($( [ "$ACCEPT_NOTICE" = 1 ] && echo --accept-notice || echo --yes ))"
+    elif [ ! -t 0 ]; then
+        die "the notice above has to be confirmed: run ./install.sh in a terminal, or add --accept-notice"
+    else
+        read -r -p "   Type yes to confirm that you have read this and agree: " ans || ans=""
+        [[ "$ans" =~ ^[Yy]([Ee][Ss])?$|^[Jj][Aa]?$ ]] || die "not confirmed: nothing was installed"
+        ok "notice confirmed"
+    fi
+    date '+%Y-%m-%d %H:%M' > "$NOTICE_FILE"
+fi
 
 # ------------------------------------------------------------------ 1. checks
 step "Checking the computer"

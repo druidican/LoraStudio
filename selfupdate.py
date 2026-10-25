@@ -11,7 +11,7 @@
     5. Restart LoRA Studio (button) to use the new version. Roll back puts the files of before the last update back.
 """
 from __future__ import annotations
-__version__ = "1.251026g"  # LoRA Studio version, see version.py
+__version__ = "1.251026n"  # LoRA Studio version, see version.py
 
 import ast
 import json
@@ -28,7 +28,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 BACKUPS = HERE / "update_backups"
 PREFIX = "lorastudio_"
-EXTRA_FILES = ("requirements.txt", "README.md", "REFERENCE.md", "LICENSE")       # copied too, not in the parts list
+EXTRA_FILES = ("requirements.txt", "README.md", "REFERENCE.md", "LICENSE", "NOTICE")       # copied too, not in the parts list
 DIRS = ("manual", "logo")                              # folders that are copied as a whole (the manual, the logo)
 STATE = {"busy": False}
 

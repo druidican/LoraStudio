@@ -17,7 +17,7 @@ Folders are suggested from what is found on this computer (a ComfyUI install, it
 Ollama running, ...). Nothing is moved or deleted.
 """
 from __future__ import annotations
-__version__ = "1.251026g"  # LoRA Studio version, see version.py
+__version__ = "1.251026n"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -304,6 +304,8 @@ def build(hint: dict):
     import inspect
     bk = {} if "css" in inspect.signature(gr.Blocks.launch).parameters else {"css": CSS}
     with gr.Blocks(title="LoRA Studio setup", **bk) as app:
+        import notice                       # the very first page, confirmed once
+        notice.build_gate(app, notice.logo_data_url())
         with gr.Column(elem_id="fr_wrap"):
             gr.Markdown("# LoRA Studio setup")
             steps_html = gr.HTML(bar(0))
