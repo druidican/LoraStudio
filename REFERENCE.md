@@ -327,8 +327,9 @@ and a do-and-don't list with the words used. It is read from `manual/` (one Mark
 
 ## The logo
 
-The painted logo (`logo/lorastudio_logo_full.jpg`, by L. G. H. Druidican): old photographs bound into a large
-paintbrush on blue and red paint, with *LoRA Studio · for LoRA making*. Its middle (the brush and the photos)
+The painted logo (`program/logo/lorastudio_logo_full.jpg`, by L. G. H. Druidican): old photographs bound into a large
+paintbrush on blue and red paint, with *LoRA Studio · for LoRA making* and *powered by sd-scripts and musubi-tuner*, a nod to
+the two trainers by kohya-ss. Its middle (the brush and the photos)
 is the icon next to the title, the browser tab icon (`favicon.png`) and the Windows starter icon (`lorastudio.ico`).
 When LoRA Studio asks for a login (Settings › Start and network), the login fields sit on the painting
 (`lorastudio_login.jpg`), as a card in the middle of the screen.

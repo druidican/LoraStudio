@@ -1,4 +1,4 @@
-<p align="center"><img src="program/logo/lorastudio_logo_full.jpg" width="560" alt="LoRA Studio: old photographs bound into a paintbrush, 'LoRA Studio · for LoRA making'"></p>
+<p align="center"><img src="program/logo/lorastudio_logo_full.jpg" width="560" alt="LoRA Studio: old photographs bound into a paintbrush, 'LoRA Studio · for LoRA making', powered by sd-scripts and musubi-tuner"></p>
 
 # LoRA Studio
 
