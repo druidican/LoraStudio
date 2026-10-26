@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026t"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -1908,6 +1908,11 @@ from sd_settings import (  # noqa: E402,F401 - moved by topic, see sd_settings.p
     st_apply_suggestions,
     st_load,
     st_online,
+    st_dl_visible,
+    st_download,
+    st_download_all,
+    st_download_link,
+    st_download_stop,
     st_raw,
     st_refresh,
     st_refresh_all,
@@ -2807,16 +2812,32 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
                     st_refresh_btn = gr.Button("Refresh file lists", size="sm", scale=1)
                 st_info = gr.Markdown("")
                 st_flags = gr.State([""] * ST_N)
-                st_rows, st_dirs, st_files = [], [], []
+                st_rows, st_dirs, st_files, st_dl_btns = [], [], [], []
                 for i in range(ST_N):
-                    with gr.Row(visible=False) as _row:
+                    with gr.Row(visible=False, equal_height=True) as _row:
                         _d = gr.Textbox(label="Folder", scale=2)
                         _f = gr.Dropdown(choices=[], label="File", allow_custom_value=True, scale=3)
+                        _b = gr.Button("⬇ From Hugging Face", size="sm", visible=False, scale=0, min_width=170)
                     st_rows.append(_row)
                     st_dirs.append(_d)
                     st_files.append(_f)
+                    st_dl_btns.append(_b)
                 with gr.Row():
                     st_save_btn = gr.Button(f"Save to {sname}", variant="primary")
+                    st_dl_all = gr.Button("⬇ Download all missing files", visible=False)
+                    st_dl_stop = gr.Button("Stop download", variant="stop", size="sm", scale=0, min_width=140)
+                st_dl_md = gr.Markdown("")
+                with gr.Accordion("Download any file from Hugging Face (paste its link)", open=False):
+                    gr.Markdown("For a file that is not in the built-in list, or another version of it: open the file on "
+                                "huggingface.co and copy the link from the address bar (…/blob/main/…) or from its download "
+                                "button (…/resolve/main/…). Your Hugging Face token is used, so gated repos work once you "
+                                "have accepted their licence there. The file goes into your models folder (or the slot's "
+                                "folder) and the slot is saved. A file in several parts (…-00001-of-00003) is fetched whole.")
+                    with gr.Row():
+                        st_dl_slot = gr.Dropdown(choices=[], label="For the slot", scale=2)
+                        st_dl_link = gr.Textbox(label="Hugging Face file link", scale=5,
+                                                placeholder="https://huggingface.co/<owner>/<repo>/blob/main/<file>.safetensors")
+                        st_dl_go = gr.Button("⬇ Download", variant="primary", scale=1)
                 st_msg = gr.Markdown("")
                 with gr.Accordion("Suggestions: which files fit this LoRA type and base model", open=True):
                     gr.Markdown("Every model file in the slot folders (and the `models` folder above them) is identified from "
@@ -2980,6 +3001,7 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
                   cs_text=cs_text, cs_plan=cs_plan, cs_script=cs_script, cs_steps=cs_steps, cs_fields=cs_fields,
                   cs_save_new_btn=cs_save_new_btn, cs_save_over_btn=cs_save_over_btn, cs_status=cs_status,
                   cs_newname=cs_newname, cs_apply=(cs_apply, [cs_ds, cs_type, cs_script, cs_text, cs_plan] + cs_fields, cs_outs),
+                  cs_models=(cs_use_settings, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs),
                   cc_apply_btn=cc_apply_btn, cs_queue_btn=cs_queue_btn, cs_save_msg=cs_save_msg)
         mvis(cs_script.input(cs_script_change, cs_ctl, cs_outs))
         pp_after(ap_btn.click(lambda *a: (yield from ap_prepare(*a, manual=True)), ap_in, ap_out)
@@ -3093,8 +3115,10 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         for _r, _d, _f in zip(st_rows, st_dirs, st_files):
             st_slot_outs += [_r, _d, _f]
         st_outs = st_slot_outs + [st_flags, st_info]
-        st_type.input(st_load, [st_type, st_rec], st_outs)
-        demo.load(st_load, [st_type, st_rec], st_outs)
+        _stv = lambda ev: ev.then(st_dl_visible, [st_type, st_flags] + st_files, st_dl_btns + [st_dl_all, st_dl_slot],
+                                  show_progress="hidden")
+        _stv(st_type.input(st_load, [st_type, st_rec], st_outs))
+        _stv(demo.load(st_load, [st_type, st_rec], st_outs))
         st_rec.input(st_refresh_all, [st_rec] + st_dirs + st_files, st_files)
         st_refresh_btn.click(st_refresh_all, [st_rec] + st_dirs + st_files, st_files)
         for _d, _f in zip(st_dirs, st_files):
@@ -3114,6 +3138,19 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         st_sug_apply.click(st_apply_suggestions, [st_type, st_flags, st_sug_picks, st_sug_all, st_rec] + st_dirs + st_files,
                            st_dirs + st_files).then(st_suggest, sug_in, [st_sug_md, st_sug_picks])
         st_online_btn.click(st_online, [st_type, st_files[0]], st_online_md)
+        # Hugging Face downloads (Settings > Hugging Face token is used)
+        st_dl_vis_in = [st_type, st_flags] + st_files
+        st_dl_vis_out = st_dl_btns + [st_dl_all, st_dl_slot]
+        for _i, (_d, _f, _b) in enumerate(zip(st_dirs, st_files, st_dl_btns)):
+            _f.change(st_dl_visible, st_dl_vis_in, st_dl_vis_out, show_progress="hidden")
+            _b.click(lambda t, fl, d, f, i=_i: (yield from st_download(t, fl, i, d, f)), [st_type, st_flags, _d, _f],
+                     [st_dl_md, _d, _f], concurrency_id="hfdl", concurrency_limit=1)
+        st_dl_all.click(st_download_all, [st_type, st_flags, st_rec] + st_dirs + st_files,
+                        [st_dl_md] + st_dirs + st_files, concurrency_id="hfdl", concurrency_limit=1)
+        st_dl_go.click(st_download_link, [st_type, st_flags, st_dl_slot, st_dl_link, st_rec] + st_dirs + st_files,
+                       [st_dl_md] + st_dirs + st_files, concurrency_id="hfdl", concurrency_limit=1)
+        st_dl_stop.click(st_download_stop, None, None, queue=False)
+        st_type.input(lambda: "", None, st_dl_md)
         gx_pick.input(gfx_pick, gx_pick, gx_val)
         gx_detect.click(detect_gfx, None, [gx_val, gx_msg])
         gx_save_btn.click(env_save, [gx_val] + gx_extra, [gx_msg, st_raw_box])

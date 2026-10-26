@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.261026r"  # LoRA Studio version, see version.py
+__version__ = "1.261026t"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -893,6 +893,12 @@ def build(app, show):
         with gr.Column(visible=False, elem_id="ds_s9") as steps[9]:
             gr.Markdown("### Launch script")
             s9_type = gr.Radio(choices=[], label="LoRA type", elem_id="ds_s9type")
+            with gr.Row(elem_classes=["ls-card"], visible=False, equal_height=True) as s9_dl_row:
+                s9_dl_note = gr.Markdown()
+                s9_dl_btn = gr.Button("⬇ Download from Hugging Face", variant="primary", size="sm",
+                                      scale=0, min_width=260)
+                s9_dl_stop = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=80)
+            s9_dl_md = gr.Markdown()
             show("s9_head")
             with gr.Column(elem_classes=["ls-card"], elem_id="ds_s9plan"):
                 gr.Markdown("**Your plan**")
@@ -1072,12 +1078,39 @@ def build(app, show):
 
     def s9_load(s):
         if s.get("view") != "flow" or s.get("step") != 9 or not s.get("ds"):
-            return gr.update(), gr.update()
+            return gr.update(), gr.update(), gr.update(), gr.update()
         m = F.meta(s["ds"])
         labels = F.type_labels()
         ch = [(FT.label(labels.get(t, t), FT.trainer_for(t)), t) for t in m["types"]]
         cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else None)
-        return gr.update(choices=ch, value=cur, visible=len(ch) > 0), s9_queue_vis(s)
+        return (gr.update(choices=ch, value=cur, visible=len(ch) > 0), s9_queue_vis(s)) + s9_dl_vis(s)
+
+    def s9_dl_vis(s):
+        """The download card when model files of the type are missing and Hugging Face has them (hfdownload.py)."""
+        m = F.meta(s["ds"]) if s.get("ds") else {"types": []}
+        cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else "")
+        try:
+            import hfdownload as HD
+            import sd_settings as SS
+            miss = HD.missing(cur) if cur else []
+        except Exception:                                  # noqa: BLE001
+            miss = []
+        if not miss:
+            return gr.update(visible=False), gr.update(value="")
+        k = HD.known(cur)
+        rows = ", ".join(f"**{SS.slot_label(f)}** (`{Path(k[f][1]).name}`)" for f in miss)
+        tok = "" if SS.read_hf_token() else " A Hugging Face token (Settings › Hugging Face token) is needed for gated models."
+        return (gr.update(visible=True), gr.update(value=f"Missing on this computer: {rows}. They can be downloaded from "
+                                                         f"Hugging Face into your models folder.{tok}"))
+
+    def s9_dl_fn(s):
+        import hfdownload as HD
+        m = F.meta(s["ds"]) if s.get("ds") else {"types": []}
+        cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else "")
+        if not cur:
+            yield "Pick the LoRA type first."
+            return
+        yield from HD.fetch_missing(cur)
 
     def s9_queue_vis(s):
         """'Add to the queue' only when the trainer of the type is installed (the script is made either way)."""
@@ -1088,7 +1121,7 @@ def build(app, show):
     all_outs = (nav_outs + [n_list] + [e_list, e_head, e_steps] + [i_head, i_html, i_what] + [s2_md, s2_grid, s2_show, s2_extra]
                 + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words] + [s4_box, s4_status] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode]
                 + [s6_max, s6_sum, s6_table, s6_go, s6_crop] + [s7_sets, s7_mirror_row, s7_rec, s7_cons, UI["oc"]["leave"]] + [s8_tree, s8_checks, s8_grid, s8_cap2]
-                + [s9_type, UI["cs_queue_btn"], sync, s9_calc, s9_eff] + s9_vals)
+                + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, sync, s9_calc, s9_eff] + s9_vals)
 
     def refresh_all(s, find, show8, text, leave):
         out = list(nav_updates(s))
@@ -1484,7 +1517,12 @@ def build(app, show):
     def s9_pick(s, t):
         return go(s, tkey=t)
     fn, ins, outs = UI["cs_retype"]
-    s9_type.input(s9_pick, [st, s9_type], st).then(sync_key, st, sync).then(s9_queue_vis, st, UI["cs_queue_btn"])
+    s9_type.input(s9_pick, [st, s9_type], st).then(sync_key, st, sync).then(s9_queue_vis, st, UI["cs_queue_btn"]) \
+        .then(s9_dl_vis, st, [s9_dl_row, s9_dl_note]).then(lambda: "", None, s9_dl_md)
+    _mfn, _mins, _mouts = UI["cs_models"]
+    s9_dl_btn.click(s9_dl_fn, st, s9_dl_md, concurrency_id="hfdl", concurrency_limit=1) \
+        .then(s9_dl_vis, st, [s9_dl_row, s9_dl_note]).then(_mfn, _mins, _mouts)
+    s9_dl_stop.click(lambda: __import__("hfdownload").STOP.set(), None, None, queue=False)
     # one at a time, in the order they were asked for: a slower one for the type before must not land last
     UI["cs_text"].change(s9_calc_fn, [st, UI["cs_text"]], [s9_calc, s9_eff] + s9_vals, show_progress="hidden",
                          concurrency_id="s9calc", concurrency_limit=1)

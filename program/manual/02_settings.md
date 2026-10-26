@@ -23,6 +23,11 @@ left say how many things need a look there.
 Pick the files once per LoRA type (Illustrious, SDXL, Anima, …). New launch scripts use them. *Suggestions* reads
 the header of every model file and marks the ones that fit the type.
 
+A file you don't have yet? Next to a missing file there is **⬇ From Hugging Face**: it downloads the usual file for
+that slot into your models folder and fills the slot. With your Hugging Face token (Settings › AI helpers) gated models
+work too, once you have accepted their licence on huggingface.co. For another file, open *Download any file from
+Hugging Face* and paste the file's link.
+
 > **Don't** pick a model of another family (an SD 1.5 checkpoint for SDXL, a VAE as the checkpoint): the run fails
 > with "The model does not fit this LoRA type".
 

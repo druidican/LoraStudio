@@ -568,7 +568,13 @@ Each setting has one place:
 - **Settings › Trainers + GPU** (`training_settings.txt`, `[general]`): the sd-scripts and musubi-tuner folders,
   working folder, venv, trace, and the GPU / ROCm environment. A new sd-scripts folder needs a restart.
 - **Settings › Model files** (`training_settings.txt`): the LoRA type first, then its model, VAE and text-encoder
-  files, the suggestions, and LoRA subtypes (such as Pony).
+  files, the suggestions, and LoRA subtypes (such as Pony). A missing file with a known source gets a
+  **⬇ From Hugging Face** button (also *Download all missing files*, and the same card on Datasets › 9 Launch script):
+  the usual file for that slot (from the sd-scripts / musubi-tuner documentation) is downloaded with your Hugging Face
+  token into the models folder (`checkpoints`, `diffusion_models`, `text_encoders`, `vae`, `loras`) or the slot's own
+  folder, and the slot is saved. *Download any file from Hugging Face* takes a pasted file link (…/blob/main/… or
+  …/resolve/main/…) for any slot; files split in parts are fetched whole; a stopped download goes on from where it
+  stopped (`<file>.part`). Gated repos (FLUX.1-dev, FLUX.2-dev, SD 3.5): accept the licence on the repo's page first.
 - **Settings › AI helpers**: the Ollama address and vision model (captions, the picture check, the automatic
   preparation) and the Hugging Face token (`huggingtoken.txt`, paste a new one and press *Save token*).
 - **Settings › Library** (`library_settings.txt`): style (Dark / Normal), base models, expected bases, NSFW blur.

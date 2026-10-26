@@ -5,7 +5,7 @@ and the GPU / GFX values.
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026t"  # LoRA Studio version, see version.py
 
 import glob
 import json
@@ -541,6 +541,110 @@ def st_online(tkey, base_file, progress=gr.Progress()):
         return S.GUIDE.lookup_online(tkey, os.path.expanduser(base), read_hf_token() or "")
     except Exception as e:                          # noqa: BLE001
         return f"Online lookup failed: {e}"
+
+
+# ---- Hugging Face downloads (hfdownload.py), on a click
+def _hd():
+    import hfdownload
+    return hfdownload
+
+
+def st_dl_visible(tkey, flags, *files):
+    """A download button on every slot whose file is missing and that has a built-in file; 'Download all' when
+    there are two or more; the slot list for the paste-a-link field."""
+    HD = _hd()
+    kn = HD.known(tkey) if tkey else {}
+    btns, n = [], 0
+    for i in range(S.ST_N):
+        flag = flags[i] if i < len(flags) else ""
+        f = files[i] if i < len(files) else ""
+        vis = bool(flag) and flag in kn and HD.is_missing(f or "")
+        n += vis
+        btns.append(gr.update(visible=vis))
+    slots = [(slot_label(f), f) for f in flags if f]
+    return btns + [gr.update(visible=n >= 2), gr.update(choices=slots, value=slots[0][1] if slots else None)]
+
+
+def _slot_after(path, recursive=True):
+    """(folder update, file update) for a slot after a download."""
+    if path is None:
+        return gr.update(), gr.update()
+    d = str(path.parent.parent if _hd().GENERIC.match(path.name) else path.parent)
+    return gr.update(value=d), gr.update(choices=list_model_files(d, recursive), value=str(path))
+
+
+def st_download(tkey, flags, i, d, f):
+    flag = flags[i] if i < len(flags) else ""
+    if not tkey or not flag:
+        yield "Pick a LoRA type first.", gr.update(), gr.update()
+        return
+    gen, res = _hd().fetch(tkey, flag, slot_dir=d or ""), None
+    try:
+        while True:
+            yield next(gen), gr.update(), gr.update()
+    except StopIteration as e:
+        res = e.value
+    yield (gr.update(), *_slot_after(res))
+
+
+def _all_slots(flags, results, recursive, n):
+    out_d, out_f = [], []
+    for i in range(n):
+        flag = flags[i] if i < len(flags) else ""
+        a, b = _slot_after(results.get(flag), recursive) if flag in results else (gr.update(), gr.update())
+        out_d.append(a)
+        out_f.append(b)
+    return out_d + out_f
+
+
+def st_download_all(tkey, flags, recursive, *args):
+    dirs = list(args[:S.ST_N])
+    HD = _hd()
+    todo = HD.missing(tkey)
+    keep = [gr.update()] * (2 * S.ST_N)
+    if not todo:
+        yield ["✔ Every model file of this LoRA type is on this computer."] + keep
+        return
+    results, log = {}, []
+    for flag in todo:
+        i = flags.index(flag) if flag in flags else -1
+        gen, last = HD.fetch(tkey, flag, slot_dir=dirs[i] if i >= 0 else ""), ""
+        try:
+            while True:
+                last = next(gen)
+                yield ["\n\n".join(log + [last])] + keep
+        except StopIteration as e:
+            if e.value is not None:
+                results[flag] = e.value
+        log.append(last)
+        if HD.STOP.is_set():
+            break
+    yield ["\n\n".join(log + [f"**{len(results)} of {len(todo)} files downloaded.**"])] + _all_slots(
+        flags, results, recursive, S.ST_N)
+
+
+def st_download_link(tkey, flags, slot, link, recursive, *args):
+    dirs = list(args[:S.ST_N])
+    keep = [gr.update()] * (2 * S.ST_N)
+    if not tkey or not slot:
+        yield ["Pick a LoRA type and the slot first."] + keep
+        return
+    if not (link or "").strip():
+        yield ["Paste the link of the file on huggingface.co first."] + keep
+        return
+    i = flags.index(slot) if slot in flags else -1
+    gen, res = _hd().fetch(tkey, slot, slot_dir=dirs[i] if i >= 0 else "", link=link), None
+    try:
+        while True:
+            yield [next(gen)] + keep
+    except StopIteration as e:
+        res = e.value
+    yield [gr.update()] + _all_slots(flags, {slot: res} if res else {}, recursive, S.ST_N)
+
+
+def st_download_stop():
+    _hd().STOP.set()
+    gr.Info("Stopping the download: it goes on from there next time.")
 
 
 def st_raw() -> str:

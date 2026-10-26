@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261026s"  # LoRA Studio version, see version.py
+__version__ = "1.261026t"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -399,6 +399,24 @@ def _wdtags():
     import wdtagger as WD
     need(WD.REPO == "SmilingWolf/wd-eva02-large-tagger-v3", "another tagger model")
     return line
+
+
+@check("the Hugging Face download list covers every built-in LoRA type and reads pasted links")
+def _hfdl():
+    import hfdownload as HD
+    import Lora_Datatypes as L
+    for t, cfg in L.PRESETS.items():
+        k = HD.known(t)
+        for flag, _ in cfg.get("model_args", []):
+            need(flag.lstrip("-") in k, f"{t}: no download for {flag}")
+    need(HD.parse_link("https://huggingface.co/a/b/blob/main/x/y.safetensors?download=true") == ("a/b", "main", "x/y.safetensors"),
+         "a /blob/ link was not read")
+    need(HD.parse_link("https://huggingface.co/a/b/resolve/v2/z.safetensors") == ("a/b", "v2", "z.safetensors"),
+         "a /resolve/ link was not read")
+    need(HD.parse_link("https://example.com/x.safetensors") is None, "a link to another site was taken")
+    need(HD.part_paths("te/model-00001-of-00003.safetensors", 3)[2] == "te/model-00003-of-00003.safetensors",
+         "the parts of a split file are wrong")
+    return f"{len(L.PRESETS)} types"
 
 
 @check("sorting stays valid when pictures move or are removed (only new pictures ask for a new sort)")
