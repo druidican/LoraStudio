@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.261026t"
-VERSION = "1.261026t"
+__version__ = "1.261026u"
+VERSION = "1.261026u"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.251026o",
-    "version.py": "1.261026t",
+    "version.py": "1.261026u",
     "program/lspaths.py": "1.251026o",
     "program/Training/sdgui.py": "1.261026t",
     "program/Training/sd_script.py": "1.251026o",
@@ -29,7 +29,7 @@ RELEASE: dict = {
     "program/Data/dsflow.py": "1.261026s",
     "program/Training/training_ui.py": "1.251026o",
     "program/Settings/settings_ui.py": "1.251026o",
-    "program/Gallery/lora_library.py": "1.261026p",
+    "program/Gallery/lora_library.py": "1.261026u",
     "program/Training/comfytest.py": "1.251026o",
     "program/Data/captioner.py": "1.261026r",
     "program/Data/wdtagger.py": "1.261026r",
@@ -53,7 +53,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.251026o",
     "program/Settings/updater.py": "1.251026o",
     "program/Settings/backup.py": "1.251026o",
-    "selftest.py": "1.261026t",
+    "selftest.py": "1.261026u",
     "program/Settings/machinecheck.py": "1.251026o",
     "program/Settings/selfupdate.py": "1.251026o",
     "program/Training/failcodes.py": "1.251026o",
@@ -71,6 +71,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.261026u", "Collection › Maintenance › Sync now syncs the .metadata.json files both ways: data that only one side has (notes, tags, trigger words, Civitai data, usage tips …) is copied to the other, also into the LoRA folder's file, so ComfyUI's LoRA Manager sees your edits; an empty field takes the other side's value; where both differ, the newer file wins. File paths stay as they are on each side, a .bak is made before a file changes."),
     ("1.261026t", "Model files can be downloaded from Hugging Face on a click, with your token: a ⬇ From Hugging Face button next to every missing file in Settings › Model files (and Download all missing files), the same card on Datasets › 9 Launch script, and a field to paste any Hugging Face file link for a slot. The usual files per LoRA type come from the sd-scripts and musubi-tuner documentation; they go into your models folder (checkpoints, diffusion_models, text_encoders, vae, loras), files in several parts are fetched whole, a stopped download goes on later, gated repos say what to do, and the slot is saved."),
     ("1.261026s", "Datasets › 4 Sort stays done when pictures are removed, moved (step 5), saved again (step 6) or when the repeat folder is renamed: a picture is matched by its file name, not only by its full path; only new pictures ask for a new sort. Step 5 also keeps the sort results of moved pictures."),
     ("1.261026r", "Datasets › 7 Tags: the tag-style caption sets (Illustrious, Pony, SDXL, Anima) are written by the WD tagger (SmilingWolf/wd-eva02-large-tagger-v3, through sd-scripts' own tagger) instead of Ollama: general tags only (no character names, the trigger word stands for them), the Never describe list and the consistency check as usual; works without Ollama; onnx/onnxruntime are installed into the training venv the first time. Tag cleaning keeps tags like 1girl."),

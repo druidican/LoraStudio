@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261026t"  # LoRA Studio version, see version.py
+__version__ = "1.261026u"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -417,6 +417,17 @@ def _hfdl():
     need(HD.part_paths("te/model-00001-of-00003.safetensors", 3)[2] == "te/model-00003-of-00003.safetensors",
          "the parts of a split file are wrong")
     return f"{len(L.PRESETS)} types"
+
+
+@check("Personal sync merges .metadata.json both ways (missing and empty fields filled, newer file wins)")
+def _metamerge():
+    import lora_library as LL
+    a = {"notes": "", "tags": ["a"], "civitai": {"trainedWords": ["trig"]}, "favorite": True}
+    b = {"notes": "mine", "tags": ["b"], "civitai": {"trainedWords": [], "id": 5}, "extra": 1}
+    m = LL.merge_meta(a, b, a_wins=False)
+    need(m["notes"] == "mine" and m["civitai"] == {"trainedWords": ["trig"], "id": 5}, f"got {m}")
+    need(m["tags"] == ["b"] and m["favorite"] is True and m["extra"] == 1, f"got {m}")
+    need(LL.merge_meta(a, b, a_wins=True)["tags"] == ["a"], "the newer file did not win")
 
 
 @check("sorting stays valid when pictures move or are removed (only new pictures ask for a new sort)")

@@ -890,9 +890,12 @@ images) into each dataset's `LoraManager/` folder:
   dataset, or the same SHA256 hash (a renamed copy, like `MyChar_Illustrious` for `mycharILLV1`).
 - The files are stored under the dataset model file's name (`mycharILLV1.metadata.json`,
   `mycharILLV1.preview.webp`), so the cards find them.
-- A file is only copied when it is missing in the dataset or newer in the LoRA folder. Edits you make in
-  LoRA page edits are saved to the dataset copy only, so a later sync keeps them (and a `.bak` is made before a newer
-  `.metadata.json` from the LoRA folder replaces one).
+- Pictures are copied when they are missing in the dataset or newer in the LoRA folder.
+- The `.metadata.json` files are synced **both ways**: a field that only one side has, or that is empty on one side
+  (empty text or list, 0), is copied to the other, also into the LoRA folder's file, so ComfyUI's LoRA Manager sees
+  your LoRA page edits and LoRA Studio sees what LoRA Manager added. Where both sides have a different value, the
+  newer file wins. Location fields (file name, file path, folder, preview) stay as they are on each side. A `.bak` is
+  made before either file is changed; files that already agree are not touched.
 - Example images are copied too (for a complete dataset), but are not shown on the cards. Sample images from
   training are not shown either.
 

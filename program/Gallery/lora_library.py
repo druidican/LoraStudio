@@ -34,7 +34,7 @@ Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.261026p"  # LoRA Studio version, see version.py
+__version__ = "1.261026u"  # LoRA Studio version, see version.py
 
 import base64
 import contextlib
@@ -2201,6 +2201,79 @@ def _sync_one(src: Path, dst: Path, stats: dict) -> None:
         stats["errors"].append(f"{src.name}: {e}")
 
 
+# fields that describe where a file lies: each side keeps its own
+_META_OWN = {"file_name", "file_path", "folder", "preview_url", "modified"}
+
+
+def _empty(v) -> bool:
+    """Missing for the merge: None, "", "{}", [], {}, 0 (booleans are values: False is kept)."""
+    if isinstance(v, bool):
+        return False
+    if v is None or v == 0 or v == "" or v == [] or v == {}:
+        return True
+    return isinstance(v, str) and v.strip() in ("", "{}", "[]")
+
+
+def merge_meta(a: dict, b: dict, a_wins: bool) -> dict:
+    """Both .metadata.json files together: a field that is missing or empty on one side is taken from the other;
+    when both have a different value, the newer file (a_wins) decides. Nested parts (civitai …) merge the same way."""
+    out = {}
+    for k in list(a) + [k for k in b if k not in a]:
+        if k not in b:
+            out[k] = a[k]
+        elif k not in a:
+            out[k] = b[k]
+        elif isinstance(a[k], dict) and isinstance(b[k], dict):
+            out[k] = merge_meta(a[k], b[k], a_wins)
+        elif _empty(a[k]):
+            out[k] = b[k]
+        elif _empty(b[k]):
+            out[k] = a[k]
+        else:
+            out[k] = a[k] if a_wins else b[k]
+    return out
+
+
+def _sync_meta(src: Path, dst: Path, stats: dict) -> None:
+    """Sync both ways: data only one .metadata.json has is copied into the other (the LoRA folder's file and the
+    dataset copy); for fields both have, the newer file wins. Location fields (file path, folder, preview) stay as
+    they are on each side. A .bak is made before a file is changed; files that already agree are not touched."""
+    if not dst.exists():
+        _sync_one(src, dst, stats)
+        return
+    a, b = _load_json(src, None), _load_json(dst, None)
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        _sync_one(src, dst, stats)                       # one of them is not readable JSON: the old rule
+        return
+    try:
+        src_newer = src.stat().st_mtime > dst.stat().st_mtime + 1
+    except OSError as e:
+        stats["errors"].append(f"{src.name}: {e}")
+        return
+    m = merge_meta(a, b, src_newer)
+    changed = False
+    for path, cur in ((src, a), (dst, b)):
+        new = dict(m)
+        for k in _META_OWN:                              # this side's own location fields
+            if k in cur:
+                new[k] = cur[k]
+            else:
+                new.pop(k, None)
+        if new != cur:
+            try:
+                write_sidecar(path, new)
+                changed = True
+                stats["merged"] = stats.get("merged", 0) + 1
+                if path == src:
+                    stats["back"] = stats.get("back", 0) + 1
+            except OSError as e:
+                stats["errors"].append(f"{path.name}: {e}")
+    if changed:
+        stats["updated"] += 1
+    else:
+        stats["same"] += 1
+
+
 # ----------------------------------------------------------------------------------- housekeeping (Clean up tab)
 def _trainer():
     """sdgui when it runs in the same program (LoRA Studio): for the active run and the musubi-tuner folder."""
@@ -2329,7 +2402,7 @@ def personal_sync(lib: Library, progress=None) -> str:
         sc_path = f.with_name(old + ".metadata.json")
         sidecar = _load_json(sc_path, None) if sc_path.exists() else None
         if sc_path.exists():
-            _sync_one(sc_path, dst_dir / (new + ".metadata.json"), stats)
+            _sync_meta(sc_path, dst_dir / (new + ".metadata.json"), stats)
         preview = find_preview(src_dir, old, sidecar if isinstance(sidecar, dict) else None)
         if preview:
             _sync_one(preview, dst_dir / _renamed(preview.name, old, new), stats)
@@ -2352,6 +2425,9 @@ def personal_sync(lib: Library, progress=None) -> str:
     if done_loras:
         shown = ", ".join(done_loras[:30]) + (f" and {len(done_loras) - 30} more" if len(done_loras) > 30 else "")
         lines.append(f"Updated: {shown}.")
+    if stats.get("back"):
+        lines.append(f"**{stats['back']}** `.metadata.json` file(s) in the LoRA folder got data that only the dataset "
+                     "copy had (a `.bak` was made next to each).")
     if stats["errors"]:
         lines.append("Could not copy: " + "; ".join(stats["errors"][:10]))
     return "\n\n".join(lines)
@@ -2944,8 +3020,10 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                     "Copies the LoRA Manager files of your own LoRAs (`.metadata.json`, preview and example pictures) "
                     f"from the LoRA folder into each dataset's **`{ARCHIVE_DIR}/`** folder, where the Collection reads them. "
                     "A LoRA belongs to a dataset when it has the same name and size as a model file in the dataset, or "
-                    "the same SHA256 hash (renamed copies). Downloads are left alone; your edits are kept (a `.bak` is "
-                    "made before a newer `.metadata.json` replaces one).")
+                    "the same SHA256 hash (renamed copies). Downloads are left alone. The `.metadata.json` files are synced both "
+                    "ways: what only one side has (notes, tags, trigger words, Civitai data …) is copied to the other, "
+                    "an empty field takes the other side's value, and where both differ the newer file wins. A `.bak` "
+                    "is made before a file is changed.")
                 sync_btn = gr.Button("Sync now", variant="primary")
                 sync_msg = gr.Markdown()
             with gr.Column(scale=1, elem_classes=["ls-card"]):
