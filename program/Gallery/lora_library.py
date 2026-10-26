@@ -34,7 +34,7 @@ Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026p"  # LoRA Studio version, see version.py
 
 import base64
 import contextlib
@@ -635,6 +635,7 @@ class Lora:
     scripts: list = field(default_factory=list)     # [(Path, has_logging_dir)]
     samples: list = field(default_factory=list)     # [Path]
     issues: list = field(default_factory=list)      # [(level, text)]
+    accepted: list = field(default_factory=list)    # warnings accepted by you: not shown, not marked
     status: str = "ok"
     gid: str = ""                                    # version group (mycharAnimaV1, V2, ... share one)
     group_name: str = ""                             # name without the version: mycharAnima
@@ -1346,6 +1347,9 @@ class Library:
         ds = lora.dataset
         if ds and ds.captions < ds.images:
             issues.append(("warning", f"{ds.images - ds.captions} dataset images have no caption"))
+        accepted = set(ov.get("accepted") or [])        # warnings you looked at and accepted (LoRA page › Accept)
+        lora.accepted = [t for lvl, t in issues if lvl == "warning" and t in accepted]
+        issues = [(lvl, t) for lvl, t in issues if not (lvl == "warning" and t in accepted)]
         lora.issues = issues
         lora.status = max((lvl for lvl, _ in issues), key=lambda l: STATUS_ORDER[l], default="ok")
 
@@ -2089,6 +2093,9 @@ def files_check_html(lib: Library, lora: Lora) -> str:
 
 def details_html(lib: Library, lora: Lora) -> tuple[str, str]:
     issues = "".join(f"<div class='ll-issue ll-issue-{l}'>{esc(t)}</div>" for l, t in lora.issues)
+    if getattr(lora, "accepted", None):
+        issues += (f"<div class='ll-muted' style='margin-top:6px'>Accepted by you: {esc('; '.join(lora.accepted))} "
+                   "(no mark in the Collection)</div>")
     epochs = ""
     if lora.epoch_files:
         epochs = ("<div class='ll-muted' style='margin-top:8px'>Epoch files: "
@@ -2842,6 +2849,12 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                                                       "launch script in Training › Run.")
                             e_done_msg = gr.Markdown()
                             d_head = gr.HTML()
+                            with gr.Row(elem_classes=["ls-bar"]):
+                                d_accept = gr.Button("Accept the warnings", size="sm", scale=0, min_width=190)
+                                d_accept_msg = gr.Markdown(
+                                    "A warning you have looked at (for example *Run stopped at epoch 8 of 10* when "
+                                    "you stopped it on purpose): accept it, and the orange mark goes away. Press "
+                                    "again to show accepted warnings again.", elem_classes=["ls-note"])
                             with gr.Accordion("Copy this LoRA to your LoRA folder", open=False) as d_cp_acc:
                                 with gr.Row():
                                     d_cp_dest = gr.Textbox(label="Copy to folder", scale=4)
@@ -3253,6 +3266,29 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         LIB._evaluate(lora)
         LIB.save_cache()
         return f"Saved to `{target}`.", gr.update(choices=lora_choices(lora.gid), value=lora.gid)
+
+    def accept_warnings(key):
+        lora = LIB.loras.get(key)
+        if not lora:
+            return gr.update(), "Open a LoRA first."
+        ov = LIB.overrides(key)
+        warn = [t for lvl, t in lora.issues if lvl == "warning"]
+        if warn:
+            ov["accepted"] = sorted(set(ov.get("accepted") or []) | set(warn))
+            msg = f"Accepted: {'; '.join(warn)}. The orange mark is gone."
+        elif ov.get("accepted"):
+            ov.pop("accepted", None)
+            msg = "The accepted warnings show again."
+        else:
+            return gr.update(), "This version has no warnings to accept" + (
+                " (a red problem, such as a NaN loss, cannot be accepted: train it again)." if lora.issues else ".")
+        LIB.save_data()
+        LIB._evaluate(lora)
+        LIB.save_cache()
+        return details_html(LIB, lora)[0], msg
+
+    d_accept.click(accept_warnings, cur_key, [d_head, d_accept_msg]
+                   ).then(do_render, filters, lib_html).then(do_gallery, gal_inputs, gal_html)
 
     e_save.click(save_edits, [cur_key, e_name, e_char, e_trig, e_notes, e_str, e_clip, e_nsfw,
                               e_fav, e_flag, e_reason], [e_msg, pick_dd]
