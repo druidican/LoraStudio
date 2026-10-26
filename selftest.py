@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261026r"  # LoRA Studio version, see version.py
+__version__ = "1.261026s"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -399,6 +399,16 @@ def _wdtags():
     import wdtagger as WD
     need(WD.REPO == "SmilingWolf/wd-eva02-large-tagger-v3", "another tagger model")
     return line
+
+
+@check("sorting stays valid when pictures move or are removed (only new pictures ask for a new sort)")
+def _sortkeep():
+    import dsflow as F
+    pics = {"/a/10_x/p1.png": {"cat": "good"}, "/a/10_x/p2.png": {"cat": "out"}}
+    find = F.sort_lookup(pics)
+    need(find("/a/20_x/p1.png") is not None, "a renamed repeat folder lost the sort")
+    need(find("/a/10_x/p2.webp") is not None, "another format lost the sort")
+    need(find("/a/10_x/p9.png") is None, "a new picture was taken as sorted")
 
 
 # ---------------------------------------------------------------- the page

@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.261026r"
-VERSION = "1.261026r"
+__version__ = "1.261026s"
+VERSION = "1.261026s"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.251026o",
-    "version.py": "1.261026r",
+    "version.py": "1.261026s",
     "program/lspaths.py": "1.251026o",
     "program/Training/sdgui.py": "1.251026o",
     "program/Training/sd_script.py": "1.251026o",
     "program/Data/sd_prepare.py": "1.251026o",
     "program/Training/sd_settings.py": "1.251026o",
     "program/Data/datasets_ui.py": "1.261026r",
-    "program/Data/dsflow.py": "1.261026r",
+    "program/Data/dsflow.py": "1.261026s",
     "program/Training/training_ui.py": "1.251026o",
     "program/Settings/settings_ui.py": "1.251026o",
     "program/Gallery/lora_library.py": "1.261026p",
@@ -52,7 +52,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.251026o",
     "program/Settings/updater.py": "1.251026o",
     "program/Settings/backup.py": "1.251026o",
-    "selftest.py": "1.261026r",
+    "selftest.py": "1.261026s",
     "program/Settings/machinecheck.py": "1.251026o",
     "program/Settings/selfupdate.py": "1.251026o",
     "program/Training/failcodes.py": "1.251026o",
@@ -70,6 +70,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.261026s", "Datasets › 4 Sort stays done when pictures are removed, moved (step 5), saved again (step 6) or when the repeat folder is renamed: a picture is matched by its file name, not only by its full path; only new pictures ask for a new sort. Step 5 also keeps the sort results of moved pictures."),
     ("1.261026r", "Datasets › 7 Tags: the tag-style caption sets (Illustrious, Pony, SDXL, Anima) are written by the WD tagger (SmilingWolf/wd-eva02-large-tagger-v3, through sd-scripts' own tagger) instead of Ollama: general tags only (no character names, the trigger word stands for them), the Never describe list and the consistency check as usual; works without Ollama; onnx/onnxruntime are installed into the training venv the first time. Tag cleaning keeps tags like 1girl."),
     ("1.261026q", "Datasets › 3 Setup: Object, Action / pose and Concept need the words for the thing; when they were missing, Continue showed the message but the page went back to the saved purpose and hid the words field, so step 3 just repeated. Your choice now stays, the words field stays open and the message says where to write."),
     ("1.261026p", "Collection: a warning you have looked at (for example 'Run stopped at epoch 8 of 10' after stopping a run on purpose) can be accepted on the LoRA page (Accept the warnings): the orange mark goes away; pressing again shows it again."),

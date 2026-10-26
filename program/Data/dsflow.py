@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.261026r"  # LoRA Studio version, see version.py
+__version__ = "1.261026s"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -662,6 +662,21 @@ def sort_result(ds) -> dict | None:
     return _load(ds, "sort.json")
 
 
+def sort_lookup(pics: dict):
+    """A finder for a picture's sort entry: by its path, else by its file name (and stem). The paths change when
+    the repeat folder is renamed, the dataset is reached by another path, or step 6 saves a picture as another
+    format; the picture is still the one that was sorted."""
+    by_name, by_stem = {}, {}
+    for k, v in (pics or {}).items():
+        by_name.setdefault(Path(k).name, v)
+        by_stem.setdefault(Path(k).stem, v)
+
+    def find(p):
+        p = str(p)
+        return (pics or {}).get(p) or by_name.get(Path(p).name) or by_stem.get(Path(p).stem)
+    return find
+
+
 # --------------------------------------------------------------------------- 5 Select
 QUOTA = {"close-up": 0.35, "upper body": 0.35, "full body": 0.2}
 
@@ -700,10 +715,11 @@ def rank(ds, target: int, mode: str | None = None) -> list[dict]:
         return _rank_varied(ds, target)
     res = sort_result(ds) or {}
     pics = res.get("pics") or {}
+    find = sort_lookup(pics)
     have = {str(p) for p in candidates(ds)}
     rows = []
     for p in sorted(have):
-        e = pics.get(p)
+        e = find(p)
         if e is None:
             rows.append({"path": p, "cat": "new", "q": 0.5, "framing": "", "outfit": "", "place": ""})
         else:
@@ -1214,7 +1230,8 @@ def step_states(ds) -> dict:
         out["setup"] = ("todo", "LoRA type and purpose not set yet")
     so = sort_result(ds)
     if so:
-        changed = any(str(p) not in so["pics"] for p in imgs)
+        find = sort_lookup(so.get("pics"))              # only NEW pictures ask for a new sort, removed ones do not
+        changed = any(find(p) is None for p in imgs)
         out["sort"] = ("warn" if changed else "done", f"done {so['at']} · baseline {so['baseline']}"
                        + (" · new pictures since" if changed else ""))
     else:
@@ -1556,9 +1573,10 @@ def _batch_one(ds, url, model, say) -> list[str]:
 def _rank_varied(ds, target: int) -> list[dict]:
     res = sort_result(ds) or {}
     pics = res.get("pics") or {}
+    find = sort_lookup(pics)
     rows = []
     for p in sorted(str(x) for x in candidates(ds)):
-        e = pics.get(p)
+        e = find(p)
         rows.append({"path": p, "cat": "new", "q": 0.5, "framing": "", "outfit": "", "place": ""} if e is None
                     else {"path": p, **e})
     cands = [r for r in rows if r["cat"] in ("good", "detail", "alike", "new")]
