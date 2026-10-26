@@ -1,6 +1,17 @@
-<p align="center"><img src="logo/lorastudio_logo_full.jpg" width="560" alt="LoRA Studio: old photographs bound into a paintbrush, 'LoRA Studio · for LoRA making'"></p>
+<p align="center"><img src="program/logo/lorastudio_logo_full.jpg" width="560" alt="LoRA Studio: old photographs bound into a paintbrush, 'LoRA Studio · for LoRA making'"></p>
 
 # LoRA Studio
+
+I found that making LoRAs on my system was a bit of a challenge, and remembering and keeping track of all the
+settings, and watching the LoRAs while they were being trained, was a bit of a hassle. Some of the other tools out
+there, although great, just didn't suit my way of doing things, so I decided to make a GUI to help me. It ended up
+becoming a combined GUI for sd-scripts and musubi-tuner.
+
+Since I do not know how to code myself, I have had Claude.ai help me. This of course might lead some to disregard
+this GUI, for many reasons, and I do not blame you. But still, feel free to test it out, and I would welcome any
+suggestions or corrections you may discover along the way.
+
+*– Druidican*
 
 LoRA Studio is a program for making your own **LoRAs** (small add-on models for image generators such as SDXL,
 Illustrious, Pony, FLUX, Z-Image and Qwen-Image). It runs on your own computer and opens in your browser. It takes
@@ -11,7 +22,7 @@ It does not train by itself: it prepares everything and runs the well-known trai
 [sd-scripts](https://github.com/kohya-ss/sd-scripts) and [musubi-tuner](https://github.com/kohya-ss/musubi-tuner)
 for you. Ollama (optional) looks at the pictures and writes captions.
 
-<p align="center"><img src="manual/img/workflow.jpg" width="820" alt="From pictures to a LoRA"></p>
+<p align="center"><img src="program/manual/img/workflow.jpg" width="820" alt="From pictures to a LoRA"></p>
 
 > **Made on Linux with an AMD Radeon (ROCm).** LoRA Studio was built and tested on Fedora with an RX 9070 XT. It is
 > written to work on NVIDIA cards and on Windows (through WSL2) too, but those have not been tried on real hardware
@@ -32,8 +43,8 @@ for you. Ollama (optional) looks at the pictures and writes captions.
   Studio and the trainers, and a machine check that tests your GPU and does a tiny training.
 - **Manual**: a guide with pictures inside the program.
 
-<p align="center"><img src="manual/img/step9.jpg" width="400" alt="Datasets, step 9: the launch script">
-<img src="manual/img/compare.jpg" width="400" alt="Training, Results: comparing two versions"></p>
+<p align="center"><img src="program/manual/img/step9.jpg" width="400" alt="Datasets, step 9: the launch script">
+<img src="program/manual/img/compare.jpg" width="400" alt="Training, Results: comparing two versions"></p>
 
 ## What you need
 
