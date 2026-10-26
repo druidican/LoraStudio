@@ -65,7 +65,10 @@ The steps (the bar above them shows the dataset, its LoRA types and purpose; the
    about every picture (one clear subject, framing, outfit, place, quality, watermarks, and a 1-5 rating of how much
    the picture teaches about the subject, plus a detail it shows well; remembered). A rating of 1 (subject tiny,
    hidden, cut off or lost in the background) leaves the picture out, 2 is a warning, and the rating and a shown
-   detail count in the quality score (not for style LoRAs). Answers from before this check are asked again once. It lists groups of
+   detail count in the quality score (not for style LoRAs). For a character it also asks the face size and whether
+   the identifying features can be seen: hidden by clothes, pose or angle, or a tiny face on a small figure, leaves
+   the picture out; plain hands, feet, legs or arms without anything special are left out instead of kept as
+   detail shots; sharpness weighs less, so a slightly soft picture that shows the character well beats a crisp one. Answers from before this check are asked again once. It lists groups of
    pictures that are too alike (the best ones are kept), duplicates, **detail shots** (only the hands, tail, horns or
    back: kept, they teach details the full pictures show too small), pictures that are not good enough, and
    watermarks. The **baseline** says whether the good pictures are enough for a LoRA.

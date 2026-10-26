@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.261026w"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -164,6 +164,8 @@ CONTENT_PROMPT = """Look at this photo for an image-model training set and answe
  "part_only": "<'' or, when the picture shows only a PART of the person or character on purpose, which part: hands, tail, horns, back, feet, a tattoo, ...>",
  "outfit": "<2-5 words for the clothing, '' if none>",
  "place": "<2-4 words for the place or background>",
+ "face_size": "<none | tiny | small | medium | large: how big the main subject's face is in the picture>",
+ "features_visible": <true if what identifies the subject can be seen: face, hair, body shape, skin, marks; false if clothing, pose, objects or the angle hide nearly all of it (a huge dress that hides the body, a pose with the face and body turned away or covered)>,
  "teaches": <1-5: how much a model can learn about the main subject from this picture. 1 = almost nothing (the subject is tiny, mostly hidden, cut off, blurred or lost in clutter, or the picture is mostly empty background); 3 = usable; 5 = the subject is clearly shown with its details>,
  "unique_detail": "<'' or a visible detail of the subject that this picture shows well and that is easy to miss elsewhere: a tattoo, a scar, jewellery, a pattern, an accessory>",
  "note": "<anything else that makes it a poor training picture, '' if none>"}"""
@@ -208,6 +210,22 @@ def teaches(d: dict):
     return min(5, max(1, v))
 
 
+def face_size(d: dict) -> str:
+    v = str(d.get("face_size") or "").strip().lower()
+    return v if v in ("none", "tiny", "small", "medium", "large") else ""
+
+
+# parts that say nothing about who the character is, unless they show something special (claws, a tattoo …)
+PLAIN_PARTS = ("hand", "hands", "finger", "fingers", "foot", "feet", "toe", "toes", "leg", "legs", "arm", "arms",
+               "shoe", "shoes", "boot", "boots", "knee", "knees", "lap", "torso", "belly", "chest")
+
+
+def plain_part(part: str) -> bool:
+    words = re.findall(r"[a-z]+", (part or "").lower())
+    return bool(words) and all(w in PLAIN_PARTS or w in ("and", "the", "both", "left", "right", "bare", "only")
+                               for w in words)
+
+
 def unique_detail(d: dict) -> str:
     v = re.sub(r"\s+", " ", str(d.get("unique_detail") or "").strip())
     return "" if v.lower() in ("", "none", "no", "n/a", "''", "null") else v[:60]
@@ -245,6 +263,16 @@ def content_issues(d: dict, purpose: str) -> list[tuple[str, str]]:
             out.append((WARN, f"face partly hidden or cut: {fp}"))
         if _true(d.get("heavy_filter")):
             out.append((WARN, "strong filter or retouch: the LoRA learns the filtered look"))
+        face = face_size(d)
+        hidden = d.get("features_visible") is False or str(d.get("features_visible")).lower() == "false"
+        part = str(d.get("part_only") or "").strip().lower() not in ("", "none", "no", "n/a", "''")
+        if people >= 1 and not part:
+            if hidden:
+                out.append((BAD, "hides nearly everything about the character (clothes, pose or angle)"))
+            elif face in ("tiny", "none") and (teaches(d) or 3) <= 3:
+                out.append((BAD, "face too small and little else to learn from (the character fills only a small part)"))
+            elif face == "tiny":
+                out.append((WARN, "face very small: fine for a few full-body pictures, not many"))
     elif purpose == "concept" and _true(d.get("heavy_filter")):
         out.append((WARN, "strong filter or edit"))
     t = teaches(d) if purpose != "style" else None     # a style LoRA learns the whole picture, not one subject

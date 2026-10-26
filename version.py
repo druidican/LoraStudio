@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.261026v"
-VERSION = "1.261026v"
+__version__ = "1.261026w"
+VERSION = "1.261026w"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.251026o",
-    "version.py": "1.261026v",
+    "version.py": "1.261026w",
     "program/lspaths.py": "1.251026o",
     "program/Training/sdgui.py": "1.261026v",
     "program/Training/sd_script.py": "1.261026v",
     "program/Data/sd_prepare.py": "1.261026v",
     "program/Training/sd_settings.py": "1.261026v",
     "program/Data/datasets_ui.py": "1.261026v",
-    "program/Data/dsflow.py": "1.261026v",
+    "program/Data/dsflow.py": "1.261026w",
     "program/Training/training_ui.py": "1.261026v",
     "program/Settings/settings_ui.py": "1.251026o",
     "program/Gallery/lora_library.py": "1.261026v",
@@ -35,7 +35,7 @@ RELEASE: dict = {
     "program/Data/wdtagger.py": "1.261026v",
     "program/Settings/hfdownload.py": "1.261026v",
     "program/Settings/ollamactl.py": "1.251026o",
-    "program/Data/datacheck.py": "1.261026v",
+    "program/Data/datacheck.py": "1.261026w",
     "program/Data/consistency.py": "1.251026o",
     "program/Data/pictools.py": "1.261026v",
     "program/Data/pictools_worker.py": "1.251026o",
@@ -52,7 +52,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.251026o",
     "program/Settings/updater.py": "1.251026o",
     "program/Settings/backup.py": "1.251026o",
-    "selftest.py": "1.261026v",
+    "selftest.py": "1.261026w",
     "program/Settings/machinecheck.py": "1.251026o",
     "program/Settings/selfupdate.py": "1.251026o",
     "program/Training/failcodes.py": "1.251026o",
@@ -70,6 +70,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.261026w", "Datasets › 4 Sort, for characters: pictures where clothes, pose or angle hide nearly everything about the character, or where the figure is small and the face tiny, are left out; plain hands, feet, legs or arms are left out instead of kept as detail shots (a tail, horns, a tattoo stay); the face size counts, and sharpness weighs less, so a slightly soft picture that shows the character well beats a crisp one that shows little."),
     ("1.261026v", "Datasets › 4 Sort / 5 Select: the Ollama sort also rates how much each picture teaches about the subject (1-5) and notes a detail it shows well; pictures that teach almost nothing are left out, the rating counts in the quality score. Step 5 has pins under every picture: 📌 Always keeps it and ⛔ Never leaves it out whatever the rules say, kept through new sorts and used by the automatic improvement. Clean-up: dead code removed (the old picture picker, unused functions and imports, 80 unused re-exports in sdgui), and Lora_Datatypes.py is no longer re-read on every call (read again only when it changes): opening a dataset step is up to 7× faster."),
     ("1.261026u", "Collection › Maintenance › Sync now syncs the .metadata.json files both ways: data that only one side has (notes, tags, trigger words, Civitai data, usage tips …) is copied to the other, also into the LoRA folder's file, so ComfyUI's LoRA Manager sees your edits; an empty field takes the other side's value; where both differ, the newer file wins. File paths stay as they are on each side, a .bak is made before a file changes."),
     ("1.261026t", "Model files can be downloaded from Hugging Face on a click, with your token: a ⬇ From Hugging Face button next to every missing file in Settings › Model files (and Download all missing files), the same card on Datasets › 9 Launch script, and a field to paste any Hugging Face file link for a slot. The usual files per LoRA type come from the sd-scripts and musubi-tuner documentation; they go into your models folder (checkpoints, diffusion_models, text_encoders, vae, loras), files in several parts are fetched whole, a stopped download goes on later, gated repos say what to do, and the slot is saved."),

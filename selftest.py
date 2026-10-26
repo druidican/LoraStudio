@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.261026w"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -439,6 +439,14 @@ def _pins():
     need(any("teaches almost nothing" in t for t in bad), f"a useless picture is not left out: {bad}")
     need(not any("teaches" in t for s, t in DC.content_issues({"people": 1, "teaches": 1}, "style")),
          "the usefulness rating should not judge a style LoRA")
+    dress = {"people": 1, "teaches": 3, "face_size": "tiny", "features_visible": True, "framing": "full body"}
+    need(any(s == DC.BAD and "face too small" in t for s, t in DC.content_issues(dress, "character")),
+         "a tiny figure with a tiny face is not left out")
+    pose = {"people": 1, "teaches": 3, "face_size": "small", "features_visible": False}
+    need(any(s == DC.BAD and "hides nearly everything" in t for s, t in DC.content_issues(pose, "character")),
+         "a pose that hides the character is not left out")
+    need(DC.plain_part("both feet") and DC.plain_part("hands") and not DC.plain_part("tail") and
+         not DC.plain_part("horns"), "plain parts (hands, feet) are not told from features (tail, horns)")
     old = F.pins
     try:
         F.pins = lambda ds: {"a": "keep", "b": "never"}

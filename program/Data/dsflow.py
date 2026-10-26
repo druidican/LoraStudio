@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.261026w"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -607,7 +607,7 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                 note = "stopped"
                 break
             d, key = _content_cached(p, model, cache)
-            if d is not None and "teaches" not in d:      # an answer from before the usefulness check: ask again
+            if d is not None and "features_visible" not in d:   # an answer from before the usefulness check: ask again
                 d = None
             if d is None:
                 eta = f", about {S.fmt((time.time() - t0) / max(done, 1) * (len(rest) - i + 1))} left" if done else ""
@@ -628,6 +628,7 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
             e["part"] = _norm(d.get("part_only"))
             e["teaches"] = DC.teaches(d)
             e["udetail"] = DC.unique_detail(d)
+            e["face"] = DC.face_size(d)
             if e["part"] in ("none", "no", "n/a", "''"):
                 e["part"] = ""
             issues = DC.content_issues(d, purpose)
@@ -635,7 +636,9 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                 issues = [x for x in issues if not any(w in x[1] for w in ("no person", "no clear main subject",
                                                                           "face not visible", "face partly", "teaches almost",
                                                                           "shows little"))]
-                if e["cat"] == "good":
+                if e["cat"] == "good" and DC.plain_part(e["part"]) and not e.get("udetail"):
+                    e["cat"], e["why"] = "poor", f"only the {e['part']}: shows nothing that identifies the character"
+                elif e["cat"] == "good":
                     e["cat"], e["why"] = "detail", f"only the {e['part']}: teaches a detail the full pictures show too small"
             bad = [t for s, t in issues if s == DC.BAD and "watermark" not in t]
             if bad and e["cat"] in ("good", "detail"):
@@ -667,13 +670,18 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
     for i, e in enumerate(order):
         sharp = i / max(1, len(order) - 1)
         size_ = min(1.0, min(e["w"], e["h"]) / max(side or 1024, 1))
+        # sharpness only decides between pictures that show the same much: a slightly soft picture that shows the
+        # character well beats a crisp one that shows little
         if "aes" in e:                                   # the quality score of the picture tools leads
             aes = max(0.0, min(1.0, (e["aes"] - 3.0) / 4.0))
-            e["q"] = round(0.5 * aes + 0.3 * sharp + 0.2 * size_ - 0.08 * len(e["warn"]), 3)
+            e["q"] = 0.5 * aes + 0.15 * sharp + 0.2 * size_ - 0.05 * len(e["warn"])
         else:
-            e["q"] = round(0.6 * sharp + 0.4 * size_ - 0.08 * len(e["warn"]), 3)
+            e["q"] = 0.4 * sharp + 0.4 * size_ - 0.05 * len(e["warn"])
         if e.get("teaches"):                             # how much the picture shows of the subject
-            e["q"] = round(e["q"] + 0.08 * (e["teaches"] - 3) + (0.05 if e.get("udetail") else 0.0), 3)
+            e["q"] += 0.12 * (e["teaches"] - 3) + (0.05 if e.get("udetail") else 0.0)
+        if purpose == "character" and e.get("face") in ("medium", "large"):
+            e["q"] += 0.05
+        e["q"] = round(e["q"], 3)
     # too alike: the same framing, outfit and place more than a few times (the best ones are kept)
     combos: dict = {}
     for p, e in pics.items():

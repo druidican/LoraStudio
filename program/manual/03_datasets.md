@@ -43,7 +43,10 @@ see pictures in `_reserve/` and other folders too: the ones you keep in step 5 j
 Pass 1 (no AI) removes what is too small, blurry or a duplicate. Pass 2 asks the Ollama vision model about every
 picture: one clear subject, framing, outfit, place, quality, watermarks, and how much the picture shows of the
 subject. A picture that teaches almost nothing (the subject tiny, hidden or lost in the background) is left out; one
-that shows a detail well (a tattoo, jewellery) ranks higher. It takes about a second or two per picture.
+that shows a detail well (a tattoo, jewellery) ranks higher. For a character, a picture is also left out when clothes,
+pose or angle hide nearly everything about the character, when the figure is small and the face tiny, or when it shows
+only plain hands or feet (a tail, horns or a tattoo stay as detail shots). Sharpness only decides between pictures
+that show the character equally well. It takes about a second or two per picture.
 
 ## 5 · Select
 
