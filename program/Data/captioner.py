@@ -11,7 +11,7 @@ Only the Python standard library is used (urllib); Pillow is used to shrink the 
 Run it on its own to test the connection:   python3 captioner.py [--url http://127.0.0.1:11434] [image.jpg]
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026r"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -253,7 +253,7 @@ def clean_tags(text: str, trigger: str, leave_out: str, max_tags: int) -> tuple[
     t = re.sub(r"<think>.*?</think>", "", text or "", flags=re.S)
     t = re.sub(r"^\s*(caption|tags|answer)\s*:\s*", "", t.strip(), flags=re.I)
     raw = [x.strip().strip('"\'.').lower() for x in re.split(r"[,\n]", t)]
-    raw = [re.sub(r"^[-*\d.)\s]+", "", x).replace("_", " ").strip() for x in raw]
+    raw = [re.sub(r"^\s*(?:[-*•]+|\d+[.)])\s*", "", x).replace("_", " ").strip() for x in raw]   # list marks, not 1girl
     out, seen, dropped = [], set(), []
     for x in raw:
         if not x or x in seen or x == (trigger or "").lower() or len(x.split()) > 5:

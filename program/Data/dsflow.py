@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026r"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1016,8 +1016,16 @@ def set_count(ds, ext) -> tuple[int, int]:
 
 
 def write_set(ds, url, model, trigger, leave_out, style, length, detail, ext, only_missing=False):
-    """Generator like sdgui.oc_run, for any caption set (IMG.sentences.txt ...)."""
+    """Generator like sdgui.oc_run, for any caption set (IMG.sentences.txt ...). Tag sets are written by the WD
+    tagger (wdtagger.py), sentence sets by Ollama."""
     S = sg()
+    if style == "tags":
+        yield from _write_set_wd(ds, trigger, leave_out, length, ext, only_missing)
+        return
+    import features as FT
+    if not FT.have("ollama"):
+        yield f"Sentences (`IMG{ext}`) need Ollama, which is not installed: write them in 8 Review, or install Ollama."
+        return
     bad = S._oc_check(ds, url, model, trigger)
     if bad:
         yield bad
@@ -1052,6 +1060,25 @@ def write_set(ds, url, model, trigger, leave_out, style, length, detail, ext, on
     if failed:
         msg += f" {len(failed)} failed: " + "; ".join(failed[:3])
     yield msg
+
+
+def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
+    """A tag set with the WD tagger (no Ollama needed)."""
+    import wdtagger as WD
+    S = sg()
+    imgs = images(ds)
+    if only_missing:
+        imgs = [p for p in imgs if not read_set(p, ext)]
+    if not imgs:
+        yield "Every picture already has a caption in this set."
+        return
+    S.record_change(f"captions {ext} of {ds}", {set_file(p, ext): (set_file(p, ext).read_text(encoding="utf-8", errors="ignore")
+                                                                 if set_file(p, ext).is_file() else None) for p in imgs})
+    STOP.clear()
+    cap = S.CAP if S.CAP is not None else __import__("captioner")
+    max_tags = cap.TAG_COUNT.get(int(length or 3), 20)
+    yield from WD.tag(imgs, (trigger or ds).strip(), leave_out or "", max_tags,
+                      lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP)
 
 
 def mirror_kept(ds, ext, url, model, trigger) -> str:
@@ -1475,9 +1502,9 @@ def _batch_one(ds, url, model, say) -> list[str]:
     if BATCH["stop"]:
         return done + ["stopped"]
     import features as FT
-    if not FT.have("ollama"):
-        done.append("captions: not written (Ollama missing)")
-    for st in (caption_sets(ds) if FT.have("ollama") else []):   # 7 Tags: only pictures without a caption
+    if not FT.have("ollama") and any(x["style"] != "tags" for x in caption_sets(ds)):
+        done.append("sentence captions: not written (Ollama missing)")
+    for st in [x for x in caption_sets(ds) if FT.have("ollama") or x["style"] == "tags"]:   # 7 Tags: tags by the WD tagger
         tkey = st["tkeys"][0] if st["tkeys"] else m["types"][0]
         _, style, length, detail = S.oc_recommend(tkey, m["purpose"])
         style = st["style"]

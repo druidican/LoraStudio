@@ -14,24 +14,25 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.261026q"
-VERSION = "1.261026q"
+__version__ = "1.261026r"
+VERSION = "1.261026r"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.251026o",
-    "version.py": "1.261026q",
+    "version.py": "1.261026r",
     "program/lspaths.py": "1.251026o",
     "program/Training/sdgui.py": "1.251026o",
     "program/Training/sd_script.py": "1.251026o",
     "program/Data/sd_prepare.py": "1.251026o",
     "program/Training/sd_settings.py": "1.251026o",
-    "program/Data/datasets_ui.py": "1.261026q",
-    "program/Data/dsflow.py": "1.251026o",
+    "program/Data/datasets_ui.py": "1.261026r",
+    "program/Data/dsflow.py": "1.261026r",
     "program/Training/training_ui.py": "1.251026o",
     "program/Settings/settings_ui.py": "1.251026o",
     "program/Gallery/lora_library.py": "1.261026p",
     "program/Training/comfytest.py": "1.251026o",
-    "program/Data/captioner.py": "1.251026o",
+    "program/Data/captioner.py": "1.261026r",
+    "program/Data/wdtagger.py": "1.261026r",
     "program/Settings/ollamactl.py": "1.251026o",
     "program/Data/datacheck.py": "1.251026o",
     "program/Data/consistency.py": "1.251026o",
@@ -51,7 +52,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.251026o",
     "program/Settings/updater.py": "1.251026o",
     "program/Settings/backup.py": "1.251026o",
-    "selftest.py": "1.251026o",
+    "selftest.py": "1.261026r",
     "program/Settings/machinecheck.py": "1.251026o",
     "program/Settings/selfupdate.py": "1.251026o",
     "program/Training/failcodes.py": "1.251026o",
@@ -69,6 +70,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.261026r", "Datasets › 7 Tags: the tag-style caption sets (Illustrious, Pony, SDXL, Anima) are written by the WD tagger (SmilingWolf/wd-eva02-large-tagger-v3, through sd-scripts' own tagger) instead of Ollama: general tags only (no character names, the trigger word stands for them), the Never describe list and the consistency check as usual; works without Ollama; onnx/onnxruntime are installed into the training venv the first time. Tag cleaning keeps tags like 1girl."),
     ("1.261026q", "Datasets › 3 Setup: Object, Action / pose and Concept need the words for the thing; when they were missing, Continue showed the message but the page went back to the saved purpose and hid the words field, so step 3 just repeated. Your choice now stays, the words field stays open and the message says where to write."),
     ("1.261026p", "Collection: a warning you have looked at (for example 'Run stopped at epoch 8 of 10' after stopping a run on purpose) can be accepted on the LoRA page (Accept the warnings): the orange mark goes away; pressing again shows it again."),
     ("1.251026o", "New folder layout: program/ holds the program by topic (Gallery, Data, Training, Settings, Other, plus the Manual and the logo), userdata/ holds everything that is yours (settings, token, marks, caches, logs, reports, update backups); the launcher, version.py, selftest.py, the installers and the documents stay in the main folder. An older install moves into it by itself at the first start or with ./install.sh (the old program files are kept aside); backups of the old layout import as before. On an NVIDIA card Settings › Trainers and GPU shows CUDA values instead of the ROCm ones, and launch scripts leave the ROCm-only values out. README: made on Linux with ROCm, testers wanted."),
@@ -106,6 +108,7 @@ PARTS = [
     ("program/Gallery/lora_library.py", "Collection (the LoRA library)"),
     ("program/Training/comfytest.py", "test pictures with ComfyUI"),
     ("program/Data/captioner.py", "captions with Ollama"),
+    ("program/Data/wdtagger.py", "tags with the WD tagger (wd-eva02-large-tagger-v3) for the tag-style caption sets"),
     ("program/Settings/ollamactl.py", "Ollama control"),
     ("program/Data/datacheck.py", "picture check"),
     ("program/Data/consistency.py", "consistency check"),

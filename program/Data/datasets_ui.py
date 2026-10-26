@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.261026q"  # LoRA Studio version, see version.py
+__version__ = "1.261026r"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -92,7 +92,8 @@ def stepper_html(st) -> str:
         cls = "ds-st-now" if n == cur else {"done": "ds-st-done", "warn": "ds-st-warn"}.get(s, "")
         mark = "✓" if s == "done" and n != cur else str(n)
         click = f' onclick="{send(f"step|{n}")}"' if n >= 2 else ""
-        miss = " ds-missing" if key == "tags" and not FT.have("ollama") else ""
+        miss = " ds-missing" if key == "tags" and not FT.have("ollama") and ds and any(
+            x["style"] != "tags" for x in F.caption_sets(ds)) else ""
         lab = FT.label(label, "ollama") if miss else label
         out.append(f'<button class="ds-step {cls}{miss}"{click}{" disabled" if n == 1 else ""}><span class="ds-num">{mark}</span>'
                    f'<span>{esc(lab)}</span></button>')
@@ -837,23 +838,25 @@ def build(app, show):
                 s6_go = gr.Button("Resize →", variant="primary", size="sm", scale=0, min_width=220)
             s6_msg = gr.Markdown()
         with gr.Column(visible=False, elem_id="ds_s7") as steps[7]:
-            gr.Markdown("### " + FT.label("Tag every picture", "ollama"),
-                        elem_classes=[] if FT.have("ollama") else ["ls-missing"])
+            gr.Markdown("### Tag every picture")
+            gr.Markdown("**Tags** (Illustrious, Pony, SDXL anime, Anima) are written by the **WD tagger** "
+                        "(SmilingWolf/wd-eva02-large-tagger-v3, run by sd-scripts; the first time it downloads about "
+                        "1.2 GB). Only general tags: no character names, so the trigger word stands for them; the "
+                        "*Never describe* list and the consistency check apply as usual. **Sentences** (FLUX, Qwen-Image, "
+                        "Z-Image, …) are written by Ollama.", elem_classes=["ls-note"])
             if not FT.have("ollama"):
-                gr.Markdown("Writing captions needs Ollama, which is not installed. Write or paste the captions yourself "
-                            "in **8 Review** (click a picture), or put `.txt` files next to the pictures; the consistency "
-                            "check below works without Ollama (with a word list). "
+                gr.Markdown("Ollama is not installed: tag sets work, sentence captions do not. Write those yourself in "
+                            "**8 Review** (click a picture), or put `.txt` files next to the pictures. "
                             f"Ollama: [{FT.ollama_guide()}]({FT.ollama_guide()}), then Settings › Start and network.",
                             elem_classes=["ls-missing-note"])
             s7_rec = gr.HTML(elem_id="ds_s7rec")
             s7_sets = gr.HTML()
-            with gr.Row(elem_classes=["ls-bar"], visible=FT.have("ollama")):
+            with gr.Row(elem_classes=["ls-bar"]):
                 s7_both = gr.Button("Write the captions", variant="primary", size="sm", scale=0, min_width=190)
                 s7_missing = gr.Button("Only pictures without a caption", size="sm", scale=0, min_width=240)
                 s7_stop = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=90)
             s7_out = gr.Markdown()
-            with gr.Accordion("Caption settings: length, detail, never describe, try on 3 pictures", open=False,
-                              visible=FT.have("ollama")):
+            with gr.Accordion("Caption settings: length, detail, never describe, try on 3 pictures", open=False):
                 show("p_caption")
             with gr.Column(elem_classes=["ls-card"]) as s7_cons:
                 gr.Markdown("#### Consistency, checked while tagging")
@@ -962,7 +965,7 @@ def build(app, show):
         for n, key, label in F.STEPS[1:]:
             s, text = sts.get(key, ("todo", ""))
             chip = {"done": "ok", "warn": "warn", "optional": ""}.get(s, "")
-            miss = key == "tags" and not FT.have("ollama")
+            miss = key == "tags" and not FT.have("ollama") and any(x["style"] != "tags" for x in F.caption_sets(ds))
             rows.append(f'<div class="ds-srow{" ds-srow-next" if n == nxt else ""}{" ds-missing" if miss else ""}"><span class="ds-snum">{n}</span>'
                         f'<b>{esc(FT.label(label, "ollama") if miss else label)}</b>'
                         f'<span class="ls-chip {chip}">{esc(text)}</span><span class="ds-sp"></span>'

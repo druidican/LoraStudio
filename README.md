@@ -20,7 +20,7 @@ pictures.
 
 It does not train by itself: it prepares everything and runs the well-known trainers
 [sd-scripts](https://github.com/kohya-ss/sd-scripts) and [musubi-tuner](https://github.com/kohya-ss/musubi-tuner)
-for you. Ollama (optional) looks at the pictures and writes captions.
+for you. The WD tagger writes booru tags; Ollama (optional) sorts the pictures and writes sentence captions.
 
 <p align="center"><img src="program/manual/img/workflow.jpg" width="820" alt="From pictures to a LoRA"></p>
 
@@ -33,7 +33,7 @@ for you. Ollama (optional) looks at the pictures and writes captions.
 ## What it does
 
 - **Datasets**: nine steps from a folder of pictures to a launch script: a check for unusable pictures, sorting,
-  choosing, resizing, captions (by hand or with Ollama), a review, and a launch script with tuned settings for your
+  choosing, resizing, captions (by hand, with the WD tagger for tags, or with Ollama for sentences), a review, and a launch script with tuned settings for your
   LoRA type and the number of pictures.
 - **Training**: a queue, the live run (step, loss, time left), and **Results** for every run: which save point to try
   first, test pictures with your own ComfyUI workflow, two versions side by side, and a plain-words explanation when a

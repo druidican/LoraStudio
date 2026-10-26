@@ -63,7 +63,9 @@ keep it. Then the size: pictures bigger than needed are scaled down, never squar
 
 ![Step 7: captions and the consistency check](img/step7.jpg)
 
-Writes a caption for every picture with Ollama: tags (Illustrious, Pony, SDXL) or sentences (Anima, Z-Image, FLUX).
+Writes a caption for every picture. **Tags** (Illustrious, Pony, SDXL, Anima) come from the **WD tagger**
+(wd-eva02-large-tagger-v3, run by sd-scripts; no Ollama needed, about 1.2 GB downloaded the first time); **sentences**
+(Z-Image, FLUX, Qwen-Image) come from Ollama.
 For a character, captions describe what **changes** (clothes, pose, place) and leave out what is always the
 character, so the trigger word learns it. The consistency check finds traits that are named in different ways.
 

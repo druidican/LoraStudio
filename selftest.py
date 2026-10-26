@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026r"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -387,6 +387,18 @@ def _venvcheck():
     need([b[0] for b in r["bad"]] == ["rocm-sdk-devel"], f"found {r['bad']}")
     VC.inspect()                                     # the real one again, for the Health check
     return VC.LAST.get("text", "")
+
+
+@check("WD tagger: tags cleaned like Ollama's (trigger first, traits out, 1girl kept)")
+def _wdtags():
+    import captioner as C
+    line, dropped = C.clean_tags("1girl, solo, blue_eyes, blonde_hair, smile, 1. outdoors", "selftest",
+                                 C.DEFAULT_LEAVE_OUT, 20)
+    need(line.startswith("selftest, 1girl, solo"), f"got {line!r}")
+    need("blue eyes" not in line and "blonde hair" not in line and "outdoors" in line, f"got {line!r}")
+    import wdtagger as WD
+    need(WD.REPO == "SmilingWolf/wd-eva02-large-tagger-v3", "another tagger model")
+    return line
 
 
 # ---------------------------------------------------------------- the page
