@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.261026x"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -784,9 +784,11 @@ def build(app, show):
         with gr.Column(visible=False, elem_id="ds_s4") as steps[4]:
             gr.Markdown("### Sort with Ollama" if FT.have("ollama") else "### Sort")
             gr.Markdown("Pass 1 is quick (no AI): too blurry, too small for your LoRA types, duplicates. Pass 2 looks at "
-                        "each picture with the Ollama model: one clear subject, framing, outfit, place, quality and "
-                        "watermarks. Pictures that show only a part of the character (hands, tail, horns, back) are "
-                        "kept as detail shots.", elem_classes=["ls-note"])
+                        "each picture with the Ollama model: one clear subject, framing, outfit, place, quality, "
+                        "watermarks and how much it shows of the subject. Pictures that hide the subject or show "
+                        "almost nothing of it are left out; a part with a feature (tail, horns, a tattoo) is kept as a "
+                        "detail shot, plain hands or feet are not. Step 5 lets you overrule any of it with pins.",
+                        elem_classes=["ls-note"])
             if not FT.have("ollama"):
                 gr.Markdown("**Pass 2 · detailed (Ollama missing)**: only the quick pass runs, so framing, outfits, places "
                             "and watermarks are not known (step 5 then picks by quality only).",

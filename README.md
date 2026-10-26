@@ -74,7 +74,9 @@ needed (one restart), runs the same installer inside it and puts a **LoRA Studio
 The installer asks three questions: **sd-scripts**, **musubi-tuner** and **Ollama**: install it for you, use the one
 you have, or none. At the end it writes an **install report** (no passwords, tokens or home folder) that you can send
 when something does not work. The first start opens a setup page in your browser for your folders; every step can be
-skipped. More: the Manual chapter *Installing*, and [REFERENCE.md](REFERENCE.md#install-with-installsh-recommended).
+skipped.
+
+**Step by step, with the first start, updates, removing it and help when something goes wrong: [INSTALL.md](INSTALL.md).**
 
 ## Updates
 

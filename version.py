@@ -14,18 +14,18 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.261026w"
-VERSION = "1.261026w"
+__version__ = "1.261026x"
+VERSION = "1.261026x"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.251026o",
-    "version.py": "1.261026w",
+    "version.py": "1.261026x",
     "program/lspaths.py": "1.251026o",
     "program/Training/sdgui.py": "1.261026v",
     "program/Training/sd_script.py": "1.261026v",
     "program/Data/sd_prepare.py": "1.261026v",
     "program/Training/sd_settings.py": "1.261026v",
-    "program/Data/datasets_ui.py": "1.261026v",
+    "program/Data/datasets_ui.py": "1.261026x",
     "program/Data/dsflow.py": "1.261026w",
     "program/Training/training_ui.py": "1.261026v",
     "program/Settings/settings_ui.py": "1.251026o",
@@ -54,7 +54,7 @@ RELEASE: dict = {
     "program/Settings/backup.py": "1.251026o",
     "selftest.py": "1.261026w",
     "program/Settings/machinecheck.py": "1.251026o",
-    "program/Settings/selfupdate.py": "1.251026o",
+    "program/Settings/selfupdate.py": "1.261026x",
     "program/Training/failcodes.py": "1.251026o",
     "program/Other/report.py": "1.251026o",
     "program/Other/manual.py": "1.261026v",
@@ -65,11 +65,12 @@ RELEASE: dict = {
     "program/Training/Lora_Datatypes.py": "1.251026o",
     "program/Training/Training_Recommendations.py": "1.251026o",
     "program/Other/lora_studio.css": "1.261026v",
-    "install.sh": "1.251026o",
+    "install.sh": "1.261026x",
     "start.sh": "1.251026o",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.261026x", "Documentation: a new INSTALL.md (step by step for Linux and Windows: what you need, the installer's questions, the first start, updates, moving to a new computer, removing it, and a troubleshooting table), linked from the README and part of the zip. The Manual describes the Hugging Face downloads, the two-way metadata sync, the usefulness check and the pins, with new pictures of step 4, step 5 and Settings › Model files; step 4's own text was updated too."),
     ("1.261026w", "Datasets › 4 Sort, for characters: pictures where clothes, pose or angle hide nearly everything about the character, or where the figure is small and the face tiny, are left out; plain hands, feet, legs or arms are left out instead of kept as detail shots (a tail, horns, a tattoo stay); the face size counts, and sharpness weighs less, so a slightly soft picture that shows the character well beats a crisp one that shows little."),
     ("1.261026v", "Datasets › 4 Sort / 5 Select: the Ollama sort also rates how much each picture teaches about the subject (1-5) and notes a detail it shows well; pictures that teach almost nothing are left out, the rating counts in the quality score. Step 5 has pins under every picture: 📌 Always keeps it and ⛔ Never leaves it out whatever the rules say, kept through new sorts and used by the automatic improvement. Clean-up: dead code removed (the old picture picker, unused functions and imports, 80 unused re-exports in sdgui), and Lora_Datatypes.py is no longer re-read on every call (read again only when it changes): opening a dataset step is up to 7× faster."),
     ("1.261026u", "Collection › Maintenance › Sync now syncs the .metadata.json files both ways: data that only one side has (notes, tags, trigger words, Civitai data, usage tips …) is copied to the other, also into the LoRA folder's file, so ComfyUI's LoRA Manager sees your edits; an empty field takes the other side's value; where both differ, the newer file wins. File paths stay as they are on each side, a .bak is made before a file changes."),

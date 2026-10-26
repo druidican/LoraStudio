@@ -12,4 +12,6 @@ Manager's format).
 
 - **Completed** marks a version as finished: its launch script is hidden in Training › Run. A new version starts
   unmarked.
-- **Maintenance** syncs LoRA Manager data and previews, and cleans up leftovers of finished runs.
+- **Maintenance** syncs LoRA Manager data and previews, and cleans up leftovers of finished runs. *Sync now* works
+  both ways for the `.metadata.json` files: what only one side has (notes, tags, trigger words, Civitai data) is
+  copied to the other, an empty field takes the other side's value, and where both differ the newer file wins.

@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.251026o
+# LoRA Studio version 1.261026x
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh
@@ -57,7 +57,7 @@ MU_REPO="https://github.com/kohya-ss/musubi-tuner.git"
 ADAPTER_REPO="ostris/zimage_turbo_training_adapter"
 ADAPTER_FILE="zimage_turbo_training_adapter_v2.safetensors"
 
-APP_FILES="lora_studio.py version.py selftest.py requirements.txt start.sh install.sh README.md REFERENCE.md LICENSE NOTICE"
+APP_FILES="lora_studio.py version.py selftest.py requirements.txt start.sh install.sh README.md INSTALL.md REFERENCE.md LICENSE NOTICE"
 APP_DIRS="program"                          # the program by topic (Gallery Data Training Settings Other), manual, logo
 DATA_FILES="library_settings.txt training_settings.txt huggingtoken.txt completed.json library_data.json
 model_ids.json hash_cache.json picture_index.json launch_settings.json"
