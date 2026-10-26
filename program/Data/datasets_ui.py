@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026q"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -1247,19 +1247,26 @@ def build(app, show):
 
     # ---- 3 Setup
     def s3_save(s, types, purpose, wm, trig, words):
-        if not types:
-            return s, "Pick at least one LoRA type."
-        if purpose in F.CONCEPT_KINDS and not (words or "").strip():
-            return s, "Write the words for it (e.g. katana, sword): the captions leave them out."
         m = F.meta(s["ds"])
-        m.update(types=list(types), purpose=purpose or "character", wm_removed=bool(wm),
-                 trigger=(trig or s["ds"]).strip(), concept_words=(words or "").strip())
+        # what you picked is kept even when something is still missing: the page is drawn again after Continue,
+        # and without this it went back to the saved purpose (and hid the words field), so step 3 just repeated
+        if types:
+            m["types"] = list(types)
+        m.update(purpose=purpose or "character", wm_removed=bool(wm), trigger=(trig or s["ds"]).strip(),
+                 concept_words=(words or "").strip())
+        if not types:
+            F.meta_save(s["ds"], m)
+            return s, "**Pick at least one LoRA type** (the list at the top), then press Continue again."
+        if purpose in F.CONCEPT_KINDS and not (words or "").strip():
+            F.meta_save(s["ds"], m)
+            return s, ("**Write the words for it** in the field under Purpose (for example *katana, sword*), then "
+                       "press Continue again: the captions leave these words out, so the LoRA learns them.")
         m["steps"]["setup"] = {"at": time.strftime("%Y-%m-%d %H:%M")}
         F.meta_save(s["ds"], m)
         return go(s, step=4, tkey=types[0]), ""
     after_nav(s3_next.click(s3_save, [st, s3_types, s3_purpose, s3_wm, s3_trig, s3_words], [st, s3_msg]))
-    s3_purpose.input(lambda p: gr.update(visible=p in F.CONCEPT_KINDS, label=F.CONCEPT_ASK.get(p, F.CONCEPT_ASK["object"])),
-                     s3_purpose, s3_words)
+    s3_purpose.change(lambda p: gr.update(visible=p in F.CONCEPT_KINDS, label=F.CONCEPT_ASK.get(p, F.CONCEPT_ASK["object"])),
+                      s3_purpose, s3_words, show_progress="hidden")
 
     # ---- 4 Sort
     def s4_run(s):

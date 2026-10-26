@@ -14,18 +14,18 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.261026p"
-VERSION = "1.261026p"
+__version__ = "1.261026q"
+VERSION = "1.261026q"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.251026o",
-    "version.py": "1.261026p",
+    "version.py": "1.261026q",
     "program/lspaths.py": "1.251026o",
     "program/Training/sdgui.py": "1.251026o",
     "program/Training/sd_script.py": "1.251026o",
     "program/Data/sd_prepare.py": "1.251026o",
     "program/Training/sd_settings.py": "1.251026o",
-    "program/Data/datasets_ui.py": "1.251026o",
+    "program/Data/datasets_ui.py": "1.261026q",
     "program/Data/dsflow.py": "1.251026o",
     "program/Training/training_ui.py": "1.251026o",
     "program/Settings/settings_ui.py": "1.251026o",
@@ -69,6 +69,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.261026q", "Datasets › 3 Setup: Object, Action / pose and Concept need the words for the thing; when they were missing, Continue showed the message but the page went back to the saved purpose and hid the words field, so step 3 just repeated. Your choice now stays, the words field stays open and the message says where to write."),
     ("1.261026p", "Collection: a warning you have looked at (for example 'Run stopped at epoch 8 of 10' after stopping a run on purpose) can be accepted on the LoRA page (Accept the warnings): the orange mark goes away; pressing again shows it again."),
     ("1.251026o", "New folder layout: program/ holds the program by topic (Gallery, Data, Training, Settings, Other, plus the Manual and the logo), userdata/ holds everything that is yours (settings, token, marks, caches, logs, reports, update backups); the launcher, version.py, selftest.py, the installers and the documents stay in the main folder. An older install moves into it by itself at the first start or with ./install.sh (the old program files are kept aside); backups of the old layout import as before. On an NVIDIA card Settings › Trainers and GPU shows CUDA values instead of the ROCm ones, and launch scripts leave the ROCm-only values out. README: made on Linux with ROCm, testers wanted."),
     ("1.251026n", "The notice about sd-scripts and musubi-tuner (made by kohya-ss, Apache License 2.0; LoRA Studio does not own or include them): confirmed once in install.sh and on the very first page in the browser; also in the NOTICE file and Settings › Version › Licences and credits."),
