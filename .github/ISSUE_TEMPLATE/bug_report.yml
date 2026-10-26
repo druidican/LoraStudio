@@ -1,0 +1,32 @@
+name: Bug report
+description: Something in LoRA Studio does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. Please do not paste your Hugging Face token or attach your LoRA Studio folder.
+        The install report and Report for Claude have tokens and your home folder removed already.
+  - type: input
+    id: version
+    attributes:
+      label: LoRA Studio version
+      description: Next to the title, or Settings › Version (for example 1.011126)
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Report
+      description: For a failed run, Report for Claude (Settings › Version, or the Report button of the run in Training › Results). For an install problem, the install report the installer printed at the end. Paste it or drop the file here.
+  - type: input
+    id: computer
+    attributes:
+      label: Computer
+      description: System and graphics card, for example Fedora 44, RX 9070 XT
