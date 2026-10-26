@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE */
-/* LoRA Studio version 1.251026o */
+/* LoRA Studio version 1.261026v */
 /* LoRA Studio: the look of the pages (colours come from the --ll-* variables of the Collection style).
    Edit freely. For your own changes that survive updates, use custom.css next to this file instead:
    it is loaded after this one, and an update never replaces it. Reload the page after a change
@@ -151,6 +151,12 @@ table.rs-table { border:0 !important; width:100%; border-collapse:collapse; font
 .ds-tick input { appearance:auto; -webkit-appearance:checkbox; accent-color:#21857C; width:15px; height:15px; flex:none; }
 .ds-tick span, .ds-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
 .ds-why { color:var(--ll-muted); font-size:11.5px; line-height:1.3; }
+.ds-pins { display:flex; gap:4px; margin:2px 0; }
+.ds-pin { background:none !important; cursor:pointer; font-size:11px; line-height:1.5; padding:1px 8px !important; border-radius:99px !important; border:1px solid #9AA1AB88 !important; color:inherit; opacity:.75; min-width:0; }
+.ds-pin:hover { opacity:1; border-color:#9AA1AB !important; }
+.ds-pin.ds-pin-on { opacity:1; }
+.ds-pin.ds-pin-on[data-k="keep"] { background:#21857C !important; border-color:#21857C !important; color:#fff; }
+.ds-pin.ds-pin-on[data-k="never"] { background:#B5402F !important; border-color:#B5402F !important; color:#fff; }
 .ds-count { font-weight:700; font-family:'JetBrains Mono',monospace; margin:6px 0; }
 .ds-chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0; }
 .ds-strip { display:grid; grid-template-columns:repeat(auto-fill, minmax(70px, 1fr)); gap:6px; margin-top:8px; }

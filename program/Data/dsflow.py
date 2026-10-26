@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.261026s"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -98,6 +98,54 @@ def meta(ds) -> dict:
 
 def meta_save(ds, m: dict):
     _save(ds, "dataset.json", m)
+
+
+# ---- pins: your own decision for a picture (step 5), kept through new sorts and winning over every rule
+PIN_LABEL = {"keep": "always keep (your pin)", "never": "never use (your pin)"}
+
+
+def _pin_key(p) -> str:
+    return Path(str(p)).stem.lower()                     # by name: survives moves, a renamed repeat folder, a new format
+
+
+def pins(ds) -> dict:
+    """{picture name: "keep" | "never"}"""
+    return dict(meta(ds).get("pins") or {}) if ds else {}
+
+
+def set_pin(ds, path, state: str) -> str:
+    m = meta(ds)
+    p = dict(m.get("pins") or {})
+    if state in PIN_LABEL:
+        p[_pin_key(path)] = state
+    else:
+        p.pop(_pin_key(path), None)
+    m["pins"] = p
+    meta_save(ds, m)
+    return state if state in PIN_LABEL else ""
+
+
+def pin_of(pn: dict, path) -> str:
+    return pn.get(_pin_key(path), "")
+
+
+def _apply_pins(ds, rows: list, cands: list) -> tuple[list, list]:
+    """(pinned 'keep' rows, the candidates without any pinned row). A 'never' picture is never a candidate;
+    an 'always keep' one is taken first, whatever its category (even a picture the sort left out)."""
+    pn = pins(ds)
+    if not pn:
+        return [], cands
+    for r in rows:
+        r["pin"] = pin_of(pn, r["path"])
+    first = [r for r in rows if r["pin"] == "keep"]
+    return first, [r for r in cands if not r.get("pin")]
+
+
+def _pin_reasons(rows):
+    for r in rows:
+        if r.get("pin"):
+            r["keep"] = r["pin"] == "keep"
+            r["reason"] = PIN_LABEL[r["pin"]]
 
 
 def mark_step(ds, key, info=None):
@@ -559,6 +607,8 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                 note = "stopped"
                 break
             d, key = _content_cached(p, model, cache)
+            if d is not None and "teaches" not in d:      # an answer from before the usefulness check: ask again
+                d = None
             if d is None:
                 eta = f", about {S.fmt((time.time() - t0) / max(done, 1) * (len(rest) - i + 1))} left" if done else ""
                 yield f"Pass 2 · detailed (Ollama): {i} of {len(rest)}{eta}"
@@ -576,12 +626,15 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
             e["framing"] = _norm(d.get("framing")) or "other"
             e["outfit"], e["place"] = _norm(d.get("outfit")), _norm(d.get("place"))
             e["part"] = _norm(d.get("part_only"))
+            e["teaches"] = DC.teaches(d)
+            e["udetail"] = DC.unique_detail(d)
             if e["part"] in ("none", "no", "n/a", "''"):
                 e["part"] = ""
             issues = DC.content_issues(d, purpose)
             if e["part"] and purpose != "style":         # a detail shot is not "no clear subject"
                 issues = [x for x in issues if not any(w in x[1] for w in ("no person", "no clear main subject",
-                                                                          "face not visible", "face partly"))]
+                                                                          "face not visible", "face partly", "teaches almost",
+                                                                          "shows little"))]
                 if e["cat"] == "good":
                     e["cat"], e["why"] = "detail", f"only the {e['part']}: teaches a detail the full pictures show too small"
             bad = [t for s, t in issues if s == DC.BAD and "watermark" not in t]
@@ -619,6 +672,8 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
             e["q"] = round(0.5 * aes + 0.3 * sharp + 0.2 * size_ - 0.08 * len(e["warn"]), 3)
         else:
             e["q"] = round(0.6 * sharp + 0.4 * size_ - 0.08 * len(e["warn"]), 3)
+        if e.get("teaches"):                             # how much the picture shows of the subject
+            e["q"] = round(e["q"] + 0.08 * (e["teaches"] - 3) + (0.05 if e.get("udetail") else 0.0), 3)
     # too alike: the same framing, outfit and place more than a few times (the best ones are kept)
     combos: dict = {}
     for p, e in pics.items():
@@ -726,8 +781,13 @@ def rank(ds, target: int, mode: str | None = None) -> list[dict]:
             rows.append({"path": p, **e})
     cands = [r for r in rows if r["cat"] in ("good", "detail", "alike", "new")]
     cands.sort(key=lambda r: (r["cat"] == "alike", -r["q"]))
+    pinned, cands = _apply_pins(ds, rows, cands)
     purpose = meta(ds)["purpose"]
-    keep, fr_n, combo_n = [], Counter(), Counter()
+    keep, fr_n, combo_n = list(pinned), Counter(), Counter()
+    for r in pinned:
+        f = r.get("framing") or "other"
+        fr_n[f] += 1
+        combo_n[(f, r.get("outfit"), r.get("place"))] += 1
     quota = {k: max(1, round(v * target)) for k, v in QUOTA.items()} if purpose == "character" else {}
     detail_max = max(1, round(0.12 * target))
     for r in cands:
@@ -762,6 +822,8 @@ def rank(ds, target: int, mode: str | None = None) -> list[dict]:
                 bits = [f] if f else []
                 if r.get("outfit"):
                     bits.append(r["outfit"])
+                if r.get("udetail"):
+                    bits.append(f"shows {r['udetail']}")
                 r["reason"] = "kept: " + (" · ".join(bits) if bits else f"quality {r['q']:.2f}")
         else:
             if r["cat"] in ("out", "dup", "poor"):
@@ -770,6 +832,7 @@ def rank(ds, target: int, mode: str | None = None) -> list[dict]:
                 r["reason"] = r.get("why") or "too alike"
             else:
                 r["reason"] = "lower quality, or adds the same framing, outfit and place again"
+    _pin_reasons(rows)
     return rows
 
 
@@ -1590,7 +1653,12 @@ def _rank_varied(ds, target: int) -> list[dict]:
     except Exception:                                    # noqa: BLE001
         embs = {}
     detail_max = max(1, round(0.2 * target))
-    keep, seen = [], {"framing": Counter(), "outfit": Counter(), "place": Counter()}
+    pinned, cands = _apply_pins(ds, rows, cands)
+    keep, seen = list(pinned), {"framing": Counter(), "outfit": Counter(), "place": Counter()}
+    for r in pinned:
+        for k in seen:
+            if r.get(k):
+                seen[k][r[k]] += 1
     while len(keep) < target and cands:
         best, best_s = None, -9.0
         for r in cands:
@@ -1626,6 +1694,7 @@ def _rank_varied(ds, target: int) -> list[dict]:
         else:
             r["reason"] = r.get("why") or ("not needed: others show the same" if r["cat"] in ("good", "alike", "new")
                                            else r["cat"])
+    _pin_reasons(rows)
     return rows
 
 

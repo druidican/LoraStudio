@@ -15,7 +15,7 @@ Gated repos (FLUX.1-dev, FLUX.2-dev, SD 3.5): accept the licence once on the rep
 huggingface.co, with the account the token belongs to.
 """
 from __future__ import annotations
-__version__ = "1.261026t"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import os
 import re
@@ -77,7 +77,6 @@ KNOWN: dict[str, dict[str, tuple]] = {
               "vae": ("black-forest-labs/FLUX.2-dev", "ae.safetensors", 1),
               "text_encoder": ("black-forest-labs/FLUX.2-klein-base-4B", "text_encoder/model-00001-of-00002.safetensors", 2)},
 }
-GATED_HINT = {"black-forest-labs/FLUX.1-dev", "black-forest-labs/FLUX.2-dev", "stabilityai/stable-diffusion-3.5-medium"}
 
 # the ComfyUI subfolder for each kind of slot
 KIND = {"vae": "vae", "ae": "vae", "clip_l": "text_encoders", "clip_g": "text_encoders", "t5xxl": "text_encoders",

@@ -7,7 +7,7 @@ Settings › Trainers and GPU shows whether the tools are ready; "Install the pi
 the venv lacks (spandrel, for the upscalers) without touching PyTorch.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import base64
 import json
@@ -169,9 +169,6 @@ def stop():
     with _P["lock"]:
         stop_locked()
 
-
-def ping() -> dict:
-    return call({"cmd": "ping"}, timeout=300)
 
 
 # --------------------------------------------------------------------------- analyze, with a cache per file

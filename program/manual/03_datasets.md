@@ -41,7 +41,9 @@ see pictures in `_reserve/` and other folders too: the ones you keep in step 5 j
 ![Step 4: the quick pass and the Ollama pass](img/step4.jpg)
 
 Pass 1 (no AI) removes what is too small, blurry or a duplicate. Pass 2 asks the Ollama vision model about every
-picture: one clear subject, framing, outfit, place, quality, watermarks. It takes about a second or two per picture.
+picture: one clear subject, framing, outfit, place, quality, watermarks, and how much the picture shows of the
+subject. A picture that teaches almost nothing (the subject tiny, hidden or lost in the background) is left out; one
+that shows a detail well (a tattoo, jewellery) ranks higher. It takes about a second or two per picture.
 
 ## 5 · Select
 
@@ -50,6 +52,10 @@ picture: one clear subject, framing, outfit, place, quality, watermarks. It take
 A suggested number of pictures for the type and purpose, and a selection: **Safe** takes the cleanest pictures first,
 **Varied** more close-ups, angles, outfits and details. Untick what you don't want; *Confirm selection* moves the rest
 to `_reserve/` (you can swap them back any time).
+
+The sort can still be wrong. Under each picture: **📌 Always** keeps it whatever the rules say (a unique detail the
+sort dropped), **⛔ Never** leaves it out (useless content the sort kept). Pins are saved at once, stay after a new
+sort and count in the automatic improvement too; click a pin again to remove it.
 
 ## 6 · Watermarks and size
 

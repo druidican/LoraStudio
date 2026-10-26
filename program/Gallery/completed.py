@@ -17,12 +17,11 @@ Marks from before versions were tracked have no "versions": they count for every
 """
 
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import json
 import re
 import time
-from pathlib import Path
 
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 FILE = _LP.USER / "completed.json"

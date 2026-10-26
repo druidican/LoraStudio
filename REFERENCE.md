@@ -62,14 +62,19 @@ The steps (the bar above them shows the dataset, its LoRA types and purpose; the
    and the scene; an action's describe the person, clothes and place, never the pose). With several types the sort uses the strictest size, step 7 writes one caption set
    per caption style and step 9 one launch script per type.
 4. **Sort**: pass 1 is quick (too blurry, too small for your LoRA types, near-duplicates); pass 2 asks the Ollama model
-   about every picture (one clear subject, framing, outfit, place, quality, watermarks; remembered). It lists groups of
+   about every picture (one clear subject, framing, outfit, place, quality, watermarks, and a 1-5 rating of how much
+   the picture teaches about the subject, plus a detail it shows well; remembered). A rating of 1 (subject tiny,
+   hidden, cut off or lost in the background) leaves the picture out, 2 is a warning, and the rating and a shown
+   detail count in the quality score (not for style LoRAs). Answers from before this check are asked again once. It lists groups of
    pictures that are too alike (the best ones are kept), duplicates, **detail shots** (only the hands, tail, horns or
    back: kept, they teach details the full pictures show too small), pictures that are not good enough, and
    watermarks. The **baseline** says whether the good pictures are enough for a LoRA.
 5. **Select**: a suggested size for the type, purpose and variety (a character: 30-50), picked by quality first and
    then by what each picture adds (framing, outfit, place), with about 35 % close-ups, 35 % upper body, 20 % full body
    (all full-body pictures stay) and about 10 % detail shots. Tick or untick, then *Confirm selection*: the others go
-   with their captions to `_reserve/` (not deleted; *Move all back* undoes it). **How to pick**: *Safe* (the cleanest
+   with their captions to `_reserve/` (not deleted; *Move all back* undoes it). **Pins** under each picture:
+   *📌 Always* keeps it and *⛔ Never* leaves it out, whatever the rules say; saved at once in the dataset (by picture
+   name), kept through new sorts and used by the automatic improvement too. **How to pick**: *Safe* (the cleanest
    pictures first) or *Varied* (what a picture adds counts as much as its quality: more close-ups, angles, outfits,
    places and details; look-alikes count less). The choice is kept per dataset; the batch fix has its own default.
 6. **Resize**: keep the shape and scale down to a longest side (default 1.5× the type's resolution, changeable). Per

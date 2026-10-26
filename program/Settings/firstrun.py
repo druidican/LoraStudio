@@ -17,14 +17,12 @@ Folders are suggested from what is found on this computer (a ComfyUI install, it
 Ollama running, ...). Nothing is moved or deleted.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
-import json
 import os
 import re
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))

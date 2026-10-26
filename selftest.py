@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261026u"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -428,6 +428,29 @@ def _metamerge():
     need(m["notes"] == "mine" and m["civitai"] == {"trainedWords": ["trig"], "id": 5}, f"got {m}")
     need(m["tags"] == ["b"] and m["favorite"] is True and m["extra"] == 1, f"got {m}")
     need(LL.merge_meta(a, b, a_wins=True)["tags"] == ["a"], "the newer file did not win")
+
+
+@check("step 5 pins win over the rules; the sort leaves out pictures that teach nothing about the subject")
+def _pins():
+    import datacheck as DC
+    import dsflow as F
+    need(DC.teaches({"teaches": "1"}) == 1 and DC.teaches({}) is None, "the usefulness rating is not read")
+    bad = [t for s, t in DC.content_issues({"people": 1, "teaches": 1}, "character") if s == DC.BAD]
+    need(any("teaches almost nothing" in t for t in bad), f"a useless picture is not left out: {bad}")
+    need(not any("teaches" in t for s, t in DC.content_issues({"people": 1, "teaches": 1}, "style")),
+         "the usefulness rating should not judge a style LoRA")
+    old = F.pins
+    try:
+        F.pins = lambda ds: {"a": "keep", "b": "never"}
+        rows = [{"path": "/x/10_d/a.png", "cat": "out"}, {"path": "/x/10_d/b.png", "cat": "good"},
+                {"path": "/x/10_d/c.png", "cat": "good"}]
+        first, cands = F._apply_pins("d", rows, [r for r in rows if r["cat"] == "good"])
+        need([r["path"] for r in first] == ["/x/10_d/a.png"], "an 'always keep' pin is not taken first")
+        need([r["path"] for r in cands] == ["/x/10_d/c.png"], "a 'never' pin is still a candidate")
+        F._pin_reasons(rows)
+        need(rows[0]["keep"] is True and rows[1]["keep"] is False, "the pins do not decide keep")
+    finally:
+        F.pins = old
 
 
 @check("sorting stays valid when pictures move or are removed (only new pictures ask for a new sort)")

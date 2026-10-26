@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import copy
 import difflib
@@ -54,7 +54,7 @@ def builtin_presets():
     except Exception as e:
         PRESETS_ERROR["msg"] = f"{type(e).__name__}: {e}"
         return None, dict(EXTRA_PRESETS)
-    merged = dict(sc.PRESETS)
+    merged = {k: dict(v) for k, v in sc.PRESETS.items()}   # a copy of each preset: callers set keys on theirs
     for k, v in EXTRA_PRESETS.items():
         merged.setdefault(k, v)
     return sc, merged

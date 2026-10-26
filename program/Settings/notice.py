@@ -7,11 +7,10 @@ itself). The answer is kept in notice_accepted.json next to the program; a new N
 text is in the NOTICE file and in Settings › Version › Licences and credits.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import json
 import time
-from pathlib import Path
 
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 HERE = _LP.USER

@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -263,7 +263,6 @@ def scripts_html(show_done: bool = False) -> str:
                 f'run and finished (hidden; Show finished shows it again)" onclick="lsSend(\'tr_box\', \'mark|{k}\')">'
                 'Mark as run</button>' if not_run and not is_done and path not in queued else "")
         extra = ""
-        import features as FT
         if not FT.can_train_text(info["text"]):          # its trainer is not installed: made here, run elsewhere
             part = "musubi" if "MUSUBI_DIR=" in info["text"] else "sd_scripts"
             btn = f'<span class="tr-muted ls-missing">{_esc(FT.missing(part))}</span>'

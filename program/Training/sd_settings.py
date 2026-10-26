@@ -5,7 +5,7 @@ and the GPU / GFX values.
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.261026t"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import glob
 import json
@@ -505,7 +505,7 @@ def st_suggest(tkey, flags, *args):
 def st_apply_suggestions(tkey, flags, picks, replace_fitting, recursive, *args):
     """Put the suggested files into the slots: empty, missing or unsuitable ones (all of them when ticked).
     The base model is only replaced by another file of the same model family when the chosen one is unusable."""
-    dirs, files = list(args[:S.ST_N]), list(args[S.ST_N:2 * S.ST_N])
+    files = list(args[S.ST_N:2 * S.ST_N])
     req = S.GUIDE.requirements_for(tkey, _type_base(tkey)) if S.GUIDE else {}
     out_d, out_f, changed = [], [], []
     for i in range(S.ST_N):

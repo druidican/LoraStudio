@@ -14,10 +14,9 @@ Needs onnx + onnxruntime in the training venv: installed by itself the first tim
 command is shown. The model (about 1.2 GB) is downloaded the first time into userdata/wd_tagger/.
 """
 from __future__ import annotations
-__version__ = "1.261026r"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import os
-import re
 import shutil
 import subprocess
 import sys

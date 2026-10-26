@@ -6,11 +6,10 @@ as ![what it shows](img/name.jpg) and are shown from the program folder. Links t
 [text](#chapter-name) where chapter-name is the file name without the number (04_training.md -> #training).
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import html
 import re
-from pathlib import Path
 
 import gradio as gr
 

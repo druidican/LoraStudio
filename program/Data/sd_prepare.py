@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -782,7 +782,7 @@ def _ap_ollama(url, model):
         return url, "", "a training run is active (it would share the GPU)"
     try:
         ms = S.CAP.list_models(url)
-    except Exception as e:                  # noqa: BLE001
+    except Exception:                       # noqa: BLE001
         return url, "", f"Ollama is not reachable at {url}"
     vis = [m["name"] for m in ms if m["vision"]]
     if model not in vis:
@@ -926,35 +926,6 @@ def rv_undo():
     S.LAST_CHANGE["files"] = {}
     return f"Undid '{desc}': restored {n} file(s)."
 
-
-def transform(text, find, repl, mode, ignore_case):
-    """Returns the new caption text, or None if unchanged. Raises re.error for a bad regex."""
-    if mode == "tag":
-        old = S.split_tags(text)
-        out, hit = [], False
-        for t in old:
-            same = t.lower() == find.lower() if ignore_case else t == find
-            if same:
-                hit = True
-                if repl.strip():
-                    out.append(repl.strip())
-            else:
-                out.append(t)
-        if not hit:
-            return None
-        seen, dedup = set(), []                  # drop duplicates the replacement may have created
-        for t in out:
-            k = t.lower()
-            if k not in seen:
-                seen.add(k)
-                dedup.append(t)
-        return ", ".join(dedup) if dedup != old else None
-    flags = re.I if ignore_case else 0
-    if mode == "text":
-        new = re.sub(re.escape(find), lambda m: repl, text, flags=flags)
-    else:
-        new = re.sub(find, repl, text, flags=flags)
-    return None if new == text else new
 
 
 CC_CORE = ("hair colour", "hair length", "eye colour", "skin tone", "build", "horns", "ears", "tail", "wings", "fur")

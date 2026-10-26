@@ -5,14 +5,13 @@ Saved in launch_settings.json next to the program (readable only by you: it can 
 lora_studio.py reads it at start; an option given on the command line (./start.sh --port 7861) still wins.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import json
 import os
 import sys
 import threading
 import time
-from pathlib import Path
 
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 APP_DIR = _LP.USER

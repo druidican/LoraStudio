@@ -34,9 +34,8 @@ Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.261026u"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
-import base64
 import contextlib
 import copy
 import hashlib
@@ -1019,9 +1018,6 @@ class Library:
             return None
         return best_member(members) or members[-1]
 
-    def latest(self, gid: str):
-        members = self.groups.get(gid)
-        return members[-1] if members else None
 
     # ---- cache --------------------------------------------------------- #
 
@@ -1534,10 +1530,6 @@ def best_member(members: list):
     return next((m for m in members if v is not None and m.version == v), None)
 
 
-def is_best(l: Lora, members: list | None = None) -> bool:
-    members = members or (LIB.group_of(l) if "LIB" in globals() else [l])
-    return len(members) > 1 and best_member(members) is l
-
 
 BEST_BADGE = ('<span class="ll-done ll-best" title="Marked as the best version in Training › Results: shown first">'
               '&#9733; Best</span>')
@@ -2046,7 +2038,6 @@ def render_library(lib: Library, search: str, bases: list, statuses: list, group
             if cards:
                 sections[names[k]] = cards
 
-    n_untrained = sum(1 for k in lib.datasets if k not in trained)
     gst = [group_status(m)[0] for m in lib.groups.values() if m and (m[-1].dataset or show_foreign)]
     n_prob, n_warn = gst.count("problem"), gst.count("warning")
     head = (f'<div class="ll-stats"><span><b>{len(loras)}</b> LoRAs shown</span>'

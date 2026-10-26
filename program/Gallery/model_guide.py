@@ -15,14 +15,13 @@ Results of identify() are cached in model_ids.json (keyed by path, size and modi
 """
 
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import html
 import json
 import os
 import re
 import struct
-import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -139,7 +138,6 @@ def _shape(head, key):
 
 def _identify_head(head: dict, name: str) -> dict:
     keys = [k for k in head if k != "__metadata__"]
-    ks = set(keys)
     meta = head.get("__metadata__") or {}
     out = {"kind": "unknown", "dtype": _dtype_summary(head), "scaled": False, "bundle": [], "note": ""}
     out["scaled"] = any(k.endswith((".scale_weight", ".scale_input")) or k == "scaled_fp8" for k in keys)

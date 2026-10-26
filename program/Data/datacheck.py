@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -164,6 +164,8 @@ CONTENT_PROMPT = """Look at this photo for an image-model training set and answe
  "part_only": "<'' or, when the picture shows only a PART of the person or character on purpose, which part: hands, tail, horns, back, feet, a tattoo, ...>",
  "outfit": "<2-5 words for the clothing, '' if none>",
  "place": "<2-4 words for the place or background>",
+ "teaches": <1-5: how much a model can learn about the main subject from this picture. 1 = almost nothing (the subject is tiny, mostly hidden, cut off, blurred or lost in clutter, or the picture is mostly empty background); 3 = usable; 5 = the subject is clearly shown with its details>,
+ "unique_detail": "<'' or a visible detail of the subject that this picture shows well and that is easy to miss elsewhere: a tattoo, a scar, jewellery, a pattern, an accessory>",
  "note": "<anything else that makes it a poor training picture, '' if none>"}"""
 
 
@@ -172,7 +174,7 @@ def content(url: str, model: str, img: Path, timeout: float = 600.0) -> dict:
     import captioner as CAP                        # same connection and image handling as Recaption
     r = CAP._req(url, "/api/chat", {
         "model": model, "stream": False, "format": "json", "keep_alive": "5m",
-        "options": {"temperature": 0.0, "num_predict": 300},
+        "options": {"temperature": 0.0, "num_predict": 420},
         "messages": [{"role": "user", "content": CONTENT_PROMPT, "images": [CAP.image_b64(img, 896)]}],
     }, timeout=timeout)
     txt = ((r.get("message") or {}).get("content") or r.get("response") or "").strip()
@@ -195,6 +197,20 @@ CONCEPT_KINDS = ("object", "action", "concept")
 def base_purpose(p) -> str:
     """character / style / concept (object, action and effect LoRAs follow the concept rules)."""
     return "concept" if p in CONCEPT_KINDS else (p or "character")
+
+
+def teaches(d: dict):
+    """The vision model's 1-5 rating of how much the picture shows of the subject; None when it gave none."""
+    try:
+        v = int(float(str(d.get("teaches")).strip()))
+    except (TypeError, ValueError):
+        return None
+    return min(5, max(1, v))
+
+
+def unique_detail(d: dict) -> str:
+    v = re.sub(r"\s+", " ", str(d.get("unique_detail") or "").strip())
+    return "" if v.lower() in ("", "none", "no", "n/a", "''", "null") else v[:60]
 
 
 def content_issues(d: dict, purpose: str) -> list[tuple[str, str]]:
@@ -231,6 +247,11 @@ def content_issues(d: dict, purpose: str) -> list[tuple[str, str]]:
             out.append((WARN, "strong filter or retouch: the LoRA learns the filtered look"))
     elif purpose == "concept" and _true(d.get("heavy_filter")):
         out.append((WARN, "strong filter or edit"))
+    t = teaches(d) if purpose != "style" else None     # a style LoRA learns the whole picture, not one subject
+    if t is not None and t <= 1:
+        out.append((BAD, "teaches almost nothing about the subject (tiny, hidden, cut off or lost in the background)"))
+    elif t == 2:
+        out.append((WARN, "shows little of the subject"))
     note = str(d.get("note") or "").strip()
     if note and note.lower() not in ("none", "no", "n/a"):
         out.append((WARN, f"vision model: {note}"))

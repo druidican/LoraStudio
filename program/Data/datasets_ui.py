@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.261026t"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -23,8 +23,6 @@ import datacheck as DC
 import dsflow as F
 import features as FT
 
-STEP_KEYS = [k for _, k, _ in F.STEPS]
-STEP_NAME = {n: l for n, _, l in F.STEPS}
 FLOW = list(range(2, 10))
 _THUMBS: dict = {}
 
@@ -165,7 +163,17 @@ def grid(rows, ticks=False, click=True, elem="g") -> str:
                 else f'<div class="ds-name">{esc(r.get("label") or Path(p).name)}</div>')
         img = f'<img src="{thumb(p)}" loading="lazy" alt="">'
         img = f'<button class="ds-img" onclick="{send("pick|" + p)}">{img}</button>' if click else img
-        cells.append(f'<div class="{cls}" data-p="{esc(p)}">{img}{tick}<div class="ds-why">{esc(r.get("why", ""))}</div></div>')
+        pin = ""
+        if "pin" in r:                                   # step 5: your own decision, kept through new sorts
+            pv = r["pin"] or ""
+            pin = ('<div class="ds-pins">' + "".join(
+                f'<button class="ds-pin{" ds-pin-on" if pv == k else ""}" data-k="{k}" title="{t}" '
+                f'onclick="dsPin(this)">{lab}</button>'
+                for k, lab, t in (("keep", "📌 Always", "Always keep this picture: it wins over every rule and stays "
+                                                       "pinned after a new sort. Click again to unpin."),
+                                  ("never", "⛔ Never", "Never use this picture, whatever the sort says. Click again "
+                                                        "to unpin."))) + "</div>")
+        cells.append(f'<div class="{cls}" data-p="{esc(p)}">{img}{tick}{pin}<div class="ds-why">{esc(r.get("why", ""))}</div></div>')
     return f'<div class="ds-grid" id="ds-grid-{elem}">' + "".join(cells) + "</div>"
 
 
@@ -175,6 +183,18 @@ window.dsCount = function(el){
   var c = el.closest('.ds-cell'); if (c) c.classList.toggle('ds-off', !el.checked);
   var n = g.querySelectorAll('input:checked').length, t = g.querySelectorAll('input').length;
   document.querySelectorAll('.ds-count').forEach(function(e){ e.textContent = n + ' ticked · ' + (t - n) + ' go to _reserve/'; });
+};
+window.dsPin = function(b){
+  var c = b.closest('.ds-cell'); if (!c) return;
+  var on = !b.classList.contains('ds-pin-on');
+  c.querySelectorAll('.ds-pin').forEach(function(x){ x.classList.remove('ds-pin-on'); });
+  var k = on ? b.dataset.k : '';
+  if (on) b.classList.add('ds-pin-on');
+  var i = c.querySelector('input[type=checkbox]');
+  if (i && k) { i.checked = (k === 'keep'); dsCount(i); }
+  var w = c.querySelector('.ds-why');
+  if (w) w.textContent = k === 'keep' ? 'always keep (your pin)' : (k === 'never' ? 'never use (your pin)' : 'unpinned: press Use the suggestion to sort it in again');
+  lsSend('ds_box', 'pin|' + (k || 'none') + '|' + c.dataset.p);
 };
 window.dsTickAll = function(on){
   document.querySelectorAll('#ds_s5 .ds-grid input').forEach(function(i){ i.checked = on; dsCount(i); });
@@ -313,7 +333,7 @@ def s5_grid(ds, keep_n):
                                        "Picked by quality first, then what each picture adds (framing, outfit, place).")
            + '</div></div>')
     cells = [{"path": r["path"], "why": _where(ds, r["path"]) + r.get("reason", ""), "keep": r["keep"],
-              "bad": r["cat"] in ("out", "poor")}
+              "bad": r["cat"] in ("out", "poor") and not r.get("pin"), "pin": r.get("pin", "")}
              for r in sorted(rows, key=lambda r: (not r["keep"], r["cat"] in ("out", "poor", "dup"), Path(r["path"]).name))]
     outside = {str(x) for x in F.extra_pictures(ds)} if F.include_extra(ds) else set()
     n_in = sum(1 for r in rows if r["keep"] and str(r["path"]) in outside)
@@ -781,6 +801,9 @@ def build(app, show):
                 s4_next = gr.Button("Continue to Select →", variant="primary", size="sm", scale=0, min_width=220)
         with gr.Column(visible=False, elem_id="ds_s5") as steps[5]:
             gr.Markdown("### Select the best pictures")
+            gr.Markdown("**📌 Always** keeps a picture whatever the rules say (a unique detail the sort missed); "
+                        "**⛔ Never** leaves one out (useless content the sort kept). Your pins are saved at once, stay "
+                        "after a new sort and count in the automatic improvement too.", elem_classes=["ls-note"])
             with gr.Row(equal_height=False):
                 with gr.Column(scale=1, elem_classes=["ls-card"]):
                     s5_sug = gr.HTML()
@@ -1163,6 +1186,10 @@ def build(app, show):
             return s, keep, v, keep, keep
         if act in ("pick", "fix") and s.get("step") == 8:
             return s, keep, keep, v, keep
+        if act == "pin" and s.get("ds"):                 # step 5: saved at once; the cell already shows it
+            state, _, path = arg.partition("|")
+            F.set_pin(s["ds"], path, state)
+            return s, keep, keep, keep, keep
         return s, keep, keep, keep, keep
 
     box6 = gr.Textbox(visible=False)

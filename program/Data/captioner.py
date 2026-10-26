@@ -11,7 +11,7 @@ Only the Python standard library is used (urllib); Pillow is used to shrink the 
 Run it on its own to test the connection:   python3 captioner.py [--url http://127.0.0.1:11434] [image.jpg]
 """
 from __future__ import annotations
-__version__ = "1.261026r"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -139,8 +139,6 @@ def build_prompt(style: str, trigger: str, leave_out: str, length: int, detail: 
 
 
 # Kept for callers of the first version (sentences, length 3, detail 4)
-SYSTEM = None
-
 USER = "Write the caption for this photo."
 USER_HINT = ("Write the caption for this photo. An automatic tagger listed these words for it; they may be wrong, so "
              "use only what you can see yourself: {tags}")

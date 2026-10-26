@@ -11,14 +11,13 @@ Everything that is removed goes to the desktop's normal Trash (freedesktop.org: 
 the space is freed when the Trash is emptied). `gio trash` is used when present, else the Trash spec directly.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 
 import hashlib
 import os
 import re
 import shutil
 import subprocess
-import time
 import urllib.parse
 from datetime import datetime
 from pathlib import Path

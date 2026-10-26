@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.261026t"  # LoRA Studio version, see version.py
+__version__ = "1.261026v"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -1456,14 +1456,22 @@ def find_scan_script(explicit):
     return None
 
 
+_SCAN_MOD: dict = {}
+
+
 def load_scan_module():
-    """Import Lora_Datatypes.py fresh each time, so edits to PRESETS apply without a restart."""
+    """Lora_Datatypes.py, read again only when the file changed, so edits to PRESETS apply without a restart
+    (it used to be read on every call: dozens of times for one page)."""
     if SCAN_SCRIPT is None:
         raise FileNotFoundError("Lora_Datatypes.py not found. Put it next to sdgui.py or pass --datatypes.")
-    spec = importlib.util.spec_from_file_location("Lora_Datatypes", str(SCAN_SCRIPT))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    st = Path(SCAN_SCRIPT).stat()
+    key = (str(SCAN_SCRIPT), st.st_mtime_ns, st.st_size)
+    if _SCAN_MOD.get("key") != key:
+        spec = importlib.util.spec_from_file_location("Lora_Datatypes", str(SCAN_SCRIPT))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _SCAN_MOD.update(key=key, mod=mod)
+    return _SCAN_MOD["mod"]
 
 
 PROGRAM_MARKS = ("lora_studio.py", "sdgui.py", "lora_library.py", "start.sh", "install.sh", "setup.py", "pyproject.toml",
@@ -1691,135 +1699,73 @@ def gpu_status_text():
 
 # ---- the launch script page, preparing a dataset and the trainer settings live in sd_script.py,
 # sd_prepare.py and sd_settings.py (imported back here, so sdgui.<name> works as before)
-from sd_script import (  # noqa: E402,F401 - moved by topic, see sd_script.py
+from sd_script import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
     EXTRA_DIR,
-    is_main_folder,
-    main_repeat_folders,
     CHOICE,
-    EXTRA_PRESETS,
-    FLAG_WHY,
     FORM_FIELDS,
     FORM_GROUPS,
-    KEEP,
     META_KEYS,
-    MODEL_FIELDS,
-    MUSUBI_VARS,
     NEW,
     OLD_RUNS,
-    OPT_WHY,
     PRESETS_ERROR,
-    RECS_ERROR,
-    RECS_FILE,
     RESERVED_TYPES,
-    SCHED_WHY,
-    SCRIPT_DIR_LINE,
-    SCRIPT_DIR_OLD,
     STUDIO_MODE,
     STUDIO_TABLE,
     SUBTYPE_BASES,
-    VIEWS_OK,
-    _BIG_ENV,
-    _BUNDLE_PREFIXES,
-    _COMPONENT,
     _PH,
     _arg_re,
-    _auto_rename,
-    _bump_if_taken,
-    _busy_scripts,
-    _cmd,
     _cs_result,
-    _folder_note,
-    _has,
-    _inside,
-    _log_summary,
-    _mask,
-    _new_status,
-    _next_name,
     _num,
     _plan_state,
-    _rel,
-    _var_re,
-    _ver_of,
-    add_logging,
     apply_form,
     archive_all_datasets,
     archive_old_scripts,
-    build_prompts,
     builtin_presets,
     cs_apply,
     cs_apply_quiet,
     cs_check,
     cs_ds_change,
-    cs_load,
     cs_read,
     cs_retype,
     cs_save_new,
     cs_save_over,
     cs_script_change,
-    cs_script_choices,
     cs_suggest,
     custom_subtypes,
     dataset_stats,
     datatypes_status,
     ensure_folders,
     explain_for,
-    explain_md,
     export_report,
     find_script,
     form_dict,
-    has_samples,
     infer_type,
     launch_scripts,
     load_recs,
     make_plan,
     merged_presets,
-    model_file_problem,
-    name_by_version,
     next_script_version,
-    prompts_path_from_text,
     read_form,
-    recommend_numbers,
     recommended_repeats,
     recs_status,
-    safetensors_keys,
-    script_for_type,
     script_home,
     set_choice,
     set_script_version,
     training_command,
-    tuned_cfg,
     type_choices,
-    type_dataset_checks,
-    unique_script_name,
-    with_virtual_row)
-from sd_prepare import (  # noqa: E402,F401 - moved by topic, see sd_prepare.py
+    with_virtual_row,
+)
+from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
     AP_ASK,
-    CC_CORE,
     CC_JS,
     CC_OPEN_JS,
-    DC_CACHE_NAME,
-    DC_STOP,
     OC_FAMILY,
     OC_STOP,
-    WM_LABEL,
-    _ap_ollama,
-    _cc_explain,
-    _cc_recommend,
-    _cc_thumb,
     _dc_cache_load,
-    _dc_cache_path,
     _dc_cache_save,
     _dc_min_side,
-    _dc_report,
-    _locked_leave_out,
     _oc_check,
     _oc_family,
-    _oc_hint,
-    _pictools_ready,
-    _wm_box,
-    _wm_paintable,
-    _wm_recommended,
-    _wm_source,
     ap_caption,
     ap_prepare,
     cc_apply,
@@ -1844,29 +1790,19 @@ from sd_prepare import (  # noqa: E402,F401 - moved by topic, see sd_prepare.py
     oc_stop,
     record_change,
     rv_undo,
-    transform,
     wm_apply,
     wm_apply_live,
-    wm_apply_steps,
     wm_crop_apply,
     wm_crop_show,
     wm_paint_apply,
     wm_render,
-    wm_set_aside,
-    wm_tool_open)
-from sd_settings import (  # noqa: E402,F401 - moved by topic, see sd_settings.py
+    wm_tool_open,
+)
+from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
     ENV_EXTRA,
-    ENV_NAMES,
     GFX_VAR,
-    HF_FILE,
     KNOWN_GFX,
-    KNOWN_LIBS,
-    MODEL_EXTS,
-    OPTIONAL_VAE_TYPES,
     SECTION_NAMES,
-    SLOT_LABELS,
-    _slot_dir,
-    _sub_outs,
     _type_base,
     apply_gfx_env,
     base_name,
@@ -1883,25 +1819,19 @@ from sd_settings import (  # noqa: E402,F401 - moved by topic, see sd_settings.p
     get_export,
     get_gfx,
     gfx_load,
-    gfx_name_to_version,
     gfx_pick,
     header_status,
     hf_path,
     hf_status_text,
-    list_model_files,
     mask_token,
     read_hf_token,
     read_settings,
-    rp_choices,
     rp_make,
     rp_name_update,
-    rp_new_name,
     rp_refresh,
     rp_rename,
-    scan_library,
     scan_short,
     set_arg,
-    set_export,
     settings_models,
     settings_path,
     slot_label,
@@ -1925,7 +1855,8 @@ from sd_settings import (  # noqa: E402,F401 - moved by topic, see sd_settings.p
     sub_remove,
     type_slots,
     vae_optional,
-    write_settings)
+    write_settings,
+)
 
 
 # ---- sample images on/off, logging, folder creation (all work on the script text)
@@ -2033,19 +1964,6 @@ try:
 except Exception:                           # noqa: BLE001
     CC = None
 
-
-# --------------------------------------------------------------------------- Datasets > Add pictures
-try:
-    import picker as PK
-except Exception:                           # noqa: BLE001
-    PK = None
-
-
-# --------------------------------------------------------------------------- Datasets > Trim
-try:
-    import trim as TM
-except Exception:                           # noqa: BLE001
-    TM = None
 
 
 def script_saved_hook(ds) -> str:
@@ -2464,7 +2382,6 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         ST_N = max(4, max(len(v.get("model_args", [])) for v in merged_presets()[1].values()))
     except Exception:
         ST_N = 4
-    scripts = list_scripts()
     sname = Path(settings_path()).name
     ctx = (gr.Blocks(title="sd-scripts launcher", **({} if LAUNCH_HAS_CSS else {"css": CSS}))
            if parent is None else contextlib.nullcontext(parent))
@@ -2493,7 +2410,6 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
                 gpu_md = gr.HTML(gpu_status_text(), elem_id="gpu_status")
                 hf_md = gr.Markdown(hf_status_text(), elem_id="hf_status")
         status = gr.Markdown(status_text(), visible=not studio)
-        seen = gr.State(-1)
         _types = type_choices()
         _purposes = [("Character / person", "character"), ("Art style", "style"), ("Object / item", "object"),
                      ("Action / pose", "action"), ("Concept / effect", "concept")]
@@ -2635,117 +2551,113 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
                         dc_back_btn = gr.Button("Move all back", size="sm", scale=1)
                     dc_msg = gr.Markdown("")
             with page("p_wm", "Watermarks"):
-                if True:
-                    gr.Markdown("Pictures where the sort found marks **added on top** of the picture (watermarks, site "
-                                "names, logo stamps, signatures, date stamps): remove them (picture tools), crop them off, set "
-                                "the picture aside, or keep it (it may be learned). Text that belongs to the scene (signs, shirts) is left alone.",
-                                elem_classes=["ls-note"])
-                    wm_sum = gr.Markdown("")
-                    wm_html = gr.HTML("", elem_id="wm_html")
-                    wm_box = gr.Textbox(visible=False)
-                    with gr.Row(elem_classes=["ls-bar"], elem_id="wm_btnrow"):
-                        wm_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=1,
-                                                 elem_id="wm_apply_btn")
-                        wm_reco_btn = gr.Button("Use the recommended option for the undecided ones", size="sm", scale=2,
-                                                elem_id="wm_reco_btn")
-                    wm_msg = gr.Markdown("")
-                    wm_tool = gr.Textbox(elem_id="wm_tool", show_label=False, container=False)
-                    with gr.Column(visible=False, elem_classes=["ls-card"], elem_id="wm_panel") as wm_panel:
-                        wm_ptitle = gr.Markdown()
-                        with gr.Column(visible=True) as wm_paint_col:
-                            gr.Markdown("Paint over the mark with the brush (a little over its edges is fine). The "
-                                        "picture tools fill in what is under it; the rest of the picture stays as it is.",
-                                        elem_classes=["ls-note"])
-                            wm_editor = gr.ImageEditor(type="pil", image_mode="RGBA", sources=(), transforms=(),
-                                                       layers=False, height=560, show_label=False,
-                                                       brush=gr.Brush(colors=["#ff3b30"], default_color="#ff3b30",
-                                                                      default_size=28, color_mode="fixed"),
-                                                       buttons=[], elem_id="wm_editor")
-                        with gr.Column(visible=False) as wm_crop_col:
-                            gr.Markdown("Move the edges until the mark is outside; the shaded part is cut off.",
-                                        elem_classes=["ls-note"])
-                            wm_cimg = gr.Image(type="pil", interactive=False, height=420, show_label=False)
-                            wm_aspect = gr.Radio(["free", "3:4", "1:1", "4:3"], value="free", label="Shape")
-                            with gr.Row():
-                                wm_l = gr.Slider(0, 100, value=0, step=1, label="Left %")
-                                wm_r = gr.Slider(0, 100, value=100, step=1, label="Right %")
-                            with gr.Row():
-                                wm_t = gr.Slider(0, 100, value=0, step=1, label="Top %")
-                                wm_b = gr.Slider(0, 100, value=100, step=1, label="Bottom %")
-                            wm_cres = gr.Markdown()
-                        with gr.Row(elem_classes=["ls-bar"]):
-                            wm_paint_go = gr.Button("Remove what I painted", variant="primary", size="sm", scale=0,
-                                                    min_width=200)
-                            wm_crop_go = gr.Button("Use this crop", variant="primary", size="sm", scale=0,
-                                                   min_width=160, visible=False)
-                            wm_close = gr.Button("Close", size="sm", scale=0, min_width=100)
-                        wm_pmsg = gr.Markdown()
-                        wm_rel = gr.State("")
+                gr.Markdown("Pictures where the sort found marks **added on top** of the picture (watermarks, site "
+                            "names, logo stamps, signatures, date stamps): remove them (picture tools), crop them off, set "
+                            "the picture aside, or keep it (it may be learned). Text that belongs to the scene (signs, shirts) is left alone.",
+                            elem_classes=["ls-note"])
+                wm_sum = gr.Markdown("")
+                wm_html = gr.HTML("", elem_id="wm_html")
+                wm_box = gr.Textbox(visible=False)
+                with gr.Row(elem_classes=["ls-bar"], elem_id="wm_btnrow"):
+                    wm_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=1,
+                                             elem_id="wm_apply_btn")
+                    wm_reco_btn = gr.Button("Use the recommended option for the undecided ones", size="sm", scale=2,
+                                            elem_id="wm_reco_btn")
+                wm_msg = gr.Markdown("")
+                wm_tool = gr.Textbox(elem_id="wm_tool", show_label=False, container=False)
+                with gr.Column(visible=False, elem_classes=["ls-card"], elem_id="wm_panel") as wm_panel:
+                    wm_ptitle = gr.Markdown()
+                    with gr.Column(visible=True) as wm_paint_col:
+                        gr.Markdown("Paint over the mark with the brush (a little over its edges is fine). The "
+                                    "picture tools fill in what is under it; the rest of the picture stays as it is.",
+                                    elem_classes=["ls-note"])
+                        wm_editor = gr.ImageEditor(type="pil", image_mode="RGBA", sources=(), transforms=(),
+                                                   layers=False, height=560, show_label=False,
+                                                   brush=gr.Brush(colors=["#ff3b30"], default_color="#ff3b30",
+                                                                  default_size=28, color_mode="fixed"),
+                                                   buttons=[], elem_id="wm_editor")
+                    with gr.Column(visible=False) as wm_crop_col:
+                        gr.Markdown("Move the edges until the mark is outside; the shaded part is cut off.",
+                                    elem_classes=["ls-note"])
+                        wm_cimg = gr.Image(type="pil", interactive=False, height=420, show_label=False)
+                        wm_aspect = gr.Radio(["free", "3:4", "1:1", "4:3"], value="free", label="Shape")
+                        with gr.Row():
+                            wm_l = gr.Slider(0, 100, value=0, step=1, label="Left %")
+                            wm_r = gr.Slider(0, 100, value=100, step=1, label="Right %")
+                        with gr.Row():
+                            wm_t = gr.Slider(0, 100, value=0, step=1, label="Top %")
+                            wm_b = gr.Slider(0, 100, value=100, step=1, label="Bottom %")
+                        wm_cres = gr.Markdown()
+                    with gr.Row(elem_classes=["ls-bar"]):
+                        wm_paint_go = gr.Button("Remove what I painted", variant="primary", size="sm", scale=0,
+                                                min_width=200)
+                        wm_crop_go = gr.Button("Use this crop", variant="primary", size="sm", scale=0,
+                                               min_width=160, visible=False)
+                        wm_close = gr.Button("Close", size="sm", scale=0, min_width=100)
+                    wm_pmsg = gr.Markdown()
+                    wm_rel = gr.State("")
             with page("p_repeat", "Repeat folder"):
-                if True:
-                    rp_info = gr.Markdown("")
-                    with gr.Row():
-                        rp_folder = gr.Dropdown(choices=[], label="Image folder", scale=4)
-                        rp_repeats = gr.Number(label="Repeats", value=0, precision=0, scale=1)
-                        rp_newname = gr.Textbox(label="New folder name", scale=3)
-                    with gr.Row():
-                        rp_confirm = gr.Checkbox(label="Allow moving images that sit directly in the dataset folder into a new repeat folder",
-                                                 value=False, scale=3)
-                        rp_btn = gr.Button("Rename / create repeat folder", variant="primary", scale=2)
-                        rp_epochs_btn = gr.Button("Set epochs to hit the target steps", scale=2)
-                        rp_make_btn = gr.Button("Create missing folders now (repeat folder, model, log)", scale=2)
-                    rp_msg = gr.Markdown("")
+                rp_info = gr.Markdown("")
+                with gr.Row():
+                    rp_folder = gr.Dropdown(choices=[], label="Image folder", scale=4)
+                    rp_repeats = gr.Number(label="Repeats", value=0, precision=0, scale=1)
+                    rp_newname = gr.Textbox(label="New folder name", scale=3)
+                with gr.Row():
+                    rp_confirm = gr.Checkbox(label="Allow moving images that sit directly in the dataset folder into a new repeat folder",
+                                             value=False, scale=3)
+                    rp_btn = gr.Button("Rename / create repeat folder", variant="primary", scale=2)
+                    rp_epochs_btn = gr.Button("Set epochs to hit the target steps", scale=2)
+                    rp_make_btn = gr.Button("Create missing folders now (repeat folder, model, log)", scale=2)
+                rp_msg = gr.Markdown("")
             with page("p_caption", "Captions"):
-                if True:
-                    gr.Markdown(
-                        "The Ollama model (Settings › AI helpers) looks at every picture and writes a caption that starts "
-                        "with the trigger word. For a person, captions describe what changes (clothes, pose, place, light, "
-                        "framing) and leave out what is always that person, so the trigger word learns it. **Try on 3 "
-                        "pictures** writes nothing; **Write captions** replaces the `.txt` captions (Undo restores them).",
-                        elem_classes=["ls-note"])
-                    with gr.Row():
-                        oc_trigger = gr.Textbox(label="Trigger word (first word of every caption)", scale=1)
-                        oc_leave = gr.Textbox(label="Never describe (always part of the person)",
-                                              value=CAP.DEFAULT_LEAVE_OUT if CAP else "", scale=3)
-                    with gr.Row():
-                        oc_style = gr.Radio(choices=[("Sentences", "sentences"), ("Tags", "tags")], value="sentences",
-                                            label="Caption format", scale=1)
-                        oc_length = gr.Slider(1, 5, value=3, step=1, label="Length (1 very short ... 5 very long)", scale=2)
-                        oc_detail = gr.Slider(1, 4, value=3, step=1, label="Detail (1 basic ... 4 everything)", scale=2)
-                        oc_rec_btn = gr.Button("Use recommended", size="sm", scale=0, min_width=140)
-                    oc_rec = gr.Markdown("", elem_id="oc_rec")
-                    oc_ex = gr.HTML("", elem_id="oc_ex")
-                    with gr.Row(elem_classes=["ls-bar"]):
-                        oc_hints = gr.Checkbox(label="Give the old tags to the model as hints (they can be wrong)", value=False, scale=3)
-                        oc_unload = gr.Checkbox(label="Free the VRAM when done", value=True, scale=2)
-                        oc_prev_btn = gr.Button("Try on 3 pictures", size="sm", scale=1, min_width=120)
-                        oc_run_btn = gr.Button("Write captions", variant="primary", size="sm", scale=1, min_width=150)
-                        oc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=1, min_width=70)
-                        oc_undo_btn = gr.Button("Undo last change", size="sm", scale=1, min_width=130)
-                    oc_out = gr.Markdown("")
+                gr.Markdown(
+                    "The Ollama model (Settings › AI helpers) looks at every picture and writes a caption that starts "
+                    "with the trigger word. For a person, captions describe what changes (clothes, pose, place, light, "
+                    "framing) and leave out what is always that person, so the trigger word learns it. **Try on 3 "
+                    "pictures** writes nothing; **Write captions** replaces the `.txt` captions (Undo restores them).",
+                    elem_classes=["ls-note"])
+                with gr.Row():
+                    oc_trigger = gr.Textbox(label="Trigger word (first word of every caption)", scale=1)
+                    oc_leave = gr.Textbox(label="Never describe (always part of the person)",
+                                          value=CAP.DEFAULT_LEAVE_OUT if CAP else "", scale=3)
+                with gr.Row():
+                    oc_style = gr.Radio(choices=[("Sentences", "sentences"), ("Tags", "tags")], value="sentences",
+                                        label="Caption format", scale=1)
+                    oc_length = gr.Slider(1, 5, value=3, step=1, label="Length (1 very short ... 5 very long)", scale=2)
+                    oc_detail = gr.Slider(1, 4, value=3, step=1, label="Detail (1 basic ... 4 everything)", scale=2)
+                    oc_rec_btn = gr.Button("Use recommended", size="sm", scale=0, min_width=140)
+                oc_rec = gr.Markdown("", elem_id="oc_rec")
+                oc_ex = gr.HTML("", elem_id="oc_ex")
+                with gr.Row(elem_classes=["ls-bar"]):
+                    oc_hints = gr.Checkbox(label="Give the old tags to the model as hints (they can be wrong)", value=False, scale=3)
+                    oc_unload = gr.Checkbox(label="Free the VRAM when done", value=True, scale=2)
+                    oc_prev_btn = gr.Button("Try on 3 pictures", size="sm", scale=1, min_width=120)
+                    oc_run_btn = gr.Button("Write captions", variant="primary", size="sm", scale=1, min_width=150)
+                    oc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=1, min_width=70)
+                    oc_undo_btn = gr.Button("Undo last change", size="sm", scale=1, min_width=130)
+                oc_out = gr.Markdown("")
             with page("p_cons", "Consistency"):
-                if True:
-                    gr.Markdown("The traits of the character itself that the captions mention (hair, eyes, build, skin, "
-                                "horns, tattoos, a signature object): the same in most pictures is **taken out of the "
-                                "captions** so the trigger word learns it; words that mean the same (athletic, fit, toned) "
-                                "become one word; **odd pictures** that say something else are shown so you can look. "
-                                "Clothes, places, poses, expressions and light stay in each caption.",
-                                elem_classes=["ls-note"])
-                    with gr.Row(elem_classes=["ls-bar"]):
-                        cc_btn = gr.Button("Check the captions", size="sm", scale=0, min_width=170)
-                        cc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=70)
-                        cc_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=0, min_width=150)
-                    cc_sum = gr.Markdown("")
-                    cc_box = gr.Textbox(elem_id="cc_box", show_label=False, container=False)
-                    with gr.Row(equal_height=False):
-                        with gr.Column(scale=3):
-                            cc_html = gr.HTML("", elem_id="cc_html", **({"js_on_load": CC_OPEN_JS} if "js_on_load" in
-                                              inspect.signature(gr.HTML.__init__).parameters else {}))
-                        with gr.Column(scale=2, elem_id="cc_view"):
-                            cc_img = gr.Image(label="Picture", type="filepath", interactive=False, height=420)
-                            cc_cap = gr.Markdown("*Click a picture that says something else to look at it with its caption.*")
-                    cc_msg = gr.Markdown("")
-                    cc_confirm = gr.Checkbox(label="Confirm", value=False, visible=False)
+                gr.Markdown("The traits of the character itself that the captions mention (hair, eyes, build, skin, "
+                            "horns, tattoos, a signature object): the same in most pictures is **taken out of the "
+                            "captions** so the trigger word learns it; words that mean the same (athletic, fit, toned) "
+                            "become one word; **odd pictures** that say something else are shown so you can look. "
+                            "Clothes, places, poses, expressions and light stay in each caption.",
+                            elem_classes=["ls-note"])
+                with gr.Row(elem_classes=["ls-bar"]):
+                    cc_btn = gr.Button("Check the captions", size="sm", scale=0, min_width=170)
+                    cc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=70)
+                    cc_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=0, min_width=150)
+                cc_sum = gr.Markdown("")
+                cc_box = gr.Textbox(elem_id="cc_box", show_label=False, container=False)
+                with gr.Row(equal_height=False):
+                    with gr.Column(scale=3):
+                        cc_html = gr.HTML("", elem_id="cc_html", **({"js_on_load": CC_OPEN_JS} if "js_on_load" in
+                                          inspect.signature(gr.HTML.__init__).parameters else {}))
+                    with gr.Column(scale=2, elem_id="cc_view"):
+                        cc_img = gr.Image(label="Picture", type="filepath", interactive=False, height=420)
+                        cc_cap = gr.Markdown("*Click a picture that says something else to look at it with its caption.*")
+                cc_msg = gr.Markdown("")
+                cc_confirm = gr.Checkbox(label="Confirm", value=False, visible=False)
 
             # ================================================================ Settings > Trainers and GPU
             with page("trainers", "Trainers + GPU"):
