@@ -20,6 +20,10 @@ works. It writes `userdata/lorastudio_check_<time>.md`: the file to send when so
 *Install this update* writes only the program files (your settings, token, databases, logs and venv are never
 touched), keeps a backup of what it replaces in `update_backups/`, runs the self-test, and puts the old files back
 by itself when the test fails. It refuses while a training run, the queue or the automatic improvement is busy.
+
+**From GitHub**, without a zip: *Check GitHub* says whether there is a newer upload on GitHub, and *Install from
+GitHub* downloads and installs it the same safe way. While the repository is private, save a GitHub token with read
+access first (the field above the buttons).
 *Restart LoRA Studio* goes through `start.sh` (new packages get installed) and the page reloads by itself.
 *Roll back the last update* brings back the files from before it. **The trainers**: updates for sd-scripts and musubi-tuner
 from their GitHub pages, tested before and after, rolled back when a test fails.

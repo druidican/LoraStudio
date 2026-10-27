@@ -80,7 +80,8 @@ skipped.
 
 ## Updates
 
-**Settings › Updates**: choose a newer LoraStudio.zip. LoRA Studio shows what changes, keeps a backup of the old
+**Settings › Updates**: *Check GitHub* and *Install from GitHub* (the newest upload, no zip needed), or choose a newer
+LoraStudio.zip. LoRA Studio shows what changes, keeps a backup of the old
 files, tests the new version and goes back by itself if the test fails. Your settings and data are never part of an
 update. Versions are `release.ddmmyy` with a letter for later updates of that release (`1.261026`, `1.261026b`, …);
 Settings › Version shows the version of every part.

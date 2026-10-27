@@ -536,6 +536,25 @@ def selfupdate_panel(app):
             back = gr.Button("Roll back the last update", size="sm", scale=0, min_width=210)
         ulog = gr.Textbox(label="LoRA Studio update", lines=10, max_lines=24, interactive=False, autoscroll=True,
                           elem_id="ls_selfupd")
+        import ghupdate as GH
+        with gr.Accordion("From GitHub: the newest upload, without a zip", open=True):
+            gr.Markdown(f"Checks [github.com/{GH.repo()}](https://github.com/{GH.repo()}) (branch `{GH.branch()}`) for the "
+                        "newest upload and installs it the same safe way as a zip: a backup first, the self-test, and "
+                        "back by itself when the test fails. Only when you press the buttons. While the repository is "
+                        "private, a **GitHub token** with read access to it is needed (github.com › Settings › Developer "
+                        "settings › Fine-grained tokens: this repository, *Contents: read*); it is saved in "
+                        "`userdata/github_token.txt`, readable only by you, and left out of every report.",
+                        elem_classes=["ls-note"])
+            with gr.Row(elem_classes=["ls-bar"]):
+                gh_tok = gr.Textbox(label="GitHub token", type="password", scale=4,
+                                    placeholder=(f"saved: {GH.mask(GH.read_token())}" if GH.read_token()
+                                                 else "github_pat_… (empty: no token)"))
+                gh_tok_save = gr.Button("Save token", size="sm", scale=0, min_width=120)
+            with gr.Row(elem_classes=["ls-bar"]):
+                gh_check = gr.Button("Check GitHub", size="sm", scale=0, min_width=150)
+                gh_inst = gr.Button("Install from GitHub", variant="primary", size="sm", scale=0, min_width=190,
+                                    interactive=False)
+            gh_md = gr.Markdown()
 
     def on_file(path):
         h = selfupdate_plan_html(path)
@@ -576,6 +595,31 @@ def selfupdate_panel(app):
         SU.rollback(say=lines.append)
         return "\n".join(lines)
     back.click(do_back, None, ulog)
+
+    def gh_save(tok):
+        msg = GH.save_token(tok)
+        t = GH.read_token()
+        return msg, gr.update(value="", placeholder=f"saved: {GH.mask(t)}" if t else "github_pat_… (empty: no token)")
+    gh_tok_save.click(gh_save, gh_tok, [gh_md, gh_tok])
+
+    def gh_do_check():
+        c = GH.check()
+        return c["text"], gr.update(interactive=bool(c.get("ok")) and not c.get("same"))
+    gh_check.click(gh_do_check, None, [gh_md, gh_inst])
+
+    def gh_do_install():
+        lines = []
+        done = {"ok": None}
+
+        def work():
+            done["ok"] = GH.install(say=lines.append)
+        th = threading.Thread(target=work, daemon=True, name="ghupdate")
+        th.start()
+        while th.is_alive():
+            time.sleep(0.7)
+            yield "\n".join(lines), gr.update()
+        yield "\n".join(lines), gr.update(interactive=not done["ok"])
+    gh_inst.click(gh_do_install, None, [ulog, gh_inst])
     rest.click(SU.restart, None, ulog, js="""() => { setTimeout(function wait(){
         fetch(location.href, {cache: 'no-store'}).then(function(r){ if (r.ok) location.reload(); else setTimeout(wait, 2000); })
         .catch(function(){ setTimeout(wait, 2000); }); }, 6000); }""")

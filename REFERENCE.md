@@ -481,6 +481,16 @@ run, the queue or the automatic improvement is busy):
 **Roll back the last update** puts the files of before it back (then restart). Settings › Version shows afterwards
 which parts the update changed.
 
+**From GitHub** (same card): *Check GitHub* asks github.com/druidican/LoraStudio for the newest upload to the `main`
+branch (the commit and its `version.py`, a few kB) and says whether it is newer, a new upload of the same version, or
+what you have. *Install from GitHub* downloads that commit as a zip into `userdata/update_backups/downloads/` and
+installs it exactly as above (backup, self-test, back by itself), so a new upload with the same version number works
+too: only the files that differ are written. The commit you updated from is kept in `userdata/github_update.json`.
+Nothing is checked at start: only the buttons go online. While the repository is private, a **GitHub token** is
+needed: a fine-grained token for this repository with *Contents: read*, saved with *Save token* in
+`userdata/github_token.txt` (readable only by you, not in backups, removed from every report); an empty field removes
+it.
+
 ## The training venv: PyTorch, ROCm and CUDA (Settings › Updates)
 
 **The training venv** card checks at every start (no download) that every ROCm or CUDA part is the version PyTorch is

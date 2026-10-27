@@ -195,6 +195,9 @@ computers on your network may open LoRA Studio (that needs a login, set on the s
 - **In the program**: download the new `LoraStudio.zip`, open **Settings › Updates** and choose the zip. LoRA Studio
   shows what changes, keeps a backup of the old files, tests the new version and goes back by itself when the test
   fails. Restart when it asks.
+- **From GitHub**: **Settings › Updates › From GitHub › Check GitHub**, then *Install from GitHub*: the newest upload,
+  downloaded and installed the same safe way, without a zip. (While the repository is private it needs a GitHub token
+  with read access, saved on the same page.)
 - **With the installer**: unpack the new zip and run `./install.sh` from it again. It updates LoRA Studio in
   `~/LoraStudio`, pulls the newest trainers and keeps PyTorch as it is.
 
