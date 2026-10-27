@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261026w"  # LoRA Studio version, see version.py
+__version__ = "1.261026y"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -428,6 +428,25 @@ def _metamerge():
     need(m["notes"] == "mine" and m["civitai"] == {"trainedWords": ["trig"], "id": 5}, f"got {m}")
     need(m["tags"] == ["b"] and m["favorite"] is True and m["extra"] == 1, f"got {m}")
     need(LL.merge_meta(a, b, a_wins=True)["tags"] == ["a"], "the newer file did not win")
+
+
+@check("training card: version and clip skip go to LoRA Manager, trigger words come back, old notes text goes")
+def _tcard():
+    import json as _j
+    import lora_library as LL
+    import trainingcard as TC
+    ls = TC.apply({"notes": "Trained on 2026-10-20 from the dataset x. 10 epochs.\n\nMy note"},
+                  {"version": "V1", "trigger": "x", "clip_skip": ""}, "sig")
+    need(ls["notes"] == "My note", f"the old training text stayed in Notes: {ls['notes']!r}")
+    need(ls["civitai"]["name"] == "V1" and _j.loads(ls["usage_tips"])["clip_skip"] == 1, "version / clip skip not set")
+    lm = {"model_name": "mine", "civitai": {"trainedWords": ["a", "b"]}, "usage_tips": '{"strength": 0.8}',
+          "modelDescription": ""}
+    m = LL.sync_rules(lm, ls, LL.merge_meta(lm, ls, False))
+    need(m["civitai"]["name"] == "V1", "LoRA Studio's version did not win")
+    need(m["civitai"]["trainedWords"] == ["a", "b"], "LoRA Manager's trigger words were not taken")
+    tips = _j.loads(m["usage_tips"])
+    need(tips.get("strength") == 0.8 and tips.get("clip_skip") == 1, f"usage tips not merged: {tips}")
+    need(m["model_name"] == "mine" and m["modelDescription"] == "", "LoRA Manager's own fields were changed")
 
 
 @check("step 5 pins win over the rules; the sort leaves out pictures that teach nothing about the subject")

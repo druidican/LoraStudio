@@ -34,7 +34,7 @@ Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.261026y"  # LoRA Studio version, see version.py
 
 import contextlib
 import copy
@@ -752,6 +752,15 @@ PREVIEW_EXT = (".webp", ".png", ".jpg", ".jpeg", ".gif", ".mp4", ".webm")
 
 
 def find_preview(folder: Path, stem: str, sidecar: dict | None) -> Path | None:
+    """The preview: the one LoRA Manager's card links (preview_url, the picture you chose there) first, else
+    <stem>.preview.<ext> / <stem>.<ext> next to the file."""
+    if sidecar and sidecar.get("preview_url"):
+        p = Path(str(sidecar["preview_url"]))
+        try:
+            if p.is_absolute() and p.is_file() and p.suffix.lower() in IMG_EXT:
+                return p
+        except OSError:
+            pass
     for ext in PREVIEW_EXT:
         for name in (stem + ext, stem + ".preview" + ext):
             p = folder / name
@@ -800,6 +809,34 @@ def files_starting_with(folder: Path, prefix: str) -> list[str]:
         out.append(names[i])
         i += 1
     return out
+
+
+_LM_ROOTS: dict = {}
+
+
+def lm_example_roots(lib) -> list[str]:
+    """LoRA Manager's example picture folder(s) (its setting example_images_path, one sub-folder per sha256, or per
+    library and then sha256), read from LoRA Manager's settings.json."""
+    if "v" in _LM_ROOTS:
+        return _LM_ROOTS["v"]
+    cands = [Path.home() / ".config" / "ComfyUI-LoRA-Manager" / "settings.json"]
+    for r in lib.settings.get("lora_dirs") or []:
+        p = Path(os.path.expanduser(r)).resolve()
+        for up in [p] + list(p.parents)[:4]:
+            cands.append(up / "custom_nodes" / "ComfyUI-Lora-Manager" / "settings.json")
+            cands.append(up / "custom_nodes" / "comfyui-lora-manager" / "settings.json")
+    out = []
+    for c in dict.fromkeys(cands):
+        try:
+            data = json.loads(c.read_text(encoding="utf-8")) if c.is_file() else {}
+        except (OSError, ValueError):
+            continue
+        root = (data or {}).get("example_images_path") if isinstance(data, dict) else ""
+        if root and Path(root).is_dir():
+            out.append(str(root))
+            out += [str(d) for d in Path(root).iterdir() if d.is_dir() and not re.fullmatch(r"[0-9a-f]{64}", d.name)]
+    _LM_ROOTS["v"] = list(dict.fromkeys(out))
+    return _LM_ROOTS["v"]
 
 
 def find_examples(folder: Path, stem: str, sha: str, preview: Path | None, roots: list[str]) -> list[Path]:
@@ -1190,6 +1227,9 @@ class Library:
                 lora.sidecar_from_archive = True
             if arch.is_dir():
                 lora.preview = find_preview(arch, lora.stem, None)
+                ex_dir = arch / f"{lora.stem}_examples"       # LoRA Manager's example pictures, copied by the sync
+                if ex_dir.is_dir():
+                    lora.examples = sorted(p for p in ex_dir.rglob("*") if p.suffix.lower() in IMG_EXT)
         lora.sidecar = sc if isinstance(sc, dict) else None
 
         lora.base = detect_base(meta, lora.sidecar, lora.path, self.settings["bases"])
@@ -2058,6 +2098,13 @@ def render_library(lib: Library, search: str, bases: list, statuses: list, group
 # Details
 # --------------------------------------------------------------------------- #
 
+def _card_script(lora) -> str:
+    """The launch script that made this version (from its training card), as a file name."""
+    import trainingcard as TC
+    sp = TC.stored(lora.sidecar).get("_script")
+    return Path(sp).name if sp else ""
+
+
 def files_check_html(lib: Library, lora: Lora) -> str:
     ds = lora.dataset
     has_meta = any(k.startswith("ss_") for k in lora.meta)
@@ -2069,7 +2116,8 @@ def files_check_html(lib: Library, lora: Lora) -> str:
          f"{ds.captions}/{ds.images}" if ds else "-"),
         ("Model file", lora.dataset_path is not None,
          lora.dataset_path.parent.name + "/" + lora.dataset_path.name if lora.dataset_path else "not found"),
-        ("Launch script", bool(lora.scripts), ", ".join(p.name for p, _ in lora.scripts[:2]) or "not found"),
+        ("Launch script", bool(lora.scripts) or bool(_card_script(lora)),
+         _card_script(lora) or ", ".join(p.name for p, _ in lora.scripts[:2]) or "not found"),
         ("TensorBoard log", bool(lora.loss),
          Path(lora.log_run).name if lora.log_run else
          ("script has --logging_dir, no log matched" if logging_in_script else "not found - add --logging_dir")),
@@ -2094,12 +2142,25 @@ def details_html(lib: Library, lora: Lora) -> tuple[str, str]:
     head = (f"<div class='ll-dhead'><div class='ll-muted ll-upper'>{esc(lora.base)} · {esc(lora.character)}</div>"
             f"<h2>{esc(lora.display_name)}</h2><div class='ll-mono ll-muted'>{esc(lora.path)}</div>"
             f"{issues}{epochs}</div>")
-    rows = settings_rows(lora)
-    if rows:
-        dl = "".join(f"<dt>{esc(a)}</dt><dd>{esc(b)}</dd>" for a, b in rows)
-        settings = f"<h4>Training settings <span class='ll-muted'>(from .safetensors)</span></h4><dl class='ll-ddl'>{dl}</dl>"
+    import trainingcard as TC
+    card = TC.stored(lora.sidecar)
+    if card:                                             # what you set (Edit, or synced from LoRA Manager) is shown
+        if lora.trigger_words:
+            card["trigger"] = ", ".join(str(w) for w in lora.trigger_words)
+        vname = ((lora.sidecar or {}).get("civitai") or {}).get("name")
+        if vname:
+            card["version"] = vname
+        cs = TC.usage_tips(lora.sidecar).get("clip_skip")
+        if cs not in (None, "") and not card.get("clip_skip"):
+            card["clip_skip"] = f"{cs} (usage tip)"
+        settings = "<h4>Training</h4>" + TC.card_html(card, esc)
     else:
-        settings = "<h4>Training settings</h4><p class='ll-muted'>No sd-scripts training metadata in this file.</p>"
+        rows = settings_rows(lora)                       # a LoRA without a dataset: what its file says
+        if rows:
+            dl = "".join(f"<dt>{esc(a)}</dt><dd>{esc(b)}</dd>" for a, b in rows)
+            settings = f"<h4>Training settings <span class='ll-muted'>(from .safetensors)</span></h4><dl class='ll-ddl'>{dl}</dl>"
+        else:
+            settings = "<h4>Training settings</h4><p class='ll-muted'>No training data found for this LoRA.</p>"
     tags = "".join(f"<span class='ll-tag'>{esc(t)} {p}%</span>" for t, p in lora.tags)
     if tags:
         settings += f"<h4>Caption tags</h4><div class='ll-tags'>{tags}</div>"
@@ -2225,6 +2286,41 @@ def merge_meta(a: dict, b: dict, a_wins: bool) -> dict:
     return out
 
 
+def _tips(sc: dict) -> dict:
+    raw = (sc or {}).get("usage_tips") or "{}"
+    try:
+        t = json.loads(raw) if isinstance(raw, str) else dict(raw)
+        return t if isinstance(t, dict) else {}
+    except (ValueError, TypeError):
+        return {}
+
+
+def sync_rules(lm: dict, ls: dict, m: dict, lm_newer: bool = False) -> dict:
+    """What LoRA Studio knows best wins over the merge: the version name (from the training card or your Edit), and
+    the trigger words of the dataset when neither side has any. Usage tips (strength, clip skip, …) are merged field
+    by field; no clip skip anywhere means the default, 1."""
+    m = dict(m)
+    civ = dict(m.get("civitai") or {})
+    ls_civ = (ls.get("civitai") or {}) if isinstance(ls.get("civitai"), dict) else {}
+    card = ((ls.get("lorastudio") or {}).get("training") or {}) if isinstance(ls.get("lorastudio"), dict) else {}
+    ver = ls_civ.get("name") or card.get("version")
+    if ver:
+        civ["name"] = ver
+    if not civ.get("trainedWords") and card.get("trigger"):
+        civ["trainedWords"] = [w.strip() for w in str(card["trigger"]).split(",") if w.strip()]
+    if civ or "civitai" in m:
+        m["civitai"] = civ
+    t_lm, t_ls = _tips(lm), _tips(ls)
+    tips = merge_meta(t_lm, t_ls, lm_newer)            # tips: fill what one side lacks; the newer file on a clash
+    try:
+        cs = int(float(tips.get("clip_skip")))
+    except (TypeError, ValueError):
+        cs = 0
+    tips["clip_skip"] = cs if cs >= 1 else int(float(card.get("clip_skip") or 1))
+    m["usage_tips"] = json.dumps(tips)
+    return m
+
+
 def _sync_meta(src: Path, dst: Path, stats: dict) -> None:
     """Sync both ways: data only one .metadata.json has is copied into the other (the LoRA folder's file and the
     dataset copy); for fields both have, the newer file wins. Location fields (file path, folder, preview) stay as
@@ -2241,7 +2337,7 @@ def _sync_meta(src: Path, dst: Path, stats: dict) -> None:
     except OSError as e:
         stats["errors"].append(f"{src.name}: {e}")
         return
-    m = merge_meta(a, b, src_newer)
+    m = sync_rules(a, b, merge_meta(a, b, src_newer), src_newer)
     changed = False
     for path, cur in ((src, a), (dst, b)):
         new = dict(m)
@@ -2250,6 +2346,8 @@ def _sync_meta(src: Path, dst: Path, stats: dict) -> None:
                 new[k] = cur[k]
             else:
                 new.pop(k, None)
+        if path == src and "lorastudio" not in cur:      # the training card stays in LoRA Studio's copy
+            new.pop("lorastudio", None)
         if new != cur:
             try:
                 write_sidecar(path, new)
@@ -2392,18 +2490,31 @@ def personal_sync(lib: Library, progress=None) -> str:
         before = stats["new"] + stats["updated"]
         sc_path = f.with_name(old + ".metadata.json")
         sidecar = _load_json(sc_path, None) if sc_path.exists() else None
+        ls_path = dst_dir / (new + ".metadata.json")
         if sc_path.exists():
-            _sync_meta(sc_path, dst_dir / (new + ".metadata.json"), stats)
+            _sync_meta(sc_path, ls_path, stats)
+            try:                        # the training card into LoRA Studio's copy, then what it adds to LoRA Manager
+                import trainingcard as TC
+                sc_new = _load_json(ls_path, None)
+                lora.sidecar, lora.sidecar_path = (sc_new if isinstance(sc_new, dict) else None), ls_path
+                if TC.scan_one(lib, lora) == "scanned":
+                    _sync_meta(sc_path, ls_path, {"new": 0, "updated": 0, "same": 0, "errors": stats["errors"]})
+            except Exception as e:      # noqa: BLE001
+                stats["errors"].append(f"{new} training card: {e}")
         preview = find_preview(src_dir, old, sidecar if isinstance(sidecar, dict) else None)
-        if preview:
-            _sync_one(preview, dst_dir / _renamed(preview.name, old, new), stats)
+        if preview:                     # the preview LoRA Manager's card shows: the LoRA page shows the same one
+            target = dst_dir / f"{new}.preview{preview.suffix.lower()}"
+            for ext in PREVIEW_EXT:
+                other = dst_dir / f"{new}.preview{ext}"
+                if other != target and other.exists() and preview.stat().st_mtime > other.stat().st_mtime:
+                    try:
+                        other.unlink()
+                    except OSError:
+                        pass
+            _sync_one(preview, target, stats)
         sha = (((sidecar or {}) if isinstance(sidecar, dict) else {}).get("sha256") or "").lower()
-        for ex in find_examples(src_dir, old, sha, preview, lib.settings["lora_dirs"]):
-            if ex.parent == src_dir:
-                dst = dst_dir / _renamed(ex.name, old, new)
-            else:                       # LoRA Manager example sub-folder (sha256 or name)
-                dst = dst_dir / f"{new}_examples" / ex.name
-            _sync_one(ex, dst, stats)
+        for ex in find_examples(src_dir, old, sha, preview, list(lib.settings["lora_dirs"]) + lm_example_roots(lib)):
+            _sync_one(ex, dst_dir / f"{new}_examples" / ex.name, stats)   # LoRA Manager's example pictures
         if stats["new"] + stats["updated"] > before:
             done_loras.append(f"{lora.dataset.name} · {new}")
     _LISTINGS.clear()
@@ -2503,6 +2614,11 @@ CSS = """
 .ll-dhead h2 { margin:4px 0 4px; font-size:26px; }
 .ll-ddl { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; margin:0; font-size:13px; }
 .ll-ddl dt { color:var(--ll-muted); } .ll-ddl dd { margin:0; font-family:'JetBrains Mono',monospace; }
+.ll-tgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:10px; }
+.ll-tcard { border:1px solid var(--ll-line); border-radius:10px; padding:10px 12px; background:var(--ll-card); }
+.ll-tcard .rs-label { font-size:11px; letter-spacing:.06em; color:var(--ll-muted); margin-bottom:6px; }
+.ll-tcard .ll-ddl { grid-template-columns:minmax(120px,max-content) 1fr; }
+.ll-tcard .ll-ddl dd { overflow-wrap:anywhere; font-size:12.5px; }
 .ll-check { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; font-size:13px; }
 .ll-check li { display:flex; justify-content:space-between; gap:12px; }
 h4 { margin:18px 0 8px; font-size:14px; }
@@ -2820,9 +2936,12 @@ def versions_html(lora) -> str:
             when = time.strftime("%Y-%m-%d", time.localtime(t)) if t else ""
         except (OSError, ValueError, TypeError):
             pass
-        pics = m.get("ss_num_train_images") or ""
-        steps = m.get("ss_max_train_steps") or m.get("ss_steps") or ""
-        loss = f"{l.loss[-1][1]:.3f}" if l.loss else ""
+        import trainingcard as TC
+        card = TC.stored(l.sidecar)                      # the training card, when the version was scanned
+        when = (card.get("trained_on") or "")[:10] or when
+        pics = card.get("pictures") or m.get("ss_num_train_images") or ""
+        steps = card.get("steps") or m.get("ss_max_train_steps") or m.get("ss_steps") or ""
+        loss = f"{l.loss[-1][1]:.3f}" if l.loss else (card.get("final_loss") or "")
         done = "✓ yes" if is_completed(l) else "no"
         rows.append(f"<tr><td><b>{esc(l.vlabel)}</b></td><td>{esc(when)}</td><td>{esc(pics)}</td><td>{esc(steps)}</td>"
                     f"<td>{esc(loss)}</td><td>{done}</td></tr>")
@@ -2910,6 +3029,8 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                             d_preview = gr.Image(label="Preview", type="pil", interactive=False, height=460)
                             gr.Markdown("Preview from LoRA Manager · NSFW blur follows Settings › Look and base models",
                                         elem_classes=["ls-note"])
+                            d_examples = gr.Gallery(label="Example pictures from LoRA Manager", columns=4, height=200,
+                                                    object_fit="cover", visible=False, allow_preview=True)
                         with gr.Column(scale=3):
                             e_done = gr.Checkbox(label="Completed", value=False, interactive=False,
                                                  info="Ticked automatically when training finishes. Completed hides this "
@@ -2970,11 +3091,11 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                                                    **({"buttons": ["copy"]} if "buttons" in inspect.signature(gr.Textbox.__init__).parameters
                                                       else {"show_copy_button": True}))
                 with gr.Tab("Training", id="lp_train"):
-                    with gr.Row(equal_height=False):
-                        with gr.Column(scale=2):
-                            d_settings = gr.HTML()
-                        with gr.Column(scale=3):
-                            d_loss = gr.LinePlot(x="step", y="loss", label="Loss", height=260)
+                    d_settings = gr.HTML()
+                    with gr.Row(elem_classes=["ls-bar"]):
+                        d_rescan = gr.Button("Read the training again", size="sm", scale=0, min_width=210)
+                        gr.Markdown("after you changed the launch script or the log", elem_classes=["ls-note"])
+                    d_loss = gr.LinePlot(x="step", y="loss", label="Loss", height=260)
                     gr.Markdown("#### All versions")
                     lp_versions = gr.HTML(elem_id="lp_versions")
                     with gr.Row(elem_classes=["ls-bar"]):
@@ -2984,7 +3105,11 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                     with gr.Row():
                         e_name = gr.Textbox(label="Display name")
                         e_char = gr.Textbox(label="Character (groups it in Browse)")
+                    with gr.Row():
+                        e_ver = gr.Textbox(label="Version", info="shown as the version in ComfyUI's LoRA Manager", scale=1)
+                        e_cskip = gr.Number(label="Clip skip", value=None, precision=0, minimum=1, scale=1)
                     e_trig = gr.Textbox(label="Trigger words (one per line)", lines=3)
+                    e_desc = gr.Textbox(label="Description", lines=3)
                     e_notes = gr.Textbox(label="Notes", lines=3)
                     with gr.Row():
                         e_str = gr.Number(label="Strength", value=None)
@@ -2998,7 +3123,8 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                     with gr.Row(elem_classes=["ls-bar"]):
                         e_save = gr.Button("Save", variant="primary", scale=0, min_width=120)
                         gr.Markdown(f"Saved in the dataset's {ARCHIVE_DIR}/ folder, a .bak is kept. Training settings come "
-                                    "from the file and cannot be edited.", elem_classes=["ls-note"])
+                                    "(the Training tab) come from the LoRA file, its launch script and its log and cannot be edited.",
+                                    elem_classes=["ls-note"])
                     e_msg = gr.Markdown()
 
         # ---------------- Maintenance: Sync | Clean up ---------------- #
@@ -3017,6 +3143,19 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                     "is made before a file is changed.")
                 sync_btn = gr.Button("Sync now", variant="primary")
                 sync_msg = gr.Markdown()
+                gr.HTML('<div class="rs-label" style="margin-top:14px">TRAINING CARDS</div>')
+                gr.Markdown("### Scan all LoRAs")
+                gr.Markdown(
+                    "Reads every LoRA of your datasets once: its launch script, the LoRA file's training data, the repeat "
+                    "folders and the run log, into separate fields on the LoRA page (Training tab), saved in the "
+                    f"dataset's `{ARCHIVE_DIR}/` copy of the LoRA Manager file. A version that was scanned is read again "
+                    "only when its file changes; a new version is read the first time it is opened or scanned. The long "
+                    "training text older versions wrote into *Notes* is taken out (your own notes stay).",
+                    elem_classes=["ls-note"])
+                with gr.Row(elem_classes=["ls-bar"]):
+                    tc_btn = gr.Button("Scan all LoRAs", variant="primary", scale=0, min_width=170)
+                    tc_force = gr.Checkbox(label="Read the scanned ones again too", value=False, scale=0, min_width=260)
+                tc_msg = gr.Markdown()
             with gr.Column(scale=1, elem_classes=["ls-card"]):
                 gr.HTML('<div class="rs-label">OUT · CLEAN UP</div>')
                 gr.Markdown("### Free disk space")
@@ -3192,7 +3331,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
 
     detail_outputs = [d_preview, d_head, d_settings, d_loss,
                       e_name, e_char, e_trig, e_notes, e_str, e_clip, e_nsfw, e_fav, e_flag, e_reason, e_msg,
-                      pick_dd, ver_dd, cur_key, e_done, d_empty, d_body]
+                      pick_dd, ver_dd, cur_key, e_done, d_empty, d_body, e_ver, e_cskip, e_desc, d_examples]
 
     def on_pick(v):
         key = (v or "").split("|")[0]
@@ -3210,7 +3349,14 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         lora = LIB.loras.get(key)
         if not lora:
             return ([None, "", "", pd.DataFrame(columns=["step", "loss"])] + [gr.update()] * 10
-                    + ["", gr.update(), gr.update(), "", gr.update(value=False, interactive=False), gr.update(visible=True), gr.update(visible=False)])
+                    + ["", gr.update(), gr.update(), "", gr.update(value=False, interactive=False), gr.update(visible=True),
+                       gr.update(visible=False), "", None, "", gr.update(visible=False, value=None)])
+        import trainingcard as TC
+        if lora.dataset is not None and lora.final and not TC.is_scanned(lora):
+            try:                                 # a version not read yet: its training card is made now
+                TC.scan_one(LIB, lora)
+            except Exception as e:               # noqa: BLE001
+                print(f"[LoRA Library] training card of {lora.stem}: {e!r}")
         head, settings = details_html(LIB, lora)
         prev = load_image(lora.preview) if lora.preview else None
         prev_upd = gr.update(value=prev, elem_classes=["ll-blur"] if LIB.blur(lora) else [])
@@ -3228,9 +3374,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         if not trig.strip() and sug.get("trigger"):
             trig = sug["trigger"]
             filled.append("trigger word")
-        if not (notes or "").strip() and sug.get("notes"):
-            notes = sug["notes"]
-            filled.append("notes")
+        notes = TC.strip_auto_notes(notes or "")          # the old training text is in the Training tab now
         if strength is None and sug.get("strength") is not None:
             strength = sug["strength"]
             filled.append("strength")
@@ -3255,7 +3399,12 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                 gr.update(choices=lora_choices(lora.gid), value=lora.gid),
                 gr.update(choices=version_choices(lora), value=lora.key,
                           interactive=len(LIB.group_of(lora)) > 1),
-                lora.key, done_checkbox(lora), gr.update(visible=False), gr.update(visible=True)]
+                lora.key, done_checkbox(lora), gr.update(visible=False), gr.update(visible=True),
+                (lora.sidecar or {}).get("civitai", {}).get("name") or (lora.vlabel if lora.version is not None else ""),
+                tips.get("clip_skip") if tips.get("clip_skip") not in (None, "") else
+                (int(TC.stored(lora.sidecar).get("clip_skip") or 1) if lora.sidecar else None),
+                (lora.sidecar or {}).get("modelDescription", ""),
+                gr.update(value=[str(p) for p in lora.examples[:40]] or None, visible=bool(lora.examples))]
 
     def done_checkbox(lora):
         ds, t = done_key(lora)
@@ -3293,7 +3442,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
     pick_dd.input(show_group, pick_dd, detail_outputs)
     ver_dd.input(show_details, ver_dd, detail_outputs)
 
-    def save_edits(key, name, char, trig, notes, strength, clip, nsfw, fav, flag, reason):
+    def save_edits(key, name, char, trig, notes, strength, clip, nsfw, fav, flag, reason, ver="", cskip=None, desc=""):
         lora = LIB.loras.get(key)
         if not lora:
             return "Pick a LoRA first.", gr.update()
@@ -3303,7 +3452,14 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         data["civitai"] = civ
         civ["trainedWords"] = [t.strip() for t in (trig or "").splitlines() if t.strip()]
         data["notes"] = notes or ""
+        if (ver or "").strip():
+            civ["name"] = ver.strip()
+        data["modelDescription"] = desc or ""
         tips = usage_tips(lora)
+        if cskip is None or (isinstance(cskip, float) and math.isnan(cskip)):
+            tips.pop("clip_skip", None)
+        else:
+            tips["clip_skip"] = int(cskip)
         for k, v in (("strength", strength), ("clip_strength", clip)):
             if v is None or (isinstance(v, float) and math.isnan(v)):
                 tips.pop(k, None)
@@ -3360,7 +3516,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                    ).then(do_render, filters, lib_html).then(do_gallery, gal_inputs, gal_html)
 
     e_save.click(save_edits, [cur_key, e_name, e_char, e_trig, e_notes, e_str, e_clip, e_nsfw,
-                              e_fav, e_flag, e_reason], [e_msg, pick_dd]
+                              e_fav, e_flag, e_reason, e_ver, e_cskip, e_desc], [e_msg, pick_dd]
                  ).then(do_render, filters, lib_html).then(do_gallery, gal_inputs, gal_html)
 
     def do_sync(q, b, st, g, progress=gr.Progress()):
@@ -3369,6 +3525,21 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
 
     sync_btn.click(do_sync, filters, [sync_msg, lib_html, base_f, pick_dd, gal_base]
                    ).then(do_gallery, gal_inputs, gal_html)
+
+    def do_cards(force, progress=gr.Progress()):
+        import trainingcard as TC
+        return TC.scan_all(LIB, bool(force), progress)
+
+    tc_btn.click(do_cards, tc_force, tc_msg)
+
+    def rescan_one(key):
+        import trainingcard as TC
+        lora = LIB.loras.get(key)
+        if lora is not None and lora.dataset is not None:
+            TC.scan_one(LIB, lora, force=True)
+        return show_details(key)
+
+    d_rescan.click(rescan_one, cur_key, detail_outputs)
 
     # ---- copy to LoRA folder (Details)
     def details_copy_info(key):

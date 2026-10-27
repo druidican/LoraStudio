@@ -181,7 +181,7 @@ versions list says *★ best*. Mark it again to remove it, and the newest versio
 **Browse** shows your own LoRAs in two looks: **Pictures** (one tile per dataset, the newest picture, a chip per LoRA
 type) and **Status** (only problems of the LoRA files themselves; what a dataset still needs is in Datasets ›
 Improvements). Click a tile for its **LoRA page**: Overview (preview, Completed, trigger words, copy to the LoRA
-folder), Pictures (everything you made with it in ComfyUI, all versions), Training (settings from the file, the loss,
+folder, LoRA Manager's example pictures), Pictures (everything you made with it in ComfyUI, all versions), Training (the training card, the loss,
 all versions) and Edit. **Maintenance** is Sync (LoRA Manager files from your LoRA folder into the datasets) and Clean
 up (leftovers of all finished LoRAs, orphaned LoRA Manager files).
 
@@ -904,8 +904,30 @@ images) into each dataset's `LoraManager/` folder:
   your LoRA page edits and LoRA Studio sees what LoRA Manager added. Where both sides have a different value, the
   newer file wins. Location fields (file name, file path, folder, preview) stay as they are on each side. A `.bak` is
   made before either file is changed; files that already agree are not touched.
-- Example images are copied too (for a complete dataset), but are not shown on the cards. Sample images from
-  training are not shown either.
+- Some fields follow their own rule: the **version name** (LoRA Manager shows it as *Version*, `N/A` when empty) comes
+  from LoRA Studio (the training card, or what you typed in Edit) and overwrites LoRA Manager's; **trigger words** come
+  from LoRA Manager when LoRA Studio has none, and from the dataset's trigger word when neither has any; the **usage
+  tips** (strength, CLIP strength, clip skip) are merged one by one, and with no clip skip anywhere both get the
+  default, **1**. The training card itself stays in LoRA Studio's copy only.
+- The **preview** LoRA Manager's card shows (its `preview_url`, the picture you chose there) becomes the preview on the
+  LoRA page, and LoRA Manager's **example pictures** (next to the LoRA, or in its example images folder, read from
+  LoRA Manager's `settings.json`) are copied to `LoraManager/<lora>_examples/` and shown under the preview on the
+  LoRA page's Overview. Sample images from training are not shown.
+
+**Training cards.** The LoRA page's **Training** tab shows what each version was trained with, in separate fields in
+four groups: *Dataset* (dataset, LoRA type, version, trigger words, pictures, repeat folders, captions), *Schedule*
+(epochs, steps and how they add up: pictures × repeats ÷ batch ÷ accumulation × epochs, batch, gradient accumulation,
+resolution), *Network and optimizer* (base model, trainer, dim / alpha, learning rate, optimizer, scheduler, clip skip,
+noise offset, min SNR gamma, precision, seed) and *Result* (trained on, training time, final loss, the save point to
+try first, GPU). They are read from the LoRA file's training data first, then its launch script (the one whose
+`--output_name` is this version, also in `_old_runs/`), the plan line of the script and the repeat folders, the run log
+in `userdata/gui_logs/` and the TensorBoard log. The card is saved in the dataset's `LoraManager/<lora>.metadata.json`
+under `lorastudio`, with a scanned mark (the LoRA file's size and time): **Collection › Maintenance › Scan all LoRAs**
+reads every version once, a version is read again only when its file changes, and a version that was never read is
+read when its LoRA page opens. *Read the training again* (Training tab) reads one version again. The facts cannot be
+edited; **Edit** has *Version*, *Clip skip*, *Description*, *Trigger words*, *Notes* and the strengths. The long
+training text older versions wrote into *Notes* is taken out at the scan (your own notes stay). New runs write the
+GPU's name at the top of their run log, so their card shows it.
 
 After updating from an older LoRA Studio, press **Sync from LoRA folder** once so every dataset has its
 pictures and LoRA Manager data under the right names.

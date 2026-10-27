@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.261026y"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -800,7 +800,9 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
     LOG_DIR.mkdir(exist_ok=True)
     logfile = LOG_DIR / f"{datetime.now():%Y%m%d_%H%M%S}_{src.stem}.log"
     try:                                            # Training › Results finds the launch script of a run from this line
-        logfile.write_text(f"##LS_SCRIPT {src}\n" + (f"##LS_RESUME {resume}\n" if resume else ""), encoding="utf-8")
+        gpu = gpu_name()
+        logfile.write_text(f"##LS_SCRIPT {src}\n" + (f"##LS_RESUME {resume}\n" if resume else "")
+                           + (f"##LS_GPU {gpu}\n" if gpu else ""), encoding="utf-8")
     except OSError:
         pass
 
@@ -1674,6 +1676,31 @@ def format_gpu(cards):
         name = str(c["card"]).replace("card", "GPU ")
         out.append(f'<div class="grow"><span class="gname">{name}</span>{"".join(bars)}</div>')
     return "".join(out)
+
+
+_GPU_NAME: dict = {}
+
+
+def gpu_name() -> str:
+    """The graphics card's name (nvidia-smi or rocm-smi), for the run log and the LoRA's training card."""
+    if "v" in _GPU_NAME:
+        return _GPU_NAME["v"]
+    name = ""
+    try:
+        if shutil.which("nvidia-smi"):
+            r = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True,
+                               text=True, timeout=8)
+            name = (r.stdout.strip().splitlines() or [""])[0].strip()
+        if not name:
+            exe = shutil.which("rocm-smi") or next(iter(sorted(glob.glob("/opt/rocm*/bin/rocm-smi"))), None)
+            if exe:
+                r = subprocess.run([exe, "--showproductname"], capture_output=True, text=True, timeout=8)
+                m = re.search(r"Card Series:\s*(.+)", r.stdout) or re.search(r"Card Model:\s*(.+)", r.stdout)
+                name = m.group(1).strip() if m else ""
+    except Exception:                       # noqa: BLE001
+        name = ""
+    _GPU_NAME["v"] = name
+    return name
 
 
 def gpu_status_text():
