@@ -923,8 +923,16 @@ note where they differ clearly (only with at least 2 on each side). Framings, ou
 dataset's sort as it is now. **Your graphics card** groups every run log by LoRA type and batch size / resolution:
 finished, out of video memory, other failures, and the median seconds per step. Step 5's suggested size shows what
 your good LoRAs of the type had; step 9 shows *Your graphics card* (a warning when the batch ran out of memory
-before, or that it finished before) and takes the training time from your runs at the same batch size. Results are
-kept for 10 minutes; *Read again* reads everything again.
+before, or that it finished before) and takes the training time from your runs at the same batch size.
+**Settings that work for you**: per LoRA type the medians (learning rate, dim, alpha, epochs, steps, batch) and the
+most used optimizer, scheduler and resolution of the good versions next to the others, with a note where they
+differ by a quarter or more; step 9 shows *Your good LoRAs* with them. **Training too long?**: per LoRA type, where in
+the run the save point to try first was (the epoch it advised ÷ the epochs); with 3 or more runs and a median of 80 %
+or less, step 9 says how many of the planned epochs may be enough. **How you use your LoRAs**: from the picture index
+(LoRA page › Pictures; old names count too), the pictures made with each LoRA, the median strength, when last, and
+the LoRAs never used with their size. The LoRA page's Overview says *Used in N of your pictures, usually at strength
+X*, and Edit offers that strength when none is set (3 pictures or more). Results are kept for 10 minutes; *Read
+again* reads everything again.
 
 **Training cards.** The LoRA page's **Training** tab shows what each version was trained with, in separate fields in
 four groups: *Dataset* (dataset, LoRA type, version, trigger words, pictures, repeat folders, captions), *Schedule*

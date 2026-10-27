@@ -463,6 +463,15 @@ def _insights():
     need(g["safe"] == 2 and g["oom_at"] == 4, f"wrong batch advice: {g}")
     need(abs([c for c in g["batches"] if c["batch"] == 2][0]["sps"] - 1.6) < 1e-6, "wrong seconds per step")
     need(IN._speed("steps: 10/100 [00:01<00:10, 2.00it/s] steps: 20/100 [00:02, 2.00it/s]") == 0.5, "tqdm speed not read")
+    need(IN._best_epoch("Try epoch 10 first, then the final (12)") == 10 and IN._best_epoch("Try the final (12) first") == 12,
+         "the save point advice is not read")
+    st = lambda v, lr, best: {"type": "sdxl", "label": "SDXL", "verdict": v, "facts": {}, "stem": "x",
+                              "settings": {"lr": lr, "epochs": 10, "best_ratio": best / 10, "best_epoch": best}}
+    rows = [st("good", 1e-4, 6), st("good", 1e-4, 5), st("weak", 3e-4, 7), st("weak", 3e-4, 6)]
+    ss = IN.settings_summary(rows)[0]
+    need(ss["good"]["lr"] == 1e-4 and any("Learning rate" in n for n in ss["notes"]), f"settings not compared: {ss}")
+    es = IN.epochs_summary(rows)[0]
+    need(es["n"] == 4 and es["ratio"] == 0.6 and "fewer epochs" in es["note"], f"early save points not seen: {es}")
 
 
 @check("step 5 pins win over the rules; the sort leaves out pictures that teach nothing about the subject")

@@ -603,6 +603,15 @@ def calc(ds, tkey, text):
         pass
     if gnote:
         eff.append(("Your graphics card", "⚠ too big?" if "ran out" in gnote else "fits", gnote))
+    try:                                                 # what your good LoRAs of this type were trained with
+        import insights as IN
+        sh, eh = IN.settings_hint(tkey), IN.epochs_hint(tkey, ep)
+        if sh:
+            eff.append(("Your good LoRAs", "for comparison", sh[:1].upper() + sh[1:] + " (Collection › Insights)."))
+        if eh:
+            eff.append(("Epochs", "maybe fewer", eh[:1].upper() + eh[1:] + "."))
+    except Exception:                                    # noqa: BLE001
+        pass
     if sps and total:
         mins = sps * total / 60
         line = f"about {mins:.0f} min"

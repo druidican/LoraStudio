@@ -2139,9 +2139,19 @@ def details_html(lib: Library, lora: Lora) -> tuple[str, str]:
     if lora.epoch_files:
         epochs = ("<div class='ll-muted' style='margin-top:8px'>Epoch files: "
                   + ", ".join(str(e) for e, _ in lora.epoch_files) + "</div>")
+    used = ""
+    try:
+        import insights
+        u = insights.usage_of(lora)
+        if u and u["pictures"]:
+            used = (f"<div class='ll-muted' style='margin-top:6px'>Used in <b>{u['pictures']}</b> of your pictures"
+                    + (f", usually at strength <b>{u['strength']:.2f}</b>" if u.get("strength") is not None else "")
+                    + (f", last on {esc(u['last'])}" if u.get("last") else "") + "</div>")
+    except Exception:                            # noqa: BLE001
+        pass
     head = (f"<div class='ll-dhead'><div class='ll-muted ll-upper'>{esc(lora.base)} · {esc(lora.character)}</div>"
             f"<h2>{esc(lora.display_name)}</h2><div class='ll-mono ll-muted'>{esc(lora.path)}</div>"
-            f"{issues}{epochs}</div>")
+            f"{issues}{epochs}{used}</div>")
     import trainingcard as TC
     card = TC.stored(lora.sidecar)
     if card:                                             # what you set (Edit, or synced from LoRA Manager) is shown
@@ -3389,7 +3399,16 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
             trig = sug["trigger"]
             filled.append("trigger word")
         notes = TC.strip_auto_notes(notes or "")          # the old training text is in the Training tab now
-        if strength is None and sug.get("strength") is not None:
+        use = None
+        try:
+            import insights
+            use = insights.usage_of(lora)                # how you use it in your ComfyUI pictures
+        except Exception:                        # noqa: BLE001
+            pass
+        if strength is None and use and use.get("strength") is not None and use["pictures"] >= 3:
+            strength = round(float(use["strength"]), 2)
+            filled.append(f"strength {strength}: the median of the {use['pictures']} pictures you made with it")
+        elif strength is None and sug.get("strength") is not None:
             strength = sug["strength"]
             filled.append("strength")
         clip_s = tips.get("clip_strength")

@@ -3,7 +3,8 @@
 
 Everything is read on this computer from what LoRA Studio already has; nothing is sent anywhere.
 
-1. Datasets behind good and weak LoRAs. A version counts as GOOD when you rated it 4 or 5 on its LoRA page, or (not
+1. Datasets behind good and weak LoRAs (and, the same way, the settings of the good ones: "settings that work for
+   you", shown in step 9 next to the general recommendations). A version counts as GOOD when you rated it 4 or 5 on its LoRA page, or (not
    rated) when it is the ★ best version or you made pictures with it in ComfyUI; WEAK when you rated it 1 or 2.
    Unrated versions without either sign are left out. Per LoRA type the datasets of the good ones are compared with
    the others: pictures, pictures × repeats, framings, outfits, places, detail shots and caption length.
@@ -13,6 +14,11 @@ Everything is read on this computer from what LoRA Studio already has; nothing i
    resolution, whether it finished, ran out of video memory or failed otherwise, and the time per step. Per LoRA
    type: the batch sizes that worked, the ones that ran out of memory, and seconds per step, for a better time
    estimate in step 9.
+
+3. Training too long? Per LoRA type, where in the run the save point to try first was (savepoint.py's advice, kept in
+   the training card): usually early means fewer epochs would do (step 9 says how many).
+4. How you use your LoRAs: from the picture index (LoRA page › Pictures), how many pictures you made with each LoRA,
+   the strength you use (the LoRA page offers it as its strength) and when last; LoRAs never used.
 
 With few LoRAs these are hints, not rules: every number says how many LoRAs or runs it comes from.
 """
@@ -138,9 +144,163 @@ def dataset_rows(lib) -> list[dict]:
         calc = re.match(r"(\d+) pictures with repeats", card.get("steps_calc") or "")
         f["samples"] = float(calc.group(1)) if calc else None
         f["steps"] = _num(card.get("steps"))
+        st = {}                                          # the training settings, for "settings that work for you"
+        try:
+            st["lr"] = float(str(card.get("lr") or "").split()[0])
+        except (ValueError, IndexError):
+            pass
+        nw = re.match(r"\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)", card.get("network") or "")
+        if nw:
+            st["dim"], st["alpha"] = float(nw.group(1)), float(nw.group(2))
+        ep = re.findall(r"\d+", card.get("epochs") or "")
+        if ep:
+            st["epochs"] = float(ep[-1])
+        st["steps"] = _num(re.findall(r"\d+", card.get("steps") or "")[-1]) if re.findall(r"\d+", card.get("steps") or "") else None
+        st["batch"] = _num(card.get("batch"))
+        for k in ("optimizer", "resolution"):
+            if card.get(k):
+                st[k] = str(card[k])
+        if card.get("scheduler"):
+            st["scheduler"] = str(card["scheduler"]).split(" ·")[0]
+        be = _best_epoch(card.get("best_epoch") or "")
+        if be and st.get("epochs"):
+            st["best_ratio"] = be / st["epochs"]
+            st["best_epoch"] = be
         rows.append({"type": card.get("_tkey") or "", "label": card.get("lora_type") or l.base, "verdict": v,
-                     "why": why, "stem": l.stem, "ds": l.dataset.name, "facts": f})
+                     "why": why, "stem": l.stem, "ds": l.dataset.name, "facts": f, "settings": st,
+                     "gid": l.gid, "size": _size(l)})
     return rows
+
+
+def _size(l) -> int:
+    try:
+        return Path(l.path).stat().st_size
+    except (OSError, TypeError):
+        return 0
+
+
+def _best_epoch(text: str):
+    """'Try epoch 10 first, then the final (12)' -> 10; 'Try the final (12) first' -> 12."""
+    m = re.match(r"\s*Try epoch (\d+)", text)
+    if m:
+        return int(m.group(1))
+    m = re.match(r"\s*Try the final \((\d+)\)", text)
+    return int(m.group(1)) if m else None
+
+
+# --------------------------------------------------------------------------- 1. settings that work for you
+SET_NUM = [("lr", "Learning rate"), ("dim", "Network dim"), ("alpha", "Network alpha"), ("epochs", "Epochs"),
+           ("steps", "Steps"), ("batch", "Batch size")]
+SET_CAT = [("optimizer", "Optimizer"), ("scheduler", "Scheduler"), ("resolution", "Resolution")]
+
+
+def _lr(v) -> str:
+    return "–" if v is None else (f"{v:.0e}".replace("e-0", "e-") if 0 < v < 0.01 else f"{v:g}")
+
+
+def settings_summary(rows: list[dict]) -> list[dict]:
+    """Per LoRA type: {type, label, n_good, n_rest, rows: [(label, good, rest)], notes, good: {key: value}}."""
+    out = []
+    by: dict = {}
+    for r in rows:
+        by.setdefault(r["type"] or r["label"], []).append(r)
+    for t, rs in sorted(by.items(), key=lambda kv: -len(kv[1])):
+        good = [r for r in rs if r["verdict"] == "good"]
+        rest = [r for r in rs if r["verdict"] == "weak"] or [r for r in rs if r["verdict"] != "good"]
+        table, notes, gv = [], [], {}
+        for k, lab in SET_NUM:
+            g = _med([r["settings"].get(k) for r in good])
+            o = _med([r["settings"].get(k) for r in rest])
+            if g is None and o is None:
+                continue
+            f = _lr if k == "lr" else _fmt
+            table.append((lab, f(g), f(o)))
+            if g is not None:
+                gv[k] = g
+            if g is not None and o is not None and len(good) >= 2 and len(rest) >= 2 and abs(g - o) / (max(g, o) or 1) >= 0.25:
+                notes.append(f"{lab}: your good LoRAs used {'more' if g > o else 'less'} ({f(g)} against {f(o)}).")
+        for k, lab in SET_CAT:
+            cg = Counter(r["settings"].get(k) for r in good if r["settings"].get(k)).most_common(1)
+            co = Counter(r["settings"].get(k) for r in rest if r["settings"].get(k)).most_common(1)
+            if cg or co:
+                table.append((lab, cg[0][0] if cg else "–", co[0][0] if co else "–"))
+                if cg:
+                    gv[k] = cg[0][0]
+        out.append({"type": t, "label": rs[0]["label"], "n_good": len(good), "n_rest": len(rest), "rows": table,
+                    "notes": notes, "good": gv})
+    return out
+
+
+# --------------------------------------------------------------------------- 2. training too long
+def epochs_summary(rows: list[dict]) -> list[dict]:
+    """Per LoRA type, over every version with a save-point advice: where in the run the one to try first was."""
+    out = []
+    by: dict = {}
+    for r in rows:
+        if r["settings"].get("best_ratio"):
+            by.setdefault(r["type"] or r["label"], []).append(r)
+    for t, rs in sorted(by.items(), key=lambda kv: -len(kv[1])):
+        ratios = [r["settings"]["best_ratio"] for r in rs]
+        med = statistics.median(ratios)
+        early = sum(1 for x in ratios if x <= 0.8)
+        note = ""
+        if len(rs) >= 3 and med <= 0.8:
+            note = (f"the save point to try first was usually at about {round(100 * med)} % of the run "
+                    f"({early} of {len(rs)} runs ended more than 20 % later than needed): fewer epochs would do")
+        elif len(rs) >= 3:
+            note = "the best save point was usually near the end: the runs were not too long"
+        out.append({"type": t, "label": rs[0]["label"], "n": len(rs), "ratio": med, "early": early, "note": note,
+                    "runs": [(r["stem"], r["settings"].get("best_epoch"), r["settings"].get("epochs")) for r in rs]})
+    return out
+
+
+# --------------------------------------------------------------------------- 5. how you use your LoRAs
+def usage_rows(lib) -> list[dict]:
+    """Per LoRA (all versions together): pictures made with it, the strength you use, when last, file sizes."""
+    import lora_library as LL
+    import picgallery as PG
+    lib.ensure_loaded()
+    pics = PG.index()["pics"]
+    by_name: dict = {}
+    for path, e in pics.items():
+        when = (e.get("sig") or [0])[0]
+        for n, st in (e.get("loras") or {}).items():
+            by_name.setdefault(n, []).append((st, when))
+    out = []
+    for gid, members in lib.groups.items():
+        mine = [m for m in members if m.dataset is not None]
+        if not mine:
+            continue
+        names = {PG.norm(m.stem) for m in mine} | set(LL.picture_aliases(gid))
+        uses = [u for n in names for u in by_name.get(n, [])]
+        per = {m.stem: len(by_name.get(PG.norm(m.stem), [])) for m in mine}
+        strengths = [s for s, _ in uses if isinstance(s, (int, float))]
+        last = max((w for _, w in uses), default=0)
+        out.append({"gid": gid, "name": mine[-1].display_name or gid, "label": mine[-1].base, "pictures": len(uses),
+                    "strength": statistics.median(strengths) if strengths else None, "per_version": per,
+                    "last": time.strftime("%Y-%m-%d", time.localtime(last)) if last else "",
+                    "size": sum(_size(m) for m in mine), "versions": len(mine)})
+    return sorted(out, key=lambda r: -r["pictures"])
+
+
+def usage_of(lora) -> dict | None:
+    """{pictures, strength} for one LoRA (all its versions), from the cached Insights; None when not known."""
+    with _LOCK:
+        hit = _USE if time.time() - _USE.get("t", 0) < TTL else None
+    if hit is None:                                    # only the picture index: quick, also on the first LoRA page
+        try:
+            import lora_library as LL
+            rows = usage_rows(LL.LIB)
+        except Exception:                              # noqa: BLE001
+            return None
+        with _LOCK:
+            _USE.clear()
+            _USE.update(t=time.time(), rows={r["gid"]: r for r in rows})
+        hit = _USE
+    return hit["rows"].get(lora.gid)
+
+
+_USE: dict = {}
 
 
 def dataset_summary(rows: list[dict]) -> list[dict]:
@@ -294,7 +454,13 @@ def compute(lib=None, force=False) -> dict:
     except Exception as e:                             # noqa: BLE001
         print(f"[Insights] runs: {e!r}")
         rrows = []
+    try:
+        urows = usage_rows(lib)
+    except Exception as e:                             # noqa: BLE001
+        print(f"[Insights] usage: {e!r}")
+        urows = []
     v = {"datasets": dataset_summary(drows), "drows": drows, "gpu": gpu_summary(rrows), "rrows": rrows,
+         "settings": settings_summary(drows), "epochs": epochs_summary(drows), "usage": urows,
          "at": time.strftime("%H:%M")}
     with _LOCK:
         _CACHE.update(t=time.time(), v=v)
@@ -304,6 +470,7 @@ def compute(lib=None, force=False) -> dict:
 def forget():
     with _LOCK:
         _CACHE["v"] = None
+        _USE.clear()
 
 
 def dataset_hint(tkey: str) -> str:
@@ -327,6 +494,40 @@ def dataset_hint(tkey: str) -> str:
         bits.append(f"{_fmt(vals['Outfits'])} outfits")
     return (f"Your {s['n_good']} good {s['label']} LoRAs had (median) " + ", ".join(bits) + ". Collection › Insights."
             if bits else "")
+
+
+def settings_hint(tkey: str) -> str:
+    """Step 9: the settings of your good LoRAs of this type ('' with fewer than 2)."""
+    try:
+        v = compute()
+    except Exception:                                  # noqa: BLE001
+        return ""
+    s = next((x for x in v["settings"] if x["type"] == tkey), None)
+    if not s or s["n_good"] < 2:
+        return ""
+    g = s["good"]
+    bits = [f"learning rate {_lr(g['lr'])}" if g.get("lr") else "",
+            f"dim {_fmt(g['dim'])} / alpha {_fmt(g['alpha'])}" if g.get("dim") and g.get("alpha") else "",
+            f"{_fmt(g['epochs'])} epochs" if g.get("epochs") else "", f"{_fmt(g['steps'])} steps" if g.get("steps") else "",
+            f"{g['optimizer']}" if g.get("optimizer") else ""]
+    bits = [b for b in bits if b]
+    return f"your {s['n_good']} good {s['label']} LoRAs (median): " + ", ".join(bits) if bits else ""
+
+
+def epochs_hint(tkey: str, epochs: int | None) -> str:
+    """Step 9: whether your runs of this type usually peaked early."""
+    try:
+        v = compute()
+    except Exception:                                  # noqa: BLE001
+        return ""
+    s = next((x for x in v["epochs"] if x["type"] == tkey), None)
+    if not s or s["n"] < 3 or s["ratio"] > 0.8:
+        return ""
+    if epochs:
+        want = max(1, round(epochs * s["ratio"] + 0.49))
+        return (f"in your {s['n']} runs of this type the save point to try first was at about {round(100 * s['ratio'])} "
+                f"% of the run: about {want} of these {epochs} epochs may be enough (save points let you pick)")
+    return s["note"]
 
 
 def gpu_hint(tkey: str, batch: int | None, steps: int | None) -> str:
@@ -381,6 +582,47 @@ def page_html(v: dict, esc) -> str:
         elif s["n_good"] < 2 or s["n_rest"] < 2:
             H.append("<p class='ll-muted'>Too few LoRAs of this type on one side to compare yet (2 each are needed).</p>")
         H.append("</div>")
+    H.append("<h3>Settings that work for you</h3>")
+    st = [s for s in v.get("settings") or [] if s["n_good"]]
+    if not st:
+        H.append("<p class='ll-muted'>No good LoRAs yet to learn from (see above how a version counts as good).</p>")
+    for s in st:
+        H.append(f"<div class='ll-tcard' style='margin:8px 0'><div class='rs-label'>{esc(s['label'].upper())}</div>"
+                 f"<p class='ll-muted'>{s['n_good']} good · {s['n_rest']} others (medians; the most used for names)</p>"
+                 "<table class='rs-table'><thead><tr><th></th><th>Good</th><th>Others</th></tr></thead><tbody>"
+                 + "".join(f"<tr><td>{esc(a)}</td><td><b>{esc(str(b))}</b></td><td>{esc(str(c))}</td></tr>"
+                           for a, b, c in s["rows"]) + "</tbody></table>"
+                 + ("<ul>" + "".join(f"<li>{esc(n)}</li>" for n in s["notes"]) + "</ul>" if s["notes"] else "")
+                 + "</div>")
+    H.append("<h3>Training too long?</h3>")
+    ep = v.get("epochs") or []
+    if not ep:
+        H.append("<p class='ll-muted'>No finished runs with save points and a log yet.</p>")
+    for s in ep:
+        runs = " · ".join(f"{esc(n)}: {b} of {int(t)}" for n, b, t in s["runs"][:12])
+        H.append(f"<div class='ll-tcard' style='margin:8px 0'><div class='rs-label'>{esc(s['label'].upper())}</div>"
+                 f"<p>{s['n']} run{'s' if s['n'] != 1 else ''} · the save point to try first was at "
+                 f"<b>{round(100 * s['ratio'])} %</b> of the run (median)"
+                 + (f": {esc(s['note'])}" if s["note"] else " (3 runs are needed for advice)") + "</p>"
+                 f"<p class='ll-muted ll-mono'>{runs}</p></div>")
+    H.append("<h3>How you use your LoRAs</h3>")
+    us = v.get("usage") or []
+    if not any(u["pictures"] for u in us):
+        H.append("<p class='ll-muted'>No pictures found yet: scan your ComfyUI picture folders (LoRA page › Pictures › "
+                 "Scan all picture folders).</p>")
+    else:
+        rows = "".join(
+            f"<tr><td>{esc(u['name'])}</td><td>{esc(u['label'])}</td><td>{u['pictures']}</td>"
+            f"<td>{_sps(u['strength'])}</td>"
+            f"<td>{esc(u['last'])}</td></tr>" for u in us if u["pictures"])
+        H.append("<table class='rs-table'><thead><tr><th>LoRA</th><th>Type</th><th>Pictures</th><th>Strength you use</th>"
+                 "<th>Last used</th></tr></thead><tbody>" + rows + "</tbody></table>")
+        unused = [u for u in us if not u["pictures"]]
+        if unused:
+            mb = sum(u["size"] for u in unused) / 1e6
+            H.append(f"<p><b>Never used in your pictures</b> ({len(unused)}, {mb:.0f} MB): "
+                     + ", ".join(esc(u["name"]) for u in unused[:40])
+                     + ". Candidates for a clean-up, or for a test (Training › Results › test pictures).</p>")
     H.append("<h3>Your graphics card</h3>")
     if not v["gpu"]:
         H.append("<p class='ll-muted'>No run logs yet (userdata/gui_logs/): they are written by every run started "
