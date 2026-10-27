@@ -231,6 +231,24 @@ def leaks(caption: str, leave_out: str) -> list[str]:
     return hits
 
 
+# trait categories a character description may be suggested from (never ethnicity, skin, age or body parts)
+DESCRIBE_OK = ("hair colour", "eye colour", "freckles", "tattoos", "body shape", "facial features", "face", "makeup")
+
+
+def trait_tags(text: str, leave_out: str) -> list[str]:
+    """The tags of a raw tag line that name a left-out trait of a describable kind (blonde hair, blue eyes, slim,
+    freckles): the material for a suggested character description."""
+    out = []
+    for x in re.split(r"[,\n]", text or ""):
+        x = x.strip().strip('"\'.').lower().replace("_", " ")
+        if not x or len(x.split()) > 4:
+            continue
+        hit = leaks(x, leave_out)
+        if hit and all(h in DESCRIBE_OK for h in hit):
+            out.append(x)
+    return out
+
+
 def clean(text: str, trigger: str) -> str:
     """One tidy line that contains the trigger word (put in front when the model left it out)."""
     t = re.sub(r"<think>.*?</think>", "", text or "", flags=re.S)

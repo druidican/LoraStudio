@@ -1164,8 +1164,36 @@ def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
     STOP.clear()
     cap = S.CAP if S.CAP is not None else __import__("captioner")
     max_tags = cap.TAG_COUNT.get(int(length or 3), 20)
+    traits: dict = {}
     yield from WD.tag(imgs, (trigger or ds).strip(), leave_out or "", max_tags,
-                      lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP)
+                      lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP, traits)
+    if traits.get("_n"):
+        m = meta(ds)
+        m["trait_tags"] = traits                         # Character description › Suggest (step 7)
+        meta_save(ds, m)
+
+
+def suggest_description(ds) -> str:
+    """The traits the WD tagger saw in at least 40 % of the pictures (left out of the captions): a starting point for
+    the character description. Only hair, eyes, build, freckles, tattoos and such: never ethnicity, skin or age."""
+    t = dict(meta(ds).get("trait_tags") or {})
+    n = t.pop("_n", 0)
+    if not n:
+        return ""
+    keep = [k for k, c in sorted(t.items(), key=lambda kv: -kv[1]) if c >= max(2, 0.4 * n)]
+    return ", ".join(keep[:10])
+
+
+def description(ds) -> str:
+    return (meta(ds).get("description") or "").strip() if ds else ""
+
+
+def set_description(ds, text: str) -> str:
+    words = [w.strip() for w in re.split(r"[,\n]", text or "") if w.strip()]
+    m = meta(ds)
+    m["description"] = ", ".join(dict.fromkeys(words))
+    meta_save(ds, m)
+    return m["description"]
 
 
 def mirror_kept(ds, ext, url, model, trigger) -> str:

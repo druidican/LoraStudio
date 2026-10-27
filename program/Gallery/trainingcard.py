@@ -32,7 +32,8 @@ CARD_VERSION = 2                       # raise when the fields change: every car
 GROUPS = ("Dataset", "Schedule", "Network and optimizer", "Result")
 FIELDS = [   # (group, key, label)
     ("Dataset", "dataset", "Dataset"), ("Dataset", "lora_type", "LoRA type"), ("Dataset", "version", "Version"),
-    ("Dataset", "trigger", "Trigger words"), ("Dataset", "pictures", "Pictures"),
+    ("Dataset", "trigger", "Trigger words"), ("Dataset", "description", "Character description"),
+    ("Dataset", "pictures", "Pictures"),
     ("Dataset", "repeats", "Repeat folders"), ("Dataset", "captions", "Captions"),
     ("Schedule", "epochs", "Epochs"), ("Schedule", "steps", "Steps"), ("Schedule", "steps_calc", "How the steps add up"),
     ("Schedule", "batch", "Batch size"), ("Schedule", "grad_acc", "Gradient accumulation"),
@@ -125,6 +126,17 @@ def find_script(lora) -> tuple[Path | None, str]:
         except OSError:
             pass
     return None, ""
+
+
+def _desc(lora) -> str:
+    """The character description of the dataset (step 7), '' when none."""
+    if lora.dataset is None:
+        return ""
+    try:
+        import dsflow
+        return dsflow.description(lora.dataset.name)
+    except Exception:                                  # noqa: BLE001
+        return ""
 
 
 def _run_log(script: Path | None, stem: str) -> Path | None:
@@ -252,6 +264,9 @@ def build(lib, lora) -> dict:
             pass
     if trig:
         c["trigger"] = ", ".join(trig)
+    desc = _desc(lora)
+    if desc:
+        c["description"] = desc
     # pictures and repeats: what the file says was trained, else the repeat folders now
     folders = _folders_from_meta(m)
     plan = re.search(r"Plan: (\d+) images x (\d+) repeats, batch (\d+) x accum (\d+)", text or "")
@@ -373,7 +388,11 @@ def stored(sidecar: dict | None) -> dict:
 
 
 def is_scanned(lora) -> bool:
-    return bool(lora.sidecar) and ((lora.sidecar.get("lorastudio") or {}).get("scanned") or {}).get("sig") == file_sig(lora)
+    """Scanned, and the character description has not changed since."""
+    if not lora.sidecar:
+        return False
+    ls = lora.sidecar.get("lorastudio") or {}
+    return (ls.get("scanned") or {}).get("sig") == file_sig(lora) and (ls.get("desc_added") or "") == _desc(lora)
 
 
 def strip_auto_notes(notes: str) -> str:
@@ -394,6 +413,19 @@ def apply(sidecar: dict, card: dict, sig: str) -> dict:
     civ = dict(out.get("civitai") or {})
     if card.get("version"):
         civ["name"] = card["version"]                   # LoRA Studio knows the version: it wins (LoRA Manager shows N/A)
+    desc = card.get("description") or ""
+    if desc != (ls.get("desc_added") or ""):            # a new or changed description: its words join the trigger words
+        words = list(civ.get("trainedWords") or [])
+        if not words and card.get("trigger"):
+            words = [w.strip() for w in card["trigger"].split(",") if w.strip()]
+        old = {w.strip().lower() for w in (ls.get("desc_added") or "").split(",") if w.strip()}
+        words = [w for w in words if w.strip().lower() not in old]          # the old description's words go
+        for w in [x.strip() for x in desc.split(",") if x.strip()]:
+            if w.lower() not in {x.lower() for x in words}:
+                words.append(w)
+        civ["trainedWords"] = words
+        ls["desc_added"] = desc
+        out["lorastudio"] = ls
     out["civitai"] = civ
     tips = usage_tips(out)
     if not _num(tips.get("clip_skip")):

@@ -474,6 +474,18 @@ def _insights():
     need(es["n"] == 4 and es["ratio"] == 0.6 and "fewer epochs" in es["note"], f"early save points not seen: {es}")
 
 
+@check("character description: suggested from the left-out tags, added next to the trigger word")
+def _desc():
+    import captioner as C
+    import trainingcard as TC
+    t = C.trait_tags("1girl, blonde_hair, blue eyes, dark skin, large breasts, freckles, smile", C.DEFAULT_LEAVE_OUT)
+    need(t == ["blonde hair", "blue eyes", "freckles"], f"wrong traits suggested: {t}")
+    sc = TC.apply({"civitai": {"trainedWords": ["pip"]}}, {"trigger": "pip", "description": "tall, blonde hair"}, "s")
+    need(sc["civitai"]["trainedWords"] == ["pip", "tall", "blonde hair"], f"not next to the trigger: {sc['civitai']}")
+    sc2 = TC.apply(sc, {"trigger": "pip", "description": "slim build"}, "s")
+    need(sc2["civitai"]["trainedWords"] == ["pip", "slim build"], f"the old description stayed: {sc2['civitai']}")
+
+
 @check("the queue stops what a run leaves behind")
 def _sweep():
     import subprocess

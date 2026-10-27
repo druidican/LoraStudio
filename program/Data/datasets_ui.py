@@ -914,6 +914,20 @@ def build(app, show):
                 s7_missing = gr.Button("Only pictures without a caption", size="sm", scale=0, min_width=240)
                 s7_stop = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=90)
             s7_out = gr.Markdown()
+            with gr.Column(elem_classes=["ls-card"], visible=False) as s7_desc_card:
+                gr.Markdown("#### Character description, next to the trigger word")
+                gr.Markdown("The captions leave the character's own traits out, so the trigger word learns them. Name "
+                            "them here too (for example *slim build, tall, blonde hair, blue eyes*): they are added to "
+                            "the LoRA's trigger words in its LoRA Manager data, so ComfyUI offers them next to the "
+                            "trigger word to strengthen the character in a prompt. The captions do not change. "
+                            "*Suggest* takes the traits the WD tagger saw in most pictures (hair, eyes, freckles, "
+                            "tattoos; never ethnicity, skin or age).", elem_classes=["ls-note"])
+                s7_desc = gr.Textbox(label="Character description", placeholder="slim build, tall, blonde hair, blue eyes",
+                                     lines=1)
+                with gr.Row(elem_classes=["ls-bar"]):
+                    s7_desc_save = gr.Button("Save", variant="primary", size="sm", scale=0, min_width=100)
+                    s7_desc_sug = gr.Button("Suggest from the tags", size="sm", scale=0, min_width=200)
+                s7_desc_msg = gr.Markdown()
             with gr.Accordion("Caption settings: length, detail, never describe, try on 3 pictures", open=False):
                 show("p_caption")
             with gr.Column(elem_classes=["ls-card"]) as s7_cons:
@@ -1231,6 +1245,34 @@ def build(app, show):
     box8 = gr.Textbox(visible=False)
     box1 = gr.Textbox(visible=False)
     box.change(route, [box, st], [st, navbox, box6, box8, box1], show_progress="hidden")
+
+    def desc_load(s):
+        if s.get("view") != "flow" or s.get("step") != 7 or not s.get("ds"):
+            return gr.update(), gr.update(), gr.update()
+        ch = DC.base_purpose(F.meta(s["ds"])["purpose"]) == "character"
+        return gr.update(visible=ch), gr.update(value=F.description(s["ds"])), ""
+    navbox.change(desc_load, st, [s7_desc_card, s7_desc, s7_desc_msg], show_progress="hidden")
+
+    def desc_save(s, text):
+        if not s.get("ds"):
+            return gr.update(), ""
+        d = F.set_description(s["ds"], text)
+        return d, (f"✔ Saved. The LoRAs of this dataset get *{d}* next to their trigger word when they are scanned "
+                   "(they are read again by themselves; Collection › Maintenance › Sync now passes it on to LoRA "
+                   "Manager)." if d else "✔ No description: only the trigger word.")
+    s7_desc_save.click(desc_save, [st, s7_desc], [s7_desc, s7_desc_msg])
+
+    def desc_suggest(s, cur):
+        sug = F.suggest_description(s.get("ds")) if s.get("ds") else ""
+        if not sug:
+            return gr.update(), ("Nothing to suggest yet: write the tag captions with the WD tagger first (tags only; "
+                                 "for sentence captions type the description yourself).")
+        words = [w.strip() for w in (cur or "").split(",") if w.strip()]
+        for w in sug.split(", "):
+            if w.lower() not in {x.lower() for x in words}:
+                words.append(w)
+        return ", ".join(words), "Suggested from the tags: check it, add build or height yourself, then **Save**."
+    s7_desc_sug.click(desc_suggest, [st, s7_desc], [s7_desc, s7_desc_msg])
     navbox.change(refresh_all, [st, e_find, s8_show, UI["cs_text"], UI["oc"]["leave"]], all_outs, show_progress="hidden")
     for b, view in ((b_new, "new"), (b_edit, "edit"), (b_imp, "imp")):
         after_nav(b.click(lambda s, v=view: go(s, view=v, mode=v if v != "imp" else s.get("mode", "new")), st, st,

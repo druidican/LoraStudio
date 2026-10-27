@@ -91,7 +91,7 @@ def _install(py: Path):
     return True
 
 
-def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, stop=None):
+def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, stop=None, traits: dict | None = None):
     """Generator of progress lines. `write(img, line)` stores one finished caption. Returns nothing; the last line
     says how it went."""
     import captioner as CAP
@@ -157,6 +157,10 @@ def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, 
             if img is None:
                 continue
             raw = f.read_text(encoding="utf-8", errors="ignore")
+            if traits is not None:                       # the left-out traits, for a suggested description
+                for t in set(CAP.trait_tags(raw, leave_out)):
+                    traits[t] = traits.get(t, 0) + 1
+                traits["_n"] = traits.get("_n", 0) + 1
             line, _ = CAP.clean_tags(raw, trigger, leave_out, max_tags)
             if line.count(",") < 1:
                 empty += 1

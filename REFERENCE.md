@@ -92,6 +92,13 @@ The steps (the bar above them shows the dataset, its LoRA types and purpose; the
    captions so the trigger word learns them, words that mean the same become one word, and odd pictures that say
    something else are shown so you can look (fix, or this picture only). Clothes, places, poses, expressions and light
    stay in each caption. *Apply to the other caption set too* takes the same traits out of the second set.
+   **Character description** (character datasets): the traits the trigger word learns, named in words (*slim build,
+   tall, blonde hair, blue eyes*), saved in the dataset. They are added to the LoRA's trigger words in its LoRA Manager
+   data (after the trigger word; a changed description replaces the old words), so ComfyUI offers them next to the
+   trigger word; the captions do not change. *Suggest from the tags* takes the traits the WD tagger saw in at least
+   40 % of the pictures while writing the tags (hair and eye colour, freckles, tattoos, face, makeup; never ethnicity,
+   skin, age or body parts); build and height are typed by you. The LoRA page's training card shows it, and the
+   versions are read again by themselves when it changes; *Sync now* passes it on to LoRA Manager.
    **For a style LoRA** the captions describe everything *in* the picture (the people with their hair, eyes and
    clothes, objects, the place, the light, the composition) and never the style itself: *Never describe* holds the
    art style, medium, technique and artist words, so the trigger word learns the style; the consistency check is

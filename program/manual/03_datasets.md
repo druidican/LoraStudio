@@ -78,6 +78,11 @@ Writes a caption for every picture. **Tags** (Illustrious, Pony, SDXL, Anima) co
 For a character, captions describe what **changes** (clothes, pose, place) and leave out what is always the
 character, so the trigger word learns it. The consistency check finds traits that are named in different ways.
 
+**Character description**: name those traits in words too (*slim build, tall, blonde hair, blue eyes*). They are put
+next to the trigger word in the LoRA's LoRA Manager data, so ComfyUI offers them with it and you can add them to a
+prompt to make the character stronger. The captions stay as they are. *Suggest from the tags* fills in what the WD
+tagger saw in most pictures; add build and height yourself.
+
 ## 8 · Review
 
 ![Step 8: the folder, the checks and every picture with its caption](img/step8.jpg)
