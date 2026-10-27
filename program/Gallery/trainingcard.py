@@ -18,7 +18,7 @@ model when empty and the clip skip (usage_tips; 1 when nothing says otherwise). 
 sync: LoRA Manager's when LoRA Studio has none, the dataset's trigger word when neither has any.
 """
 from __future__ import annotations
-__version__ = "1.261026y"  # LoRA Studio version, see version.py
+__version__ = "1.261026z"  # LoRA Studio version, see version.py
 
 import json
 import math
@@ -27,7 +27,7 @@ import sys
 import time
 from pathlib import Path
 
-CARD_VERSION = 1                       # raise when the fields change: every card is filled again once
+CARD_VERSION = 2                       # raise when the fields change: every card is filled again once
 
 GROUPS = ("Dataset", "Schedule", "Network and optimizer", "Result")
 FIELDS = [   # (group, key, label)
@@ -232,6 +232,7 @@ def build(lib, lora) -> dict:
         c["dataset"] = lora.dataset.name
     t = sg.script_type(str(script), text) if (sg is not None and script) else ""
     if t:
+        c["_tkey"] = t
         try:
             lab = {k: v for v, k in sg.type_choices()}.get(t, t)
             c["lora_type"] = re.sub(r"\s*\[template\]", "", lab)

@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.261026x"  # LoRA Studio version, see version.py
+__version__ = "1.261026z"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -320,8 +320,16 @@ def s4_html(ds) -> str:
 
 # --------------------------------------------------------------------------- 5 Select
 def s5_suggest_html(ds, n, rng, why) -> str:
+    hint = ""
+    try:                                                 # what the datasets of your good LoRAs of this type had
+        import insights as IN
+        t = (F.meta(ds)["types"] or [""])[0]
+        hint = IN.dataset_hint(t) if t else ""
+    except Exception:                                    # noqa: BLE001
+        pass
     return (f'<div class="ds-sug"><span class="rs-label">SUGGESTED SIZE</span><div class="rs-big">{n} pictures '
-            f'<span class="ls-note">({rng} works)</span></div><div class="ls-note">{esc(why)}</div></div>')
+            f'<span class="ls-note">({rng} works)</span></div><div class="ls-note">{esc(why)}</div>'
+            + (f'<div class="ls-note" style="margin-top:6px">★ {esc(hint)}</div>' if hint else "") + '</div>')
 
 
 def s5_grid(ds, keep_n):
@@ -578,14 +586,30 @@ def calc(ds, tkey, text):
         calc_html += (f'<p class="ls-note"><b>Recommended repeats: {rec["want_repeats"]}</b> (the folder says {rep}). Change '
                       "Repeats below, or use the Repeat folder fold-out.</p>")
     eff = []
-    sps = _sec_per_step(tkey)
+    sps, gnote = _sec_per_step(tkey), ""
+    try:                                                 # your own runs of this type: per batch size, and memory
+        import insights as IN
+        g = next((x for x in IN.compute()["gpu"] if x["type"] == tkey), None)
+        if g:
+            same = [c["sps"] for c in g["batches"] if c["sps"] and c["batch"] == bs]
+            if same:
+                sps = sorted(same)[len(same) // 2]
+            if g["oom_at"] and bs >= g["oom_at"]:
+                gnote = (f"batch {g['oom_at']} ran out of video memory before"
+                         + (f"; batch {g['safe']} finished" if g["safe"] else "") + " (Collection › Insights)")
+            elif g["safe"] and bs <= g["safe"]:
+                gnote = f"batch {bs} has finished before on this computer"
+    except Exception:                                    # noqa: BLE001
+        pass
+    if gnote:
+        eff.append(("Your graphics card", "⚠ too big?" if "ran out" in gnote else "fits", gnote))
     if sps and total:
         mins = sps * total / 60
         line = f"about {mins:.0f} min"
         if rec:
             d = sps * (total - rec["total_steps"]) / 60
             line += f" ({'+' if d >= 0 else '−'}{abs(d):.0f} min against the recommendation)"
-        eff.append(("Training time", line, f"from your last run of this type ({sps:.1f} s per step)"))
+        eff.append(("Training time", line, f"from your earlier runs of this type ({sps:.2f} s per step)"))
     else:
         eff.append(("Training time", "unknown", "known after the first finished run of this type"))
     purpose = F.meta(ds)["purpose"]

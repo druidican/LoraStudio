@@ -34,7 +34,7 @@ Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.261026y"  # LoRA Studio version, see version.py
+__version__ = "1.261026z"  # LoRA Studio version, see version.py
 
 import contextlib
 import copy
@@ -3108,6 +3108,9 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                     with gr.Row():
                         e_ver = gr.Textbox(label="Version", info="shown as the version in ComfyUI's LoRA Manager", scale=1)
                         e_cskip = gr.Number(label="Clip skip", value=None, precision=0, minimum=1, scale=1)
+                        e_rate = gr.Radio([("–", 0), ("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5)], value=0,
+                                          label="Your rating", info="4-5 good, 1-2 weak: Collection › Insights compares "
+                                          "the datasets behind them", scale=2)
                     e_trig = gr.Textbox(label="Trigger words (one per line)", lines=3)
                     e_desc = gr.Textbox(label="Description", lines=3)
                     e_notes = gr.Textbox(label="Notes", lines=3)
@@ -3126,6 +3129,17 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                                     "(the Training tab) come from the LoRA file, its launch script and its log and cannot be edited.",
                                     elem_classes=["ls-note"])
                     e_msg = gr.Markdown()
+
+        # ---------------- Insights: what your datasets, LoRAs and runs say ---------------- #
+        with gr.Tab("Insights", id="insights") as ins_tab:
+            gr.Markdown("### Insights", elem_classes=["ls-h"])
+            gr.Markdown("What your own datasets, LoRAs and runs say, read on this computer: the datasets behind your good "
+                        "and weak LoRAs, and what your graphics card managed per LoRA type. With few LoRAs these are "
+                        "hints, not rules: each says how many it comes from. Step 5 and step 9 show the short version.",
+                        elem_classes=["ls-note"])
+            with gr.Row(elem_classes=["ls-bar"]):
+                ins_btn = gr.Button("Read again", size="sm", scale=0, min_width=130)
+            ins_html = gr.HTML()
 
         # ---------------- Maintenance: Sync | Clean up ---------------- #
         with gr.Tab("Maintenance", id="maint"):
@@ -3331,7 +3345,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
 
     detail_outputs = [d_preview, d_head, d_settings, d_loss,
                       e_name, e_char, e_trig, e_notes, e_str, e_clip, e_nsfw, e_fav, e_flag, e_reason, e_msg,
-                      pick_dd, ver_dd, cur_key, e_done, d_empty, d_body, e_ver, e_cskip, e_desc, d_examples]
+                      pick_dd, ver_dd, cur_key, e_done, d_empty, d_body, e_ver, e_cskip, e_desc, d_examples, e_rate]
 
     def on_pick(v):
         key = (v or "").split("|")[0]
@@ -3350,7 +3364,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         if not lora:
             return ([None, "", "", pd.DataFrame(columns=["step", "loss"])] + [gr.update()] * 10
                     + ["", gr.update(), gr.update(), "", gr.update(value=False, interactive=False), gr.update(visible=True),
-                       gr.update(visible=False), "", None, "", gr.update(visible=False, value=None)])
+                       gr.update(visible=False), "", None, "", gr.update(visible=False, value=None), 0])
         import trainingcard as TC
         if lora.dataset is not None and lora.final and not TC.is_scanned(lora):
             try:                                 # a version not read yet: its training card is made now
@@ -3404,7 +3418,8 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                 tips.get("clip_skip") if tips.get("clip_skip") not in (None, "") else
                 (int(TC.stored(lora.sidecar).get("clip_skip") or 1) if lora.sidecar else None),
                 (lora.sidecar or {}).get("modelDescription", ""),
-                gr.update(value=[str(p) for p in lora.examples[:40]] or None, visible=bool(lora.examples))]
+                gr.update(value=[str(p) for p in lora.examples[:40]] or None, visible=bool(lora.examples)),
+                int(ov.get("rating") or 0)]
 
     def done_checkbox(lora):
         ds, t = done_key(lora)
@@ -3442,7 +3457,8 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
     pick_dd.input(show_group, pick_dd, detail_outputs)
     ver_dd.input(show_details, ver_dd, detail_outputs)
 
-    def save_edits(key, name, char, trig, notes, strength, clip, nsfw, fav, flag, reason, ver="", cskip=None, desc=""):
+    def save_edits(key, name, char, trig, notes, strength, clip, nsfw, fav, flag, reason, ver="", cskip=None, desc="",
+                   rate=0):
         lora = LIB.loras.get(key)
         if not lora:
             return "Pick a LoRA first.", gr.update()
@@ -3477,6 +3493,15 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         char = (char or "").strip()
         if char and char != lora.character:
             ov["character"] = char
+        if rate:
+            ov["rating"] = int(rate)
+        else:
+            ov.pop("rating", None)
+        try:
+            import insights
+            insights.forget()                    # the Insights page and hints count the new rating
+        except Exception:                        # noqa: BLE001
+            pass
         if flag and flag != "none":
             ov["flag"], ov["flag_reason"] = flag, reason or ""
         else:
@@ -3516,7 +3541,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                    ).then(do_render, filters, lib_html).then(do_gallery, gal_inputs, gal_html)
 
     e_save.click(save_edits, [cur_key, e_name, e_char, e_trig, e_notes, e_str, e_clip, e_nsfw,
-                              e_fav, e_flag, e_reason, e_ver, e_cskip, e_desc], [e_msg, pick_dd]
+                              e_fav, e_flag, e_reason, e_ver, e_cskip, e_desc, e_rate], [e_msg, pick_dd]
                  ).then(do_render, filters, lib_html).then(do_gallery, gal_inputs, gal_html)
 
     def do_sync(q, b, st, g, progress=gr.Progress()):
@@ -3531,6 +3556,13 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         return TC.scan_all(LIB, bool(force), progress)
 
     tc_btn.click(do_cards, tc_force, tc_msg)
+
+    def do_insights(force=False):
+        import insights
+        return insights.page_html(insights.compute(LIB, force=bool(force)), esc)
+
+    ins_tab.select(lambda: do_insights(False), None, ins_html)
+    ins_btn.click(lambda: do_insights(True), None, ins_html)
 
     def rescan_one(key):
         import trainingcard as TC

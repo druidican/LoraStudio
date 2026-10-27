@@ -914,6 +914,18 @@ images) into each dataset's `LoraManager/` folder:
   LoRA Manager's `settings.json`) are copied to `LoraManager/<lora>_examples/` and shown under the preview on the
   LoRA page's Overview. Sample images from training are not shown.
 
+**Insights** (Collection › Insights) reads your datasets, LoRAs and run logs on this computer. A version counts as
+*good* when you rated it 4-5 (LoRA page › Edit › *Your rating*), or, not rated, when it is the ★ best version or you
+made at least 3 pictures with it; *weak* when rated 1-2; other versions are left out of the good/weak split. Per LoRA
+type, the medians of the good ones are shown next to the weak ones (or all others when none is rated weak): pictures,
+pictures × repeats per epoch, steps, close-ups, full body, outfits, places, detail shots and caption length, with a
+note where they differ clearly (only with at least 2 on each side). Framings, outfits and places come from the
+dataset's sort as it is now. **Your graphics card** groups every run log by LoRA type and batch size / resolution:
+finished, out of video memory, other failures, and the median seconds per step. Step 5's suggested size shows what
+your good LoRAs of the type had; step 9 shows *Your graphics card* (a warning when the batch ran out of memory
+before, or that it finished before) and takes the training time from your runs at the same batch size. Results are
+kept for 10 minutes; *Read again* reads everything again.
+
 **Training cards.** The LoRA page's **Training** tab shows what each version was trained with, in separate fields in
 four groups: *Dataset* (dataset, LoRA type, version, trigger words, pictures, repeat folders, captions), *Schedule*
 (epochs, steps and how they add up: pictures × repeats ÷ batch ÷ accumulation × epochs, batch, gradient accumulation,

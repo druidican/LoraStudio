@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261026y"  # LoRA Studio version, see version.py
+__version__ = "1.261026z"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -447,6 +447,22 @@ def _tcard():
     tips = _j.loads(m["usage_tips"])
     need(tips.get("strength") == 0.8 and tips.get("clip_skip") == 1, f"usage tips not merged: {tips}")
     need(m["model_name"] == "mine" and m["modelDescription"] == "", "LoRA Manager's own fields were changed")
+
+
+@check("Insights: good datasets against the others, and the batch sizes the graphics card managed")
+def _insights():
+    import insights as IN
+    mk = lambda v, n, c: {"type": "sdxl", "label": "SDXL", "verdict": v, "why": "", "stem": "x", "ds": "d",
+                          "facts": {"pictures": n, "close": c}}
+    s = IN.dataset_summary([mk("good", 40, 0.3), mk("good", 36, 0.35), mk("weak", 15, 0.8), mk("weak", 18, 0.7)])[0]
+    need(s["n_good"] == 2 and s["weak_is_rated"], f"wrong counts: {s}")
+    need(any("Pictures" in n and "more" in n for n in s["notes"]), f"no note about the number of pictures: {s['notes']}")
+    runs = [{"type": "sdxl", "label": "SDXL", "batch": b, "res": "1024", "result": r, "sps": sp}
+            for b, r, sp in ((2, "done", 1.5), (2, "done", 1.7), (4, "oom", None), (1, "done", 0.9))]
+    g = IN.gpu_summary(runs)[0]
+    need(g["safe"] == 2 and g["oom_at"] == 4, f"wrong batch advice: {g}")
+    need(abs([c for c in g["batches"] if c["batch"] == 2][0]["sps"] - 1.6) < 1e-6, "wrong seconds per step")
+    need(IN._speed("steps: 10/100 [00:01<00:10, 2.00it/s] steps: 20/100 [00:02, 2.00it/s]") == 0.5, "tqdm speed not read")
 
 
 @check("step 5 pins win over the rules; the sort leaves out pictures that teach nothing about the subject")

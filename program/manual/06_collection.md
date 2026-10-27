@@ -17,6 +17,12 @@ save point to try first). They are read from the LoRA file, its launch script an
 
 ![The training card of pip V2](img/lp_training.jpg)
 
+- **Insights** compares your own LoRAs. Rate a version on its LoRA page › Edit (*Your rating*: 4-5 good, 1-2 weak;
+  without a rating the ★ best version and versions you made pictures with count as good). Per LoRA type it shows the
+  datasets behind the good ones next to the others (pictures, repeats, steps, close-ups, full body, outfits, places,
+  detail shots, caption length), and what your graphics card managed: the batch sizes that finished, the ones that
+  ran out of video memory, and the seconds per step. Step 5 shows what your good LoRAs of the type had, and step 9
+  warns when the batch ran out of memory before and estimates the time from your own runs.
 - **Completed** marks a version as finished: its launch script is hidden in Training › Run. A new version starts
   unmarked.
 - **Maintenance** syncs LoRA Manager data and previews, and cleans up leftovers of finished runs. *Sync now* works

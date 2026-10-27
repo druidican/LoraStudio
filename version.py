@@ -14,22 +14,22 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.261026y"
-VERSION = "1.261026y"
+__version__ = "1.261026z"
+VERSION = "1.261026z"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.251026o",
-    "version.py": "1.261026y",
+    "version.py": "1.261026z",
     "program/lspaths.py": "1.251026o",
     "program/Training/sdgui.py": "1.261026y",
     "program/Training/sd_script.py": "1.261026v",
     "program/Data/sd_prepare.py": "1.261026v",
     "program/Training/sd_settings.py": "1.261026v",
-    "program/Data/datasets_ui.py": "1.261026x",
+    "program/Data/datasets_ui.py": "1.261026z",
     "program/Data/dsflow.py": "1.261026w",
     "program/Training/training_ui.py": "1.261026v",
     "program/Settings/settings_ui.py": "1.251026o",
-    "program/Gallery/lora_library.py": "1.261026y",
+    "program/Gallery/lora_library.py": "1.261026z",
     "program/Training/comfytest.py": "1.251026o",
     "program/Data/captioner.py": "1.261026v",
     "program/Data/wdtagger.py": "1.261026v",
@@ -44,7 +44,8 @@ RELEASE: dict = {
     "program/Data/housekeeping.py": "1.261026v",
     "program/Gallery/completed.py": "1.261026v",
     "program/Gallery/model_guide.py": "1.261026v",
-    "program/Gallery/trainingcard.py": "1.261026y",
+    "program/Gallery/trainingcard.py": "1.261026z",
+    "program/Gallery/insights.py": "1.261026z",
     "program/Other/ticker.py": "1.251026o",
     "program/Other/statusbar.py": "1.251026o",
     "program/Training/savepoint.py": "1.251026o",
@@ -53,7 +54,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.251026o",
     "program/Settings/updater.py": "1.251026o",
     "program/Settings/backup.py": "1.251026o",
-    "selftest.py": "1.261026y",
+    "selftest.py": "1.261026z",
     "program/Settings/machinecheck.py": "1.251026o",
     "program/Settings/selfupdate.py": "1.261026x",
     "program/Training/failcodes.py": "1.251026o",
@@ -71,6 +72,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.261026z", "Collection › Insights: the datasets behind your good and weak LoRAs side by side per LoRA type (pictures, repeats, steps, close-ups, full body, outfits, places, detail shots, caption length), and what your graphics card managed (batch sizes that finished or ran out of video memory, seconds per step). A version is good when you rate it 4-5 (new: Your rating on the LoRA page › Edit), or is the ★ best version, or has pictures made with it; weak when rated 1-2. Step 5 shows what your good LoRAs of the type had; step 9 warns about a batch that ran out of memory before and estimates the time from your runs at that batch size."),
     ("1.261026y", "Collection › LoRA page: a Training tab with the training card: dataset, LoRA type, version, trigger words, pictures and repeat folders, epochs and how the steps add up, batch, network, learning rate, optimizer, scheduler, clip skip and more, training time, final loss and the save point to try first, each in its own field, read from the LoRA file, its launch script (also in _old_runs), the repeat folders and the logs. Saved in the dataset's copy of the LoRA Manager file with a scanned mark; Maintenance › Scan all LoRAs reads every version once (again only when its file changes); the old training text in Notes is taken out. Edit has Version, Clip skip and Description. Sync now: the version name goes to LoRA Manager, trigger words come from it when LoRA Studio has none, usage tips are merged and clip skip defaults to 1, LoRA Manager's chosen preview and example pictures show on the LoRA page. New runs write the GPU name into their log."),
     ("1.261026x", "Documentation: a new INSTALL.md (step by step for Linux and Windows: what you need, the installer's questions, the first start, updates, moving to a new computer, removing it, and a troubleshooting table), linked from the README and part of the zip. The Manual describes the Hugging Face downloads, the two-way metadata sync, the usefulness check and the pins, with new pictures of step 4, step 5 and Settings › Model files; step 4's own text was updated too."),
     ("1.261026w", "Datasets › 4 Sort, for characters: pictures where clothes, pose or angle hide nearly everything about the character, or where the figure is small and the face tiny, are left out; plain hands, feet, legs or arms are left out instead of kept as detail shots (a tail, horns, a tattoo stay); the face size counts, and sharpness weighs less, so a slightly soft picture that shows the character well beats a crisp one that shows little."),
@@ -129,6 +131,7 @@ PARTS = [
     ("program/Gallery/completed.py", "finished-run marks"),
     ("program/Gallery/model_guide.py", "model guide"),
     ("program/Gallery/trainingcard.py", "the training card of a LoRA: its training data in separate fields"),
+    ("program/Gallery/insights.py", "Insights: the datasets behind good and weak LoRAs, what your graphics card managed"),
     ("program/Other/ticker.py", "the one page timer"),
     ("program/Other/statusbar.py", "status bar"),
     ("program/Training/savepoint.py", "save points"),
