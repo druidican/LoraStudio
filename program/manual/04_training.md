@@ -6,6 +6,9 @@
 ![Training › Run: the launch scripts and the queue](img/run.jpg)
 
 - The queue **stops Ollama** first, to free the video memory (it is not started again by itself).
+- Each LoRA runs as its own program, so its memory is free again when it ends. When the next one uses another model
+  (Anima → SDXL), the queue also asks ComfyUI to unload its models and waits until the video memory is empty; the
+  queue note says how much was free. With the same model the next one starts at once.
 - *Stop the queue when a run fails* is on by default: a failing script does not run the next ones on a broken setup.
 - *Mark as run* hides a script you don't want to train again (a failed or never-run one).
 - A saved state shows as *Resume from epoch N*: the run goes on from there.

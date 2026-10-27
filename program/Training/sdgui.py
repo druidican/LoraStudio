@@ -1058,7 +1058,109 @@ def queue_failstop(v):
 _Q_DONE_LOGS: list = []
 
 
+# ---- between queue items: the models of each script, and making room when they change
+MODEL_FLAGS = ("pretrained_model_name_or_path", "dit", "vae", "ae", "text_encoder", "clip_l", "clip_g", "t5xxl",
+               "qwen3", "gemma2", "byt5", "base_weights")
+
+
+def script_models(path) -> frozenset:
+    """The model files a launch script trains with (base model / DiT, VAE, text encoders, adapter)."""
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return frozenset()
+    home = script_home(path)
+    out = set()
+    for k in MODEL_FLAGS:
+        v = script_arg(text, k, home)
+        if v:
+            out.add((k, os.path.normpath(os.path.expanduser(v))))
+    for k, v in re.findall(r'^(DIT|VAE|TEXT_ENCODER|BASE_MODEL)="?([^"\n]+)"?', text, re.M):   # musubi scripts
+        out.add((k.lower(), v))
+    return frozenset(out)
+
+
+def vram_used():
+    """(used, total) video memory in bytes of the first card, or None when it cannot be read."""
+    try:
+        if shutil.which("nvidia-smi"):
+            r = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
+                               capture_output=True, text=True, timeout=8)
+            u, t = [float(x) for x in r.stdout.strip().splitlines()[0].split(",")]
+            return u * 2 ** 20, t * 2 ** 20
+        exe = shutil.which("rocm-smi") or next(iter(sorted(glob.glob("/opt/rocm*/bin/rocm-smi"))), None)
+        if exe:
+            r = subprocess.run([exe, "--showmeminfo", "vram", "--json"], capture_output=True, text=True, timeout=8)
+            out = r.stdout
+            cards = parse_rocm_smi(json.loads(out[out.index("{"): out.rindex("}") + 1]))
+            if cards and cards[0]["vram_total"]:
+                return float(cards[0]["vram_used"] or 0), float(cards[0]["vram_total"])
+    except Exception:                       # noqa: BLE001
+        pass
+    return None
+
+
+def sweep_run(proc) -> int:
+    """Stop whatever is left of a finished run (helper processes of the trainer that did not end with it, which
+    would keep video memory). Returns 1 when something had to be stopped."""
+    if proc is None:
+        return 0
+    try:
+        os.killpg(proc.pid, 0)              # anything left in the run's process group?
+    except (ProcessLookupError, PermissionError, OSError):
+        return 0
+    _signal(proc, signal.SIGTERM)
+    deadline = time.time() + 8
+    while time.time() < deadline:
+        try:
+            os.killpg(proc.pid, 0)
+        except (ProcessLookupError, PermissionError, OSError):
+            return 1
+        time.sleep(0.5)
+    _signal(proc, signal.SIGKILL)
+    return 1
+
+
+def make_room(note, idle, wait=90) -> str:
+    """The base model changes between two queue items: ComfyUI and Ollama let go of their models, and the queue
+    waits (up to `wait` seconds) until the video memory is back near what it was before the queue started."""
+    bits = []
+    try:
+        import comfytest as CT
+        url = CT.settings()["url"]
+        if CT.alive(url):
+            CT._req(url, "/free", {"unload_models": True, "free_memory": True}, timeout=10)
+            bits.append("ComfyUI unloaded its models")
+    except Exception:                       # noqa: BLE001
+        pass
+    try:
+        import ollamactl
+        ollamactl.stop_all()
+    except Exception:                       # noqa: BLE001
+        pass
+    v = vram_used()
+    if v is None:
+        return "; ".join(bits)
+    used, total = v
+    goal = max((idle or 0) + 768 * 2 ** 20, 0.08 * total)
+    t0 = time.time()
+    while used > goal and time.time() - t0 < wait:
+        note(f"waiting for the video memory to empty: {used / 2 ** 30:.1f} of {total / 2 ** 30:.1f} GB in use")
+        time.sleep(2)
+        v = vram_used()
+        if v is None:
+            break
+        used, total = v
+    bits.append(f"video memory free: {(total - used) / 2 ** 30:.1f} of {total / 2 ** 30:.1f} GB"
+                + ("" if used <= goal else " (some is still in use by another program)"))
+    return "; ".join(bits)
+
+
 def _queue_worker():
+    prev_models, prev_label, idle = None, "", None
+    v0 = vram_used()
+    if v0 is not None and not RUN.running():
+        idle = v0[0]                        # the video memory in use before the queue started (the desktop, ...)
     try:
         while True:
             with QLOCK:
@@ -1082,6 +1184,13 @@ def _queue_worker():
             if RUN.running():
                 it["state"], it["note"] = "failed", "another run is still active"
                 break
+            models = script_models(it["path"])
+            t_ = script_type(it["path"])
+            label = ((merged_presets()[1].get(t_) or {}).get("label") or t_ or Path(it["path"]).stem).split(" (")[0]
+            room = ""
+            if prev_models is not None and models != prev_models:   # another base model: make room for it first
+                it["note"] = f"another model ({prev_label} → {label}): freeing memory …"
+                room = f"model changed ({prev_label} → {label}): " + (make_room(warn, idle) or "memory freed")
             workdir, venv, trace = runner_settings()          # read fresh for every item
             if not _start_run(it["path"], workdir, venv, trace, it.get("resume", ""), warn, lambda m: None):
                 it["state"] = "failed"
@@ -1089,18 +1198,23 @@ def _queue_worker():
                 if QUEUE["stop_on_fail"]:
                     break
                 continue
+            if room:
+                it["note"] = room
             run = RUN
             while run.proc.poll() is None:
                 time.sleep(1)
             time.sleep(1.5)                                   # let the log reader finish
             code = run.proc.returncode
+            if sweep_run(run.proc):                           # helper processes left behind would keep video memory
+                print(f"[Queue] stopped processes left over from {Path(it['path']).name}", flush=True)
+            prev_models, prev_label = models, label
             took = fmt((run.ended or time.time()) - run.started)
             if QUEUE.get("killed"):
                 it["state"], it["note"] = "stopped", f"stopped by you after {took}"
                 break
             why = run_failure(run, code)
             if not why:
-                it["state"], it["note"] = "done", f"finished in {took}"
+                it["state"], it["note"] = "done", f"finished in {took}" + (f" · {room}" if room else "")
                 if run.logfile:
                     _Q_DONE_LOGS.append(Path(run.logfile).name)
             else:

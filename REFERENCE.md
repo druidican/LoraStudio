@@ -608,6 +608,14 @@ Each setting has one place:
   **Start queue**, **Stop after current** and **Stop now**.
 - Each queue item ends as **done**, **failed** (non-zero exit code, or a Python traceback in the log, with the reason
   and the log file name) or **stopped**.
+- **Between queue items**: every run is its own program, so when it ends the system frees all its video and normal
+  memory; anything the trainer left behind in the run's process group (a helper process after a crash) is stopped
+  too. When the next item trains with **other model files** (another base model, DiT, VAE or text encoder, for
+  example Anima → SDXL), the queue first makes room: ComfyUI is asked to unload its models (its `/free`, when it
+  runs at the address in Settings › Test pictures), Ollama's models are stopped, and it waits up to 90 s until the
+  video memory is back near what was in use before the queue started (read with rocm-smi or nvidia-smi). The item's
+  note says so (*model changed (Anima → SDXL): video memory free: 15.2 of 16.0 GB*). With the same model files the
+  next item starts at once.
 - The step counter is a **progress bar** that fills while training runs (orange), green when the run finished OK and
   red when it failed.
 - A script that runs several stages (Z-Image Turbo) also shows a **stage row** above the bar: one chip per stage

@@ -474,6 +474,17 @@ def _insights():
     need(es["n"] == 4 and es["ratio"] == 0.6 and "fewer epochs" in es["note"], f"early save points not seen: {es}")
 
 
+@check("the queue stops what a run leaves behind")
+def _sweep():
+    import subprocess
+    import time as _t
+    pr = subprocess.Popen(["bash", "-c", "sleep 60 & exit 0"], start_new_session=True)
+    pr.wait()
+    _t.sleep(0.3)
+    need(G.sweep_run(pr) == 1, "a left-over process was not found")
+    need(G.sweep_run(pr) == 0, "the process group is still there after the sweep")
+
+
 @check("step 5 pins win over the rules; the sort leaves out pictures that teach nothing about the subject")
 def _pins():
     import datacheck as DC
