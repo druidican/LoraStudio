@@ -492,8 +492,9 @@ run, the queue or the automatic improvement is busy):
 **Roll back the last update** puts the files of before it back (then restart). Settings › Version shows afterwards
 which parts the update changed.
 
-**From GitHub** (same card): *Check GitHub* asks github.com/druidican/LoraStudio for the newest upload to the `main`
-branch (the commit and its `version.py`, a few kB) and says whether it is newer, a new upload of the same version, or
+**From GitHub** (same card): *Updates from* chooses what counts: **Releases only** (the default: the newest version
+published as a GitHub release, pre-releases not counted) or **Betas too** (the newest upload to the `main` branch).
+*Check GitHub* asks github.com/druidican/LoraStudio for that commit and its `version.py` (a few kB) and says whether it is newer, a new upload of the same version, or
 what you have. *Install from GitHub* downloads that commit as a zip into `userdata/update_backups/downloads/` and
 installs it exactly as above (backup, self-test, back by itself), so a new upload with the same version number works
 too: only the files that differ are written. The commit you updated from is kept in `userdata/github_update.json`.

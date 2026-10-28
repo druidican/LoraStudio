@@ -537,9 +537,9 @@ def selfupdate_panel(app):
         ulog = gr.Textbox(label="LoRA Studio update", lines=10, max_lines=24, interactive=False, autoscroll=True,
                           elem_id="ls_selfupd")
         import ghupdate as GH
-        with gr.Accordion("From GitHub: the newest upload, without a zip", open=True):
-            gr.Markdown(f"Checks [github.com/{GH.repo()}](https://github.com/{GH.repo()}) (branch `{GH.branch()}`) for the "
-                        "newest upload and installs it the same safe way as a zip: a backup first, the self-test, and "
+        with gr.Accordion("From GitHub: updates without a zip", open=True):
+            gr.Markdown(f"Checks [github.com/{GH.repo()}](https://github.com/{GH.repo()}) (branch `{GH.branch()}`) for a new "
+                        "release (or, with *Betas too*, the newest upload) and installs it the same safe way as a zip: a backup first, the self-test, and "
                         "back by itself when the test fails. Only when you press the buttons. While the repository is "
                         "private, a **GitHub token** with read access to it is needed (github.com › Settings › Developer "
                         "settings › Fine-grained tokens: this repository, *Contents: read*); it is saved in "
@@ -551,6 +551,9 @@ def selfupdate_panel(app):
                                                  else "github_pat_… (empty: no token)"))
                 gh_tok_save = gr.Button("Save token", size="sm", scale=0, min_width=120)
                 gh_tok_test = gr.Button("Test token", size="sm", scale=0, min_width=120)
+            gh_chan = gr.Radio(list(GH.CHANNELS.values()), value=GH.CHANNELS[GH.channel()], label="Updates from",
+                               info="Releases only: the versions published as a release (tested). Betas too: also "
+                                    "every newer upload in between, which may still have rough edges.")
             with gr.Row(elem_classes=["ls-bar"]):
                 gh_check = gr.Button("Check GitHub", size="sm", scale=0, min_width=150)
                 gh_inst = gr.Button("Install from GitHub", variant="primary", size="sm", scale=0, min_width=190,
@@ -608,6 +611,11 @@ def selfupdate_panel(app):
         c = GH.check()
         return c["text"], gr.update(interactive=bool(c.get("ok")) and not c.get("same"))
     gh_check.click(gh_do_check, None, [gh_md, gh_inst])
+
+    def gh_set_chan(c):
+        GH.set_channel(c)
+        return "", gr.update(interactive=False)          # check again for the chosen kind
+    gh_chan.change(gh_set_chan, gh_chan, [gh_md, gh_inst])
 
     def gh_do_install():
         lines = []

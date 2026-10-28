@@ -21,7 +21,8 @@ works. It writes `userdata/lorastudio_check_<time>.md`: the file to send when so
 touched), keeps a backup of what it replaces in `update_backups/`, runs the self-test, and puts the old files back
 by itself when the test fails. It refuses while a training run, the queue or the automatic improvement is busy.
 
-**From GitHub**, without a zip: *Check GitHub* says whether there is a newer upload on GitHub, and *Install from
+**From GitHub**, without a zip: under *Updates from*, choose **Releases only** (the default: only versions published
+as a release) or **Betas too** (every newer upload in between). *Check GitHub* says whether there is a newer one, and *Install from
 GitHub* downloads and installs it the same safe way. While the repository is private, save a GitHub token with read
 access first (the field above the buttons).
 *Restart LoRA Studio* goes through `start.sh` (new packages get installed) and the page reloads by itself.

@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """Updates of LoRA Studio straight from GitHub (Settings › Updates › From GitHub), on a button.
 
-The newest upload to the main branch of github.com/druidican/LoraStudio is downloaded as a zip and installed exactly
+By default only releases count (the newest version published as a GitHub release, not a pre-release); with
+*Betas too* the newest upload to the main branch counts. The chosen one of github.com/druidican/LoraStudio is downloaded as a zip and installed exactly
 like a LoraStudio.zip (selfupdate.install): only the program files that differ change, the old ones are kept in
 update_backups/ first, the self-test runs, and when it fails the old files go back by themselves.
 
@@ -59,6 +60,21 @@ def repo() -> str:
 
 def branch() -> str:
     return (state().get("branch") or BRANCH).strip()
+
+
+CHANNELS = {"release": "Releases only", "beta": "Betas too (the newest upload)"}
+
+
+def channel() -> str:
+    """'release' (the default): only versions published as a GitHub release; 'beta': the newest upload to main."""
+    c = state().get("channel")
+    return c if c in CHANNELS else "release"
+
+
+def set_channel(c: str) -> str:
+    c = next((k for k, v in CHANNELS.items() if c in (k, v)), "release")
+    save_state(channel=c)
+    return c
 
 
 def read_token() -> str:
@@ -187,12 +203,30 @@ def check() -> dict:
     import selfupdate as SU
     import version as V
     r, b = repo(), branch()
+    ch = channel()
+    step = ""
     try:
-        step = "reading the newest commit"
-        c = json.loads(_get(f"{API}/repos/{r}/commits/{urllib.parse.quote(b)}").read().decode("utf-8"))
+        if ch == "release":
+            step = "reading the newest release"
+            try:
+                rel = json.loads(_get(f"{API}/repos/{r}/releases/latest").read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code != 404:
+                    raise
+                _get(f"{API}/repos/{r}").read()          # the repository is readable: there is just no release yet
+                return {"ok": False, "text": "There is no release on GitHub yet. Choose *Betas too* to get the "
+                                             "newest upload instead."}
+            tag = rel.get("tag_name") or ""
+            step = f"reading release {tag}"
+            c = json.loads(_get(f"{API}/repos/{r}/commits/{urllib.parse.quote(tag)}").read().decode("utf-8"))
+            msg = (rel.get("name") or tag)[:160]
+            date = (rel.get("published_at") or "")[:16].replace("T", " ")
+        else:
+            step = "reading the newest commit"
+            c = json.loads(_get(f"{API}/repos/{r}/commits/{urllib.parse.quote(b)}").read().decode("utf-8"))
+            msg = ((c.get("commit") or {}).get("message") or "").splitlines()[0][:160]
+            date = ((c.get("commit") or {}).get("committer") or {}).get("date", "")[:16].replace("T", " ")
         sha = c["sha"]
-        date = ((c.get("commit") or {}).get("committer") or {}).get("date", "")[:16].replace("T", " ")
-        msg = ((c.get("commit") or {}).get("message") or "").splitlines()[0][:160]
         step = "reading version.py"
         src = _get(f"{API}/repos/{r}/contents/version.py?ref={sha}", accept="application/vnd.github.raw").read()
         ver = SU._literal(src.decode("utf-8", "replace"), "VERSION") or "?"
@@ -202,21 +236,24 @@ def check() -> dict:
     newer = SU._vkey(ver) > SU._vkey(V.VERSION)
     same = last == sha
     older = SU._vkey(ver) < SU._vkey(V.VERSION)
+    what = "release" if ch == "release" else "upload"
     if same:
-        txt = f"✔ You have the newest upload: {ver} ({sha[:7]}, {date})."
+        txt = f"✔ You have the newest {what}: {ver} ({sha[:7]}, {date})."
     elif older:
-        txt = (f"The newest upload on GitHub is **{ver}** ({sha[:7]}, {date}), older than your **{V.VERSION}**. "
-               "Installing it goes back.")
+        txt = (f"The newest {what} on GitHub is **{ver}** ({sha[:7]}, {date}), older than your **{V.VERSION}**"
+               + (" (you have a beta)" if ch == "release" else "") + ". Installing it goes back.")
     elif newer:
-        txt = f"**A newer version is on GitHub: {ver}** ({sha[:7]}, {date}) · you have {V.VERSION}."
+        txt = (f"**A newer {'release' if ch == 'release' else 'version'} is on GitHub: {ver}** ({sha[:7]}, {date})"
+               f" · you have {V.VERSION}.")
     else:
-        txt = (f"**A new upload of {ver}** is on GitHub ({sha[:7]}, {date})"
+        txt = ((f"**Release {ver}** is on GitHub ({sha[:7]}, {date})" if ch == "release" else
+                f"**A new upload of {ver}** is on GitHub ({sha[:7]}, {date})")
                + (" · you were last updated from " + last[:7] if last else
                   " · LoRA Studio does not know which upload you have: Install takes only the files that differ") + ".")
     if msg:
-        txt += f"\n\nLast change: *{msg}*"
+        txt += f"\n\n{'Release' if ch == 'release' else 'Last change'}: *{msg}*"
     return {"ok": True, "sha": sha, "date": date, "message": msg, "version": ver, "have": V.VERSION, "newer": newer,
-            "same": same, "older": older, "text": txt}
+            "same": same, "older": older, "channel": ch, "text": txt}
 
 
 def download(sha: str, say=print) -> Path | None:
