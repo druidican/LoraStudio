@@ -486,6 +486,18 @@ def _desc():
     need(sc2["civitai"]["trainedWords"] == ["pip", "slim build"], f"the old description stayed: {sc2['civitai']}")
 
 
+@check("a chosen LoRA goes into the folder of its LoRA type, never a LoRA folder's root")
+def _copytarget():
+    import tempfile
+    import housekeeping as HK
+    r = Path(tempfile.mkdtemp())
+    (r / "illustrious").mkdir()
+    (r / "oldILLV1.safetensors").write_bytes(b"x")
+    t = HK.copy_target("oldILLV2", [str(r)], "Illustrious (SDXL)")
+    need(t["dir"] == r / "illustrious", f"went to {t['dir']}")
+    need(HK.copy_target("newSDXLV1", [str(r)], "SDXL")["dir"] == r / "SDXL", "no new type folder")
+
+
 @check("the queue stops what a run leaves behind")
 def _sweep():
     import subprocess

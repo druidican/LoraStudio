@@ -275,6 +275,10 @@ seed per row). Each save point is copied for a moment into `<LoRA folder>/_loras
 The pictures are kept in `<dataset>/model/compare/<name>/`. **Use this one** under a column copies that save point to
 your LoRA folder with its LoRA Manager data, and its first picture as the preview (`<name>.preview.png`).
 
+Where a copied LoRA goes (Results, the LoRA page): into the folder for its LoRA type in your LoRA folder (an existing
+`Illustrious` folder in any of your LoRA folders, in any case, else a new one in the first), or next to an older
+version when that one is in a subfolder; never into a LoRA folder's root.
+
 **After the queue**: with *Make them by themselves after the training queue has finished* (on), the test pictures of
 every successful run of the queue are made when the whole queue is done. When ComfyUI is not running then (it shares
 the GPU), LoRA Studio tries again every minute until it answers, so you can start ComfyUI when training is over.
@@ -602,7 +606,9 @@ Each setting has one place:
   stopped (`<file>.part`). Gated repos (FLUX.1-dev, FLUX.2-dev, SD 3.5): accept the licence on the repo's page first.
 - **Settings › AI helpers**: the Ollama address and vision model (captions, the picture check, the automatic
   preparation) and the Hugging Face token (`huggingtoken.txt`, paste a new one and press *Save token*).
-- **Settings › Library** (`library_settings.txt`): style (Dark / Normal), base models, expected bases, NSFW blur.
+- **Settings › Library** (`library_settings.txt`): style (Dark / Normal), base models, expected bases, NSFW blur, and
+  *Colour the Collection cards by purpose* (a border and label colour for character, art style, object, action /
+  pose and concept LoRAs, each colour your choice; off = white).
 - **Settings › Start and network** (`launch_settings.json`): see above.
 
 ## Training › Run
@@ -935,9 +941,12 @@ images) into each dataset's `LoraManager/` folder:
   tips** (strength, CLIP strength, clip skip) are merged one by one, and with no clip skip anywhere both get the
   default, **1**. The training card itself stays in LoRA Studio's copy only.
 - The **preview** LoRA Manager's card shows (its `preview_url`, the picture you chose there) becomes the preview on the
-  LoRA page, and LoRA Manager's **example pictures** (next to the LoRA, or in its example images folder, read from
-  LoRA Manager's `settings.json`) are copied to `LoraManager/<lora>_examples/` and shown under the preview on the
-  LoRA page's Overview. Sample images from training are not shown.
+  LoRA page, and LoRA Manager's **example pictures** (the ones you added on its card, kept in its example images folder
+  per SHA256, and `<lora>.<n>.png` next to the LoRA) are **linked**, not copied: their paths are kept in the dataset's
+  LoRA Manager copy, the LoRA page's Overview shows them under the preview, and the Browse card says *N examples*.
+  The folder is read from LoRA Manager's `settings.json` (`~/.config/ComfyUI-LoRA-Manager/` or its custom node
+  folder); *LoRA Manager's example pictures folder* (Maintenance) sets it by hand. Sample images from training are not
+  shown.
 
 **Insights** (Collection › Insights) reads your datasets, LoRAs and run logs on this computer. A version counts as
 *good* when you rated it 4-5 (LoRA page › Edit › *Your rating*), or, not rated, when it is the ★ best version or you

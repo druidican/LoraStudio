@@ -819,6 +819,7 @@ def lm_example_roots(lib) -> list[str]:
     library and then sha256), read from LoRA Manager's settings.json."""
     if "v" in _LM_ROOTS:
         return _LM_ROOTS["v"]
+    own = str((lib.data.get("lm_examples_dir") or "")).strip()       # set by you (Maintenance › Sync)
     cands = [Path.home() / ".config" / "ComfyUI-LoRA-Manager" / "settings.json"]
     for r in lib.settings.get("lora_dirs") or []:
         p = Path(os.path.expanduser(r)).resolve()
@@ -826,6 +827,9 @@ def lm_example_roots(lib) -> list[str]:
             cands.append(up / "custom_nodes" / "ComfyUI-Lora-Manager" / "settings.json")
             cands.append(up / "custom_nodes" / "comfyui-lora-manager" / "settings.json")
     out = []
+    if own and Path(os.path.expanduser(own)).is_dir():
+        r = Path(os.path.expanduser(own))
+        out += [str(r)] + [str(d) for d in r.iterdir() if d.is_dir() and not re.fullmatch(r"[0-9a-f]{64}", d.name)]
     for c in dict.fromkeys(cands):
         try:
             data = json.loads(c.read_text(encoding="utf-8")) if c.is_file() else {}
@@ -1227,9 +1231,13 @@ class Library:
                 lora.sidecar_from_archive = True
             if arch.is_dir():
                 lora.preview = find_preview(arch, lora.stem, None)
-                ex_dir = arch / f"{lora.stem}_examples"       # LoRA Manager's example pictures, copied by the sync
+                ex_dir = arch / f"{lora.stem}_examples"       # copies made by older versions of the sync
                 if ex_dir.is_dir():
                     lora.examples = sorted(p for p in ex_dir.rglob("*") if p.suffix.lower() in IMG_EXT)
+        if isinstance(sc, dict):                          # LoRA Manager's example pictures, linked by the sync
+            linked = [Path(x) for x in ((sc.get("lorastudio") or {}).get("examples") or [])]
+            seen = {p.name for p in lora.examples}
+            lora.examples += [p for p in linked if p.suffix.lower() in IMG_EXT and p.name not in seen and p.is_file()]
         lora.sidecar = sc if isinstance(sc, dict) else None
 
         lora.base = detect_base(meta, lora.sidecar, lora.path, self.settings["bases"])
@@ -1672,6 +1680,29 @@ def base_abbr(base: str) -> str:
     return BASE_ABBR.get(k) or (base or "?")[:3].upper()
 
 
+PURPOSES = [("character", "Character"), ("style", "Art style"), ("object", "Object"), ("action", "Action / pose"),
+            ("concept", "Concept / effect")]
+PURPOSE_COLORS = {"character": "#3B82C4", "style": "#C2410C", "object": "#15803D", "action": "#7C3AED",
+                  "concept": "#B45309"}
+
+
+def purpose_colors(lib) -> dict:
+    """{'on': bool, purpose: colour}: Settings › Look and base models › Colour the cards by purpose."""
+    d = dict(lib.data.get("purpose_colors") or {})
+    out = {"on": bool(d.get("on"))}
+    for k, _ in PURPOSES:
+        out[k] = d.get(k) or PURPOSE_COLORS[k]
+    return out
+
+
+def _purpose_of(ds_name: str) -> str:
+    try:
+        import dsflow
+        return dsflow.meta(ds_name).get("purpose") or "character"
+    except Exception:                                    # noqa: BLE001
+        return "character"
+
+
 def render_gallery(lib: Library, search: str, base: str, sort: str, only_preview: bool, favorites: bool) -> str:
     """Picture wall of your own LoRAs: one tile per dataset (mychar), with the newest picture and a label for
     every LoRA type it has (ANI, ILL, ...). Click a tile to see that dataset in the Library, folded out."""
@@ -1715,8 +1746,19 @@ def render_gallery(lib: Library, search: str, base: str, sort: str, only_preview
     else:
         tiles.sort(key=lambda t: t[4], reverse=True)
 
+    pc = purpose_colors(lib)
+
     def tile(key, members, newest, src) -> str:
         ds = newest.dataset
+        col = ""
+        if pc["on"]:                                     # Settings › Look: a colour per purpose
+            pu = _purpose_of(ds.name)
+            c = pc.get(pu) or PURPOSE_COLORS.get(pu, "")
+            lab = dict(PURPOSES).get(pu, pu)
+            col = (f' style="--pc:{esc(c)}"', f'<span class="ll-pchip" title="Purpose">{esc(lab)}</span>')
+        nex = sum(len(l.examples) for l in members if l is newest)
+        exn = (f'<span class="ll-exn" title="Example pictures linked in LoRA Manager">{nex} example'
+               f'{"s" if nex != 1 else ""}</span>') if nex else ""
         uri = thumb_data_uri(src.preview, 320) if src else ""
         blur = " ll-blur" if uri and lib.blur(src) else ""
         if uri:
@@ -1744,11 +1786,12 @@ def render_gallery(lib: Library, search: str, base: str, sort: str, only_preview
         dot = "" if worst == "ok" else f'<span class="ll-dot ll-dot-{worst}" title="{esc(worst)}"></span>'
         fav = '<span class="ll-fav">&#9733;</span>' if any((l.sidecar or {}).get("favorite") for l in members) else ""
         note = f"newest: {newest.stem}" + ("" if src is None or src is newest else f" · picture from {src.stem}")
-        return (f'<button class="ll-card ll-gtile" onclick="llOpenCard(this.dataset.open, this, this.dataset.ds)" '
+        return (f'<button class="ll-card ll-gtile{" ll-pcol" if col else ""}" '
+                f'onclick="llOpenCard(this.dataset.open, this, this.dataset.ds)"{col[0] if col else ""} '
                 f'data-gid="ds:{esc(key)}" data-ds="{esc(key)}" data-open="{newest.gid}" title="{esc(note)}">'
                 f'<span class="ll-selmark" aria-hidden="true"></span>{pic}'
                 f'<span class="ll-gcap ll-gcap2"><span class="ll-name">{fav}{dot}{esc(ds.name)}</span>'
-                f'<span class="ll-tchips">{"".join(chips)}</span></span></button>')
+                f'<span class="ll-tchips">{col[1] if col else ""}{"".join(chips)}{exn}</span></span></button>')
 
     parts = [tile(*t[:4]) for t in tiles]
     n_files = len(personal)
@@ -2523,8 +2566,20 @@ def personal_sync(lib: Library, progress=None) -> str:
                         pass
             _sync_one(preview, target, stats)
         sha = (((sidecar or {}) if isinstance(sidecar, dict) else {}).get("sha256") or "").lower()
-        for ex in find_examples(src_dir, old, sha, preview, list(lib.settings["lora_dirs"]) + lm_example_roots(lib)):
-            _sync_one(ex, dst_dir / f"{new}_examples" / ex.name, stats)   # LoRA Manager's example pictures
+        exs = [str(x) for x in find_examples(src_dir, old, sha, preview, list(lib.settings["lora_dirs"]) + lm_example_roots(lib))]
+        if exs or ls_path.exists():                     # LoRA Manager's example pictures: linked, not copied
+            cur = _load_json(ls_path, None) if ls_path.exists() else None
+            cur = cur if isinstance(cur, dict) else {"file_name": new}
+            lsd = dict(cur.get("lorastudio") or {})
+            if (lsd.get("examples") or []) != exs:
+                lsd["examples"] = exs
+                cur["lorastudio"] = lsd
+                try:
+                    write_sidecar(ls_path, cur)
+                    stats["linked"] = stats.get("linked", 0) + len(exs)
+                    stats["updated"] += 1
+                except OSError as e:
+                    stats["errors"].append(f"{ls_path.name}: {e}")
         if stats["new"] + stats["updated"] > before:
             done_loras.append(f"{lora.dataset.name} · {new}")
     _LISTINGS.clear()
@@ -2537,6 +2592,9 @@ def personal_sync(lib: Library, progress=None) -> str:
     if done_loras:
         shown = ", ".join(done_loras[:30]) + (f" and {len(done_loras) - 30} more" if len(done_loras) > 30 else "")
         lines.append(f"Updated: {shown}.")
+    if stats.get("linked"):
+        lines.append(f"Linked **{stats['linked']}** example pictures from LoRA Manager (shown on the LoRA page; not "
+                     "copied).")
     if stats.get("back"):
         lines.append(f"**{stats['back']}** `.metadata.json` file(s) in the LoRA folder got data that only the dataset "
                      "copy had (a `.bak` was made next to each).")
@@ -2598,6 +2656,10 @@ CSS = """
 .ll-big { font-size:16px; }
 .ll-mono { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ll-muted); }
 .ll-trunc { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.ll-gtile.ll-pcol { border:2px solid var(--pc) !important; }
+.ll-gtile.ll-pcol .ll-tchip-cur { background:var(--pc) !important; color:#fff !important; border-color:var(--pc) !important; }
+.ll-pchip { font-size:10px; padding:1px 7px; border-radius:99px; background:var(--pc); color:#fff; font-weight:600; }
+.ll-exn { font-size:10px; color:var(--ll-muted); margin-left:4px; }
 .ll-badge { flex:none; font-family:'JetBrains Mono',monospace; font-size:11px; padding:2px 8px; border-radius:99px;
             background:var(--ll-chip); color:var(--ll-chip-text); }
 .ll-note { font-size:11px; color:var(--ll-warn); }
@@ -3165,6 +3227,17 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                     "ways: what only one side has (notes, tags, trigger words, Civitai data …) is copied to the other, "
                     "an empty field takes the other side's value, and where both differ the newer file wins. A `.bak` "
                     "is made before a file is changed.")
+                with gr.Accordion("LoRA Manager's example pictures folder", open=False):
+                    _lmr = lm_example_roots(LIB)
+                    lm_dir = gr.Textbox(label="Example pictures folder (empty = read from LoRA Manager's settings)",
+                                        value=LIB.data.get("lm_examples_dir") or "",
+                                        placeholder=_lmr[0] if _lmr else "the 'Example images' folder set in LoRA Manager")
+                    gr.Markdown("The pictures you add to a LoRA's card in LoRA Manager are kept there, one folder per "
+                                "LoRA (its SHA256). Sync links them to the LoRA page (they are not copied). Found now: "
+                                + (f"`{_lmr[0]}`" if _lmr else "nothing (set the folder here)") + ".",
+                                elem_classes=["ls-note"])
+                    lm_dir_save = gr.Button("Save folder", size="sm")
+                    lm_dir_msg = gr.Markdown()
                 sync_btn = gr.Button("Sync now", variant="primary")
                 sync_msg = gr.Markdown()
                 gr.HTML('<div class="rs-label" style="margin-top:14px">TRAINING CARDS</div>')
@@ -3268,6 +3341,16 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                                              value=s["blur_unknown_nsfw"])
                 st_save2 = gr.Button("Save settings and rescan", variant="primary")
                 st_msg2 = gr.Markdown()
+                _pc = purpose_colors(LIB)
+                with gr.Group():
+                    pc_on = gr.Checkbox(label="Colour the Collection cards by purpose (border and label; off = all "
+                                              "white as before)", value=_pc["on"])
+                    with gr.Row():
+                        pc_pick = [gr.ColorPicker(label=lab, value=_pc[k], scale=1) for k, lab in PURPOSES]
+                    with gr.Row(elem_classes=["ls-bar"]):
+                        pc_save = gr.Button("Save colours", size="sm", scale=0, min_width=140)
+                        pc_reset = gr.Button("Default colours", size="sm", scale=0, min_width=150)
+                    pc_msg = gr.Markdown()
 
     # ---------------- Callbacks ---------------- #
     filters = [search, base_f, status_f, group_f]
@@ -3278,6 +3361,14 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
 
     for f in gal_inputs:
         f.change(do_gallery, gal_inputs, gal_html)
+
+    def pc_store(on, *cols):
+        LIB.data["purpose_colors"] = {"on": bool(on), **{k: (c or PURPOSE_COLORS[k]) for (k, _), c in zip(PURPOSES, cols)}}
+        LIB.save_data()
+        return ("✔ Saved: the cards are coloured by purpose." if on else "✔ Saved: the cards are white.")
+    pc_save.click(pc_store, [pc_on] + pc_pick, pc_msg).then(do_gallery, gal_inputs, gal_html)
+    pc_on.input(pc_store, [pc_on] + pc_pick, pc_msg).then(do_gallery, gal_inputs, gal_html)
+    pc_reset.click(lambda: [PURPOSE_COLORS[k] for k, _ in PURPOSES], None, pc_pick)
 
     def set_look(v):
         st = v == "Status"
@@ -3569,6 +3660,18 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
 
     sync_btn.click(do_sync, filters, [sync_msg, lib_html, base_f, pick_dd, gal_base]
                    ).then(do_gallery, gal_inputs, gal_html)
+
+    def lm_dir_store(d):
+        d = (d or "").strip()
+        if d and not Path(os.path.expanduser(d)).is_dir():
+            return f"❌ Not a folder: `{d}`"
+        LIB.data["lm_examples_dir"] = d
+        LIB.save_data()
+        _LM_ROOTS.clear()
+        r = lm_example_roots(LIB)
+        return (f"✔ Saved. Example pictures are read from `{r[0]}`. Restart LoRA Studio once so the LoRA page may show "
+                "pictures from there, then press Sync now." if r else "✔ Saved (read from LoRA Manager's settings).")
+    lm_dir_save.click(lm_dir_store, lm_dir, lm_dir_msg)
 
     def do_cards(force, progress=gr.Progress()):
         import trainingcard as TC

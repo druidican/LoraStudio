@@ -27,6 +27,11 @@ save point to try first). They are read from the LoRA file, its launch script an
   them next to the recommendations), whether your runs were too long (where the save point to try first was; step 9
   suggests fewer epochs when they usually peaked early), and how you use your LoRAs (pictures made with each, the
   strength you use, LoRAs you never used). The LoRA page says how often you used a LoRA and offers that strength.
+- **Colours**: Settings › Look and base models › *Colour the Collection cards by purpose* gives every card a border and
+  label in the colour of its purpose (character, art style, object, action / pose, concept); pick the colours there,
+  or leave it off for white cards.
+- **LoRA Manager's example pictures** (the ones you added on its card) are linked by *Sync now*: the LoRA page's
+  Overview shows them, and the card says how many there are.
 - **Completed** marks a version as finished: its launch script is hidden in Training › Run. A new version starts
   unmarked.
 - **Maintenance** syncs LoRA Manager data and previews, and cleans up leftovers of finished runs. *Sync now* works

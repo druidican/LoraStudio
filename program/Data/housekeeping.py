@@ -146,22 +146,35 @@ def lora_files(dirs) -> list[Path]:
 
 
 def copy_target(stem: str, lora_dirs, type_label: str) -> dict:
-    """{'dir', 'reason', 'siblings': [Path]} for a new LoRA file named <stem>."""
-    base = version_base(stem)
-    every = lora_files(lora_dirs)
-    sib = [f for f in every if version_base(f.stem) == base and f.stem.lower() != stem.lower()]
-    if sib:
-        best = max(sib, key=lambda f: (version_of(f.stem), f.stat().st_mtime if f.exists() else 0))
-        return {"dir": best.parent, "siblings": sorted(sib),
-                "reason": f"next to {best.name} (an older version)"}
-    same = [f for f in every if f.stem.lower() == stem.lower()]
-    if same:
-        return {"dir": same[0].parent, "siblings": [], "reason": f"where {same[0].name} already is"}
+    """{'dir', 'reason', 'siblings': [Path]} for a new LoRA file named <stem>: always in a subfolder of a LoRA folder,
+    never in a LoRA folder's root. Next to an older version when that one is in a subfolder (yours or the type's);
+    else in the subfolder named after the LoRA type (an existing one with that name in any LoRA folder, any case,
+    else a new one in the first LoRA folder)."""
     dirs = [Path(os.path.expanduser(str(d))) for d in lora_dirs if str(d).strip()]
     if not dirs:
         return {"dir": None, "siblings": [], "reason": "no LoRA folder set (Settings > Folders)"}
-    return {"dir": dirs[0] / type_folder(type_label), "siblings": [],
-            "reason": f"first version: a subfolder for its type in your first LoRA folder"}
+    roots = {d.resolve() for d in dirs if d.exists()} | set(dirs)
+    in_root = lambda f: f.parent in roots or f.parent.resolve() in roots
+    base = version_base(stem)
+    every = lora_files(lora_dirs)
+    sib = [f for f in every if version_base(f.stem) == base and f.stem.lower() != stem.lower()]
+    deep = [f for f in sib if not in_root(f)]
+    if deep:
+        best = max(deep, key=lambda f: (version_of(f.stem), f.stat().st_mtime if f.exists() else 0))
+        return {"dir": best.parent, "siblings": sorted(sib), "reason": f"next to {best.name} (an older version)"}
+    same = [f for f in every if f.stem.lower() == stem.lower() and not in_root(f)]
+    if same:
+        return {"dir": same[0].parent, "siblings": [], "reason": f"where {same[0].name} already is"}
+    want = type_folder(type_label)
+    for d in dirs:
+        try:
+            hit = next((c for c in d.iterdir() if c.is_dir() and c.name.lower() == want.lower()), None)
+        except OSError:
+            hit = None
+        if hit is not None:
+            return {"dir": hit, "siblings": sorted(sib), "reason": f"the {hit.name} folder for its LoRA type"}
+    return {"dir": dirs[0] / want, "siblings": sorted(sib),
+            "reason": f"a new {want} folder for its LoRA type in your first LoRA folder"}
 
 
 def _sha256(p: Path) -> str:

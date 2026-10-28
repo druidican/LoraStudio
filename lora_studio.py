@@ -390,6 +390,10 @@ def main():
     allowed += [os.path.expanduser(p) for p in args.allow_path]
     ll.THUMB_DIR.mkdir(exist_ok=True)
     allowed.append(str(ll.THUMB_DIR))      # Gallery / Library thumbnails
+    try:                                   # LoRA Manager's example pictures (linked on the LoRA page)
+        allowed += ll.lm_example_roots(ll.LIB)
+    except Exception:                      # noqa: BLE001
+        pass
     allowed += [str(USER / "reports"), str(PROG / "manual"), str(PROG / "logo")]     # reports, the manual, the logo
     try:                                   # the pictures on the Datasets pages: links to small files, not inline data
         import datacheck
