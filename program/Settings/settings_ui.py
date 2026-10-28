@@ -550,6 +550,7 @@ def selfupdate_panel(app):
                                     placeholder=(f"saved: {GH.mask(GH.read_token())}" if GH.read_token()
                                                  else "github_pat_… (empty: no token)"))
                 gh_tok_save = gr.Button("Save token", size="sm", scale=0, min_width=120)
+                gh_tok_test = gr.Button("Test token", size="sm", scale=0, min_width=120)
             with gr.Row(elem_classes=["ls-bar"]):
                 gh_check = gr.Button("Check GitHub", size="sm", scale=0, min_width=150)
                 gh_inst = gr.Button("Install from GitHub", variant="primary", size="sm", scale=0, min_width=190,
@@ -601,6 +602,7 @@ def selfupdate_panel(app):
         t = GH.read_token()
         return msg, gr.update(value="", placeholder=f"saved: {GH.mask(t)}" if t else "github_pat_… (empty: no token)")
     gh_tok_save.click(gh_save, gh_tok, [gh_md, gh_tok])
+    gh_tok_test.click(GH.test_token, None, gh_md)
 
     def gh_do_check():
         c = GH.check()

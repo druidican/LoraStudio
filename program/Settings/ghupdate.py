@@ -72,7 +72,7 @@ def read_token() -> str:
 
 
 def save_token(tok: str) -> str:
-    tok = (tok or "").strip()
+    tok = re.sub(r"\s+", "", (tok or "")).strip("\"'")
     if not tok:
         try:
             TOKEN_FILE.unlink()
@@ -94,26 +94,92 @@ def mask(tok: str) -> str:
 
 
 # --------------------------------------------------------------------------- talking to GitHub
+class _NoAuthAcrossHosts(urllib.request.HTTPRedirectHandler):
+    """Follow redirects, but never send the token on to another host (the zipball goes to codeload.github.com
+    with its own short-lived key in the address; a forwarded token there makes it refuse)."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and urllib.parse.urlsplit(newurl).netloc != urllib.parse.urlsplit(req.full_url).netloc:
+            for k in list(new.headers):
+                if k.lower() == "authorization":
+                    del new.headers[k]
+        return new
+
+
+_OPENER = urllib.request.build_opener(_NoAuthAcrossHosts)
+
+
 def _get(url: str, accept="application/vnd.github+json", timeout=30):
     h = {"Accept": accept, "User-Agent": "LoRA-Studio", "X-GitHub-Api-Version": "2022-11-28"}
     tok = read_token()
     if tok:
-        h["Authorization"] = f"Bearer {tok}"
-    return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=timeout)
+        h["Authorization"] = f"Bearer {tok}"           # kept on redirects within GitHub's API, dropped elsewhere
+    return _OPENER.open(urllib.request.Request(url, headers=h), timeout=timeout)
 
 
-def _why(e: Exception) -> str:
+def _said(e) -> str:
+    """GitHub's own words in an error answer ('Resource not accessible by personal access token', …)."""
+    try:
+        m = json.loads(e.read().decode("utf-8", "replace")).get("message", "")
+    except Exception:                                    # noqa: BLE001
+        m = ""
+    return f" · GitHub says: “{m}”" if m else ""
+
+
+def _why(e: Exception, step: str = "") -> str:
+    at = f" ({step})" if step else ""
     if isinstance(e, urllib.error.HTTPError):
+        said = _said(e)
         if e.code == 404:
-            return ("the repository was not found: while it is private, a GitHub token with read access to it is "
-                    "needed (below)" if not read_token() else
-                    "the repository or branch was not found, or the token has no access to it")
+            return ("the repository was not found" + at + ": while it is private, a GitHub token with read access "
+                    "to it is needed (below)" if not read_token() else
+                    "the repository or branch was not found" + at + ", or the token has no access to it" + said)
         if e.code == 401:
-            return "GitHub did not accept the token (expired or mistyped?)"
-        if e.code == 403:
-            return "GitHub refused (too many requests without a token, or the token lacks read access): try later"
-        return f"GitHub answered HTTP {e.code}"
-    return f"GitHub cannot be reached ({getattr(e, 'reason', e)})"
+            return "GitHub did not accept the token" + at + ": expired, revoked or not copied completely" + said
+        if e.code in (403, 429):
+            if (e.headers or {}).get("X-RateLimit-Remaining") == "0":
+                reset = (e.headers or {}).get("X-RateLimit-Reset", "")
+                when = time.strftime("%H:%M", time.localtime(int(reset))) if reset.isdigit() else "a while"
+                return f"GitHub's limit of requests is used up{at}: try again after {when}" + said
+            return ("GitHub refused" + at + ": the token has no read access to the repository's files. On "
+                    "github.com › Settings › Developer settings › Fine-grained tokens › this token: Repository "
+                    "access must include LoraStudio, and Permissions › Repository › Contents must be Read-only (a classic ghp_ token needs the repo box ticked)"
+                    + said)
+        return f"GitHub answered HTTP {e.code}{at}" + said
+    return f"GitHub cannot be reached{at} ({getattr(e, 'reason', e)})"
+
+
+def test_token() -> str:
+    """What GitHub says about the saved token: whose it is, and whether it can read the repository."""
+    tok = read_token()
+    if not tok:
+        return "No GitHub token is saved: paste it in the field and press *Save token* first."
+    kind = ("fine-grained" if tok.startswith("github_pat_") else "classic" if tok.startswith(("ghp_", "gho_"))
+            else "unknown kind")
+    try:
+        u = json.loads(_get(f"{API}/user").read().decode("utf-8"))
+        who = u.get("login") or "?"
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return (f"❌ GitHub does not accept the saved token ({kind}, {len(tok)} characters, {mask(tok)}): it has "
+                    "expired, was revoked, or was not copied completely. Make a new one on github.com › Settings › "
+                    "Developer settings › Personal access tokens, copy it with the copy button there, paste it here "
+                    "and press *Save token*.")
+        if e.code != 403:                              # fine-grained tokens without account access answer 403 here
+            return f"❌ {_why(e)}."
+        who = "?"
+    except Exception as e:                             # noqa: BLE001
+        return f"❌ {_why(e)}."
+    try:
+        _get(f"{API}/repos/{repo()}").read()
+        _get(f"{API}/repos/{repo()}/contents/version.py", accept="application/vnd.github.raw").read()
+        acc = f"✔ and it can read the files of **{repo()}**: Check GitHub and Install will work."
+    except urllib.error.HTTPError as e:
+        acc = (f"❌ but it cannot read the files of **{repo()}** (HTTP {e.code}{_said(e)}): give the token access to this repository "
+               "(Repository access › Only select repositories › LoraStudio, Permissions › Contents: Read-only).")
+    except Exception as e:                             # noqa: BLE001
+        acc = f"❌ {_why(e)}."
+    return f"The token ({kind}) belongs to **{who}** " + acc
 
 
 def check() -> dict:
@@ -122,14 +188,16 @@ def check() -> dict:
     import version as V
     r, b = repo(), branch()
     try:
+        step = "reading the newest commit"
         c = json.loads(_get(f"{API}/repos/{r}/commits/{urllib.parse.quote(b)}").read().decode("utf-8"))
         sha = c["sha"]
         date = ((c.get("commit") or {}).get("committer") or {}).get("date", "")[:16].replace("T", " ")
         msg = ((c.get("commit") or {}).get("message") or "").splitlines()[0][:160]
+        step = "reading version.py"
         src = _get(f"{API}/repos/{r}/contents/version.py?ref={sha}", accept="application/vnd.github.raw").read()
         ver = SU._literal(src.decode("utf-8", "replace"), "VERSION") or "?"
     except Exception as e:                               # noqa: BLE001
-        return {"ok": False, "text": f"❌ {_why(e)}."}
+        return {"ok": False, "text": f"❌ {_why(e, step)}."}
     last = state().get("sha", "")
     newer = SU._vkey(ver) > SU._vkey(V.VERSION)
     same = last == sha
@@ -168,7 +236,7 @@ def download(sha: str, say=print) -> Path | None:
                     break
                 f.write(b)
     except Exception as e:                               # noqa: BLE001
-        say(f"❌ {_why(e)}.")
+        say(f"❌ {_why(e, 'downloading the zip')}.")
         tmp.unlink(missing_ok=True)
         return None
     if not zipfile.is_zipfile(tmp):
