@@ -1,13 +1,13 @@
 # Installing LoRA Studio
 
-A step-by-step walkthrough for **Linux** and **Windows**: what you need first, the install itself, the first start,
+A step-by-step walkthrough for **Linux**, **Windows** and **macOS**: what you need first, the install itself, the first start,
 updates, moving to a new computer, removing it again, and what to do when something goes wrong.
 
 LoRA Studio was made on Fedora Linux with an AMD Radeon (ROCm). NVIDIA and Windows are supported by the installer but
 have not been tried on real hardware yet. If you test one of them, please send the result with the
 [Test result form](../../issues/new?template=test_result.yml).
 
-**Contents:** [Before you start](#before-you-start) · [Linux](#linux) · [Windows](#windows) ·
+**Contents:** [Before you start](#before-you-start) · [Linux](#linux) · [Windows](#windows) · [macOS](#macos) ·
 [The first start](#the-first-start) · [Starting it later](#starting-it-later) · [Updating](#updating) ·
 [A new computer, or a reinstall](#a-new-computer-or-a-reinstall) · [Removing it](#removing-it) ·
 [When something goes wrong](#when-something-goes-wrong)
@@ -23,7 +23,8 @@ also clone the repository instead: `git clone https://github.com/druidican/LoraS
 
 | | |
 |---|---|
-| System | Linux (tested on Fedora 44; Ubuntu, Debian and Mint are supported by the installer), or Windows 10/11 with WSL2 (the installer sets it up) |
+| System | Linux (tested on Fedora 44; Ubuntu, Debian and Mint are supported by the installer), Windows 10/11 with WSL2 (the installer sets it up), or macOS (LoRA Studio itself, without training) |
+| Python | nothing to install: the installer gives LoRA Studio its **own Python 3.12** (with the small tool [uv](https://docs.astral.sh/uv/), inside the LoRA Studio folder; no admin rights, your system Python is not touched) |
 | Graphics card, to train | **AMD Radeon** with ROCm (tested: RX 9070 XT, 16 GB) or **NVIDIA** with CUDA. SDXL, Illustrious and Pony fit 12-16 GB; FLUX and Qwen-Image need more |
 | Disk | about 25 GB with the trainers (PyTorch, sd-scripts, musubi-tuner), about 2 GB without, plus your models |
 | Internet | for the install (downloads PyTorch, the trainers and, if you want them, Ollama and its model) |
@@ -46,9 +47,10 @@ another computer.
 
 The installer checks for these and offers to install what is missing, so you can usually skip this step.
 
-- **git** and **Python 3.12**
-  - Fedora: `sudo dnf install python3.12 git`
-  - Ubuntu / Debian / Mint: `sudo apt install python3.12 python3.12-venv git`
+- **git** (only when the installer installs the trainers): Fedora `sudo dnf install git`, Ubuntu / Debian / Mint
+  `sudo apt install git`
+- **Python 3.12**: nothing to do. The installer downloads LoRA Studio's own Python 3.12 into `~/LoraStudio/.tools`
+  (with uv). Only when that download is not possible does it use the computer's `python3.12`.
 - **AMD Radeon**: the normal `amdgpu` driver (part of the Linux kernel). ROCm itself does **not** need to be
   installed on your system: the installer puts the ROCm libraries inside LoRA Studio's own environment. Your user
   must be in the `render` and `video` groups:
@@ -77,7 +79,8 @@ The installer explains each step as it goes. What it asks:
 5. **Your graphics card**: detected by itself. A computer with both an AMD and an NVIDIA card (most gaming laptops)
    is asked which one to train on.
 
-It then installs everything into **`~/LoraStudio`**: LoRA Studio, one Python environment (`venv/`) with PyTorch for
+It then installs everything into **`~/LoraStudio`**: LoRA Studio, its own Python 3.12 (`.tools/`), one Python
+environment (`venv/`, always the newest Gradio and other program packages) with PyTorch for
 your card, and the trainers. This takes a while (PyTorch with ROCm or CUDA is several GB). Everything it prints is
 also in `~/LoraStudio/install.log`, and at the end it writes an **install report** to
 `~/LoraStudio/userdata/reports/` (without tokens, passwords or your home folder) that you can send when something
@@ -153,6 +156,26 @@ Double-click **LoRA Studio** on the desktop. A black window opens, and your brow
 
 ---
 
+## macOS
+
+A Mac has neither CUDA nor ROCm, so the trainers are not installed there. LoRA Studio itself works: your datasets,
+the sort and captions (with Ollama), the LoRA library and gallery, and the launch scripts, which you then run on a
+Linux or Windows computer.
+
+1. Unpack `LoraStudio.zip` (double-click it in the Finder).
+2. Open **Terminal**, type `cd ` (with a space), drag the unpacked **LoraStudio** folder into the window, press Enter,
+   then run:
+   ```bash
+   bash ./install.sh
+   ```
+   It installs into `~/LoraStudio` with its own Python 3.12; nothing else needs to be installed first.
+3. Start it: `cd ~/LoraStudio && ./start.sh` (your browser opens LoRA Studio).
+
+Ollama for the Mac: [ollama.com/download/mac](https://ollama.com/download/mac); answer *it is installed* when the
+installer asks.
+
+---
+
 ## The first start
 
 1. **The notice**: the first page says that sd-scripts and musubi-tuner belong to kohya-ss and are not part of
@@ -223,7 +246,7 @@ Hugging Face token.
 
 Make a backup first (above) if you might want your settings again.
 
-- **Linux**: delete the folder: `rm -rf ~/LoraStudio`. Your datasets, LoRAs and models are in your own folders and
+- **Linux** and **macOS**: delete the folder: `rm -rf ~/LoraStudio` (its own Python goes with it). Your datasets, LoRAs and models are in your own folders and
   stay. Ollama, if the installer put it there, has its own uninstall (see [ollama.com](https://ollama.com)).
 - **Windows**: delete the **LoRA Studio** starter from the desktop, then in a Windows terminal:
   `wsl -d Ubuntu-24.04 -- rm -rf ~/LoraStudio`. To remove Ubuntu completely (this deletes **everything** inside it,

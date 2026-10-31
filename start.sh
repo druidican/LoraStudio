@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.251026o
+# LoRA Studio version 1.261026z
 # Start LoRA Studio (Training LoRA + Personal Data + Settings) and open it in the browser.
 #
 # Installed with ./install.sh (recommended): uses the shared ./venv (Python 3.12 + PyTorch + sd-scripts +
@@ -18,7 +18,20 @@
 set -o pipefail
 
 # Work from the folder this script is in (also when started from a desktop shortcut)
-cd "$(dirname "$(readlink -f "$0")")" || exit 1
+cd "$(dirname "$0")" && cd "$(pwd -P)" || exit 1
+HERE="$(pwd)"
+uv_from_github() {   # uv_from_github DIR: the uv program straight from its GitHub release (when astral.sh is not reachable)
+    local a t
+    case "$(uname -s)-$(uname -m)" in
+        Linux-x86_64) t=x86_64-unknown-linux-gnu ;; Linux-aarch64|Linux-arm64) t=aarch64-unknown-linux-gnu ;;
+        Darwin-arm64) t=aarch64-apple-darwin ;; Darwin-x86_64) t=x86_64-apple-darwin ;; *) return 1 ;;
+    esac
+    a="https://github.com/astral-sh/uv/releases/latest/download/uv-$t.tar.gz"
+    mkdir -p "$1"
+    if command -v curl >/dev/null 2>&1; then curl -LsSf "$a" | tar -xz -C "$1" --strip-components=1
+    else wget -qO- "$a" | tar -xz -C "$1" --strip-components=1; fi
+}
+sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
 VENV="./venv"
 PY="$VENV/bin/python"
@@ -56,32 +69,55 @@ for a in "$@"; do
     fi
 done
 
-# 1. Create the venv if it does not exist (or is broken)
+# 1. Create the venv if it does not exist (or is broken): with LoRA Studio's own Python 3.12 from uv (in .tools/, no admin
+#    rights, the system Python is not touched); only when uv cannot be downloaded the computer's python3.12 / python3
+if [ -e "$VENV" ] && ! "$PY" -c 'import sys' >/dev/null 2>&1; then
+    echo "The Python environment in $VENV does not work any more: making a new one ..."
+    rm -rf "$VENV"
+fi
 if [ ! -x "$PY" ]; then
     if [ -f install.sh ]; then
         echo "No Python environment yet. Recommended: ./install.sh  (sets up PyTorch, sd-scripts and musubi-tuner here)."
         echo "Creating a small GUI-only environment instead in 5 seconds (Ctrl+C to stop)..."
         sleep 5
     fi
-    echo "First start: creating the Python environment in $VENV ..."
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "python3 was not found. On Fedora: sudo dnf install python3"
-        exit 1
+    echo "First start: creating the Python 3.12 environment in $VENV ..."
+    export UV_PYTHON_INSTALL_DIR="$HERE/.tools/python" UV_CACHE_DIR="$HERE/.tools/cache" UV_NO_MODIFY_PATH=1
+    UV=""
+    for f in "$HERE/.tools/uv" "$HERE/.tools/bin/uv"; do [ -x "$f" ] && UV="$f" && break; done
+    if [ -z "$UV" ]; then
+        mkdir -p "$HERE/.tools"
+        if command -v curl >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh 2>/dev/null | env UV_UNMANAGED_INSTALL="$HERE/.tools" sh >/dev/null 2>&1
+        elif command -v wget >/dev/null 2>&1; then wget -qO- https://astral.sh/uv/install.sh 2>/dev/null | env UV_UNMANAGED_INSTALL="$HERE/.tools" sh >/dev/null 2>&1
+        fi
+        [ -x "$HERE/.tools/uv" ] || uv_from_github "$HERE/.tools" >/dev/null 2>&1
+        [ -x "$HERE/.tools/uv" ] && UV="$HERE/.tools/uv"
     fi
     rm -rf "$VENV"
-    if ! python3 -m venv "$VENV"; then
-        echo "Could not create the venv. On Fedora: sudo dnf install python3-virtualenv"
-        exit 1
+    if [ -n "$UV" ] && "$UV" venv --python 3.12 --python-preference only-managed --seed "$VENV" >/dev/null 2>&1; then
+        :
+    else
+        SYS=""
+        for c in python3.12 python3; do command -v "$c" >/dev/null 2>&1 && SYS="$c" && break; done
+        if [ -z "$SYS" ]; then
+            echo "Could not download Python 3.12 (no internet?) and no python3 was found. Connect to the internet and try again."
+            exit 1
+        fi
+        echo "uv could not be used: making the environment with $SYS ($($SYS --version 2>&1))."
+        if ! "$SYS" -m venv "$VENV"; then
+            echo "Could not create the venv. Install the venv package of your Python (e.g. sudo apt install python3.12-venv)."
+            exit 1
+        fi
     fi
     "$PY" -m pip install --upgrade pip >/dev/null
 fi
 
 # 2. Install / update the packages when requirements.txt is new or changed
-WANT="$(sha256sum requirements.txt | cut -d' ' -f1)"
+WANT="$(sha256 requirements.txt)"
 HAVE="$(cat "$STAMP" 2>/dev/null)"
 if [ "$WANT" != "$HAVE" ] || ! "$PY" -c "import gradio, pandas, PIL" >/dev/null 2>&1; then
     echo "Installing packages from requirements.txt (only needed once) ..."
-    if ! "$PY" -m pip install -r requirements.txt "${CONS[@]}"; then
+    if ! "$PY" -m pip install --upgrade -r requirements.txt "${CONS[@]}"; then
         echo
         echo "Package installation failed. Check your internet connection and run ./start.sh again."
         exit 1

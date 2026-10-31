@@ -48,7 +48,8 @@ for you. The WD tagger writes booru tags; Ollama (optional) sorts the pictures a
 
 ## What you need
 
-- **Linux** (tested on Fedora), or **Windows 10/11** through WSL2 (the installer sets it up).
+- **Linux** (tested on Fedora), **Windows 10/11** through WSL2 (the installer sets it up), or **macOS** (LoRA Studio
+  itself, without training). No Python to install first: the installer gives LoRA Studio its own Python 3.12.
 - To train: a graphics card, **AMD Radeon** with ROCm (tested on an RX 9070 XT, 16 GB) or **NVIDIA** with CUDA. The
   bigger models (FLUX, Qwen-Image) need more video memory than SDXL.
 - About 25 GB of disk space with the trainers, 2 GB without.

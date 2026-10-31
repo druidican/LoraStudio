@@ -1,9 +1,14 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.261026x
+# LoRA Studio version 1.261026z
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh
+#
+# Python 3.12 is LoRA Studio's own (made with the small tool uv in ~/LoraStudio/.tools: no admin rights, the
+# system Python is not touched); only when uv cannot be downloaded is the computer's python3.12 used.
+# Linux and Windows (inside WSL2, see install-windows.ps1) can train; on macOS only LoRA Studio itself is installed
+# (no CUDA or ROCm there): datasets, captions, the library and launch scripts, training on another computer.
 #
 # Result (default ~/LoraStudio, outside synced folders so the 15+ GB are not uploaded):
 #   ~/LoraStudio/                 LoRA Studio itself, its settings and start.sh
@@ -63,7 +68,14 @@ DATA_FILES="library_settings.txt training_settings.txt huggingtoken.txt complete
 model_ids.json hash_cache.json picture_index.json launch_settings.json"
 
 # ------------------------------------------------------------------ helpers
-SRC="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+abspath() {   # an absolute path (also on macOS): ~ expanded, the folder need not exist yet
+    local p="${1/#\~/$HOME}"
+    case "$p" in /*) ;; *) p="$PWD/$p" ;; esac
+    printf '%s' "${p%/}"
+}
+sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
+tmo() { if command -v timeout >/dev/null; then timeout "$@"; else shift; "$@"; fi; }   # tmo SECONDS command ...
+SRC="$(cd "$(dirname "$0")" && pwd -P)"
 TARGET="$HOME/LoraStudio"; GPU="auto"; GFX=""; IMPORT=""; REINSTALL_TORCH=0; MODELS=1; YES=0
 TRAINERS=""; EX_SD=""; EX_VENV=""; EX_MU=""; ASK=0; ACCEPT_NOTICE=0; A_SD=""; A_MU=""; A_OL=""; A_OLURL=""
 STEP=0
@@ -118,16 +130,16 @@ yes_no() {   # yes_no "question" y|n
 ARGS_GIVEN="$*"
 while [ $# -gt 0 ]; do
     case "$1" in
-        --dir) TARGET="$(readlink -m "${2/#\~/$HOME}")"; shift ;;
+        --dir) TARGET="$(abspath "$2")"; shift ;;
         --gpu) GPU="$2"; shift ;;
         --gfx) GFX="$2"; shift ;;
-        --import) IMPORT="$(readlink -m "${2/#\~/$HOME}")"; shift ;;
+        --import) IMPORT="$(abspath "$2")"; shift ;;
         --reinstall-torch) REINSTALL_TORCH=1 ;;
         --no-models) MODELS=0 ;;
         --trainers) TRAINERS="$2"; shift ;;
-        --sd-scripts) EX_SD="$(readlink -m "${2/#\~/$HOME}")"; shift ;;
-        --sd-venv) EX_VENV="$(readlink -m "${2/#\~/$HOME}")"; shift ;;
-        --musubi) EX_MU="$(readlink -m "${2/#\~/$HOME}")"; A_MU="${A_MU:-existing}"; shift ;;
+        --sd-scripts) EX_SD="$(abspath "$2")"; shift ;;
+        --sd-venv) EX_VENV="$(abspath "$2")"; shift ;;
+        --musubi) EX_MU="$(abspath "$2")"; A_MU="${A_MU:-existing}"; shift ;;
         --sd) A_SD="$2"; shift ;;
         --mu) A_MU="$2"; shift ;;
         --ollama) A_OL="$2"; shift ;;
@@ -173,8 +185,13 @@ fi
 # ------------------------------------------------------------------ 1. checks
 step "Checking the computer"
 . /etc/os-release 2>/dev/null || true
+IS_MAC=0
+if [ "$(uname -s)" = Darwin ]; then
+    IS_MAC=1; ID=macos; PRETTY_NAME="macOS $(sw_vers -productVersion 2>/dev/null) ($(uname -m))"
+fi
 DISTRO="${ID:-unknown}"; LIKE="${ID_LIKE:-}"
 case "$DISTRO $LIKE" in
+    macos*) PKG_PY="(LoRA Studio gets its own Python 3.12 with uv)"; PKG_GIT="xcode-select --install" ;;
     *fedora*|*rhel*) PKG_PY="sudo dnf install -y python${PYVER} git"; PKG_GIT="sudo dnf install -y git" ;;
     *ubuntu*|*debian*|*linuxmint*) PKG_PY="sudo apt install -y python${PYVER} python${PYVER}-venv git"; PKG_GIT="sudo apt install -y git" ;;
     *) PKG_PY="(install Python ${PYVER} with your package manager)"; PKG_GIT="(install git with your package manager)" ;;
@@ -198,6 +215,11 @@ ask_choice() {   # ask_choice "question" default "1) ..." "2) ..." ... -> the nu
 }
 IS_WSL=0; grep -qi microsoft /proc/version 2>/dev/null && IS_WSL=1
 [ "$IS_WSL" = 1 ] && ok "running in WSL (Windows): Ollama is installed in Windows, not here"
+if [ "$IS_MAC" = 1 ]; then        # no CUDA or ROCm on a Mac: LoRA Studio itself, training on another computer
+    ok "macOS: LoRA Studio itself (datasets, captions, library, launch scripts); the trainers need Linux or Windows"
+    A_SD=none; A_MU=none; TRAINERS=""
+    [ "$A_OL" = install ] && A_OL=remote
+fi
 MODE_FILE="$TARGET/.lorastudio-trainers"          # the answers are remembered for the next ./install.sh
 SD_MODE=""; MU_MODE=""; OL_MODE=""; OL_URL=""
 case "$TRAINERS" in install) SD_MODE=install; MU_MODE=install ;; existing) SD_MODE=existing ;; esac
@@ -268,7 +290,13 @@ if [ -z "$OL_MODE" ]; then
     HAVE_OL=0; command -v ollama >/dev/null && HAVE_OL=1
     curl -s -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && HAVE_OL=1
     say "   Ollama looks at the pictures for the detailed sort and writes the captions (a vision model, about 6 GB)."
-    if [ "$IS_WSL" = 1 ]; then
+    if [ "$IS_MAC" = 1 ]; then
+        say "   On a Mac, install Ollama with its app from https://ollama.com/download/mac"
+        n="$(ask_choice "Ollama:" "$([ "$HAVE_OL" = 1 ] && echo 1 || echo 2)" \
+            "1) it is installed (here or on another computer): ask for its address" \
+            "2) none for now (the detailed sort and captions are hidden; tick it later in Settings)")"
+        case "$n" in 1) OL_MODE=remote ;; *) OL_MODE=none ;; esac
+    elif [ "$IS_WSL" = 1 ]; then
         say "   On Windows, install Ollama in Windows itself: https://ollama.com/download/windows"
         say "   (guide: https://github.com/ollama/ollama/blob/main/docs/windows.md). LoRA Studio here reaches it over the network."
         n="$(ask_choice "Ollama:" "$([ "$HAVE_OL" = 1 ] && echo 1 || echo 2)" \
@@ -302,19 +330,51 @@ if [ "$TRAINERS" = install ] && ! command -v git >/dev/null; then
 fi
 command -v git >/dev/null && ok "git $(git --version | awk '{print $3}')"
 
-PY_SYS="$(command -v "python${PYVER}" || true)"
-if [ "$TRAINERS" = existing ] && [ -z "$PY_SYS" ]; then        # LoRA Studio alone runs on any Python 3.10 or newer
-    for c in python3.13 python3.12 python3.11 python3.10 python3; do
-        p="$(command -v "$c" || true)"
-        if [ -n "$p" ] && "$p" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))' 2>/dev/null; then PY_SYS="$p"; break; fi
-    done
+# Python 3.12: LoRA Studio's own, made with uv (https://docs.astral.sh/uv/) in $TARGET/.tools. No admin rights, the
+# system Python is not touched, and it is the same Python 3.12 on every Linux, on macOS and in WSL.
+TOOLS="$TARGET/.tools"
+export UV_PYTHON_INSTALL_DIR="$TOOLS/python" UV_CACHE_DIR="$TOOLS/cache" UV_NO_MODIFY_PATH=1
+uv_from_github() {   # uv_from_github DIR: the uv program straight from its GitHub release (when astral.sh is not reachable)
+    local a t
+    case "$(uname -s)-$(uname -m)" in
+        Linux-x86_64) t=x86_64-unknown-linux-gnu ;; Linux-aarch64|Linux-arm64) t=aarch64-unknown-linux-gnu ;;
+        Darwin-arm64) t=aarch64-apple-darwin ;; Darwin-x86_64) t=x86_64-apple-darwin ;; *) return 1 ;;
+    esac
+    a="https://github.com/astral-sh/uv/releases/latest/download/uv-$t.tar.gz"
+    mkdir -p "$1"
+    if command -v curl >/dev/null 2>&1; then curl -LsSf "$a" | tar -xz -C "$1" --strip-components=1
+    else wget -qO- "$a" | tar -xz -C "$1" --strip-components=1; fi
+}
+find_uv() { for f in "$TOOLS/uv" "$TOOLS/bin/uv"; do [ -x "$f" ] && { printf '%s' "$f"; return 0; }; done; return 0; }
+UV="$(find_uv)"
+if [ -z "$UV" ]; then
+    say "   Downloading the small tool uv (it brings LoRA Studio's own Python ${PYVER}) ..."
+    mkdir -p "$TOOLS"
+    if command -v curl >/dev/null; then curl -LsSf https://astral.sh/uv/install.sh 2>/dev/null | env UV_UNMANAGED_INSTALL="$TOOLS" sh >/dev/null 2>&1 || true
+    elif command -v wget >/dev/null; then wget -qO- https://astral.sh/uv/install.sh 2>/dev/null | env UV_UNMANAGED_INSTALL="$TOOLS" sh >/dev/null 2>&1 || true
+    fi
+    UV="$(find_uv)"
+    [ -n "$UV" ] || { uv_from_github "$TOOLS" >/dev/null 2>&1 || true; UV="$(find_uv)"; }
+fi
+PY_SYS=""
+if [ -n "$UV" ]; then
+    ok "uv $("$UV" --version 2>/dev/null | awk '{print $2}') in $TOOLS"
+    if "$UV" python install "$PYVER" >/dev/null 2>&1; then
+        PY_SYS="$(UV_PYTHON_PREFERENCE=only-managed "$UV" python find "$PYVER" 2>/dev/null || true)"
+    fi
+    [ -n "$PY_SYS" ] || warn "uv could not get Python ${PYVER} (no internet?): looking for one on this computer"
+else
+    warn "uv could not be downloaded (no curl/wget or no internet): looking for Python ${PYVER} on this computer"
 fi
 if [ -z "$PY_SYS" ]; then
-    say "   Python ${PYVER} is missing (PyTorch for ROCm/CUDA and both trainers are built for it, not for your default python3)."
-    if yes_no "Install it now with: $PKG_PY ?" y; then eval "$PKG_PY"; PY_SYS="$(command -v "python${PYVER}" || true)"; fi
-    [ -n "$PY_SYS" ] || die "Python ${PYVER} is needed: $PKG_PY"
+    PY_SYS="$(command -v "python${PYVER}" || true)"
+    if [ -z "$PY_SYS" ]; then
+        say "   Python ${PYVER} is missing (PyTorch for ROCm/CUDA and both trainers are built for it)."
+        if [ "$IS_MAC" = 0 ] && yes_no "Install it now with: $PKG_PY ?" y; then eval "$PKG_PY"; PY_SYS="$(command -v "python${PYVER}" || true)"; fi
+        [ -n "$PY_SYS" ] || die "Python ${PYVER} is needed: check the internet connection and run ./install.sh again (or: $PKG_PY)"
+    fi
+    "$PY_SYS" -m venv --help >/dev/null 2>&1 || die "Python ${PYVER} has no venv module: $PKG_PY"
 fi
-"$PY_SYS" -m venv --help >/dev/null 2>&1 || die "Python ${PYVER} has no venv module: $PKG_PY"
 ok "Python $("$PY_SYS" -c 'import sys; print(sys.version.split()[0])') ($PY_SYS)"
 
 FREE_GB=$(( $(df -Pk "$TARGET" | awk 'NR==2{print $4}') / 1048576 ))
@@ -374,7 +434,7 @@ fi   # TRAINERS = install
 
 # ------------------------------------------------------------------ 2. LoRA Studio files
 step "LoRA Studio files"
-if [ "$SRC" != "$(readlink -f "$TARGET")" ]; then
+if [ "$SRC" != "$(cd "$TARGET" && pwd -P)" ]; then
     for f in $APP_FILES; do
         [ -f "$SRC/$f" ] || die "$f is missing in $SRC (unpack the whole zip)"
         cp -f "$SRC/$f" "$TARGET/$f"
@@ -405,7 +465,7 @@ if [ ! -f "$TARGET/userdata/library_settings.txt" ]; then
     else
         while IFS= read -r f; do
             d="$(dirname "$f")"; app="$d"; [ "$(basename "$d")" = userdata ] && app="$(dirname "$d")"
-            [ "$app" != "$(readlink -f "$TARGET")" ] && [ -f "$app/lora_studio.py" ] && CANDS+=("$d")
+            [ "$app" != "$(cd "$TARGET" && pwd -P)" ] && [ -f "$app/lora_studio.py" ] && CANDS+=("$d")
         done < <(find "$HOME" -maxdepth 6 -name library_settings.txt -not -path "*/venv/*" -not -path "$TARGET/*" \
                       -not -path "*/update_backups/*" -not -path "*/restore_backups/*" 2>/dev/null | head -8)
     fi
@@ -431,14 +491,18 @@ fi
 # ------------------------------------------------------------------ 3. venv
 if [ "$TRAINERS" = existing ]; then step "A small Python environment for LoRA Studio"; else step "Python ${PYVER} environment"; fi
 VENV="$TARGET/venv"; PY="$VENV/bin/python"
-if [ "$TRAINERS" = install ] && [ -x "$PY" ] && ! "$PY" -c "import sys; raise SystemExit(sys.version_info[:2] != tuple(map(int, '$PYVER'.split('.'))))" 2>/dev/null; then
+if [ -e "$VENV" ] && ! "$PY" -c "import sys; raise SystemExit(sys.version_info[:2] != tuple(map(int, '$PYVER'.split('.'))))" 2>/dev/null; then
     OLD="$VENV.old-$(date +%Y%m%d-%H%M)"
-    warn "$VENV is a Python $("$PY" -c 'import sys;print(sys.version.split()[0])') environment (the old GUI-only one); moving it to $OLD"
+    warn "$VENV is not a working Python ${PYVER} environment; moving it to $OLD and making a new one"
     mv "$VENV" "$OLD"
 fi
 if [ ! -x "$PY" ]; then
-    "$PY_SYS" -m venv "$VENV"
-    ok "created $VENV"
+    if [ -n "$UV" ] && [[ "$PY_SYS" == "$TOOLS"/* ]]; then
+        "$UV" venv --python "$PY_SYS" --seed "$VENV" >/dev/null 2>&1 || "$PY_SYS" -m venv "$VENV"
+    else
+        "$PY_SYS" -m venv "$VENV"
+    fi
+    ok "created $VENV (Python $("$PY" -c 'import sys; print(sys.version.split()[0])'))"
 fi
 "$PY" -m pip install -q --upgrade pip setuptools wheel
 ok "pip $("$PY" -m pip --version | awk '{print $2}')"
@@ -575,19 +639,19 @@ fi   # TRAINERS = install (steps 4 and 5)
 # ------------------------------------------------------------------ 6. GUI packages
 step "LoRA Studio packages (Gradio)"
 if [ "$TRAINERS" = install ]; then
-    PIP install -q -r "$TARGET/requirements.txt" -c "$CONS"
+    PIP install -q --upgrade -r "$TARGET/requirements.txt" -c "$CONS"
     echo "$GPU ${GFX:-cuda}" > "$VENV/.lorastudio-shared"
 else
-    PIP install -q -r "$TARGET/requirements.txt"
+    PIP install -q --upgrade -r "$TARGET/requirements.txt"     # no version numbers: the newest ones
     rm -f "$VENV/.lorastudio-shared"            # start.sh: this venv is LoRA Studio's own, not the training one
 fi
-sha256sum "$TARGET/requirements.txt" | cut -d' ' -f1 > "$VENV/.requirements.sha256"
+sha256 "$TARGET/requirements.txt" > "$VENV/.requirements.sha256"
 ok "gradio $("$PY" -c 'import gradio; print(gradio.__version__)')"
 
 # ------------------------------------------------------------------ 7. test
 step "Testing"
 if [ "$SD_MODE" = existing ]; then
-    if ( cd "$EX_SD" && timeout 300 "$EX_VENV/bin/python" sdxl_train_network.py --help >/dev/null 2>/tmp/lorastudio-help.txt ); then
+    if ( cd "$EX_SD" && tmo 300 "$EX_VENV/bin/python" sdxl_train_network.py --help >/dev/null 2>/tmp/lorastudio-help.txt ); then
         ok "your sd-scripts: sdxl_train_network.py starts in its venv"
     else
         warn "your sd-scripts: sdxl_train_network.py --help failed in $EX_VENV:"; tail -3 /tmp/lorastudio-help.txt | sed 's/^/     /'
@@ -619,7 +683,7 @@ for t in "sd-scripts:sdxl_train_network.py" "sd-scripts:flux_train_network.py" "
     d="${t%%:*}"; s="${t#*:}"
     [ "$d" = sd-scripts ] && [ "$SD_MODE" != install ] && continue
     [ "$d" = musubi-tuner ] && [ "$MU_MODE" != install ] && continue
-    if ( cd "$TARGET/$d" && timeout 300 "$PY" "$s" --help >/dev/null 2>/tmp/lorastudio-help.txt ); then ok "$d: $(basename "$s") starts"
+    if ( cd "$TARGET/$d" && tmo 300 "$PY" "$s" --help >/dev/null 2>/tmp/lorastudio-help.txt ); then ok "$d: $(basename "$s") starts"
     else warn "$d: $(basename "$s") --help failed:"; tail -3 /tmp/lorastudio-help.txt | sed 's/^/     /'; fi
 done
 fi   # TRAINERS
@@ -701,7 +765,8 @@ if ol_mode in ("install", "remote") and ol_url:
 set_keys(UD / "training_settings.txt", "general", keys)
 word = {"install": "installed", "existing": "existing", "none": "none", "remote": "remote", "": "installed"}
 feat = {"ollama": word.get(ol_mode, "installed"), "sd_scripts": word.get(sd_mode, "installed"),
-        "musubi": word.get(mu_mode, "installed"), "platform": "wsl" if wsl == "1" else "linux"}
+        "musubi": word.get(mu_mode, "installed"),
+        "platform": "wsl" if wsl == "1" else "mac" if sys.platform == "darwin" else "linux"}
 if gpu in ("amd", "nvidia"):
     feat["gpu"] = gpu
 (UD / "features.json").write_text(json.dumps(feat, indent=1), encoding="utf-8")
@@ -838,7 +903,7 @@ case "$MU_MODE" in
 esac
 case "$OL_MODE" in
     install|remote) say "   Ollama:       $OL_URL" ;;
-    *) say "   Ollama:       none. To add it later: $([ "$IS_WSL" = 1 ] && echo https://ollama.com/download/windows || echo https://ollama.com/download/linux)," 
+    *) say "   Ollama:       none. To add it later: $([ "$IS_WSL" = 1 ] && echo https://ollama.com/download/windows || { [ "$IS_MAC" = 1 ] && echo https://ollama.com/download/mac; } || echo https://ollama.com/download/linux)," 
        say "                 then tick it in Settings › Start and network" ;;
 esac
 say "   Change any of these: ./install.sh --ask"
