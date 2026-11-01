@@ -10,5 +10,10 @@ scanned there): too many pictures, no full-body pictures, missing captions, wate
 
 ![Settings › Automatic improvement](img/set_batch.jpg)
 
+The settings are grouped like the steps: **Pictures to keep** (step 5; the rest go to `_reserve/`), **LoRA type and
+purpose** (step 3, only for a dataset that has none yet), **Watermarks and size** (step 6) and **Captions** (step 7)
+with what happens at the end. Your step 5 pins count here too. Everything it moves can be put back (`_reserve/`,
+`_originals/`); *Back to the defaults* resets the choices.
+
 > **Do** look at the result of an automatic run once (step 5 and step 8) before training on it.
 > **Don't** let it run on a dataset you are editing by hand at the same time.

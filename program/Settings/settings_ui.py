@@ -542,7 +542,7 @@ def selfupdate_panel(app):
                         "release (or, with *Betas too*, the newest upload) and installs it the same safe way as a zip: a backup first, the self-test, and "
                         "back by itself when the test fails. Only when you press the buttons. While the repository is "
                         "private, a **GitHub token** with read access to it is needed (github.com › Settings › Developer "
-                        "settings › Fine-grained tokens: this repository, *Contents: read*); it is saved in "
+                        "settings › Fine-grained tokens: this repository, *Contents: Read-only*); it is saved in "
                         "`userdata/github_token.txt`, readable only by you, and left out of every report.",
                         elem_classes=["ls-note"])
             with gr.Row(elem_classes=["ls-bar"]):

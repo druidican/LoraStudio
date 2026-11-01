@@ -13,10 +13,12 @@ LoRA Studio has been tested on Linux with an AMD Radeon (ROCm). Anything else is
 | A **laptop with two GPUs** | the question which GPU to train on |
 | **Windows** (NVIDIA or AMD) | the whole Windows installer: WSL2, the desktop starter, Ollama in Windows |
 | **No GPU**, or no trainers | the greyed-out parts: does it stay clear what is missing and why? |
+| **macOS** | the install without trainers: its own Python 3.12, start.sh, the greyed-out training parts |
 
 ## The steps
 
 1. **Install.** Unpack LoraStudio.zip. Linux: `./install.sh`. Windows: double-click **Install LoRA Studio.cmd**.
+   macOS: `bash ./install.sh` in Terminal.
    Answer the questions as fits your computer; *none* is a fine answer.
 2. **Keep the install report.** At the end (also when it stops) the installer writes an install report and shows
    where. On Linux it is in `~/LoraStudio/userdata/reports/`, on Windows next to the installer (and copied, so Ctrl+V pastes

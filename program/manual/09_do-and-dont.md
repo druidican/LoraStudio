@@ -14,8 +14,8 @@
 ## Don't
 
 - **Don't** put pictures of other characters, collages or screenshots with text in the repeat folder.
-- **Don't** describe the character's fixed look (hair colour, eyes, body) in the captions of a character LoRA: then
-  the trigger word does not learn it.
+- **Don't** leave the character's fixed look (hair colour, eyes, body) in the captions of a character LoRA: then
+  the trigger word does not learn it. For tags, move those tags to the trigger words in step 7.
 - **Don't** train with ComfyUI generating at the same time on the same GPU: the run runs out of video memory.
 - **Don't** delete `_originals/` or `_reserve/` by hand while working on a dataset: they are how steps 5 and 6 can be undone.
 - **Don't** edit a launch script while it is in the queue or training.

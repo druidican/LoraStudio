@@ -1,4 +1,4 @@
-# Installing: Linux, Windows, what you have
+# Installing: Linux, Windows, macOS, what you have
 
 LoRA Studio works with what your computer has. You do not need everything: a part you leave out has its buttons
 hidden, and its places are greyed out with **(… missing)** so you can see what it would do.
@@ -14,6 +14,14 @@ hidden, and its places are greyed out with **(… missing)** so you can see what
 `install.sh` asks about each one: **install it for me**, **I have it already** (it asks for the folder), or
 **none**. Ollama can be installed for you on Linux only; on Windows it is installed in Windows (see below).
 The answers are remembered; `./install.sh --ask` asks again.
+
+## Python: nothing to install
+
+The installer gives LoRA Studio its **own Python 3.12**, made with the small tool [uv](https://docs.astral.sh/uv/) in
+`~/LoraStudio/.tools`: no administrator rights, and the Python of your computer is not touched. It is the same
+Python 3.12 on every Linux, in WSL on Windows and on macOS. Only when it cannot be downloaded does the installer use
+the computer's own `python3.12`. LoRA Studio's own packages (Gradio and the rest) have no version numbers, so the
+newest are installed; the trainers keep the versions they need.
 
 ## Linux
 
@@ -50,6 +58,14 @@ Unpack LoraStudio.zip and double-click **Install LoRA Studio.cmd**:
 
 Your Windows files are in Ubuntu under `/mnt/c` (for example `/mnt/c/Users/you/Pictures`). Datasets inside Ubuntu
 train faster; the Explorer shows them under **Linux › Ubuntu-24.04 › home**.
+
+## macOS
+
+A Mac has neither CUDA nor ROCm, so the trainers are not installed there. LoRA Studio itself works: datasets, the sort
+and captions (with Ollama), the Collection and the launch scripts, which you run on a Linux or Windows computer.
+Unpack LoraStudio.zip, open **Terminal**, go into the unpacked folder (type `cd `, drag the folder in, press Enter) and
+run `bash ./install.sh`; start it with `cd ~/LoraStudio && ./start.sh`. Ollama for the Mac:
+[ollama.com/download/mac](https://ollama.com/download/mac).
 
 ## Adding a part later
 

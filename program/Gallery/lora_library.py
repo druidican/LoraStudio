@@ -3197,7 +3197,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                         e_reason = gr.Textbox(label="Flag reason")
                     with gr.Row(elem_classes=["ls-bar"]):
                         e_save = gr.Button("Save", variant="primary", scale=0, min_width=120)
-                        gr.Markdown(f"Saved in the dataset's {ARCHIVE_DIR}/ folder, a .bak is kept. Training settings come "
+                        gr.Markdown(f"Saved in the dataset's {ARCHIVE_DIR}/ folder, a .bak is kept. Training settings "
                                     "(the Training tab) come from the LoRA file, its launch script and its log and cannot be edited.",
                                     elem_classes=["ls-note"])
                     e_msg = gr.Markdown()
