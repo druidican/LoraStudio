@@ -9,7 +9,7 @@ loss rose at the end (too long?), went NaN, or was still falling (the final one,
 Loss is only a rough guide for image LoRAs: the advice is "try this one first", followed by a few test pictures.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import math
 import re

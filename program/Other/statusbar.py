@@ -5,7 +5,7 @@ GPU: rocm-smi (AMD) or nvidia-smi (NVIDIA); CPU and RAM: /proc/stat and /proc/me
 two seconds, so many open pages share one reading. A missing tool just leaves that part out.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import glob
 import html

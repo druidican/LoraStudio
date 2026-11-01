@@ -12,7 +12,7 @@ The report is written to lorastudio_check_<time>.md in the program folder: no to
 no dataset names (only how many there are). Upload that file when something is not right.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import os

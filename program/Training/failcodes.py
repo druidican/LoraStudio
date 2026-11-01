@@ -6,7 +6,7 @@ The patterns are checked in order; the first one that matches wins, so the speci
 log line that matched (shown under the description, for the curious).
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import re
 

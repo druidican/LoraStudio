@@ -11,7 +11,7 @@ Only the Python standard library is used (urllib); Pillow is used to shrink the 
 Run it on its own to test the connection:   python3 captioner.py [--url http://127.0.0.1:11434] [image.jpg]
 """
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import base64
 import io

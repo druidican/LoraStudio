@@ -13,7 +13,7 @@ until the worker is told to quit (LoRA Studio quits it before a training run and
 Model files are downloaded on first use into the models folder given as the first argument.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import base64
 import json

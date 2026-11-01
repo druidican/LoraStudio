@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.261026z"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -914,10 +914,23 @@ def build(app, show):
                 s7_missing = gr.Button("Only pictures without a caption", size="sm", scale=0, min_width=240)
                 s7_stop = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=90)
             s7_out = gr.Markdown()
+            with gr.Column(elem_classes=["ls-card"], visible=False) as s7_mv_card:
+                gr.Markdown("#### Character tags → trigger words")
+                gr.Markdown("For a character the WD tagger writes **every** tag, also the character's own (hair, eyes, "
+                            "freckles ...). Tick the ones that belong to the character: **Move** takes them out of the "
+                            "captions (so the trigger word learns them) and puts them in the Character description "
+                            "below, next to the trigger word. Ticked already: the traits in most pictures. The "
+                            "captions with all tags are kept, so **Put them back** undoes it.", elem_classes=["ls-note"])
+                s7_mv_tags = gr.CheckboxGroup(label="Tags of the caption set (pictures that have them)", choices=[])
+                with gr.Row(elem_classes=["ls-bar"]):
+                    s7_mv_read = gr.Button("Read the tags", size="sm", scale=0, min_width=150)
+                    s7_mv_go = gr.Button("Move the ticked tags", variant="primary", size="sm", scale=0, min_width=200)
+                    s7_mv_back = gr.Button("Put them back", size="sm", scale=0, min_width=150)
+                s7_mv_msg = gr.Markdown()
             with gr.Column(elem_classes=["ls-card"], visible=False) as s7_desc_card:
                 gr.Markdown("#### Character description, next to the trigger word")
-                gr.Markdown("The captions leave the character's own traits out, so the trigger word learns them. Name "
-                            "them here too (for example *slim build, tall, blonde hair, blue eyes*): they are added to "
+                gr.Markdown("The character's own traits are not in the captions (moved above, or never written), so "
+                            "the trigger word learns them. Name them here too (for example *slim build, tall, blonde hair, blue eyes*): they are added to "
                             "the LoRA's trigger words in its LoRA Manager data, so ComfyUI offers them next to the "
                             "trigger word to strengthen the character in a prompt. The captions do not change. "
                             "*Suggest* takes the traits the WD tagger saw in most pictures (hair, eyes, freckles, "
@@ -1253,6 +1266,37 @@ def build(app, show):
         return gr.update(visible=ch), gr.update(value=F.description(s["ds"])), ""
     navbox.change(desc_load, st, [s7_desc_card, s7_desc, s7_desc_msg], show_progress="hidden")
 
+    def mv_view(s, trig, msg=""):
+        """The tags of IMG.txt with their counts; ticked: the moved ones are gone, the frequent traits pre-ticked."""
+        if s.get("view") != "flow" or s.get("step") != 7 or not s.get("ds"):
+            return gr.update(), gr.update(), gr.update()
+        ds = s["ds"]
+        if DC.base_purpose(F.meta(ds)["purpose"]) != "character":
+            return gr.update(visible=False), gr.update(), ""
+        rows, n = F.tag_counts(ds, ".txt", trig or ds)
+        if not n:
+            return (gr.update(visible=True), gr.update(choices=[], value=[]),
+                    msg or "No captions yet: write the tag captions above first.")
+        choices = [(f"{t} ({c})", t) for t, c in rows[:120]]
+        moved = F.moved_tags(ds)
+        tick = F.default_ticks(rows, n)
+        note = msg or (f"{n} captions, {len(rows)} different tags." + (f" Moved already: *{', '.join(moved)}*."
+                                                                        if moved else ""))
+        return gr.update(visible=True), gr.update(choices=choices, value=tick), note
+    MV_OUT = [s7_mv_card, s7_mv_tags, s7_mv_msg]
+    navbox.change(mv_view, [st, UI["oc"]["trigger"]], MV_OUT, show_progress="hidden")
+    s7_mv_read.click(mv_view, [st, UI["oc"]["trigger"]], MV_OUT)
+
+    def mv_go(s, tags, trig):
+        msg = F.move_tags(s["ds"], tags, ".txt", trig or s["ds"]) if s.get("ds") else "Choose a dataset first."
+        return list(mv_view(s, trig, msg)) + [F.description(s["ds"]) if s.get("ds") else gr.update()]
+
+    def mv_back(s, trig):
+        msg = F.put_back(s["ds"], ".txt") if s.get("ds") else "Choose a dataset first."
+        return list(mv_view(s, trig, msg)) + [F.description(s["ds"]) if s.get("ds") else gr.update()]
+    s7_mv_go.click(mv_go, [st, s7_mv_tags, UI["oc"]["trigger"]], MV_OUT + [s7_desc])
+    s7_mv_back.click(mv_back, [st, UI["oc"]["trigger"]], MV_OUT + [s7_desc])
+
     def desc_save(s, text):
         if not s.get("ds"):
             return gr.update(), ""
@@ -1563,7 +1607,7 @@ def build(app, show):
             msg += ("\n\n" if msg else "") + last
         yield msg, s7_sets_html(ds)
     s7_both.click(write_all, [st, oc["url"], oc["model"], oc["trigger"], oc["leave"], oc["length"], oc["detail"]],
-                  [s7_out, s7_sets])
+                  [s7_out, s7_sets]).then(mv_view, [st, oc["trigger"]], MV_OUT)
     s7_missing.click(lambda *a: (yield from write_all(*a, only_missing=True)),
                      [st, oc["url"], oc["model"], oc["trigger"], oc["leave"], oc["length"], oc["detail"]], [s7_out, s7_sets])
     s7_stop.click(lambda: (F.STOP.set(), S.OC_STOP.update(flag=True)), None, None, queue=False)

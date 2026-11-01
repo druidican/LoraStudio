@@ -14,7 +14,7 @@ Contents (github.com › Settings › Developer settings › Personal access tok
 readable only by you. A public repository needs none.
 """
 from __future__ import annotations
-__version__ = "1.261026z"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import os

@@ -14,7 +14,7 @@ Needs onnx + onnxruntime in the training venv: installed by itself the first tim
 command is shown. The model (about 1.2 GB) is downloaded the first time into userdata/wd_tagger/.
 """
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import os
 import shutil
@@ -91,9 +91,11 @@ def _install(py: Path):
     return True
 
 
-def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, stop=None, traits: dict | None = None):
+def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, stop=None, traits: dict | None = None,
+        trait_leave: str | None = None):
     """Generator of progress lines. `write(img, line)` stores one finished caption. Returns nothing; the last line
-    says how it went."""
+    says how it went. `trait_leave` (default: leave_out) is what counts as a character trait for `traits`; with an
+    empty leave_out every tag is written (a character's traits are moved to the trigger words afterwards)."""
     import captioner as CAP
     st = status()
     if not st["ok"] and st["need_install"]:
@@ -158,7 +160,7 @@ def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, 
                 continue
             raw = f.read_text(encoding="utf-8", errors="ignore")
             if traits is not None:                       # the left-out traits, for a suggested description
-                for t in set(CAP.trait_tags(raw, leave_out)):
+                for t in set(CAP.trait_tags(raw, leave_out if trait_leave is None else trait_leave)):
                     traits[t] = traits.get(t, 0) + 1
                 traits["_n"] = traits.get("_n", 0) + 1
             line, _ = CAP.clean_tags(raw, trigger, leave_out, max_tags)

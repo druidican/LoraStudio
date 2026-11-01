@@ -12,7 +12,7 @@ inspect() is quick (it reads the installed versions, PyTorch is not started) and
 your own venv only gets the commands to run.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import os

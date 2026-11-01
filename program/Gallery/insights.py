@@ -23,7 +23,7 @@ Everything is read on this computer from what LoRA Studio already has; nothing i
 With few LoRAs these are hints, not rules: every number says how many LoRAs or runs it comes from.
 """
 from __future__ import annotations
-__version__ = "1.261026z"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import re
 import statistics

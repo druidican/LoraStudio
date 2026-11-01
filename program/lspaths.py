@@ -13,7 +13,7 @@ migrate() moves an older install (everything in one folder) into this layout: yo
 program files to userdata/update_backups/old_layout_<time>/. It runs at every start and does nothing once done.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import shutil
 import sys

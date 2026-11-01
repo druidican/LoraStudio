@@ -78,6 +78,11 @@ Writes a caption for every picture. **Tags** (Illustrious, Pony, SDXL, Anima) co
 For a character, captions describe what **changes** (clothes, pose, place) and leave out what is always the
 character, so the trigger word learns it. The consistency check finds traits that are named in different ways.
 
+**Character tags → trigger words** (tags, character datasets): the WD tagger writes **every** tag, also the
+character's own (hair, eyes, freckles …). The card lists all tags with the number of pictures that have them; the
+character's traits in most pictures are ticked already. **Move the ticked tags** takes them out of every caption and
+puts them in the Character description; the captions with all tags are kept, and **Put them back** undoes it.
+
 **Character description**: name those traits in words too (*slim build, tall, blonde hair, blue eyes*). They are put
 next to the trigger word in the LoRA's LoRA Manager data, so ComfyUI offers them with it and you can add them to a
 prompt to make the character stronger. The captions stay as they are. *Suggest from the tags* fills in what the WD

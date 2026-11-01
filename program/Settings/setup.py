@@ -17,7 +17,7 @@ without asking. Without a terminal (no keyboard), the defaults are used.
 """
 
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import os
 import shutil

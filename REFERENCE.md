@@ -92,6 +92,11 @@ The steps (the bar above them shows the dataset, its LoRA types and purpose; the
    captions so the trigger word learns them, words that mean the same become one word, and odd pictures that say
    something else are shown so you can look (fix, or this picture only). Clothes, places, poses, expressions and light
    stay in each caption. *Apply to the other caption set too* takes the same traits out of the second set.
+   **Character tags → trigger words** (character datasets, WD tags): the WD tagger writes every tag, also the
+   character's own; the card lists all tags with their picture counts (traits in at least 40 % of the pictures of the
+   describable kinds ticked already). *Move the ticked tags* removes them from every caption of `IMG.txt` and adds them
+   to the Character description; the captions with all tags are kept in `.lsflow/captions_alltags_txt/` and *Put them
+   back* restores them and takes the moved words out of the description again. A new tagging run starts afresh.
    **Character description** (character datasets): the traits the trigger word learns, named in words (*slim build,
    tall, blonde hair, blue eyes*), saved in the dataset. They are added to the LoRA's trigger words in its LoRA Manager
    data (after the trigger word; a changed description replaces the old words), so ComfyUI offers them next to the

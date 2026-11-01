@@ -5,7 +5,7 @@ program. Added after sdgui.CSS and lora_library.CSS by lora_studio.py, so it use
   lora_studio.css   the program's styles (an update replaces it)
   custom.css        your own changes: loaded last, never replaced by an update
 """
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 from pathlib import Path
 
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)

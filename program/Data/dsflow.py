@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.261026w"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1165,12 +1165,118 @@ def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
     cap = S.CAP if S.CAP is not None else __import__("captioner")
     max_tags = cap.TAG_COUNT.get(int(length or 3), 20)
     traits: dict = {}
-    yield from WD.tag(imgs, (trigger or ds).strip(), leave_out or "", max_tags,
-                      lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP, traits)
+    import datacheck as DC
+    character = DC.base_purpose(meta(ds).get("purpose", "character")) == "character"
+    # a character: ALL tags are written; afterwards step 7 moves the character's own ones to the trigger words
+    write_leave = "" if character else (leave_out or "")
+    yield from WD.tag(imgs, (trigger or ds).strip(), write_leave, max_tags,
+                      lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP, traits,
+                      trait_leave=(leave_out or cap.DEFAULT_LEAVE_OUT) if character else None)
+    m = meta(ds)
     if traits.get("_n"):
-        m = meta(ds)
         m["trait_tags"] = traits                         # Character description › Suggest (step 7)
-        meta_save(ds, m)
+    if character:
+        m["wd_all"] = {"ext": ext, "at": time.strftime("%Y-%m-%d %H:%M")}
+        shutil.rmtree(_moved_dir(ds, ext), ignore_errors=True)    # new captions with all tags: nothing moved yet
+        (m.get("moved_tags") or {}).pop(ext, None)
+    meta_save(ds, m)
+    if character:
+        yield ("✔ Every tag is in the captions now, also the character's own (hair, eyes ...). Next: **Character "
+               "tags → trigger words** below moves the ones you tick out of the captions and next to the trigger word.")
+
+
+# ---- step 7, character tags: all tags are written first, then the ticked ones move to the trigger words
+def _moved_dir(ds, ext) -> Path:
+    return _flow(ds) / f"captions_alltags{ext.replace('.', '_')}"
+
+
+def tag_counts(ds, ext=".txt", trigger=""):
+    """[(tag, pictures)] of a caption set, most frequent first, and the number of pictures with a caption."""
+    trig = (trigger or ds or "").strip().lower()
+    counts, n = {}, 0
+    for p in images(ds):
+        t = read_set(p, ext)
+        if not t:
+            continue
+        n += 1
+        for x in dict.fromkeys(w.strip().lower() for w in re.split(r"[,\n]", t) if w.strip()):
+            if x != trig:
+                counts[x] = counts.get(x, 0) + 1
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])), n
+
+
+def default_ticks(rows, n) -> list[str]:
+    """Pre-ticked: tags in at least 40 % of the pictures that describe the character (hair, eyes, freckles, build,
+    face, tattoos, makeup). Never ethnicity, skin or age: those you tick yourself if you want them."""
+    import captioner as CAP
+    out = []
+    for t, c in rows:
+        if c < max(2, 0.4 * n):
+            continue
+        hit = CAP.leaks(t, CAP.DEFAULT_LEAVE_OUT)
+        if hit and all(h in CAP.DESCRIBE_OK for h in hit):
+            out.append(t)
+    return out
+
+
+def moved_tags(ds, ext=".txt") -> list[str]:
+    return list((meta(ds).get("moved_tags") or {}).get(ext, {}).get("tags") or []) if ds else []
+
+
+def move_tags(ds, tags, ext=".txt", trigger="") -> str:
+    """Take the ticked tags out of every caption of the set and add them to the character description. The captions
+    with all tags are kept in .lsflow/ first, so put_back() can undo it."""
+    tags = [t.strip().lower() for t in tags or [] if t.strip()]
+    if not tags:
+        return "Tick the tags that belong to the character first."
+    trig = (trigger or ds).strip().lower()
+    tags = [t for t in tags if t != trig]
+    keep = _moved_dir(ds, ext)
+    first = not keep.is_dir()
+    keep.mkdir(parents=True, exist_ok=True)
+    changed = 0
+    for p in images(ds):
+        f = set_file(p, ext)
+        if not f.is_file():
+            continue
+        text = f.read_text(encoding="utf-8", errors="ignore")
+        if first or not (keep / f.name).is_file():
+            shutil.copy2(f, keep / f.name)                # the version with all tags
+        parts = [w.strip() for w in re.split(r"[,\n]", text) if w.strip()]
+        new = [w for w in parts if w.lower() not in set(tags)]
+        if len(new) != len(parts):
+            f.write_text(", ".join(new) + "\n", encoding="utf-8")
+            changed += 1
+    m = meta(ds)
+    mv = m.setdefault("moved_tags", {}).setdefault(ext, {"tags": [], "desc_before": m.get("description", "")})
+    mv["tags"] = list(dict.fromkeys(mv["tags"] + tags))
+    meta_save(ds, m)
+    desc = set_description(ds, ", ".join([description(ds)] + tags))
+    return (f"✔ Moved {len(tags)} tag(s) out of {changed} caption(s) and next to the trigger word: *{desc}*. "
+            "The captions with all tags are kept: **Put them back** undoes it.")
+
+
+def put_back(ds, ext=".txt") -> str:
+    """Undo move_tags: the captions with all tags back, the moved tags out of the description again."""
+    keep = _moved_dir(ds, ext)
+    m = meta(ds)
+    mv = (m.get("moved_tags") or {}).get(ext)
+    if not keep.is_dir() or not mv:
+        return "Nothing was moved in this caption set, so there is nothing to put back."
+    n = 0
+    for p in images(ds):
+        f = set_file(p, ext)
+        if (keep / f.name).is_file():
+            shutil.copy2(keep / f.name, f)
+            n += 1
+    shutil.rmtree(keep, ignore_errors=True)
+    gone = {t.lower() for t in mv.get("tags") or []}
+    m = meta(ds)
+    m.get("moved_tags", {}).pop(ext, None)
+    meta_save(ds, m)
+    left = [w for w in re.split(r",", description(ds)) if w.strip() and w.strip().lower() not in gone]
+    set_description(ds, ", ".join(left))
+    return f"✔ Put back: {n} caption(s) have all their tags again; the moved tags are out of the description."
 
 
 def suggest_description(ds) -> str:

@@ -18,7 +18,7 @@ The traits of each caption come from the Ollama model (text only, one short ques
 caption's text). Without Ollama a built-in word list finds the common ones (eyes, hair, build, skin).
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import hashlib
 import json

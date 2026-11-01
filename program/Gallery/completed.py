@@ -17,7 +17,7 @@ Marks from before versions were tracked have no "versions": they count for every
 """
 
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import re

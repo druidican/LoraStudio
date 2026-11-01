@@ -9,7 +9,7 @@ Without the file (an older install) everything counts as present, as before. A c
 page is built once at start.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import os

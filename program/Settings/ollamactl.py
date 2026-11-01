@@ -6,7 +6,7 @@ video memory and does not start one again afterwards (the top bar shows "Ollama:
 until a page that needs Ollama asks it a question).
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import html
 import json

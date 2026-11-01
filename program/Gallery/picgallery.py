@@ -14,7 +14,7 @@ The index is kept in picture_index.json next to the program. A scan only reads p
 changed since the last scan (file time + size of the picture and its .json); deleted pictures are dropped.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import os

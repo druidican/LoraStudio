@@ -5,7 +5,7 @@ Saved in launch_settings.json next to the program (readable only by you: it can 
 lora_studio.py reads it at start; an option given on the command line (./start.sh --port 7861) still wins.
 """
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import os

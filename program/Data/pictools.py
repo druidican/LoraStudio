@@ -7,7 +7,7 @@ Settings › Trainers and GPU shows whether the tools are ready; "Install the pi
 the venv lacks (spandrel, for the upscalers) without touching PyTorch.
 """
 from __future__ import annotations
-__version__ = "1.261026v"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import base64
 import json

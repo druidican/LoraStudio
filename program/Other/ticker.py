@@ -7,7 +7,7 @@ register what they want refreshed here, and lora_studio.py makes ONE timer that 
 Standalone (sdgui.py on its own) nothing is registered and the parts keep their own timers.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import gradio as gr
 

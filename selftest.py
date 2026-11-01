@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261026z"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -484,6 +484,38 @@ def _desc():
     need(sc["civitai"]["trainedWords"] == ["pip", "tall", "blonde hair"], f"not next to the trigger: {sc['civitai']}")
     sc2 = TC.apply(sc, {"trigger": "pip", "description": "slim build"}, "s")
     need(sc2["civitai"]["trainedWords"] == ["pip", "slim build"], f"the old description stayed: {sc2['civitai']}")
+
+
+@check("step 7: all tags written, ticked character tags move to the trigger words and back")
+def _tagmove():
+    import tempfile
+    import dsflow as F
+    d = Path(tempfile.mkdtemp())
+    imgs = []
+    for i, line in enumerate(["pip, blonde hair, blue eyes, smile, outdoors", "pip, blonde hair, blue eyes, indoors",
+                              "pip, blonde hair, sitting"]):
+        img = d / f"{i}.png"
+        img.write_bytes(b"x")
+        (d / f"{i}.txt").write_text(line + "\n", encoding="utf-8")
+        imgs.append(img)
+    store = {"m": {"purpose": "character", "types": []}}
+    saved = {k: getattr(F, k) for k in ("images", "meta", "meta_save", "_flow", "set_file")}
+    F.images, F.meta, F.meta_save = (lambda ds: imgs), (lambda ds: store["m"]), (lambda ds, m: store.update(m=m))
+    F._flow, F.set_file = (lambda ds: d / ".lsflow"), (lambda img, ext: img.with_suffix(ext))
+    try:
+        rows, n = F.tag_counts("pip", ".txt", "pip")
+        need(n == 3 and rows[0] == ("blonde hair", 3), f"wrong counts: {rows[:3]}")
+        tick = F.default_ticks(rows, n)
+        need(tick == ["blonde hair", "blue eyes"], f"wrong pre-ticks: {tick}")
+        F.move_tags("pip", tick, ".txt", "pip")
+        need((d / "0.txt").read_text().strip() == "pip, smile, outdoors", (d / "0.txt").read_text())
+        need(F.description("pip") == "blonde hair, blue eyes", f"description: {F.description('pip')}")
+        F.put_back("pip", ".txt")
+        need((d / "0.txt").read_text().strip() == "pip, blonde hair, blue eyes, smile, outdoors", "not put back")
+        need(F.description("pip") == "", f"description not undone: {F.description('pip')}")
+    finally:
+        for k, v in saved.items():
+            setattr(F, k, v)
 
 
 @check("a chosen LoRA goes into the folder of its LoRA type, never a LoRA folder's root")

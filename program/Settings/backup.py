@@ -18,7 +18,7 @@ Restoring on another computer or user: paths that started with the old home fold
 folder are changed to the new ones. The current files are kept in restore_backups/<time>/ first.
 """
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import json
 import os

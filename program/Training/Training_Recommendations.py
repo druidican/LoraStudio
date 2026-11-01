@@ -24,7 +24,7 @@ Run it on its own to print the table:  python Training_Recommendations.py
 """
 
 from __future__ import annotations
-__version__ = "1.251026o"  # LoRA Studio version, see version.py
+__version__ = "1.011126"  # LoRA Studio version, see version.py
 
 import os
 import re
