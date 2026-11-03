@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -95,8 +95,9 @@ def oc_recommend(tkey, purpose):
         note = ("  \nFor a **style** LoRA the captions describe everything **in** the picture (the people with their "
                 "hair, eyes and clothes, the place, the light) and never the style itself: the art style, medium and "
                 "technique are in *Never describe*, so the trigger word learns them.")
-    elif purpose in ("object", "action", "concept"):
-        what = {"object": "the object", "action": "the pose or action", "concept": "the effect"}[purpose]
+    elif purpose in ("object", "worn", "action", "concept"):
+        what = {"object": "the object", "worn": "the worn item's own look", "action": "the pose or action",
+                "concept": "the effect"}[purpose]
         note = (f"  \nFor this LoRA the captions describe everything except {what} itself: the trigger word stands "
                 "for it (its words are in *Never describe*).")
     md = (f"**Recommended for {label}: {'Tags' if style == 'tags' else 'Sentences'}**, length "

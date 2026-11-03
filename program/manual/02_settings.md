@@ -117,7 +117,7 @@ How the Collection looks and how it tells which base model a LoRA was trained on
   `Illustrious = illustrious, nova`).
 - **NSFW previews**: blur them (hover to show), from which level, and also when the level is unknown.
 - **Colour the Collection cards by purpose**: a border and a label in the colour of the purpose (character, art
-  style, object, action / pose, concept). Pick the colours and press *Save colours*; *Default colours* goes back; off
+  style, object, worn item, action / pose, concept). Pick the colours and press *Save colours*; *Default colours* goes back; off
   keeps every card white.
 - *Dark / Normal* at the top right of every page switches between dark and light.
 

@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -2553,6 +2553,7 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         status = gr.Markdown(status_text(), visible=not studio)
         _types = type_choices()
         _purposes = [("Character / person", "character"), ("Art style", "style"), ("Object / item", "object"),
+                     ("Worn item (clothes, equipment, jewelry)", "worn"),
                      ("Action / pose", "action"), ("Concept / effect", "concept")]
         _oc_url, _oc_model = oc_settings()
 

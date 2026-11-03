@@ -11,7 +11,7 @@ Only the Python standard library is used (urllib); Pillow is used to shrink the 
 Run it on its own to test the connection:   python3 captioner.py [--url http://127.0.0.1:11434] [image.jpg]
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -31,10 +31,15 @@ DEFAULT_LEAVE_OUT = ("face, facial features, eye colour, hair colour, freckles, 
 # What the LoRA is for: "character" (default), "style" or "concept". Set by the Datasets steps (and the launch script
 # page's Purpose) so every caption writer uses the right prompt.
 PURPOSE = {"value": "character", "words": ""}
-CONCEPT_KINDS = ("object", "action", "concept")      # Object / item, Action / pose, Concept / effect
+CONCEPT_KINDS = ("object", "worn", "action", "concept")   # Object / item, Worn item, Action / pose, Concept / effect
 CONCEPT_WHAT = {
     "object": ("an OBJECT (an item)", "the object itself: its shape, colours, material, parts and decorations",
                "who holds, wears or uses it, the clothes, the pose, the place, the light and the camera angle"),
+    "worn": ("a WORN ITEM (clothes, equipment or jewelry worn by people)",
+             "the item's own look: its design, shape, pattern, material and decorations (only say WHICH KIND of item "
+             "it is and WHERE it is worn, for example 'ring on index finger', 'hair clip in hair')",
+             "the person wearing it in full (hair, face, body, expression, the other clothes), the pose, what they do, "
+             "the place, the light and the camera angle"),
     "action": ("an ACTION or POSE", "the pose or action itself: how the body, arms, legs and hands are placed or move",
                "the person (hair, clothes, expression), what they hold, the place, the light and the camera angle"),
     "concept": ("a CONCEPT or EFFECT", "the effect itself and how it looks",

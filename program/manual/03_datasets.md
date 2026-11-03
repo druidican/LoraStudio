@@ -43,8 +43,9 @@ folder, and the setting switches itself off again when a launch script is saved.
 
 - **LoRA type**: the base model family. Several are fine: sorting uses the strictest size, step 7 writes one caption
   set per caption style, step 9 one launch script per type.
-- **Purpose**: character, style, object, action or concept. It decides how the captions are written and how the
-  pictures are judged.
+- **Purpose**: character, style, object, **worn item**, action or concept. It decides how the captions are written
+  and how the pictures are judged. A **worn item** is clothes, equipment or jewelry that people wear (a collection of
+  rings and hair clips, a jacket, an armour); pick which of the three, so step 7 knows which tags describe the item.
 - **Trigger word**: the first word of every caption, the word you put in a prompt to call the LoRA (`pip`).
 
 ## 4 · Sort
@@ -103,6 +104,23 @@ character's own (hair, eyes, freckles …). The card lists all tags with the num
 character's traits in most pictures are ticked already, and you tick or untick the rest. **Move the ticked tags**
 takes them out of every caption and puts them in the Character description; the captions with all tags are kept,
 and **Put them back** undoes it. *Read the tags* reads the captions again after you changed them by hand.
+
+**For a worn item** the same card is called **Item tags → trigger words**: the WD tagger writes every tag, also the
+item's own look (metal, stones, pattern, material); the look words in many pictures are ticked already. A tag with a
+kind in it (*gold ring*) leaves the kind (*ring*) when it moves. Above it, **Kinds and where they are worn**:
+
+![Step 7 for a worn item: the kinds, where they are worn, and the item's look moved to the trigger words](img/step7_worn.jpg)
+
+- One line per **kind** you want to ask for in a prompt, with the other words the tagger uses after `=`:
+  `hair clip = hairclip, hair ornament`. The same for **where** they are worn: `on index finger`, `in hair`.
+  *Suggest from the tags* fills both from what the captions say.
+- **Make the words the same** turns the other words into the kind's name in every caption, adds the name where a
+  tag mentions it (*gold ring* also gets *ring*), and puts the trigger word, the kinds and the places first. It counts
+  the pictures per kind and warns when a kind is in fewer than a third of them (step 5 shows the same count): then
+  the trigger word mostly means the others, so add pictures of it or give them more repeats in their own repeat
+  folder.
+- The person in the pictures is described in full (hair, face, the other clothes, pose, place), so the LoRA learns
+  only the item. In ComfyUI you then write `lsjc, ring, on ring finger, …`.
 
 **Character description**: the traits the trigger word learns, in words (*slim build, tall, blonde hair, blue eyes*).
 They are put next to the trigger word in the LoRA's LoRA Manager data, so ComfyUI offers them with it and you can add

@@ -14,29 +14,29 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.011126"
-VERSION = "1.011126"
+__version__ = "1.031126"
+VERSION = "1.031126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.011126",
-    "version.py": "1.011126",
+    "version.py": "1.031126",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.011126",
-    "program/Training/sd_script.py": "1.011126",
-    "program/Data/sd_prepare.py": "1.011126",
+    "program/Training/sdgui.py": "1.031126",
+    "program/Training/sd_script.py": "1.031126",
+    "program/Data/sd_prepare.py": "1.031126",
     "program/Training/sd_settings.py": "1.011126",
-    "program/Data/datasets_ui.py": "1.011126",
-    "program/Data/dsflow.py": "1.011126",
+    "program/Data/datasets_ui.py": "1.031126",
+    "program/Data/dsflow.py": "1.031126",
     "program/Training/training_ui.py": "1.011126",
     "program/Settings/settings_ui.py": "1.011126",
-    "program/Gallery/lora_library.py": "1.011126",
+    "program/Gallery/lora_library.py": "1.031126",
     "program/Training/comfytest.py": "1.011126",
-    "program/Data/captioner.py": "1.011126",
+    "program/Data/captioner.py": "1.031126",
     "program/Data/wdtagger.py": "1.011126",
     "program/Settings/ghupdate.py": "1.011126",
     "program/Settings/hfdownload.py": "1.011126",
     "program/Settings/ollamactl.py": "1.011126",
-    "program/Data/datacheck.py": "1.011126",
+    "program/Data/datacheck.py": "1.031126",
     "program/Data/consistency.py": "1.011126",
     "program/Data/pictools.py": "1.011126",
     "program/Data/pictools_worker.py": "1.011126",
@@ -55,7 +55,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.011126",
+    "selftest.py": "1.031126",
     "program/Settings/machinecheck.py": "1.011126",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -73,6 +73,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.031126", "Worn items: a new purpose for clothes, equipment and jewelry worn by people (step 3 asks which). Step 7 writes every tag; Kinds and where they are worn keeps the kind and place words the same in every caption (other words become the name, the name is added where a tag mentions it, trigger, kinds and places first) and counts the pictures per kind (step 5 shows it too); Item tags → trigger words moves the item's own look out of the captions into the Item description next to the trigger word, keeping the kind. Sentence captions describe the person in full and only name the kind and where it is worn. Manual and reference updated."),
     ("1.011126", "The first public release of LoRA Studio. Datasets: nine steps from a folder of pictures to a launch script (usable scan, sort with pins and a usefulness check, selection, resize, WD tags or Ollama sentences with the character tags moved to the trigger words, review, launch script). Training: a queue that frees video memory between models, the live run, and Results with save points to try, test pictures through ComfyUI and comparisons. Collection: your LoRAs with training cards, LoRA Manager sync both ways, example pictures, ratings and Insights. Settings: health check, folders, Hugging Face downloads, backups, updates from a zip or from GitHub releases. Install with its own Python 3.12 on Linux, Windows (WSL2) and macOS (without training). GPL-3.0-only."),
 ]
 HERE = Path(__file__).resolve().parent

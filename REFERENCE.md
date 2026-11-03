@@ -92,6 +92,14 @@ The steps (the bar above them shows the dataset, its LoRA types and purpose; the
    captions so the trigger word learns them, words that mean the same become one word, and odd pictures that say
    something else are shown so you can look (fix, or this picture only). Clothes, places, poses, expressions and light
    stay in each caption. *Apply to the other caption set too* takes the same traits out of the second set.
+   **Worn item** (purpose in step 3: clothes, equipment or jewelry): the WD tagger writes every tag; **Kinds and where
+   they are worn** holds lines `name = other words` for the kinds (`hair clip = hairclip, hair ornament`) and the places
+   (`on index finger`), saved in the dataset; *Make the words the same* rewrites every caption of `IMG.txt` (other
+   words → the name; the name added where a tag contains it; order trigger, kinds, places, the rest; the old captions
+   kept for Undo) and counts the pictures per kind (a warning below a third; step 5 shows it too). **Item tags →
+   trigger words** is the card below for the item's own look (pre-ticked: look words of that kind in at least 30 % of
+   the pictures; a moved tag that holds a kind leaves the kind); the moved words become the Item description next to
+   the trigger word. Sentence captions describe the person in full and only name the kind and where it is worn.
    **Character tags → trigger words** (character datasets, WD tags): the WD tagger writes every tag, also the
    character's own; the card lists all tags with their picture counts (traits in at least 40 % of the pictures of the
    describable kinds ticked already). *Move the ticked tags* removes them from every caption of `IMG.txt` and adds them

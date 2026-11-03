@@ -34,7 +34,7 @@ Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 
 import contextlib
 import copy
@@ -1680,9 +1680,10 @@ def base_abbr(base: str) -> str:
     return BASE_ABBR.get(k) or (base or "?")[:3].upper()
 
 
-PURPOSES = [("character", "Character"), ("style", "Art style"), ("object", "Object"), ("action", "Action / pose"),
+PURPOSES = [("character", "Character"), ("style", "Art style"), ("object", "Object"), ("worn", "Worn item"),
+            ("action", "Action / pose"),
             ("concept", "Concept / effect")]
-PURPOSE_COLORS = {"character": "#3B82C4", "style": "#C2410C", "object": "#15803D", "action": "#7C3AED",
+PURPOSE_COLORS = {"character": "#3B82C4", "style": "#C2410C", "object": "#15803D", "worn": "#BE185D", "action": "#7C3AED",
                   "concept": "#B45309"}
 
 

@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -193,7 +193,7 @@ def _true(v) -> bool:
     return v is True or (isinstance(v, str) and v.strip().lower() in ("true", "yes"))
 
 
-CONCEPT_KINDS = ("object", "action", "concept")
+CONCEPT_KINDS = ("object", "worn", "action", "concept")
 
 
 def base_purpose(p) -> str:

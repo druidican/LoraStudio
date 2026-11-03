@@ -6,7 +6,7 @@ The Collection has four pages: **Browse**, **LoRA page**, **Insights** and **Mai
 
 One tile per dataset with the picture of its newest (or ★ best) LoRA, and a label per LoRA type (✓ = Completed). With
 *Colour the Collection cards by purpose* on (Settings › Look and base models), each card has a border and a label in
-the colour of its purpose (character, art style, object, action / pose, concept).
+the colour of its purpose (character, art style, object, worn item, action / pose, concept).
 
 ![The Collection](img/collection.jpg)
 

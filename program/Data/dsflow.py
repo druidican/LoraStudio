@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -42,11 +42,15 @@ STEPS = [(1, "folder", "Folder"), (2, "scan", "Usable scan"), (3, "setup", "Setu
          (5, "select", "Select"), (6, "resize", "Resize"), (7, "tags", "Tags"), (8, "review", "Review"),
          (9, "script", "Launch script")]
 PURPOSES = [("Character / person", "character"), ("Art style", "style"), ("Object / item", "object"),
-            ("Action / pose", "action"), ("Concept / effect", "concept")]
-PURPOSE_LABEL = {"character": "Character", "style": "Art style", "object": "Object", "action": "Action / pose",
-                 "concept": "Concept / effect"}
-CONCEPT_KINDS = ("object", "action", "concept")
+            ("Worn item (clothes, equipment, jewelry)", "worn"), ("Action / pose", "action"),
+            ("Concept / effect", "concept")]
+PURPOSE_LABEL = {"character": "Character", "style": "Art style", "object": "Object", "worn": "Worn item",
+                 "action": "Action / pose", "concept": "Concept / effect"}
+CONCEPT_KINDS = ("object", "worn", "action", "concept")
+WORN_KINDS = [("Clothes", "clothes"), ("Equipment (armour, bags, tools worn)", "equipment"),
+              ("Jewelry and small items worn", "jewelry")]
 CONCEPT_ASK = {"object": "The object, in a few words (e.g. katana, sword)",
+               "worn": "The item's own look, in a few words (e.g. silver leaf design; red plaid wool)",
                "action": "The action or pose, in a few words (e.g. kneeling, one knee down)",
                "concept": "The concept or effect, in a few words (e.g. glowing aura, wet clothes)"}
 
@@ -1166,16 +1170,19 @@ def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
     max_tags = cap.TAG_COUNT.get(int(length or 3), 20)
     traits: dict = {}
     import datacheck as DC
-    character = DC.base_purpose(meta(ds).get("purpose", "character")) == "character"
-    # a character: ALL tags are written; afterwards step 7 moves the character's own ones to the trigger words
-    write_leave = "" if character else (leave_out or "")
+    purpose = meta(ds).get("purpose", "character")
+    character = DC.base_purpose(purpose) == "character"
+    # a character or a worn item: ALL tags are written; afterwards step 7 moves the character's own ones (or the
+    # item's own look) to the trigger words
+    write_leave = "" if character or purpose == "worn" else (leave_out or "")
     yield from WD.tag(imgs, (trigger or ds).strip(), write_leave, max_tags,
                       lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP, traits,
-                      trait_leave=(leave_out or cap.DEFAULT_LEAVE_OUT) if character else None)
+                      trait_leave=(leave_out or cap.DEFAULT_LEAVE_OUT) if character else
+                      ("" if purpose == "worn" else None))
     m = meta(ds)
     if traits.get("_n"):
         m["trait_tags"] = traits                         # Character description › Suggest (step 7)
-    if character:
+    if character or purpose == "worn":
         m["wd_all"] = {"ext": ext, "at": time.strftime("%Y-%m-%d %H:%M")}
         shutil.rmtree(_moved_dir(ds, ext), ignore_errors=True)    # new captions with all tags: nothing moved yet
         (m.get("moved_tags") or {}).pop(ext, None)
@@ -1183,6 +1190,10 @@ def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
     if character:
         yield ("✔ Every tag is in the captions now, also the character's own (hair, eyes ...). Next: **Character "
                "tags → trigger words** below moves the ones you tick out of the captions and next to the trigger word.")
+    elif purpose == "worn":
+        yield ("✔ Every tag is in the captions now, also the item's own look (metal, stones, pattern ...). Next: "
+               "**Kinds and where they are worn** makes those words the same in every caption, and **Item tags → "
+               "trigger words** moves the item's look out of the captions.")
 
 
 # ---- step 7, character tags: all tags are written first, then the ticked ones move to the trigger words
@@ -1205,10 +1216,23 @@ def tag_counts(ds, ext=".txt", trigger=""):
     return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])), n
 
 
-def default_ticks(rows, n) -> list[str]:
+def default_ticks(rows, n, purpose="character", worn_kind="jewelry", kinds=None, places=None) -> list[str]:
     """Pre-ticked: tags in at least 40 % of the pictures that describe the character (hair, eyes, freckles, build,
-    face, tattoos, makeup). Never ethnicity, skin or age: those you tick yourself if you want them."""
+    face, tattoos, makeup). Never ethnicity, skin or age: those you tick yourself if you want them.
+    A worn item: tags in at least 30 % of the pictures that describe the item's own look (metal, stones, pattern,
+    material ...), never the kind words or the places it is worn."""
     import captioner as CAP
+    if purpose == "worn":
+        look = WORN_LOOK.get(worn_kind or "jewelry", WORN_LOOK["jewelry"])
+        own = {w.lower() for w in (kinds or []) + (places or [])}
+        out = []
+        for t, c in rows:
+            if c < max(2, 0.3 * n) or t in own:
+                continue
+            words = set(re.findall(r"[a-z]+", t))
+            if words & look or any(re.search(rf"\b{re.escape(k)}\b", t) for k in (kinds or [])):
+                out.append(t)
+        return out
     out = []
     for t, c in rows:
         if c < max(2, 0.4 * n):
@@ -1217,6 +1241,147 @@ def default_ticks(rows, n) -> list[str]:
         if hit and all(h in CAP.DESCRIBE_OK for h in hit):
             out.append(t)
     return out
+
+
+# ---- worn items: the look words, the kinds and where they are worn
+WORN_LOOK = {
+    "jewelry": {"gold", "golden", "silver", "metal", "gem", "gems", "gemstone", "jewel", "jewels", "diamond", "pearl",
+                "pearls", "ruby", "emerald", "sapphire", "amethyst", "crystal", "crystals", "ornate", "floral", "flower",
+                "engraved", "filigree", "chain", "beads", "beaded", "enamel", "platinum", "brass", "copper", "rhinestone",
+                "rhinestones", "sparkle", "shiny", "leaf", "star", "heart", "moon", "butterfly", "ribbon", "bow"},
+    "clothes": {"plaid", "striped", "stripes", "polka", "dot", "print", "floral", "lace", "frills", "frilled", "ruffles",
+                "leather", "denim", "silk", "satin", "wool", "knit", "knitted", "embroidered", "embroidery", "buttons",
+                "zipper", "pleated", "pattern", "checkered", "sequins", "fur", "velvet", "trim", "cutout", "ribbon", "bow"},
+    "equipment": {"metal", "leather", "plate", "plates", "straps", "strap", "buckle", "buckles", "pouch", "pouches",
+                  "rivets", "trim", "ornate", "engraved", "scratched", "worn", "brass", "steel", "chainmail", "padded",
+                  "gold", "silver", "emblem", "insignia", "glowing"},
+}
+KIND_WORDS = {
+    "jewelry": ["ring", "earrings", "necklace", "bracelet", "hair clip", "hair ornament", "brooch", "piercing",
+                "choker", "anklet", "pendant", "tiara", "hairpin", "ear clip", "nose ring", "cufflinks", "watch"],
+    "clothes": ["dress", "shirt", "jacket", "coat", "skirt", "pants", "shorts", "sweater", "hoodie", "boots", "shoes",
+                "gloves", "hat", "scarf", "socks", "thighhighs", "kimono", "uniform", "vest", "cape"],
+    "equipment": ["armor", "helmet", "gauntlets", "backpack", "bag", "belt", "holster", "shield", "goggles",
+                  "headphones", "pauldrons", "greaves", "harness", "quiver", "satchel"],
+}
+PLACE_WORDS = {
+    "jewelry": ["on finger", "on index finger", "on middle finger", "on ring finger", "on thumb", "in hair", "on ear",
+                "around neck", "on wrist", "on ankle"],
+    "clothes": ["upper body", "lower body", "full body"],
+    "equipment": ["on back", "on hip", "on head", "on arm", "on chest"],
+}
+
+
+def _rules(text):
+    """'ring = rings, band' lines -> [(name, [other words])]."""
+    out = []
+    for line in (text or "").splitlines():
+        if not line.strip() or line.strip().startswith("#"):
+            continue
+        name, _, rest = line.partition("=")
+        name = name.strip().lower()
+        if name:
+            out.append((name, [w.strip().lower() for w in rest.split(",") if w.strip() and w.strip().lower() != name]))
+    return out
+
+
+def worn_setup(ds) -> dict:
+    """{'kinds': 'ring = rings\nhair clip = hairclip', 'places': '...'} as typed in step 7."""
+    w = meta(ds).get("worn_items") or {}
+    return {"kinds": w.get("kinds", ""), "places": w.get("places", "")}
+
+
+def set_worn_setup(ds, kinds, places):
+    m = meta(ds)
+    m["worn_items"] = {"kinds": (kinds or "").strip(), "places": (places or "").strip()}
+    meta_save(ds, m)
+
+
+def suggest_worn(ds, ext=".txt", trigger=""):
+    """Kinds and places found in the captions, with the other words the tagger used for them."""
+    wk = meta(ds).get("worn_kind") or "jewelry"
+    rows, _ = tag_counts(ds, ext, trigger)
+    tags = [t for t, _ in rows]
+
+    def found(words):
+        lines = []
+        for w in words:
+            alts = [t for t in tags if t != w and (t == w + "s" or t.replace(" ", "") == w.replace(" ", ""))]
+            if w in tags or alts:
+                lines.append(w + (" = " + ", ".join(alts) if alts else ""))
+        return "\n".join(lines)
+    return found(KIND_WORDS.get(wk, [])), found(PLACE_WORDS.get(wk, []))
+
+
+def worn_names(ds):
+    w = worn_setup(ds)
+    return [n for n, _ in _rules(w["kinds"])], [n for n, _ in _rules(w["places"])]
+
+
+def same_words(ds, ext=".txt", trigger="") -> str:
+    """Make the kind and place words the same in every caption: the other words become the name, the name is added
+    when a tag mentions it ('gold ring' also gets 'ring'), and the order is trigger, kinds, places, the rest. Returns
+    the balance between the kinds."""
+    w = worn_setup(ds)
+    kinds, places = _rules(w["kinds"]), _rules(w["places"])
+    if not kinds:
+        return "Write the kinds first (one per line, for example `ring` or `hair clip = hairclip, hair ornament`)."
+    trig = (trigger or ds).strip().lower()
+    alias = {a: n for n, al in kinds + places for a in al}
+    names_k, names_p = [n for n, _ in kinds], [n for n, _ in places]
+    changed, n_pics, count, none = 0, 0, {k: 0 for k in names_k}, []
+    sg().record_change(f"kind words of {ds} {ext}", {set_file(p, ext): (read_set(p, ext) or "") + "\n"
+                                                     for p in images(ds) if read_set(p, ext)})
+    for p in images(ds):
+        text = read_set(p, ext)
+        if not text:
+            continue
+        n_pics += 1
+        parts = [alias.get(x.strip().lower(), x.strip().lower()) for x in re.split(r"[,\n]", text) if x.strip()]
+        have_k = [k for k in names_k if any(x == k or re.search(rf"\b{re.escape(k)}\b", x) for x in parts)]
+        have_p = [q for q in names_p if q in parts]
+        rest = [x for x in parts if x != trig and x not in have_k and x not in have_p]
+        new = ([trig] if trig else []) + have_k + have_p + list(dict.fromkeys(rest))
+        for k in have_k:
+            count[k] += 1
+        if not have_k:
+            none.append(p.name)
+        line = ", ".join(dict.fromkeys(new))
+        if line != text.strip():
+            set_file(p, ext).write_text(line + "\n", encoding="utf-8")
+            changed += 1
+    return f"✔ {changed} of {n_pics} captions changed. " + balance_text(count, n_pics, none)
+
+
+def balance_text(count, n, none=()):
+    if not n:
+        return ""
+    parts = " · ".join(f"**{k}** {c}" for k, c in sorted(count.items(), key=lambda kv: -kv[1]))
+    low = [k for k, c in count.items() if c < n / 3] if len(count) > 1 else []
+    out = f"Pictures per kind: {parts} (of {n})."
+    if low:
+        out += (f" ⚠ {', '.join(low)} {'is' if len(low) == 1 else 'are'} in fewer than a third of the pictures: the "
+                "trigger word will mostly mean the others. Add pictures of it, or give its pictures more repeats in "
+                "their own repeat folder.")
+    if none:
+        out += f" {len(none)} caption(s) name no kind ({', '.join(none[:4])}{' …' if len(none) > 4 else ''})."
+    return out
+
+
+def worn_balance(ds, ext=".txt"):
+    kinds, _ = worn_names(ds)
+    if not kinds:
+        return ""
+    count, n = {k: 0 for k in kinds}, 0
+    for p in images(ds):
+        t = (read_set(p, ext) or "").lower()
+        if not t:
+            continue
+        n += 1
+        for k in kinds:
+            if re.search(rf"\b{re.escape(k)}\b", t):
+                count[k] += 1
+    return balance_text(count, n)
 
 
 def moved_tags(ds, ext=".txt") -> list[str]:
@@ -1232,6 +1397,7 @@ def move_tags(ds, tags, ext=".txt", trigger="") -> str:
     trig = (trigger or ds).strip().lower()
     tags = [t for t in tags if t != trig]
     keep = _moved_dir(ds, ext)
+    kinds_keep = worn_names(ds)[0] if meta(ds).get("purpose") == "worn" else []
     first = not keep.is_dir()
     keep.mkdir(parents=True, exist_ok=True)
     changed = 0
@@ -1243,7 +1409,13 @@ def move_tags(ds, tags, ext=".txt", trigger="") -> str:
         if first or not (keep / f.name).is_file():
             shutil.copy2(f, keep / f.name)                # the version with all tags
         parts = [w.strip() for w in re.split(r"[,\n]", text) if w.strip()]
-        new = [w for w in parts if w.lower() not in set(tags)]
+        new = []
+        for w in parts:
+            if w.lower() not in set(tags):
+                new.append(w)
+            else:                                        # 'gold ring' leaves 'ring' (a kind of a worn item)
+                new += [k for k in kinds_keep if re.search(rf"\b{re.escape(k)}\b", w.lower())]
+        new = list(dict.fromkeys(new))
         if len(new) != len(parts):
             f.write_text(", ".join(new) + "\n", encoding="utf-8")
             changed += 1

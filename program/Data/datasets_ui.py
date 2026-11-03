@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -327,9 +327,14 @@ def s5_suggest_html(ds, n, rng, why) -> str:
         hint = IN.dataset_hint(t) if t else ""
     except Exception:                                    # noqa: BLE001
         pass
+    bal = ""
+    if F.meta(ds).get("purpose") == "worn":              # a worn item: how the kinds are spread (from the captions)
+        bal = re.sub(r"\*\*", "", F.worn_balance(ds)) or ("Worn item: name the kinds in step 7 (Kinds and where they "
+                                                           "are worn) to see how many pictures each kind has.")
     return (f'<div class="ds-sug"><span class="rs-label">SUGGESTED SIZE</span><div class="rs-big">{n} pictures '
             f'<span class="ls-note">({rng} works)</span></div><div class="ls-note">{esc(why)}</div>'
-            + (f'<div class="ls-note" style="margin-top:6px">★ {esc(hint)}</div>' if hint else "") + '</div>')
+            + (f'<div class="ls-note" style="margin-top:6px">★ {esc(hint)}</div>' if hint else "")
+            + (f'<div class="ls-note" style="margin-top:6px">{esc(bal)}</div>' if bal else "") + '</div>')
 
 
 def s5_grid(ds, keep_n):
@@ -422,6 +427,12 @@ REC_TEXT = {
                "who holds, wears or uses it, the clothes, the pose, the place, the light. They never describe the object "
                "itself (shape, colours, material, details): its words are in <i>Never describe</i>, so the trigger word "
                "learns it. The character consistency check is not used."),
+    "worn": ("Worn item", "The captions start with the trigger word, then <b>which kind</b> of item it is and <b>where it "
+             "is worn</b> (ring, on index finger; hair clip, in hair), then <b>the person in full</b>: hair, face, the "
+             "other clothes, the pose, the place, the light. They never describe the item's own look (design, pattern, "
+             "material, decorations): the trigger word learns it. With tags, <b>Item tags → trigger words</b> below "
+             "moves those tags out, and <b>Kinds and where they are worn</b> keeps the kind and place words the same in "
+             "every caption, so you can ask for each kind in a prompt."),
     "action": ("Action / pose", "The captions describe <b>the person and the scene</b>: hair, clothes, expression, what "
                "they hold, the place, the light, the camera angle. They never describe the pose or action itself (how the "
                "body, arms, legs and hands are placed): the trigger word learns it. The pictures should show many "
@@ -442,11 +453,12 @@ def leave_update(purpose, cur, words=""):
     CAP = sg().CAP
     if CAP is None:
         return gr.update()
-    defaults = {"character": CAP.DEFAULT_LEAVE_OUT, "style": CAP.STYLE_LEAVE_OUT, "object": words, "action": words,
-                "concept": words}
+    defaults = {"character": CAP.DEFAULT_LEAVE_OUT, "style": CAP.STYLE_LEAVE_OUT, "object": words, "worn": words,
+                "action": words, "concept": words}
     labels = {"character": "Never describe (always part of the person)",
               "style": "Never describe (the style itself: the trigger word learns it)",
               "object": "Never describe (the object itself: the trigger word learns it)",
+              "worn": "Never describe (the item's own look: the trigger word learns it)",
               "action": "Never describe (the pose or action itself: the trigger word learns it)",
               "concept": "Never describe (the effect itself: the trigger word learns it)"}
     cur = (cur or "").strip()
@@ -625,9 +637,11 @@ def calc(ds, tkey, text):
     if tg:
         lo, hi = tg[0], tg[-1]
         strong = {"character": "Likeness / consistency", "style": "Style strength", "object": "How exact the object is",
+                  "worn": "How exact the item is",
                   "action": "How exact the pose is", "concept": "Effect strength"}.get(purpose, "Likeness / consistency")
         flex = {"style": "Flexibility (other subjects, prompts that ask for another look)",
                 "object": "Flexibility (other people, places and uses)",
+                "worn": "Flexibility (other people, outfits and places)",
                 "action": "Flexibility (other people, clothes and places)",
                 "concept": "Flexibility (other subjects and settings)"}.get(purpose, "Flexibility (new poses, outfits)")
         if total > hi:
@@ -805,6 +819,9 @@ def build(app, show):
                     s3_words = gr.Textbox(label=F.CONCEPT_ASK["object"], visible=False,
                                           info="These words go into Never describe in step 7: the captions name the "
                                                "trigger word instead, so it learns what they mean.")
+                    s3_worn = gr.Radio(F.WORN_KINDS, value="jewelry", label="Which kind of worn item", visible=False,
+                                       info="Decides which tags step 7 suggests moving to the trigger words (metal and "
+                                            "stones; fabric and pattern; material and parts).")
                     s3_wm = gr.Checkbox(label="Watermarks are already removed",
                                         info="Unticked: the detailed sort also looks for watermarks, stamps and site names "
                                              "and offers a crop in step 6.")
@@ -914,9 +931,29 @@ def build(app, show):
                 s7_missing = gr.Button("Only pictures without a caption", size="sm", scale=0, min_width=240)
                 s7_stop = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=90)
             s7_out = gr.Markdown()
+            with gr.Column(elem_classes=["ls-card"], visible=False) as s7_kind_card:
+                gr.Markdown("#### Kinds and where they are worn")
+                gr.Markdown("One line per **kind** of item you want to ask for in a prompt, with the other words the "
+                            "tagger uses for it after `=` (for example `hair clip = hairclip, hair ornament`), and the "
+                            "same for **where** they are worn (`on index finger`, `in hair`). **Make the words the same** "
+                            "turns the other words into the kind's name in every caption, adds the name where a tag "
+                            "mentions it (*gold ring* also gets *ring*), and puts the trigger word, the kinds and the "
+                            "places first. It also counts the pictures per kind: a kind in few pictures ends up weak.",
+                            elem_classes=["ls-note"])
+                with gr.Row():
+                    s7_kinds = gr.Textbox(label="Kinds (one per line: name = other words)", lines=4,
+                                          placeholder="ring = rings\nhair clip = hairclip, hair ornament")
+                    s7_places = gr.Textbox(label="Where they are worn (one per line: name = other words)", lines=4,
+                                           placeholder="on index finger\nin hair = hair clip in hair")
+                with gr.Row(elem_classes=["ls-bar"]):
+                    s7_kind_sug = gr.Button("Suggest from the tags", size="sm", scale=0, min_width=200)
+                    s7_kind_save = gr.Button("Save", size="sm", scale=0, min_width=100)
+                    s7_kind_go = gr.Button("Make the words the same", variant="primary", size="sm", scale=0,
+                                           min_width=230)
+                s7_kind_msg = gr.Markdown()
             with gr.Column(elem_classes=["ls-card"], visible=False) as s7_mv_card:
-                gr.Markdown("#### Character tags → trigger words")
-                gr.Markdown("For a character the WD tagger writes **every** tag, also the character's own (hair, eyes, "
+                s7_mv_title = gr.Markdown("#### Character tags → trigger words")
+                s7_mv_note = gr.Markdown("For a character the WD tagger writes **every** tag, also the character's own (hair, eyes, "
                             "freckles ...). Tick the ones that belong to the character: **Move** takes them out of the "
                             "captions (so the trigger word learns them) and puts them in the Character description "
                             "below, next to the trigger word. Ticked already: the traits in most pictures. The "
@@ -928,7 +965,7 @@ def build(app, show):
                     s7_mv_back = gr.Button("Put them back", size="sm", scale=0, min_width=150)
                 s7_mv_msg = gr.Markdown()
             with gr.Column(elem_classes=["ls-card"], visible=False) as s7_desc_card:
-                gr.Markdown("#### Character description, next to the trigger word")
+                s7_desc_title = gr.Markdown("#### Character description, next to the trigger word")
                 gr.Markdown("The character's own traits are not in the captions (moved above, or never written), so "
                             "the trigger word learns them. Name them here too (for example *slim build, tall, blonde hair, blue eyes*): they are added to "
                             "the LoRA's trigger words in its LoRA Manager data, so ComfyUI offers them next to the "
@@ -1112,7 +1149,7 @@ def build(app, show):
     # ---- step loaders
     def s3_load(s):
         if s.get("view") != "flow" or s.get("step") != 3 or not s.get("ds"):
-            return [gr.update()] * 6
+            return [gr.update()] * 7
         m = F.meta(s["ds"])
         imgs = F.images(s["ds"])
         strip = "".join(f'<img src="{thumb(p, 110)}" alt="">' for p in imgs[:24])
@@ -1120,7 +1157,8 @@ def build(app, show):
                 + (f'<div class="ls-note">… {len(imgs) - 24} more</div>' if len(imgs) > 24 else "") + "</div>")
         return (m["types"], m["purpose"], m["wm_removed"], m["trigger"] or s["ds"], pics,
                 gr.update(value=m.get("concept_words") or "", visible=m["purpose"] in F.CONCEPT_KINDS,
-                          label=F.CONCEPT_ASK.get(m["purpose"], F.CONCEPT_ASK["object"])))
+                          label=F.CONCEPT_ASK.get(m["purpose"], F.CONCEPT_ASK["object"])),
+                gr.update(value=m.get("worn_kind") or "jewelry", visible=m["purpose"] == "worn"))
 
     def s4_load(s):
         if s.get("view") != "flow" or s.get("step") != 4 or not s.get("ds"):
@@ -1204,7 +1242,7 @@ def build(app, show):
         return gr.update(visible=bool(cur) and FT.can_train(cur))
 
     all_outs = (nav_outs + [n_list] + [e_list, e_head, e_steps] + [i_head, i_html, i_what] + [s2_md, s2_grid, s2_show, s2_extra]
-                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words] + [s4_box, s4_status] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode]
+                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words, s3_worn] + [s4_box, s4_status] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode]
                 + [s6_max, s6_sum, s6_table, s6_go, s6_crop] + [s7_sets, s7_mirror_row, s7_rec, s7_cons, UI["oc"]["leave"]] + [s8_tree, s8_checks, s8_grid, s8_cap2]
                 + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, sync, s9_calc, s9_eff] + s9_vals)
 
@@ -1262,16 +1300,25 @@ def build(app, show):
     def desc_load(s):
         if s.get("view") != "flow" or s.get("step") != 7 or not s.get("ds"):
             return gr.update(), gr.update(), gr.update()
-        ch = DC.base_purpose(F.meta(s["ds"])["purpose"]) == "character"
-        return gr.update(visible=ch), gr.update(value=F.description(s["ds"])), ""
-    navbox.change(desc_load, st, [s7_desc_card, s7_desc, s7_desc_msg], show_progress="hidden")
+        pu = F.meta(s["ds"])["purpose"]
+        ch = DC.base_purpose(pu) == "character"
+        worn = pu == "worn"
+        return (gr.update(visible=ch or worn),
+                gr.update(value=F.description(s["ds"]), label="Item description" if worn else "Character description",
+                          placeholder="silver, leaf design, small green stones" if worn else
+                          "slim build, tall, blonde hair, blue eyes"), "",
+                "#### Item description, next to the trigger word" if worn else
+                "#### Character description, next to the trigger word")
+    navbox.change(desc_load, st, [s7_desc_card, s7_desc, s7_desc_msg, s7_desc_title], show_progress="hidden")
 
     def mv_view(s, trig, msg=""):
         """The tags of IMG.txt with their counts; ticked: the moved ones are gone, the frequent traits pre-ticked."""
         if s.get("view") != "flow" or s.get("step") != 7 or not s.get("ds"):
             return gr.update(), gr.update(), gr.update()
         ds = s["ds"]
-        if DC.base_purpose(F.meta(ds)["purpose"]) != "character":
+        m = F.meta(ds)
+        worn = m["purpose"] == "worn"
+        if DC.base_purpose(m["purpose"]) != "character" and not worn:
             return gr.update(visible=False), gr.update(), ""
         rows, n = F.tag_counts(ds, ".txt", trig or ds)
         if not n:
@@ -1279,12 +1326,62 @@ def build(app, show):
                     msg or "No captions yet: write the tag captions above first.")
         choices = [(f"{t} ({c})", t) for t, c in rows[:120]]
         moved = F.moved_tags(ds)
-        tick = F.default_ticks(rows, n)
+        kinds, places = F.worn_names(ds)
+        tick = F.default_ticks(rows, n, m["purpose"], m.get("worn_kind"), kinds, places)
         note = msg or (f"{n} captions, {len(rows)} different tags." + (f" Moved already: *{', '.join(moved)}*."
                                                                         if moved else ""))
         return gr.update(visible=True), gr.update(choices=choices, value=tick), note
     MV_OUT = [s7_mv_card, s7_mv_tags, s7_mv_msg]
     navbox.change(mv_view, [st, UI["oc"]["trigger"]], MV_OUT, show_progress="hidden")
+
+    WORN_NOTE = ("For a worn item the WD tagger writes **every** tag, also the item's own look (metal, stones, pattern, "
+                 "material ...). Tick the ones that are the item's look: **Move** takes them out of the captions (so "
+                 "the trigger word learns them) and puts them in the Item description below, next to the trigger "
+                 "word. A tag with a kind in it (*gold ring*) leaves the kind (*ring*). Ticked already: the look "
+                 "words in many pictures. The captions with all tags are kept, so **Put them back** undoes it.")
+    CHAR_NOTE = ("For a character the WD tagger writes **every** tag, also the character's own (hair, eyes, freckles "
+                 "...). Tick the ones that belong to the character: **Move** takes them out of the captions (so the "
+                 "trigger word learns them) and puts them in the Character description below, next to the trigger "
+                 "word. Ticked already: the traits in most pictures. The captions with all tags are kept, so **Put "
+                 "them back** undoes it.")
+
+    def worn_view(s):
+        if s.get("view") != "flow" or s.get("step") != 7 or not s.get("ds"):
+            return [gr.update()] * 6
+        worn = F.meta(s["ds"])["purpose"] == "worn"
+        w = F.worn_setup(s["ds"])
+        return (gr.update(visible=worn), w["kinds"], w["places"], F.worn_balance(s["ds"]) if worn else "",
+                "#### Item tags → trigger words" if worn else "#### Character tags → trigger words",
+                WORN_NOTE if worn else CHAR_NOTE)
+    WORN_OUT = [s7_kind_card, s7_kinds, s7_places, s7_kind_msg, s7_mv_title, s7_mv_note]
+    navbox.change(worn_view, st, WORN_OUT, show_progress="hidden")
+
+    def kind_suggest(s, kinds, places, trig):
+        if not s.get("ds"):
+            return gr.update(), gr.update(), "Choose a dataset first."
+        k, pl = F.suggest_worn(s["ds"], ".txt", trig or s["ds"])
+        if not (k or pl):
+            return gr.update(), gr.update(), "No kinds found in the captions yet: write the tag captions first."
+        merge = lambda cur, new: "\n".join(dict.fromkeys([x for x in (cur or "").splitlines() if x.strip()]
+                                                         + [x for x in new.splitlines() if x.strip()]))
+        return merge(kinds, k), merge(places, pl), ("Found in the captions: check the lines, remove what you don't "
+                                                    "want to ask for, add the rest, then **Make the words the same**.")
+
+    def kind_save(s, kinds, places):
+        if not s.get("ds"):
+            return "Choose a dataset first."
+        F.set_worn_setup(s["ds"], kinds, places)
+        return "✔ Saved. " + F.worn_balance(s["ds"])
+
+    def kind_go(s, kinds, places, trig):
+        if not s.get("ds"):
+            return "Choose a dataset first."
+        F.set_worn_setup(s["ds"], kinds, places)
+        return F.same_words(s["ds"], ".txt", trig or s["ds"])
+    s7_kind_sug.click(kind_suggest, [st, s7_kinds, s7_places, UI["oc"]["trigger"]], [s7_kinds, s7_places, s7_kind_msg])
+    s7_kind_save.click(kind_save, [st, s7_kinds, s7_places], s7_kind_msg)
+    s7_kind_go.click(kind_go, [st, s7_kinds, s7_places, UI["oc"]["trigger"]], s7_kind_msg).then(
+        mv_view, [st, UI["oc"]["trigger"]], MV_OUT)
     s7_mv_read.click(mv_view, [st, UI["oc"]["trigger"]], MV_OUT)
 
     def mv_go(s, tags, trig):
@@ -1430,7 +1527,7 @@ def build(app, show):
         after_nav(b.click(lambda s: go(s, step=3), st, st))
 
     # ---- 3 Setup
-    def s3_save(s, types, purpose, wm, trig, words):
+    def s3_save(s, types, purpose, wm, trig, words, worn="jewelry"):
         m = F.meta(s["ds"])
         # what you picked is kept even when something is still missing: the page is drawn again after Continue,
         # and without this it went back to the saved purpose (and hid the words field), so step 3 just repeated
@@ -1438,19 +1535,22 @@ def build(app, show):
             m["types"] = list(types)
         m.update(purpose=purpose or "character", wm_removed=bool(wm), trigger=(trig or s["ds"]).strip(),
                  concept_words=(words or "").strip())
+        if purpose == "worn":
+            m["worn_kind"] = worn or "jewelry"
         if not types:
             F.meta_save(s["ds"], m)
             return s, "**Pick at least one LoRA type** (the list at the top), then press Continue again."
-        if purpose in F.CONCEPT_KINDS and not (words or "").strip():
+        if purpose in F.CONCEPT_KINDS and purpose != "worn" and not (words or "").strip():
             F.meta_save(s["ds"], m)
             return s, ("**Write the words for it** in the field under Purpose (for example *katana, sword*), then "
                        "press Continue again: the captions leave these words out, so the LoRA learns them.")
         m["steps"]["setup"] = {"at": time.strftime("%Y-%m-%d %H:%M")}
         F.meta_save(s["ds"], m)
         return go(s, step=4, tkey=types[0]), ""
-    after_nav(s3_next.click(s3_save, [st, s3_types, s3_purpose, s3_wm, s3_trig, s3_words], [st, s3_msg]))
-    s3_purpose.change(lambda p: gr.update(visible=p in F.CONCEPT_KINDS, label=F.CONCEPT_ASK.get(p, F.CONCEPT_ASK["object"])),
-                      s3_purpose, s3_words, show_progress="hidden")
+    after_nav(s3_next.click(s3_save, [st, s3_types, s3_purpose, s3_wm, s3_trig, s3_words, s3_worn], [st, s3_msg]))
+    s3_purpose.change(lambda p: (gr.update(visible=p in F.CONCEPT_KINDS, label=F.CONCEPT_ASK.get(p, F.CONCEPT_ASK["object"])),
+                                 gr.update(visible=p == "worn")),
+                      s3_purpose, [s3_words, s3_worn], show_progress="hidden")
 
     # ---- 4 Sort
     def s4_run(s):
@@ -1607,7 +1707,7 @@ def build(app, show):
             msg += ("\n\n" if msg else "") + last
         yield msg, s7_sets_html(ds)
     s7_both.click(write_all, [st, oc["url"], oc["model"], oc["trigger"], oc["leave"], oc["length"], oc["detail"]],
-                  [s7_out, s7_sets]).then(mv_view, [st, oc["trigger"]], MV_OUT)
+                  [s7_out, s7_sets]).then(mv_view, [st, oc["trigger"]], MV_OUT).then(worn_view, st, WORN_OUT)
     s7_missing.click(lambda *a: (yield from write_all(*a, only_missing=True)),
                      [st, oc["url"], oc["model"], oc["trigger"], oc["leave"], oc["length"], oc["detail"]], [s7_out, s7_sets])
     s7_stop.click(lambda: (F.STOP.set(), S.OC_STOP.update(flag=True)), None, None, queue=False)

@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 
 import copy
 import difflib
@@ -676,7 +676,7 @@ def tuned_cfg(tkey, cfg, stats):
     files = {f: p for f, p in cfg.get("model_args", [])}
     files.update({"--" + k: v for k, v in S.settings_models(tkey).items()})
     try:
-        bp = "concept" if CHOICE["purpose"] in ("object", "action", "concept") else CHOICE["purpose"]
+        bp = "concept" if CHOICE["purpose"] in ("object", "worn", "action", "concept") else CHOICE["purpose"]
         out, _ = recs.apply(tkey, cfg, bp, CHOICE["priority"], int(stats.get("total") or 0), files,
                             S.GUIDE.identify if S.GUIDE else None)
         return out

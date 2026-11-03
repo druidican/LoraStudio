@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.031126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -516,6 +516,43 @@ def _tagmove():
     finally:
         for k, v in saved.items():
             setattr(F, k, v)
+
+
+@check("worn items: kind and place words made the same, the item's look moved out, the kinds kept")
+def _worn():
+    import tempfile
+    import dsflow as F
+    d = Path(tempfile.mkdtemp())
+    imgs = []
+    for i, line in enumerate(["lsjc, 1girl, gold ring, rings, silver, on finger, brown hair, indoors",
+                              "lsjc, 1girl, hairclip, silver, in hair, smile, outdoors",
+                              "lsjc, 1girl, ring, silver, hairclip, on finger, in hair, red dress"]):
+        img = d / f"{i}.png"
+        img.write_bytes(b"x")
+        (d / f"{i}.txt").write_text(line + "\n", encoding="utf-8")
+        imgs.append(img)
+    store = {"m": {"purpose": "worn", "worn_kind": "jewelry", "types": []}}
+    saved = {k: getattr(F, k) for k in ("images", "meta", "meta_save", "_flow", "set_file", "sg")}
+    F.images, F.meta, F.meta_save = (lambda ds: imgs), (lambda ds: store["m"]), (lambda ds, m: store.update(m=m))
+    F._flow, F.set_file = (lambda ds: d / ".lsflow"), (lambda img, ext: img.with_suffix(ext))
+    F.sg = lambda: type("S", (), {"record_change": staticmethod(lambda *a, **k: None)})()
+    try:
+        k, pl = F.suggest_worn("lsjc", ".txt", "lsjc")
+        need("ring = rings" in k and "hair clip = hairclip" in k, f"kinds not suggested: {k!r}")
+        F.set_worn_setup("lsjc", "ring = rings\nhair clip = hairclip", "on finger\nin hair")
+        msg = F.same_words("lsjc", ".txt", "lsjc")
+        need((d / "0.txt").read_text().startswith("lsjc, ring, on finger, 1girl, gold ring"), (d / "0.txt").read_text())
+        need("**ring** 2" in msg and "**hair clip** 2" in msg, f"balance: {msg}")
+        rows, n = F.tag_counts("lsjc", ".txt", "lsjc")
+        tick = F.default_ticks(rows, n, "worn", "jewelry", ["ring", "hair clip"], ["on finger", "in hair"])
+        need("silver" in tick and "ring" not in tick and "1girl" not in tick, f"wrong pre-ticks: {tick}")
+        F.move_tags("lsjc", ["silver", "gold ring"], ".txt", "lsjc")
+        t0 = (d / "0.txt").read_text()
+        need("silver" not in t0 and "gold ring" not in t0 and t0.startswith("lsjc, ring,"), t0)
+        need(F.description("lsjc") == "silver, gold ring", F.description("lsjc"))
+    finally:
+        for k_, v in saved.items():
+            setattr(F, k_, v)
 
 
 @check("a chosen LoRA goes into the folder of its LoRA type, never a LoRA folder's root")
