@@ -23,6 +23,15 @@ Python 3.12 on every Linux, in WSL on Windows and on macOS. Only when it cannot 
 the computer's own `python3.12`. LoRA Studio's own packages (Gradio and the rest) have no version numbers, so the
 newest are installed; the trainers keep the versions they need.
 
+## Where it goes
+
+The installer asks for the install folder; Enter takes `~/LoraStudio`. Any folder works, but keep it outside synced
+folders (MEGA, Dropbox, OneDrive): with the trainers it is 15+ GB. `./install.sh --dir FOLDER` skips the question, and
+running `./install.sh` from inside an installed LoRA Studio updates that one. You can also **move or rename the folder
+later**: at the next start `start.sh` puts the paths in its Python environment and its settings right by itself.
+With the trainers installed in that folder, run `./install.sh` once in the new place too: it offers to point the
+launch scripts you made before the move at the trainers' new folder.
+
 ## Linux
 
 ```bash

@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.051126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1175,25 +1175,29 @@ def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
     # a character or a worn item: ALL tags are written; afterwards step 7 moves the character's own ones (or the
     # item's own look) to the trigger words
     write_leave = "" if character or purpose == "worn" else (leave_out or "")
-    yield from WD.tag(imgs, (trigger or ds).strip(), write_leave, max_tags,
-                      lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP, traits,
-                      trait_leave=(leave_out or cap.DEFAULT_LEAVE_OUT) if character else
-                      ("" if purpose == "worn" else None))
+    last = ""
+    for last in WD.tag(imgs, (trigger or ds).strip(), write_leave, max_tags,
+                       lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP, traits,
+                       trait_leave=(leave_out or cap.DEFAULT_LEAVE_OUT) if character else
+                       ("" if purpose == "worn" else None)):
+        yield last
+    ok = str(last).startswith("✔") and traits.get("_n")      # only after captions were really written
     m = meta(ds)
     if traits.get("_n"):
         m["trait_tags"] = traits                         # Character description › Suggest (step 7)
-    if character or purpose == "worn":
+    if (character or purpose == "worn") and traits.get("_n"):
         m["wd_all"] = {"ext": ext, "at": time.strftime("%Y-%m-%d %H:%M")}
         shutil.rmtree(_moved_dir(ds, ext), ignore_errors=True)    # new captions with all tags: nothing moved yet
         (m.get("moved_tags") or {}).pop(ext, None)
     meta_save(ds, m)
-    if character:
-        yield ("✔ Every tag is in the captions now, also the character's own (hair, eyes ...). Next: **Character "
-               "tags → trigger words** below moves the ones you tick out of the captions and next to the trigger word.")
-    elif purpose == "worn":
-        yield ("✔ Every tag is in the captions now, also the item's own look (metal, stones, pattern ...). Next: "
-               "**Kinds and where they are worn** makes those words the same in every caption, and **Item tags → "
-               "trigger words** moves the item's look out of the captions.")
+    if ok and character:
+        yield (f"{last}\n\nEvery tag is in the captions now, also the character's own (hair, eyes ...). Next: "
+               "**Character tags → trigger words** below moves the ones you tick out of the captions and next to the "
+               "trigger word.")
+    elif ok and purpose == "worn":
+        yield (f"{last}\n\nEvery tag is in the captions now, also the item's own look (metal, stones, pattern ...). "
+               "Next: **Kinds and where they are worn** makes those words the same in every caption, and **Item tags "
+               "→ trigger words** moves the item's look out of the captions.")
 
 
 # ---- step 7, character tags: all tags are written first, then the ticked ones move to the trigger words

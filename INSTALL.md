@@ -86,7 +86,9 @@ also in `~/LoraStudio/install.log`, and at the end it writes an **install report
 `~/LoraStudio/userdata/reports/` (without tokens, passwords or your home folder) that you can send when something
 does not work.
 
-You can delete the unpacked download folder afterwards; LoRA Studio runs from `~/LoraStudio`.
+The installer asks where to install (Enter = `~/LoraStudio`; keep it outside synced folders such as MEGA or
+Dropbox). You can delete the unpacked download folder afterwards; LoRA Studio runs from the install folder. Moving or
+renaming that folder later is fine: the next `./start.sh` puts the paths right by itself.
 
 Useful options (`./install.sh --help` lists all of them):
 

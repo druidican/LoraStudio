@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.011126
+# LoRA Studio version 1.051126
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh
@@ -22,7 +22,8 @@
 # trainers and reinstalls their packages without touching PyTorch.
 #
 # Options:
-#   --dir DIR           install folder (default ~/LoraStudio)
+#   --dir DIR           install folder (asked when not given; Enter = ~/LoraStudio; run from inside an install it
+#                       updates that one)
 #   --gpu auto|amd|nvidia   (default auto: asks when the computer has both)
 #   --gfx gfxNNNN       AMD GPU architecture (default: detected, e.g. gfx1201 for the RX 9070 XT)
 #   --import DIR        old LoRA Studio folder to take settings, token, Completed marks and caches from
@@ -76,7 +77,7 @@ abspath() {   # an absolute path (also on macOS): ~ expanded, the folder need no
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 tmo() { if command -v timeout >/dev/null; then timeout "$@"; else shift; "$@"; fi; }   # tmo SECONDS command ...
 SRC="$(cd "$(dirname "$0")" && pwd -P)"
-TARGET="$HOME/LoraStudio"; GPU="auto"; GFX=""; IMPORT=""; REINSTALL_TORCH=0; MODELS=1; YES=0
+TARGET="$HOME/LoraStudio"; DIR_GIVEN=0; GPU="auto"; GFX=""; IMPORT=""; REINSTALL_TORCH=0; MODELS=1; YES=0
 TRAINERS=""; EX_SD=""; EX_VENV=""; EX_MU=""; ASK=0; ACCEPT_NOTICE=0; A_SD=""; A_MU=""; A_OL=""; A_OLURL=""
 STEP=0
 
@@ -130,7 +131,7 @@ yes_no() {   # yes_no "question" y|n
 ARGS_GIVEN="$*"
 while [ $# -gt 0 ]; do
     case "$1" in
-        --dir) TARGET="$(abspath "$2")"; shift ;;
+        --dir) TARGET="$(abspath "$2")"; DIR_GIVEN=1; shift ;;
         --gpu) GPU="$2"; shift ;;
         --gfx) GFX="$2"; shift ;;
         --import) IMPORT="$(abspath "$2")"; shift ;;
@@ -158,7 +159,18 @@ case "$TRAINERS" in ""|install|existing) ;; *) die "--trainers must be install o
 for v in "$A_SD" "$A_MU"; do case "$v" in ""|install|existing|none) ;; *) die "--sd and --mu must be install, existing or none" ;; esac; done
 case "$A_OL" in ""|install|remote|none) ;; *) die "--ollama must be install, remote or none" ;; esac
 
-mkdir -p "$TARGET"
+# Where to install: asked once (Enter = the default). Run from inside an install, it updates that one in place.
+if [ "$DIR_GIVEN" = 0 ]; then
+    if [ -f "$SRC/userdata/library_settings.txt" ] || [ -d "$SRC/venv" ]; then
+        TARGET="$SRC"                              # ./install.sh inside an installed LoRA Studio: update it there
+    elif [ "$YES" != 1 ] && [ -t 0 ]; then
+        printf '\n   Where should LoRA Studio be installed? Any folder works (outside synced folders such as MEGA,\n'
+        printf '   Dropbox or OneDrive: the trainers are 15+ GB). Press Enter for %s\n' "$TARGET"
+        read -r -p "   Install folder: " ans || ans=""
+        [ -n "$ans" ] && TARGET="$(abspath "$ans")"
+    fi
+fi
+mkdir -p "$TARGET" || { printf 'Cannot create %s\n' "$TARGET"; exit 1; }
 LOG="$TARGET/install.log"
 exec > >(tee -a "$LOG") 2>&1
 say ""
@@ -361,6 +373,8 @@ if [ -n "$UV" ]; then
     ok "uv $("$UV" --version 2>/dev/null | awk '{print $2}') in $TOOLS"
     if "$UV" python install "$PYVER" >/dev/null 2>&1; then
         PY_SYS="$(UV_PYTHON_PREFERENCE=only-managed "$UV" python find "$PYVER" 2>/dev/null || true)"
+        # the real folder, not uv's short-version link: the venv then holds no link that breaks when the folder moves
+        [ -n "$PY_SYS" ] && PY_SYS="$(cd "$(dirname "$PY_SYS")" && pwd -P)/$(basename "$PY_SYS")"
     fi
     [ -n "$PY_SYS" ] || warn "uv could not get Python ${PYVER} (no internet?): looking for one on this computer"
 else
@@ -646,6 +660,7 @@ else
     rm -f "$VENV/.lorastudio-shared"            # start.sh: this venv is LoRA Studio's own, not the training one
 fi
 sha256 "$TARGET/requirements.txt" > "$VENV/.requirements.sha256"
+(cd "$TARGET" && pwd -P) > "$VENV/.lorastudio-root"     # start.sh puts the paths right when the folder is moved
 ok "gradio $("$PY" -c 'import gradio; print(gradio.__version__)')"
 
 # ------------------------------------------------------------------ 7. test

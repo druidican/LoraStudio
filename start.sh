@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.011126
+# LoRA Studio version 1.051126
 # Start LoRA Studio (Training LoRA + Personal Data + Settings) and open it in the browser.
 #
 # Installed with ./install.sh (recommended): uses the shared ./venv (Python 3.12 + PyTorch + sd-scripts +
@@ -69,9 +69,39 @@ for a in "$@"; do
     fi
 done
 
+# 0. The LoRA Studio folder was moved or renamed: the Python environment remembers where it was made, so the paths
+#    in it (and in the settings that point at the trainers in this folder) are put right before anything starts.
+OLD_ROOT="$(cat "$VENV/.lorastudio-root" 2>/dev/null)"
+if [ -n "$OLD_ROOT" ] && [ "$OLD_ROOT" != "$HERE" ] && [ -d "$VENV" ]; then
+    echo "LoRA Studio was moved from $OLD_ROOT to $HERE: updating the paths in the Python environment ..."
+    for f in "$HERE"/.tools/python/*; do          # uv's short-version links inside .tools
+        [ -L "$f" ] || continue
+        t="$(readlink "$f")"
+        case "$t" in "$OLD_ROOT"/*) ln -sfn "$HERE${t#$OLD_ROOT}" "$f" ;; esac
+    done
+    for f in "$VENV"/bin/*; do
+        if [ -L "$f" ]; then                       # python -> .../.tools/python/... (made by uv)
+            t="$(readlink "$f")"
+            case "$t" in "$OLD_ROOT"/*) ln -sfn "$HERE${t#$OLD_ROOT}" "$f" ;; esac
+        elif [ -f "$f" ] && head -c 200 "$f" 2>/dev/null | grep -q "$OLD_ROOT"; then
+            sed -i.bak "s#$OLD_ROOT#$HERE#g" "$f" 2>/dev/null && rm -f "$f.bak"   # #! lines and activate scripts
+        fi
+    done
+    [ -f "$VENV/pyvenv.cfg" ] && sed -i.bak "s#$OLD_ROOT#$HERE#g" "$VENV/pyvenv.cfg" && rm -f "$VENV/pyvenv.cfg.bak"
+    old_t="${OLD_ROOT/#$HOME/~}"; new_t="${HERE/#$HOME/~}"
+    for f in userdata/training_settings.txt userdata/library_settings.txt; do
+        [ -f "$f" ] && sed -i.bak "s#$OLD_ROOT/#$HERE/#g; s#$old_t/#$new_t/#g" "$f" && rm -f "$f.bak"
+    done
+    echo "$HERE" > "$VENV/.lorastudio-root"
+fi
+
 # 1. Create the venv if it does not exist (or is broken): with LoRA Studio's own Python 3.12 from uv (in .tools/, no admin
 #    rights, the system Python is not touched); only when uv cannot be downloaded the computer's python3.12 / python3
 if [ -e "$VENV" ] && ! "$PY" -c 'import sys' >/dev/null 2>&1; then
+    if [ -f "$SHARED" ]; then                     # the training environment (PyTorch, trainers): never thrown away here
+        echo "The training environment in $VENV does not start. Run ./install.sh (it repairs it; your settings stay)."
+        exit 1
+    fi
     echo "The Python environment in $VENV does not work any more: making a new one ..."
     rm -rf "$VENV"
 fi
@@ -111,6 +141,7 @@ if [ ! -x "$PY" ]; then
     fi
     "$PY" -m pip install --upgrade pip >/dev/null
 fi
+[ -f "$VENV/.lorastudio-root" ] || echo "$HERE" > "$VENV/.lorastudio-root"
 
 # 2. Install / update the packages when requirements.txt is new or changed
 WANT="$(sha256 requirements.txt)"

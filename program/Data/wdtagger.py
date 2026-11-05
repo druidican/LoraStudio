@@ -14,7 +14,7 @@ Needs onnx + onnxruntime in the training venv: installed by itself the first tim
 command is shown. The model (about 1.2 GB) is downloaded the first time into userdata/wd_tagger/.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.051126"  # LoRA Studio version, see version.py
 
 import os
 import shutil
@@ -170,8 +170,10 @@ def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, 
             n += 1
         if stop is not None and stop.is_set():
             yield f"■ Stopped: {n} of {len(images)} pictures tagged by the WD tagger."
-        elif proc.returncode != 0 and n == 0:
-            yield "❌ The WD tagger stopped:\n\n```\n" + "\n".join(tail[-8:]) + "\n```"
+        elif n == 0:                                     # nothing written: always say why, also with exit code 0
+            yield ("❌ The WD tagger wrote no captions" + (f" (exit code {proc.returncode})" if proc.returncode else "")
+                   + ". Its last lines:\n\n```\n" + ("\n".join(tail[-10:]) or "(no output)") + "\n```\n\n"
+                   "Settings › Version › *Report for Claude* includes them too.")
         else:
             yield (f"✔ Done: {n} of {len(images)} pictures tagged by the WD tagger ({REPO}), "
                    f"in {int(time.time() - t0)} s" + (f"; {empty} got almost no tags" if empty else "") + ".")
