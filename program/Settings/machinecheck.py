@@ -12,7 +12,7 @@ The report is written to lorastudio_check_<time>.md in the program folder: no to
 no dataset names (only how many there are). Upload that file when something is not right.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.051126b"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -219,12 +219,12 @@ def check_gpu(R, G, venv):
         import statusbar
         gs = statusbar.machine()["gpus"]
         for g in gs:
-            R.add("ok", "GPU (rocm-smi / nvidia-smi)", f"{g['name']} · {g['vram_total'] / 1024 ** 3:.0f} GB"
+            R.add("ok", "GPU (amd-smi / rocm-smi / nvidia-smi)", f"{g['name']} · {g['vram_total'] / 1024 ** 3:.0f} GB"
                   f" · {g['vram_used'] / 1024 ** 3:.1f} GB used now")
         if not gs:
-            R.add("warn", "GPU (rocm-smi / nvidia-smi)", "not found")
+            R.add("warn", "GPU (amd-smi / rocm-smi / nvidia-smi)", "not found")
     except Exception as e:                               # noqa: BLE001
-        R.add("warn", "GPU (rocm-smi / nvidia-smi)", repr(e))
+        R.add("warn", "GPU (amd-smi / rocm-smi / nvidia-smi)", repr(e))
     try:
         v, msg = G.detect_gfx()
         R.add("info", "GPU architecture", msg or str(v))

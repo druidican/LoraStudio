@@ -20,7 +20,8 @@ Everything you see here (pictures, runs, losses) is made-up test data.
 
 ![The status bar](img/topbar.jpg)
 
-It is the same on every page: what is training now (step, loss, time left), how busy the GPU, CPU and RAM are, and
+It is the same on every page: what is training now (step, loss, time left), how busy the GPU, CPU and RAM are (AMD:
+from `amd-smi` with ROCm 10 and newer, `rocm-smi` before; NVIDIA: `nvidia-smi`), and
 which Ollama model sits in video memory (Settings › AI helpers starts and stops it). *Dark / Normal* at the top right
 switches between dark and light. When a run ends it says so, with the save point to try first, or what went
 wrong. Click it to go to Training › Run.

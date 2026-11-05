@@ -5,7 +5,7 @@ and the GPU / GFX values.
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.051126b"  # LoRA Studio version, see version.py
 
 import glob
 import json
@@ -855,7 +855,7 @@ def apply_gfx_env():
 
 
 def detect_gfx():
-    """(version, message) from rocminfo, falling back to rocm-smi."""
+    """(version, message) from rocminfo, falling back to amd-smi or rocm-smi."""
     names = []
     exe = shutil.which("rocminfo") or next(iter(sorted(glob.glob("/opt/rocm*/bin/rocminfo"))), None)
     if exe:
@@ -865,16 +865,14 @@ def detect_gfx():
         except Exception:
             pass
     if not names:
-        exe = shutil.which("rocm-smi") or next(iter(sorted(glob.glob("/opt/rocm*/bin/rocm-smi"))), None)
-        if exe:
-            try:
-                out = subprocess.run([exe, "--showproductname"], capture_output=True, text=True, timeout=10).stdout
-                names = re.findall(r"\bgfx[0-9a-f]{3,4}\b", out)
-            except Exception:
-                pass
+        try:
+            import gpusmi
+            names = gpusmi.gfx_names()                   # amd-smi (ROCm 10+) or rocm-smi
+        except Exception:                                # noqa: BLE001
+            pass
     names = [n for n in names if n != "gfx000"]
     if not names:
-        return gr.update(), "Could not detect the GPU (rocminfo / rocm-smi gave no gfx name). Pick it from the list instead."
+        return gr.update(), "Could not detect the GPU (rocminfo / amd-smi / rocm-smi gave no gfx name). Pick it from the list instead."
     n = names[0]
     v = gfx_name_to_version(n)
     return v, f"Detected **{n}**, which is `{v}`. If the card is not officially supported by your ROCm, pick the nearest supported entry from the list instead."

@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.051126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -553,6 +553,21 @@ def _worn():
     finally:
         for k_, v in saved.items():
             setattr(F, k_, v)
+
+
+@check("AMD GPU values are read from amd-smi (ROCm 10+) as from rocm-smi")
+def _amdsmi():
+    import gpusmi as GS
+    a = [{"gpu": 0, "usage": {"gfx_activity": {"value": 37, "unit": "%"}},
+          "power": {"socket_power": {"value": 212, "unit": "W"}, "power_limit": {"value": 304, "unit": "W"}},
+          "temperature": {"edge": {"value": 61, "unit": "C"}, "hotspot": {"value": 78, "unit": "C"}},
+          "mem_usage": {"total_vram": {"value": 16304, "unit": "MB"}, "used_vram": {"value": 9120, "unit": "MB"}}}]
+    c = GS.parse_amd_smi(a)[0]
+    need((c["load"], c["temp"], c["junction"], c["power"]) == (37, 61, 78, 212), f"amd-smi metric: {c}")
+    need(abs(c["vram_total"] / 2 ** 20 - 16304) < 1, f"VRAM not in bytes: {c}")
+    m = GS.parse_amd_smi({"gpu_data": [{"gpu": 0, "gfx": "55 %", "vram_used": "8000 MB", "vram_total": "16304 MB",
+                                        "hotspot_temperature": "80 °C", "power_usage": "180 W"}]})[0]
+    need((m["load"], m["junction"], m["power"]) == (55, 80, 180) and m["vram_used"] == 8000 * 2 ** 20, f"monitor: {m}")
 
 
 @check("a chosen LoRA goes into the folder of its LoRA type, never a LoRA folder's root")

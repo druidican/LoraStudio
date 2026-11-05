@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.051126
+# LoRA Studio version 1.051126b
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh
@@ -440,6 +440,21 @@ if [ "$GPU" = amd ]; then
     fi
     [ -n "$GFX" ] || die "could not detect the AMD GPU architecture. Pass it with --gfx (gfx1201 for the RX 9070 XT)."
     ok "GPU: AMD $GFX (PyTorch for ROCm)"
+    # GPU values for the status bar: ROCm 10 and newer have amd-smi ("amd-smi monitor"), rocm-smi is gone
+    ROCM_SYS="$(cat /opt/rocm*/.info/version 2>/dev/null | sort -V | tail -1 || true)"
+    ROCM_MAJ="${ROCM_SYS%%.*}"; [ -n "$ROCM_MAJ" ] || ROCM_MAJ="${ROCM_VER%%.*}"
+    AMDSMI="$(command -v amd-smi || ls /opt/rocm*/bin/amd-smi 2>/dev/null | sort -V | tail -1 || true)"
+    ROCMSMI="$(command -v rocm-smi || ls /opt/rocm*/bin/rocm-smi 2>/dev/null | sort -V | tail -1 || true)"
+    if [ "${ROCM_MAJ:-0}" -ge 10 ] 2>/dev/null || [ -z "$ROCMSMI" ]; then GPU_TOOL="$AMDSMI"; else GPU_TOOL="$ROCMSMI"; fi
+    [ -n "$GPU_TOOL" ] || GPU_TOOL="${AMDSMI:-$ROCMSMI}"
+    if [ -n "$GPU_TOOL" ]; then
+        ok "GPU values: $(basename "$GPU_TOOL") ($GPU_TOOL)$([ -n "$ROCM_SYS" ] && echo ", ROCm $ROCM_SYS on the system")"
+    elif [ "${ROCM_MAJ:-0}" -ge 10 ] 2>/dev/null; then
+        warn "ROCm ${ROCM_SYS:-$ROCM_VER}: amd-smi is not installed, so the top bar shows no GPU load, memory or temperature"
+        say "     Fedora: sudo dnf install amdsmi   ·   Ubuntu: sudo apt install amd-smi-lib   (training works without it)"
+    else
+        warn "neither amd-smi nor rocm-smi found: the top bar shows no GPU values (training works without them)"
+    fi
     id -nG | grep -qwE "render" || warn "your user is not in the 'render' group: sudo usermod -aG render,video $(id -un) (then log out and in)"
 else
     ok "GPU: NVIDIA $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null | head -1) (PyTorch for CUDA)"
@@ -739,7 +754,7 @@ GPU_KIND="$GPU"                                   # which settings LoRA Studio s
 if [ "$GPU_KIND" = auto ]; then
     if [ -e /dev/kfd ]; then GPU_KIND=amd; elif command -v nvidia-smi >/dev/null || [ -x /usr/lib/wsl/lib/nvidia-smi ]; then GPU_KIND=nvidia; fi
 fi
-"$PY" - "$TARGET" "$SD_MODE" "$EX_SD" "$EX_MU" "$EX_VENV" "$MU_MODE" "$OL_MODE" "$OL_URL" "$IS_WSL" "$GPU_KIND" <<'EOF'
+"$PY" - "$TARGET" "$SD_MODE" "$EX_SD" "$EX_MU" "$EX_VENV" "$MU_MODE" "$OL_MODE" "$OL_URL" "$IS_WSL" "$GPU_KIND" "${GPU_TOOL:-}" <<'EOF'
 import re, shutil, sys
 from pathlib import Path
 T = Path(sys.argv[1]); home = str(Path.home())
@@ -784,6 +799,9 @@ feat = {"ollama": word.get(ol_mode, "installed"), "sd_scripts": word.get(sd_mode
         "platform": "wsl" if wsl == "1" else "mac" if sys.platform == "darwin" else "linux"}
 if gpu in ("amd", "nvidia"):
     feat["gpu"] = gpu
+tool = (sys.argv[11:12] or [""])[0]
+if tool:
+    feat["gpu_tool"] = tool                       # amd-smi (ROCm 10+) or rocm-smi, for the top bar's GPU values
 (UD / "features.json").write_text(json.dumps(feat, indent=1), encoding="utf-8")
 show = lambda m, p: "none (launch scripts are made, not run here)" if m == "none" else tilde(p)
 print(f"   sd-scripts:   {show(sd_mode, sd)}\n   musubi-tuner: {show(mu_mode, mu)}\n"

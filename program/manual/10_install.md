@@ -41,7 +41,9 @@ cd ~/LoraStudio && ./start.sh
 ```
 
 With a trainer to install, it installs PyTorch for your graphics card: **AMD Radeon** with ROCm, **NVIDIA** with
-CUDA. A computer with both (a laptop) is asked which one to train on. With your own trainers, or none, it only makes
+CUDA. For the GPU values in the top bar it looks for **amd-smi** (ROCm 10 and newer, where `rocm-smi` is gone) or
+`rocm-smi` (older ROCm); without either, training still works (Fedora: `sudo dnf install amdsmi`, Ubuntu: `sudo apt
+install amd-smi-lib`). A computer with both (a laptop) is asked which one to train on. With your own trainers, or none, it only makes
 a small environment for LoRA Studio itself.
 
 ## Windows

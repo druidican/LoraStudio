@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.051126b"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -151,7 +151,7 @@ def checks() -> list[dict]:
             vram = f" · {g[0]['vram_total'] / 1024 ** 3:.0f} GB" if g[0].get("vram_total") else ""
             add("ok", "GPU", f"{g[0]['name']}{vram}", "trainers")
         else:
-            add("warn", "GPU", "not detected (no rocm-smi or nvidia-smi)", "trainers")
+            add("warn", "GPU", "not detected (no amd-smi, rocm-smi or nvidia-smi)", "trainers")
     except Exception:                                    # noqa: BLE001
         pass
     # Ollama

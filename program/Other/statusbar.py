@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """The status strip at the top of every page: the training run, and the machine (GPU, VRAM, CPU, RAM).
 
-GPU: rocm-smi (AMD) or nvidia-smi (NVIDIA); CPU and RAM: /proc/stat and /proc/meminfo. Everything is cached for
+GPU: amd-smi or rocm-smi (AMD, see gpusmi.py) or nvidia-smi (NVIDIA); CPU and RAM: /proc/stat and /proc/meminfo. Everything is cached for
 two seconds, so many open pages share one reading. A missing tool just leaves that part out.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.051126b"  # LoRA Studio version, see version.py
 
 import glob
 import html
@@ -51,26 +51,16 @@ def _ram():
 
 def _gpu():
     """[{name, load, temp, vram_used, vram_total}] in %, °C and bytes."""
-    exe = shutil.which("rocm-smi") or next(iter(sorted(glob.glob("/opt/rocm*/bin/rocm-smi"))), None)
-    if exe:
-        try:
-            r = subprocess.run([exe, "--showuse", "--showmeminfo", "vram", "--showtemp", "--json"],
-                               capture_output=True, text=True, timeout=6)
-            out = r.stdout
-            data = json.loads(out[out.index("{"): out.rindex("}") + 1])
-            sg = sys.modules.get("sdgui")
-            cards = sg.parse_rocm_smi(data) if sg else []
-            res = []
-            for c in cards:
-                tot = c.get("vram_total") or 0
-                div = 1 if tot > 1e6 else 1024 ** 2            # bytes, or MB in old ROCm versions
-                res.append({"name": str(c["card"]).replace("card", "GPU "), "load": c.get("load"),
-                            "temp": c.get("junction") if c.get("temp") is None else c.get("temp"),
-                            "vram_used": (c.get("vram_used") or 0) * div, "vram_total": tot * div})
-            if res:
-                return res
-        except Exception:
-            pass
+    try:                                                   # AMD: amd-smi (ROCm 10+) or rocm-smi, values in bytes
+        import gpusmi
+        res = [{"name": str(c["card"]).replace("card", "GPU "), "load": c.get("load"),
+                "temp": c.get("junction") if c.get("temp") is None else c.get("temp"),
+                "vram_used": c.get("vram_used") or 0, "vram_total": c.get("vram_total") or 0}
+               for c in gpusmi.cards()]
+        if res:
+            return res
+    except Exception:                                      # noqa: BLE001
+        pass
     exe = shutil.which("nvidia-smi")
     if exe:
         try:
@@ -120,7 +110,7 @@ def machine_html() -> str:
         used, tot = m["ram"]
         parts.append(_meter("RAM", used / tot, f"RAM {used / gb:.1f}/{tot / gb:.0f} GB"))
     if not m["gpus"]:
-        parts.insert(0, '<span class="ls-mnote">GPU: no rocm-smi / nvidia-smi</span>')
+        parts.insert(0, '<span class="ls-mnote">GPU: no amd-smi / rocm-smi / nvidia-smi</span>')
     return "".join(parts)
 
 

@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.051126b"  # LoRA Studio version, see version.py
 
 import copy
 import difflib
@@ -1165,7 +1165,7 @@ def export_report():
          f"- musubi-tuner: `{S.musubi_root()}` " + _cmd(["git", "-C", str(S.musubi_root()), "log", "-1", "--format=%h %cd", "--date=short"]),
          "", "## Hardware and software",
          f"- GPU: {_cmd(['bash', '-c', 'lspci | grep -iE \"vga|3d\" | head -2'])}",
-         f"- VRAM / ROCm: {_cmd(['bash', '-c', 'rocm-smi --showproductname --showmeminfo vram 2>/dev/null | grep -iE \"card series|vram total|Total Memory\" | head -3'])}",
+         f"- VRAM / ROCm: {_cmd(['bash', '-c', '(amd-smi static --asic --vram 2>/dev/null | grep -iE \"market_name|size\" | head -3) || (rocm-smi --showproductname --showmeminfo vram 2>/dev/null | grep -iE \"card series|vram total|Total Memory\" | head -3)'])}",
          f"- RAM: {_cmd(['bash', '-c', 'free -h | head -2 | tail -1'])}",
          f"- Kernel: {_cmd(['uname', '-r'])}"]
     wd, venv, _ = S.runner_settings()

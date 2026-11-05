@@ -16,7 +16,7 @@ It does NOT touch your sd-scripts install or its venv. It:
   * Settings tab: model / VAE / text-encoder files per LoRA type (folder + file dropdown), saved in <sd-scripts>/settings.txt
     and used for new launch scripts
   * Monitor tab: newest sample images from disk + optional TensorBoard
-  * GPU status (top right) from rocm-smi: load, VRAM, temperature, power; Hugging Face token status
+  * GPU status (top right) from amd-smi (ROCm 10+) or rocm-smi: load, VRAM, temperature, power; Hugging Face token status
     (token read from <sd-scripts>/huggingtoken.txt and written into `export HF_TOKEN=` in launch scripts)
   * Scan library button: finds new image libraries in <sd-scripts>/images
   * Repeat folders panel: rename a folder to the correct <N>_name format
@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.051126b"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -1088,12 +1088,9 @@ def vram_used():
                                capture_output=True, text=True, timeout=8)
             u, t = [float(x) for x in r.stdout.strip().splitlines()[0].split(",")]
             return u * 2 ** 20, t * 2 ** 20
-        exe = shutil.which("rocm-smi") or next(iter(sorted(glob.glob("/opt/rocm*/bin/rocm-smi"))), None)
-        if exe:
-            r = subprocess.run([exe, "--showmeminfo", "vram", "--json"], capture_output=True, text=True, timeout=8)
-            out = r.stdout
-            cards = parse_rocm_smi(json.loads(out[out.index("{"): out.rindex("}") + 1]))
-            if cards and cards[0]["vram_total"]:
+        import gpusmi
+        cards = gpusmi.cards()                   # amd-smi (ROCm 10+) or rocm-smi, in bytes
+        if cards and cards[0]["vram_total"]:
                 return float(cards[0]["vram_used"] or 0), float(cards[0]["vram_total"])
     except Exception:                       # noqa: BLE001
         pass
@@ -1768,7 +1765,8 @@ def _bar(label, frac, text, warn=0.6, crit=0.85):
 
 def format_gpu(cards):
     if not cards:
-        return '<div class="gmsg">GPU: no data from rocm-smi</div>'
+        import gpusmi
+        return f'<div class="gmsg">GPU: no data from {gpusmi.label()}</div>'
     out = []
     for c in cards:
         bars = []
@@ -1806,11 +1804,8 @@ def gpu_name() -> str:
                                text=True, timeout=8)
             name = (r.stdout.strip().splitlines() or [""])[0].strip()
         if not name:
-            exe = shutil.which("rocm-smi") or next(iter(sorted(glob.glob("/opt/rocm*/bin/rocm-smi"))), None)
-            if exe:
-                r = subprocess.run([exe, "--showproductname"], capture_output=True, text=True, timeout=8)
-                m = re.search(r"Card Series:\s*(.+)", r.stdout) or re.search(r"Card Model:\s*(.+)", r.stdout)
-                name = m.group(1).strip() if m else ""
+            import gpusmi
+            name = gpusmi.name()                 # amd-smi (ROCm 10+) or rocm-smi
     except Exception:                       # noqa: BLE001
         name = ""
     _GPU_NAME["v"] = name
@@ -1821,19 +1816,16 @@ def gpu_status_text():
     now = time.time()
     if now - _GPU["t"] < 2.0:
         return _GPU["txt"]
-    exe = shutil.which("rocm-smi") or next(iter(sorted(glob.glob("/opt/rocm*/bin/rocm-smi"))), None)
-    if not exe:
-        txt = '<div class="gmsg">GPU: rocm-smi not found</div>'
+    import gpusmi
+    if not gpusmi.tool():
+        txt = '<div class="gmsg">GPU: amd-smi / rocm-smi not found</div>'
     else:
         try:
-            r = subprocess.run([exe, "--showuse", "--showmeminfo", "vram", "--showtemp", "--showpower", "--json"],
-                               capture_output=True, text=True, timeout=6)
-            out = r.stdout
-            txt = format_gpu(parse_rocm_smi(json.loads(out[out.index("{"): out.rindex("}") + 1])))
+            txt = format_gpu(gpusmi.cards())
         except subprocess.TimeoutExpired:
-            txt = '<div class="gmsg">GPU: rocm-smi timed out</div>'
+            txt = f'<div class="gmsg">GPU: {gpusmi.label()} timed out</div>'
         except Exception:
-            txt = '<div class="gmsg">GPU: could not read rocm-smi output</div>'
+            txt = f'<div class="gmsg">GPU: could not read {gpusmi.label()} output</div>'
     _GPU["t"], _GPU["txt"] = now, txt
     return txt
 
