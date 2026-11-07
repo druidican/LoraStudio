@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.051126b"  # LoRA Studio version, see version.py
+__version__ = "1.071126b"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -740,6 +740,35 @@ def append_args(body: str, argstr: str):
     return body, False
 
 
+_SAMPLE_FLAGS = ("sample_every_n_epochs", "sample_every_n_steps", "sample_at_first", "sample_sampler")
+
+
+def _drop_arg(body: str, name: str) -> tuple[str, bool]:
+    """Remove --name and its value (if any) from the script text."""
+    pat = re.compile(rf"[ \t]*(?<![\w-])--{name}(?![\w-])(?:(?:=|[ \t]+)(?!--)(?:\"[^\"]*\"|'[^']*'|[^\s\\]+))?")
+    new = pat.sub("", body)
+    if new == body:
+        return body, False
+    new = re.sub(r"^[ \t]*\\[ \t]*\n", "", new, flags=re.M)          # a line that held only that option
+    return new, True
+
+
+def fix_flags(body: str) -> tuple[str, list]:
+    """Options that make sd-scripts fail or are ignored, taken out: sampling without --sample_prompts (it crashes
+    at the first sample) and --clip_skip in an SDXL script (SDXL does not use it). Returns (body, notes)."""
+    notes = []
+    if not re.search(r"(?<![\w-])--sample_prompts(?![\w-])", body):
+        gone = [f for f in _SAMPLE_FLAGS if _drop_arg(body, f)[1]]
+        for f in gone:
+            body = _drop_arg(body, f)[0]
+        if gone:
+            notes.append("removed " + ", ".join("--" + f for f in gone) + " (no --sample_prompts: sd-scripts would stop at the first sample)")
+    if re.search(r"sdxl_train\w*\.py", body) and re.search(r"(?<![\w-])--clip_skip(?![\w-])", body):
+        body = _drop_arg(body, "clip_skip")[0]
+        notes.append("removed --clip_skip (SDXL, Illustrious and Pony do not use it)")
+    return body, notes
+
+
 def inject_resume(body: str, state: str):
     """Append `--resume <state>` to the end of the first training command. Returns (body, ok)."""
     return append_args(body, f"--resume {shlex.quote(state)}")
@@ -765,6 +794,7 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
         warn(f"Launch script not found: {src}")
         return False
     body = src.read_text(encoding="utf-8", errors="ignore")      # always the saved file, never a stale copy
+    body, fixed = fix_flags(body)
 
     resume = "" if resume in (None, "", NO_STATE) else resume
     if resume:
@@ -830,6 +860,8 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
     run.lines.append(f"venv prelude: {bool((venv or '').strip())}, resume: {resume or 'no'}"
                      + (f" (saved step {run.step_offset})" if run.step_offset else ""))
     run.lines.append(f"log file: {logfile}")
+    for n in fixed:
+        run.lines.append(f"LoRA Studio {n}.")
     run.proc = subprocess.Popen(
         ["bash", str(tmp)],
         cwd=str(cwd),

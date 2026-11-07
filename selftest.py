@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.071126"  # LoRA Studio version, see version.py
+__version__ = "1.071126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -579,6 +579,20 @@ def _quality():
     ill = SS.add_quality("illustrious", {"label": "Illustrious (SDXL)", "flags": ["--keep_tokens 1"]})
     need('--caption_suffix ", masterpiece, best quality"' in ill["flags"] and "--keep_tokens 1" in ill["flags"], ill)
     need(not SS.add_quality("sdxl", {"label": "SDXL", "flags": []}).get("quality_words"), "plain SDXL got quality words")
+
+
+@check("a launch script never samples without prompts, and SDXL scripts carry no --clip_skip")
+def _fixflags():
+    import sdgui as G
+    import sd_script as SS
+    a = 'accelerate launch sdxl_train_network.py \\\n  --seed 42 --sample_every_n_epochs 1 --clip_skip 2\n'
+    b, n = G.fix_flags(a)
+    need("--sample_every_n_epochs" not in b and "--clip_skip" not in b and len(n) == 2, b)
+    c = 'accelerate launch sdxl_train_network.py --sample_every_n_epochs 1 --sample_prompts "p.txt"\n'
+    need(G.fix_flags(c)[0] == c, "sampling with prompts was changed")
+    vals = ["1" if f == "sample_every_n_epochs" else "2" if f == "clip_skip" else "" for f, _ in SS.FORM_FIELDS]
+    t, _, _ = SS.apply_form('accelerate launch sdxl_train_network.py --seed 42\n', vals)
+    need("--sample_every_n_epochs" not in t and "--clip_skip" not in t, t)
 
 
 @check("a chosen LoRA goes into the folder of its LoRA type, never a LoRA folder's root")

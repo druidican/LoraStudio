@@ -14,15 +14,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.071126"
-VERSION = "1.071126"
+__version__ = "1.071126b"
+VERSION = "1.071126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.011126",
-    "version.py": "1.071126",
+    "version.py": "1.071126b",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.051126b",
-    "program/Training/sd_script.py": "1.071126",
+    "program/Training/sdgui.py": "1.071126b",
+    "program/Training/sd_script.py": "1.071126b",
     "program/Data/sd_prepare.py": "1.031126",
     "program/Training/sd_settings.py": "1.051126b",
     "program/Data/datasets_ui.py": "1.031126",
@@ -56,7 +56,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.071126",
+    "selftest.py": "1.071126b",
     "program/Settings/machinecheck.py": "1.051126b",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -74,6 +74,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.071126b", "Launch scripts: sampling is never written or run without a prompts file (sd-scripts stopped at the first sample), and SDXL, Illustrious and Pony scripts no longer get --clip_skip. A script that has them is fixed when it runs."),
     ("1.071126", "Quality words: Pony LoRA types train with score_9, score_8_up, score_7_up, source_anime in front of every caption and Illustrious with masterpiece, best quality behind it (--caption_prefix / --caption_suffix in the launch script; the caption files stay as they are; for Pony --keep_tokens also keeps the quality words and the trigger word in front); newly generated sample prompts get them too."),
     ("1.051126b", "AMD GPU values from amd-smi: ROCm 10 and newer have no rocm-smi, so the top bar, the machine check, the GPU name for the run log and Detect GPU read amd-smi (metric and static, in JSON) there, and rocm-smi on older ROCm. install.sh looks for both, tells which one it uses (and how to install amd-smi when it is missing) and saves the choice."),
     ("1.051126", "Install: the installer asks for the install folder (Enter = ~/LoraStudio; --dir still works; run inside an install it updates that one), and a moved or renamed LoRA Studio folder starts again: start.sh puts the paths of its Python environment and settings right by itself (a training environment is never thrown away). Datasets › 7: when the WD tagger writes no captions, its last lines are shown instead of a done message."),

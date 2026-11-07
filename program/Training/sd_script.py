@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.071126"  # LoRA Studio version, see version.py
+__version__ = "1.071126b"  # LoRA Studio version, see version.py
 
 import copy
 import difflib
@@ -240,6 +240,10 @@ def apply_form(text: str, vals):
                 changes.append(f"{label}: added {v}")
             else:
                 failed.append(label)
+    fixed, notes = S.fix_flags(text)
+    if notes:
+        text = fixed
+        changes += [n[:1].upper() + n[1:] for n in notes]
     return text, changes, failed
 
 
@@ -1473,6 +1477,7 @@ def cs_save_over(ds, script, text, tkey, plan, makedirs):
         gr.Warning("No existing launch script is selected: use Save as new.")
         return "No existing launch script is selected."
     p = Path(script)
+    text = S.fix_flags(text or "")[0]
     shutil.copy2(p, p.with_name(p.name + ".bak"))
     p.write_text((text or "").rstrip("\n") + "\n", encoding="utf-8")
     msg = f"**Saved `{p.name}`** (previous version: `{p.name}.bak`). The queue always runs the saved file."
@@ -1515,7 +1520,7 @@ def cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, pla
     if dest.exists():
         gr.Warning(f"{name} already exists. Pick another name, or select it and use Save (overwrite).")
         return _cs_result(status=f"`{name}` already exists. Choose another name.", plan=plan) + [gr.update()]
-    text, vnote = _bump_if_taken(S.lora_path(ds), text or "")
+    text, vnote = _bump_if_taken(S.lora_path(ds), S.fix_flags(text or "")[0])
     if STUDIO_MODE["on"] and (plan or {}).get("rename") and (plan or {}).get("repeats"):
         r = _auto_rename(ds, plan["repeats"][0])
         if r:
