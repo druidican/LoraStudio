@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.071126"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -836,12 +836,15 @@ def build_prompts_text(caps, fallback_trigger, name, cfg):
 
     lines = []
 
+    pre, suf = cfg.get("quality_words") or ("", "")      # Pony: score_9, … first; Illustrious: masterpiece, … last
+
     def add(parts):
         tags = []
         for t in [trigger] + base + parts:
             if t and t not in tags:
                 tags.append(t)
-        lines.append(f"{', '.join(tags)} --n {cfg.get('negative') or NEGATIVE_PROMPT} {sample_args} --d {SAMPLE_SEED}")
+        text = ", ".join([x for x in (pre, ", ".join(tags), suf) if x])
+        lines.append(f"{text} --n {cfg.get('negative') or NEGATIVE_PROMPT} {sample_args} --d {SAMPLE_SEED}")
 
     add([pick("view", 0) or "looking at viewer", pick("expression", 0)])      # plain baseline
     for i in range(4):                                                         # varied, from your tags

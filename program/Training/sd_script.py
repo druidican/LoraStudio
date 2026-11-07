@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.051126b"  # LoRA Studio version, see version.py
+__version__ = "1.071126"  # LoRA Studio version, see version.py
 
 import copy
 import difflib
@@ -85,6 +85,39 @@ def custom_subtypes() -> dict:
     return out
 
 
+# Quality words of a model family: put in front of (Pony) or behind (Illustrious) every caption while training (with
+# sd-scripts' --caption_prefix / --caption_suffix, so the caption files stay as they are) and every sample prompt.
+QUALITY_PREFIX = {"pony": "score_9, score_8_up, score_7_up, source_anime"}
+QUALITY_SUFFIX = {"illustrious": "masterpiece, best quality"}
+
+
+def quality_family(key: str, preset: dict) -> str:
+    """'pony', 'illustrious' or '' for a LoRA type (a subtype counts by its name: Pony, PonyXL, …)."""
+    words = f"{key} {preset.get('label', '')} {preset.get('suffix', '')}".lower()
+    if "pony" in words:
+        return "pony"
+    if key == "illustrious" or "illustrious" in words:
+        return "illustrious"
+    return ""
+
+
+def add_quality(key: str, p: dict) -> dict:
+    fam = quality_family(key, p)
+    pre, suf = QUALITY_PREFIX.get(fam, ""), QUALITY_SUFFIX.get(fam, "")
+    if not (pre or suf) or p.get("quality_words"):
+        return p
+    flags = list(p.get("flags") or [])
+    if pre:
+        n = len([w for w in pre.split(",") if w.strip()])
+        # the quality words come first, so --keep_tokens must also keep them before the trigger word
+        flags = [re.sub(r"--keep_tokens\s+(\d+)", lambda m: f"--keep_tokens {int(m.group(1)) + n}", f) for f in flags]
+        flags.append(f'--caption_prefix "{pre},"')
+    if suf:
+        flags.append(f'--caption_suffix ", {suf}"')
+    p.update(flags=flags, quality_words=(pre, suf))
+    return p
+
+
 def merged_presets():
     """(scan module or None, {key: preset}): built-in types plus the subtypes defined in settings.txt."""
     sc, merged = builtin_presets()
@@ -96,6 +129,8 @@ def merged_presets():
         p.update(label=f"{c['label']} ({SUBTYPE_BASES[c['base']]})", suffix=c["tag"], base=c["base"], custom=True)
         p.pop("template", None)
         merged[key] = p
+    for key in list(merged):
+        merged[key] = add_quality(key, copy.deepcopy(merged[key]))
     return sc, merged
 
 

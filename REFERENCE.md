@@ -128,6 +128,10 @@ The steps (the bar above them shows the dataset, its LoRA types and purpose; the
    The bottom bar: *Fill with recommended settings* (it also gives the repeat folder the recommended count, with its
    copies in `_originals/` and `_reserve/`), *Check flags against my trainer*, *Save*, *Save as new version* and
    *Add to the queue*.
+   **Quality words** (`sd_script.QUALITY_PREFIX` / `QUALITY_SUFFIX`): a type with *pony* in its key, label or file
+   tag gets `--caption_prefix "score_9, score_8_up, score_7_up, source_anime,"` and its `--keep_tokens` raised by 4
+   (so the quality words and the trigger word stay in front); Illustrious gets `--caption_suffix ", masterpiece, best
+   quality"`. Newly generated sample prompts get the same words; caption files are not changed.
 
 The locked traits of earlier versions (`traits.txt`) are no longer used.
 

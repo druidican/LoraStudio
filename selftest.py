@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.051126b"  # LoRA Studio version, see version.py
+__version__ = "1.071126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -568,6 +568,17 @@ def _amdsmi():
     m = GS.parse_amd_smi({"gpu_data": [{"gpu": 0, "gfx": "55 %", "vram_used": "8000 MB", "vram_total": "16304 MB",
                                         "hotspot_temperature": "80 °C", "power_usage": "180 W"}]})[0]
     need((m["load"], m["junction"], m["power"]) == (55, 80, 180) and m["vram_used"] == 8000 * 2 ** 20, f"monitor: {m}")
+
+
+@check("Pony gets score_9 … in front of the captions, Illustrious masterpiece, best quality behind")
+def _quality():
+    import sd_script as SS
+    pony = SS.add_quality("pony", {"label": "Pony (SDXL)", "flags": ["--shuffle_caption --keep_tokens 1"]})
+    need('--caption_prefix "score_9, score_8_up, score_7_up, source_anime,"' in pony["flags"], pony["flags"])
+    need("--shuffle_caption --keep_tokens 5" in pony["flags"], f"keep_tokens not moved: {pony['flags']}")
+    ill = SS.add_quality("illustrious", {"label": "Illustrious (SDXL)", "flags": ["--keep_tokens 1"]})
+    need('--caption_suffix ", masterpiece, best quality"' in ill["flags"] and "--keep_tokens 1" in ill["flags"], ill)
+    need(not SS.add_quality("sdxl", {"label": "SDXL", "flags": []}).get("quality_words"), "plain SDXL got quality words")
 
 
 @check("a chosen LoRA goes into the folder of its LoRA type, never a LoRA folder's root")

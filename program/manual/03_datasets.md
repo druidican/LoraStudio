@@ -160,6 +160,12 @@ script text** shows the script itself.
   batch size ran out of video memory before and estimates the time from your runs; *Your good LoRAs* shows their
   settings next to the recommendations; *Epochs* suggests fewer when your runs usually peaked early.
 
+**Quality words**: a **Pony** LoRA type (a subtype with Pony in its name) trains with `score_9, score_8_up,
+score_7_up, source_anime` in front of every caption, an **Illustrious** one with `masterpiece, best quality` behind
+it. The launch script adds them while training (`--caption_prefix` / `--caption_suffix`, the caption files stay as
+they are; for Pony `--keep_tokens` keeps them and the trigger word in front), and new sample prompts get them too
+(an existing prompts file is kept as you wrote it).
+
 **Save as new version** writes `pipILLV1.sh`, the next one `pipILLV2.sh`; older scripts move to `_old_runs/`. *Add to
 the queue* sends it to Training › Run.
 
