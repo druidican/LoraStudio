@@ -24,7 +24,7 @@ Run it on its own to print the table:  python Training_Recommendations.py
 """
 
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.071126c"  # LoRA Studio version, see version.py
 
 import os
 import re
@@ -61,10 +61,12 @@ FAMILY = {"sdxl": "sdxl", "illustrious": "sdxl", "sd15": "sd15", "flux": "flux",
 # ---------------------------------------------------------------------------------------------------------------
 RECS = {
     "sdxl": {
-        "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=12, lr="1e-4", dim=32, alpha=16, noise_offset=0.0357,
+        "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=12, lr="1e-4", dim=32, alpha=32, noise_offset=0.0357,
                           notes=["Caption with booru tags, trigger word first; drop tags for permanent traits (hair/eye "
                                  "colour, horns) so they bind to the trigger, keep clothes, pose, background, expression.",
-                                 "Illustrious and Pony are trained the same way; generate with clip skip 2 as usual for them."]),
+                                 "Illustrious and Pony are trained the same way; generate with clip skip 2 as usual for them.",
+                                 "Alpha = dim (32/32): with alpha 16 the LoRA learns at half strength, which gave weaker likeness "
+                                 "and detail in tests."]),
         "style": dict(views=30, steps_min=2000, steps_max=4000, epochs=10, lr="1e-4", dim=32, alpha=32, noise_offset=0.04,
                       notes=["Style LoRAs need more varied images (30-100+: many subjects, scenes and compositions) and "
                              "a higher rank than characters.",

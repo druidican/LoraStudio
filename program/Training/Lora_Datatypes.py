@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.071126"  # LoRA Studio version, see version.py
+__version__ = "1.071126c"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -131,7 +131,7 @@ PRESETS = {
             "--resolution 1024,1024",
             "--enable_bucket --min_bucket_reso 512 --max_bucket_reso 1536 --bucket_reso_steps 64",
             "--network_module networks.lora",
-            "--network_dim 32 --network_alpha 16",
+            "--network_dim 32 --network_alpha 32",
             "--mixed_precision bf16 --save_precision bf16",
             "--sdpa --no_half_vae --gradient_checkpointing",
             "--cache_latents --cache_latents_to_disk",
