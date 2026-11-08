@@ -34,3 +34,6 @@ LoraStudio*.zip
 notice_accepted.json
 .lorastudio-notice
 userdata/
+
+# release builds (tools/build_zip.sh)
+dist/
