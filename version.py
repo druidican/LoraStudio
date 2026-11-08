@@ -14,18 +14,18 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.071126c"
-VERSION = "1.071126c"
+__version__ = "1.081126"
+VERSION = "1.081126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.011126",
-    "version.py": "1.071126c",
+    "version.py": "1.081126",
     "program/lspaths.py": "1.011126",
     "program/Training/sdgui.py": "1.071126b",
     "program/Training/sd_script.py": "1.071126b",
     "program/Data/sd_prepare.py": "1.031126",
     "program/Training/sd_settings.py": "1.051126b",
-    "program/Data/datasets_ui.py": "1.031126",
+    "program/Data/datasets_ui.py": "1.081126",
     "program/Data/dsflow.py": "1.051126",
     "program/Training/training_ui.py": "1.011126",
     "program/Settings/settings_ui.py": "1.051126b",
@@ -74,6 +74,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.081126", "Datasets: the error 'desc_load didn't return enough output values' in the terminal when moving between pages is gone."),
     ("1.071126c", "SDXL, Illustrious and Pony character LoRAs now train with alpha = dim (32/32) instead of 32/16, which learned at half strength."),
     ("1.071126b", "Launch scripts: sampling is never written or run without a prompts file (sd-scripts stopped at the first sample), and SDXL, Illustrious and Pony scripts no longer get --clip_skip. A script that has them is fixed when it runs."),
     ("1.071126", "Quality words: Pony LoRA types train with score_9, score_8_up, score_7_up, source_anime in front of every caption and Illustrious with masterpiece, best quality behind it (--caption_prefix / --caption_suffix in the launch script; the caption files stay as they are; for Pony --keep_tokens also keeps the quality words and the trigger word in front); newly generated sample prompts get them too."),

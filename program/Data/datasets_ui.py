@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.081126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -1299,7 +1299,7 @@ def build(app, show):
 
     def desc_load(s):
         if s.get("view") != "flow" or s.get("step") != 7 or not s.get("ds"):
-            return gr.update(), gr.update(), gr.update()
+            return gr.update(), gr.update(), gr.update(), gr.update()
         pu = F.meta(s["ds"])["purpose"]
         ch = DC.base_purpose(pu) == "character"
         worn = pu == "worn"
