@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.091126b"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -758,7 +758,7 @@ def build_command(cfg, name, train_dir, out_dir, bs, ga, epochs, save_every,
         f"--lr_scheduler {cfg['scheduler']} --lr_warmup_steps {cfg['warmup']}",
         f"--save_every_n_epochs {save_every}",
         "--save_model_as safetensors",
-        '--caption_extension ".txt"',
+        f'--caption_extension "{cfg.get("caption_ext") or ".txt"}"',
         f"--max_data_loader_n_workers {cfg.get('workers', 2)} --persistent_data_loader_workers",
         "--seed 42",
     ]
@@ -1042,7 +1042,7 @@ PYCHECK"""] if cfg.get("base_weights_check") and any(fl == "--base_weights" for 
         '{',
         '  echo "[general]"',
         '  echo "resolution = [${RESOLUTION}]"',
-        '  echo "caption_extension = \\".txt\\""',
+        f'  echo "caption_extension = \\"{cfg.get("caption_ext") or ".txt"}\\""',
         '  echo "batch_size = ${BATCH_SIZE}"',
         '  echo "enable_bucket = true"',
         '  echo "bucket_no_upscale = false"',

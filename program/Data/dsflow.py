@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.091126b"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1070,22 +1070,70 @@ def style_of(tkey) -> str:
     return S.OC_FAMILY.get(fam, ("sentences",))[0]
 
 
+# Model families whose text encoder reads both booru tags and sentences: the dataset decides (step 3), and with both
+# caption sets the launch script picks one (step 9).
+BOTH_STYLES = {"anima", "flux", "chroma"}
+CAPTION_CHOICES = [("Each type's usual style", "auto"), ("Tags", "tags"), ("Sentences", "sentences"),
+                   ("Both: pick per run in step 9", "both")]
+
+
+def can_both(tkey) -> bool:
+    return sg()._oc_family(tkey) in BOTH_STYLES
+
+
+def styles_for(tkey, m: dict) -> list[str]:
+    """The caption styles this LoRA type gets in this dataset, its usual one first."""
+    base = style_of(tkey)
+    if not can_both(tkey):
+        return [base]
+    ch = m.get("caption_choice") or "auto"
+    if ch == "both":
+        return [base, "sentences" if base == "tags" else "tags"]
+    return [ch] if ch in ("tags", "sentences") else [base]
+
+
 def caption_sets(ds) -> list[dict]:
     """[{'style', 'ext', 'types': [labels], 'tkeys'}]: the first LoRA type's style is IMG.txt."""
     m = meta(ds)
     labels = type_labels()
     out = []
     for t in m["types"] or []:
-        st = style_of(t)
-        e = next((x for x in out if x["style"] == st), None)
-        if e is None:
-            e = {"style": st, "ext": ".txt" if not out else f".{st}.txt", "types": [], "tkeys": []}
-            out.append(e)
-        e["types"].append(labels.get(t, t))
-        e["tkeys"].append(t)
+        for st in styles_for(t, m):
+            e = next((x for x in out if x["style"] == st), None)
+            if e is None:
+                e = {"style": st, "ext": ".txt" if not out else f".{st}.txt", "types": [], "tkeys": []}
+                out.append(e)
+            e["types"].append(labels.get(t, t))
+            e["tkeys"].append(t)
     if not out:
         out.append({"style": "sentences", "ext": ".txt", "types": [], "tkeys": []})
     return out
+
+
+def train_sets(ds, tkey) -> list[dict]:
+    """The caption sets a launch script of this type can train on."""
+    return [x for x in caption_sets(ds) if tkey in x["tkeys"]]
+
+
+def train_style(ds, tkey) -> str:
+    """The style a launch script of this type trains on: your pick in step 9, else the type's usual one."""
+    sets = train_sets(ds, tkey)
+    pick = (meta(ds).get("train_style") or {}).get(tkey)
+    if pick and any(x["style"] == pick for x in sets):
+        return pick
+    return sets[0]["style"] if sets else style_of(tkey)
+
+
+def caption_ext(ds, tkey) -> str:
+    """--caption_extension for a launch script of this type (".txt", ".sentences.txt", ...)."""
+    st = train_style(ds, tkey)
+    return next((x["ext"] for x in train_sets(ds, tkey) if x["style"] == st), ".txt")
+
+
+def set_train_style(ds, tkey, style):
+    m = meta(ds)
+    m.setdefault("train_style", {})[tkey] = style
+    meta_save(ds, m)
 
 
 def set_file(img: Path, ext: str) -> Path:

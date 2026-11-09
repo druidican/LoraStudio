@@ -43,6 +43,10 @@ folder, and the setting switches itself off again when a launch script is saved.
 
 - **LoRA type**: the base model family. Several are fine: sorting uses the strictest size, step 7 writes one caption
   set per caption style, step 9 one launch script per type.
+- **Captions for Anima, FLUX and Chroma** (shown when one of them is ticked): these models read both tags and
+  sentences. *Each type's usual style* gives Anima tags and FLUX / Chroma sentences; *Tags* or *Sentences* gives them
+  that one; *Both* makes step 7 write a tag set **and** a sentence set, and step 9 asks which one each launch script
+  trains on.
 - **Purpose**: character, style, object, **worn item**, action or concept. It decides how the captions are written
   and how the pictures are judged. A **worn item** is clothes, equipment or jewelry that people wear (a collection of
   rings and hair clips, a jacket, an armour); pick which of the three, so step 7 knows which tags describe the item.
@@ -181,6 +185,11 @@ they are; for Pony `--keep_tokens` keeps them and the trigger word in front), an
 | Z-Image Base | 32 / 32 | 1e-4 | 1600–3000 | no adapter; the LoRA also works on Turbo (strength 1.0–1.5) |
 
 Alpha is always the same as the rank: a lower alpha makes the LoRA learn at a fraction of its strength.
+
+**Caption set for this launch script** (only when the dataset has a tag set and a sentence set that this LoRA type
+can read): pick *Tags (IMG.txt)* or *Sentences (IMG.sentences.txt)*. It is written into the script
+(`--caption_extension`) and remembered for the next version. Types that read only one style (Illustrious, Pony,
+Z-Image …) always train on their own set.
 
 **Save as new version** writes `pipILLV1.sh`, the next one `pipILLV2.sh`; older scripts move to `_old_runs/`. *Add to
 the queue* sends it to Training › Run.

@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.091126"
-VERSION = "1.091126"
+__version__ = "1.091126b"
+VERSION = "1.091126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.011126",
-    "version.py": "1.091126",
+    "version.py": "1.091126b",
     "program/lspaths.py": "1.011126",
     "program/Training/sdgui.py": "1.071126b",
-    "program/Training/sd_script.py": "1.091126",
+    "program/Training/sd_script.py": "1.091126b",
     "program/Data/sd_prepare.py": "1.091126",
     "program/Training/sd_settings.py": "1.051126b",
-    "program/Data/datasets_ui.py": "1.091126",
-    "program/Data/dsflow.py": "1.091126",
+    "program/Data/datasets_ui.py": "1.091126b",
+    "program/Data/dsflow.py": "1.091126b",
     "program/Training/training_ui.py": "1.011126",
     "program/Settings/settings_ui.py": "1.091126",
     "program/Gallery/lora_library.py": "1.091126",
@@ -56,7 +56,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.091126",
+    "selftest.py": "1.091126b",
     "program/Settings/machinecheck.py": "1.051126b",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -66,7 +66,7 @@ RELEASE: dict = {
     "program/Settings/venvcheck.py": "1.011126",
     "program/Settings/features.py": "1.091126",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.091126",
+    "program/Training/Lora_Datatypes.py": "1.091126b",
     "program/Training/Training_Recommendations.py": "1.091126",
     "program/Other/lora_studio.css": "1.011126",
     "install.sh": "1.051126b",
@@ -74,6 +74,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.091126b", "Caption sets: Anima, FLUX and Chroma can use tags, sentences or both (step 3); with both, step 9 picks the set a launch script trains on. Fixed: a second LoRA type in a dataset trained on the first caption set instead of its own."),
     ("1.091126", "Character settings revised: SDXL, Illustrious and Pony train the text encoders lightly (5e-5); FLUX and Chroma use rank 32 / alpha 32 and up to 3000 steps; Z-Image Turbo up to 3000 steps; new LoRA type Z-Image Base (no training adapter); a class word in step 3 makes sentence captions begin 'trigger, a class word, ...'."),
     ("1.081126", "Datasets: the error 'desc_load didn't return enough output values' in the terminal when moving between pages is gone."),
     ("1.071126c", "SDXL, Illustrious and Pony character LoRAs now train with alpha = dim (32/32) instead of 32/16, which learned at half strength."),

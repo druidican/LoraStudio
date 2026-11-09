@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.091126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -165,6 +165,30 @@ def _chardefaults():
     need("BASE_WEIGHTS" in zit, "Z-Image Turbo lost its adapter")
     need(G.infer_type(zib, presets, "") == "zimagebase" and G.infer_type(zit, presets, "") == "zimage",
          f"type detection: {G.infer_type(zib, presets, '')} / {G.infer_type(zit, presets, '')}")
+
+
+@check("each launch script trains on its own caption set; Anima/FLUX/Chroma can have both")
+def _capsets():
+    import dsflow as F
+    import sd_script as SS
+    old = F.meta(DS)
+    try:
+        G.set_choice("character", "balanced")
+        F.meta_save(DS, {**old, "types": ["illustrious", "zimage"], "caption_choice": "auto", "train_style": {}})
+        need([x["ext"] for x in F.caption_sets(DS)] == [".txt", ".sentences.txt"], F.caption_sets(DS))
+        zit = G.make_plan(DS, "zimage")["script_text"]
+        need('caption_extension = \\".sentences.txt\\"' in zit, "Z-Image does not train on the sentence set")
+        need('--caption_extension ".txt"' in G.make_plan(DS, "illustrious")["script_text"], "Illustrious lost IMG.txt")
+        F.meta_save(DS, {**F.meta(DS), "types": ["illustrious", "anima"], "caption_choice": "both"})
+        need(len(F.train_sets(DS, "anima")) == 2 and len(F.train_sets(DS, "illustrious")) == 1, "anima should have both")
+        need('--caption_extension ".txt"' in G.make_plan(DS, "anima")["script_text"], "Anima's usual set is the tags")
+        F.set_train_style(DS, "anima", "sentences")
+        t = G.make_plan(DS, "anima")["script_text"]
+        need('--caption_extension ".sentences.txt"' in t, "the pick in step 9 is not used")
+        need('--caption_extension ".txt"' in SS.set_caption_ext(t, ".txt"), "set_caption_ext")
+        need('\\".tags.txt\\"' in SS.set_caption_ext(zit, ".tags.txt"), "set_caption_ext (musubi)")
+    finally:
+        F.meta_save(DS, old)
 
 
 @check("sentence captions of a character begin 'trigger, a class word, ...'")

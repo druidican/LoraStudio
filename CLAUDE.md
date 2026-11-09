@@ -65,6 +65,10 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
 - **WD tagger writes every tag** for characters and worn items; step 7's *tags → trigger words* card moves the
   ticked ones into the description (undo: *Put them back*). Earlier versions left trait tags out, which hid
   information and errors. A failing WD tagger must always show its error, never "done".
+- **Caption sets:** one per caption style (`IMG.txt`, `IMG.<style>.txt`); every launch script gets
+  `--caption_extension` of its own set (`dsflow.caption_ext`). Anima, FLUX and Chroma read both styles: step 3
+  chooses tags / sentences / both, step 9 picks the set per script (`train_style` in the dataset's meta).
+- **Class word** (step 3, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).
 - **Worn item** purpose (clothes / equipment / jewelry): kinds and places, *Make the words the same*, balance check.
 - **Quality words:** Pony trains with `score_9, score_8_up, score_7_up, source_anime` as `--caption_prefix`
   (keep_tokens raised to cover them), Illustrious with `masterpiece, best quality` as `--caption_suffix`; caption

@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.091126b"  # LoRA Studio version, see version.py
 
 import copy
 import difflib
@@ -573,6 +573,28 @@ def build_prompts(sc, stats, cfg):
     return path, sc.build_prompts_text(caps, lora.name.lower(), lora.name, cfg)[0], True
 
 
+def caption_ext_for(ds, tkey) -> str:
+    """The caption set a new launch script of this type trains on (Datasets: step 3 and 9), else IMG.txt."""
+    try:
+        import dsflow
+        return dsflow.caption_ext(ds, tkey) if ds else ".txt"
+    except Exception:                                  # noqa: BLE001
+        return ".txt"
+
+
+_TOML_EXT = re.compile(r'(caption_extension = \\")([^"\\]*)(\\")')
+
+
+def set_caption_ext(text: str, ext: str) -> str:
+    """Point a launch script at another caption set: --caption_extension, or the dataset.toml line of a musubi script."""
+    if _TOML_EXT.search(text or ""):
+        return _TOML_EXT.sub(lambda m: m.group(1) + ext + m.group(3), text)
+    m = _arg_re("caption_extension").search(text or "")
+    if m:
+        return text[:m.start(2)] + f'"{ext}"' + text[m.end(2):]
+    return S.append_args(text or "", f'--caption_extension "{ext}"')[0]
+
+
 def has_samples(text) -> bool:
     return re.search(r"(?<![\w-])--sample_prompts(?![\w-])", text or "") is not None
 
@@ -756,6 +778,7 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
         samples = False                              # musubi types train without sample images
     stats = with_virtual_row(dataset_stats(ds))
     cfg = tuned_cfg(tkey, cfg, stats)
+    cfg["caption_ext"] = caption_ext_for(ds, tkey)
     so = _num(steps_over)
     if so:
         cfg["steps"], cfg["targets"] = so, (round(so * 0.7), so, round(so * 1.3))

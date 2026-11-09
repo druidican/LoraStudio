@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.091126b"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -409,8 +409,9 @@ def s7_sets_html(ds) -> str:
         cards.append(f'<div class="ds-set"><div><b>{lab}</b> <span class="rs-mono">IMG{esc(s["ext"])}</span>'
                      f'<span class="ls-chip {"ok" if c == t and t else ""}">{c}/{t}</span></div>'
                      f'<div class="ls-note">for {esc(", ".join(s["types"]) or "your LoRA type")}</div></div>')
-    note = ("Two LoRA types with different caption styles, so two caption sets side by side. Each launch script reads "
-            "its own (--caption_extension)." if len(sets) > 1 else "One caption set for your LoRA type.")
+    note = ("Two caption sets side by side: one with tags, one with sentences. Each launch script reads its own "
+            "(--caption_extension); a type that can read both (Anima, FLUX, Chroma) trains on the one you pick in step 9."
+            if len(sets) > 1 else "One caption set for your LoRA type.")
     return f'<div class="ls-note">{note}</div><div class="ds-sets">' + "".join(cards) + "</div>"
 
 
@@ -815,6 +816,11 @@ def build(app, show):
                     s3_types = gr.CheckboxGroup(choices=_types, label="LoRA types (one or more)")
                     gr.Markdown("Several types: sorting uses the strictest size, step 7 writes one caption set per caption "
                                 "style, step 9 one launch script per type.", elem_classes=["ls-note"])
+                    s3_caps = gr.Radio(F.CAPTION_CHOICES, value="auto", visible=False,
+                                       label="Captions for Anima, FLUX and Chroma: tags, sentences or both",
+                                       info="These models read both. Each type's usual style: tags for Anima, sentences "
+                                            "for FLUX and Chroma. Both: step 7 writes a tag set and a sentence set, and "
+                                            "step 9 lets you pick which one a launch script trains on.")
                     s3_purpose = gr.Radio(F.PURPOSES, value="character", label="Purpose")
                     s3_words = gr.Textbox(label=F.CONCEPT_ASK["object"], visible=False,
                                           info="These words go into Never describe in step 7: the captions name the "
@@ -1020,6 +1026,9 @@ def build(app, show):
         with gr.Column(visible=False, elem_id="ds_s9") as steps[9]:
             gr.Markdown("### Launch script")
             s9_type = gr.Radio(choices=[], label="LoRA type", elem_id="ds_s9type")
+            s9_caps = gr.Radio(choices=[], label="Caption set for this launch script", visible=False,
+                               info="This dataset has a tag set and a sentence set that this LoRA type can read. "
+                                    "Your pick is written into the script (--caption_extension); Save keeps it.")
             with gr.Row(elem_classes=["ls-card"], visible=False, equal_height=True) as s9_dl_row:
                 s9_dl_note = gr.Markdown()
                 s9_dl_btn = gr.Button("⬇ Download from Hugging Face", variant="primary", size="sm",
@@ -1154,7 +1163,7 @@ def build(app, show):
     # ---- step loaders
     def s3_load(s):
         if s.get("view") != "flow" or s.get("step") != 3 or not s.get("ds"):
-            return [gr.update()] * 8
+            return [gr.update()] * 9
         m = F.meta(s["ds"])
         imgs = F.images(s["ds"])
         strip = "".join(f'<img src="{thumb(p, 110)}" alt="">' for p in imgs[:24])
@@ -1164,7 +1173,8 @@ def build(app, show):
                 gr.update(value=m.get("concept_words") or "", visible=m["purpose"] in F.CONCEPT_KINDS,
                           label=F.CONCEPT_ASK.get(m["purpose"], F.CONCEPT_ASK["object"])),
                 gr.update(value=m.get("worn_kind") or "jewelry", visible=m["purpose"] == "worn"),
-                gr.update(value=m.get("class_word", "person"), visible=DC.base_purpose(m["purpose"]) == "character"))
+                gr.update(value=m.get("class_word", "person"), visible=DC.base_purpose(m["purpose"]) == "character"),
+                gr.update(value=m.get("caption_choice") or "auto", visible=any(F.can_both(t) for t in m["types"])))
 
     def s4_load(s):
         if s.get("view") != "flow" or s.get("step") != 4 or not s.get("ds"):
@@ -1208,12 +1218,30 @@ def build(app, show):
 
     def s9_load(s):
         if s.get("view") != "flow" or s.get("step") != 9 or not s.get("ds"):
-            return gr.update(), gr.update(), gr.update(), gr.update()
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         m = F.meta(s["ds"])
         labels = F.type_labels()
         ch = [(FT.label(labels.get(t, t), FT.trainer_for(t)), t) for t in m["types"]]
         cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else None)
-        return (gr.update(choices=ch, value=cur, visible=len(ch) > 0), s9_queue_vis(s)) + s9_dl_vis(s)
+        return (gr.update(choices=ch, value=cur, visible=len(ch) > 0), s9_queue_vis(s)) + s9_dl_vis(s) + (s9_caps_vis(s),)
+
+    def s9_caps_vis(s):
+        m = F.meta(s["ds"]) if s.get("ds") else {"types": []}
+        cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else "")
+        sets = F.train_sets(s["ds"], cur) if cur else []
+        if len(sets) < 2:
+            return gr.update(visible=False, choices=[], value=None)
+        ch = [(f"{'Tags' if x['style'] == 'tags' else 'Sentences'} (IMG{x['ext']})", x["style"]) for x in sets]
+        return gr.update(visible=True, choices=ch, value=F.train_style(s["ds"], cur))
+
+    def s9_caps_pick(s, style, text):
+        m = F.meta(s["ds"]) if s.get("ds") else {"types": []}
+        cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else "")
+        if not cur or not style:
+            return gr.update()
+        F.set_train_style(s["ds"], cur, style)
+        import sd_script as SS
+        return SS.set_caption_ext(text or "", F.caption_ext(s["ds"], cur)) if (text or "").strip() else gr.update()
 
     def s9_dl_vis(s):
         """The download card when model files of the type are missing and Hugging Face has them (hfdownload.py)."""
@@ -1249,9 +1277,9 @@ def build(app, show):
         return gr.update(visible=bool(cur) and FT.can_train(cur))
 
     all_outs = (nav_outs + [n_list] + [e_list, e_head, e_steps] + [i_head, i_html, i_what] + [s2_md, s2_grid, s2_show, s2_extra]
-                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words, s3_worn, s3_class] + [s4_box, s4_status] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode]
+                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words, s3_worn, s3_class, s3_caps] + [s4_box, s4_status] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode]
                 + [s6_max, s6_sum, s6_table, s6_go, s6_crop] + [s7_sets, s7_mirror_row, s7_rec, s7_cons, UI["oc"]["leave"]] + [s8_tree, s8_checks, s8_grid, s8_cap2]
-                + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, sync, s9_calc, s9_eff] + s9_vals)
+                + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, s9_caps, sync, s9_calc, s9_eff] + s9_vals)
 
     def refresh_all(s, find, show8, text, leave):
         out = list(nav_updates(s))
@@ -1534,7 +1562,7 @@ def build(app, show):
         after_nav(b.click(lambda s: go(s, step=3), st, st))
 
     # ---- 3 Setup
-    def s3_save(s, types, purpose, wm, trig, words, worn="jewelry", cls="person"):
+    def s3_save(s, types, purpose, wm, trig, words, worn="jewelry", cls="person", caps="auto"):
         m = F.meta(s["ds"])
         # what you picked is kept even when something is still missing: the page is drawn again after Continue,
         # and without this it went back to the saved purpose (and hid the words field), so step 3 just repeated
@@ -1542,6 +1570,7 @@ def build(app, show):
             m["types"] = list(types)
         m.update(purpose=purpose or "character", wm_removed=bool(wm), trigger=(trig or s["ds"]).strip(),
                  concept_words=(words or "").strip())
+        m["caption_choice"] = caps or "auto"
         if DC.base_purpose(purpose or "character") == "character":
             m["class_word"] = re.sub(r"^(an?|the)\s+", "", (cls or "").strip(), flags=re.I)
         if purpose == "worn":
@@ -1556,7 +1585,9 @@ def build(app, show):
         m["steps"]["setup"] = {"at": time.strftime("%Y-%m-%d %H:%M")}
         F.meta_save(s["ds"], m)
         return go(s, step=4, tkey=types[0]), ""
-    after_nav(s3_next.click(s3_save, [st, s3_types, s3_purpose, s3_wm, s3_trig, s3_words, s3_worn, s3_class], [st, s3_msg]))
+    after_nav(s3_next.click(s3_save, [st, s3_types, s3_purpose, s3_wm, s3_trig, s3_words, s3_worn, s3_class, s3_caps], [st, s3_msg]))
+    s3_types.change(lambda ts: gr.update(visible=any(F.can_both(t) for t in ts or [])), s3_types, s3_caps,
+                    show_progress="hidden")
     s3_purpose.change(lambda p: (gr.update(visible=p in F.CONCEPT_KINDS, label=F.CONCEPT_ASK.get(p, F.CONCEPT_ASK["object"])),
                                  gr.update(visible=p == "worn"), gr.update(visible=DC.base_purpose(p or "") == "character")),
                       s3_purpose, [s3_words, s3_worn, s3_class], show_progress="hidden")
@@ -1776,7 +1807,8 @@ def build(app, show):
         return go(s, tkey=t)
     fn, ins, outs = UI["cs_retype"]
     s9_type.input(s9_pick, [st, s9_type], st).then(sync_key, st, sync).then(s9_queue_vis, st, UI["cs_queue_btn"]) \
-        .then(s9_dl_vis, st, [s9_dl_row, s9_dl_note]).then(lambda: "", None, s9_dl_md)
+        .then(s9_dl_vis, st, [s9_dl_row, s9_dl_note]).then(lambda: "", None, s9_dl_md).then(s9_caps_vis, st, s9_caps)
+    s9_caps.input(s9_caps_pick, [st, s9_caps, UI["cs_text"]], UI["cs_text"])
     _mfn, _mins, _mouts = UI["cs_models"]
     s9_dl_btn.click(s9_dl_fn, st, s9_dl_md, concurrency_id="hfdl", concurrency_limit=1) \
         .then(s9_dl_vis, st, [s9_dl_row, s9_dl_note]).then(_mfn, _mins, _mouts)
