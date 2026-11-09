@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.071126b"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -150,6 +150,36 @@ def _plans():
         need(G.training_command(t), f"{tkey}: no training command found")
         done.append(tkey)
     return ", ".join(done)
+
+
+@check("character defaults: SDXL text encoders, FLUX/Chroma rank 32, Z-Image Base without the adapter")
+def _chardefaults():
+    sc, presets = G.merged_presets()
+    G.set_choice("character", "balanced")
+    ill = G.make_plan(DS, "illustrious")["script_text"]
+    need("--text_encoder_lr 5e-5" in ill and "--network_train_unet_only" not in ill, "Illustrious: text encoders not trained")
+    for t in ("flux", "chroma"):
+        need("--network_dim 32 --network_alpha 32" in G.make_plan(DS, t)["script_text"], f"{t}: not rank 32/32")
+    zib, zit = G.make_plan(DS, "zimagebase")["script_text"], G.make_plan(DS, "zimage")["script_text"]
+    need("BASE_WEIGHTS" not in zib and "z_image_bf16" in zib, "Z-Image Base: adapter in the script or wrong model")
+    need("BASE_WEIGHTS" in zit, "Z-Image Turbo lost its adapter")
+    need(G.infer_type(zib, presets, "") == "zimagebase" and G.infer_type(zit, presets, "") == "zimage",
+         f"type detection: {G.infer_type(zib, presets, '')} / {G.infer_type(zit, presets, '')}")
+
+
+@check("sentence captions of a character begin 'trigger, a class word, ...'")
+def _classword():
+    import captioner as C
+    old = dict(C.PURPOSE)
+    try:
+        C.PURPOSE.update(value="character", **{"class": "robot"})
+        need(C.clean("pip sits on a bench", "pip") == "pip, a robot, sits on a bench", C.clean("pip sits on a bench", "pip"))
+        need(C.clean("A robot stands in the rain", "pip") == "pip, a robot, stands in the rain", "subject not replaced")
+        need("pip, a robot," in C.build_prompt("sentences", "pip", "hair colour", 3, 3), "prompt rule missing")
+        C.PURPOSE.update(value="style")
+        need(C.clean("pip sits", "pip") == "pip sits", "style captions changed")
+    finally:
+        C.PURPOSE.clear(); C.PURPOSE.update(old)
 
 
 @check("launch script names count up (V1, V2, ...)")

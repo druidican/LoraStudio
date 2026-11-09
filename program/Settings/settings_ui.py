@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.051126b"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -111,7 +111,7 @@ def checks() -> list[dict]:
         if (mu / "src" / "musubi_tuner").is_dir() and FT.have("musubi"):
             add("ok", "musubi-tuner", _tilde(mu), "trainers")
         used = {sg.script_type(p) for _, p in sg.list_scripts()}
-        if FT.have("musubi") and any(t in used for t in ("zimage", "qwenimage", "flux2")) and \
+        if FT.have("musubi") and any(t in used for t in ("zimage", "zimagebase", "qwenimage", "flux2")) and \
                 not (mu / "src" / "musubi_tuner").is_dir():
             add("bad", "musubi-tuner", "not found, but you have launch scripts that need it", "trainers")
         if FT.have("sd_scripts") and sg.sd_root().is_dir():

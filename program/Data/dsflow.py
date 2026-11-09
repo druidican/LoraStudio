@@ -17,7 +17,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.051126"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1910,6 +1910,7 @@ def _batch_one(ds, url, model, say) -> list[str]:
         if CAP is not None:
             CAP.PURPOSE["value"] = m["purpose"]
             CAP.PURPOSE["words"] = m.get("concept_words") or ""
+            CAP.PURPOSE["class"] = m.get("class_word", "person")
         leave = {"character": CAP.DEFAULT_LEAVE_OUT if CAP else "", "style": CAP.STYLE_LEAVE_OUT if CAP else ""}.get(
             m["purpose"], m.get("concept_words") or "")
         last = ""

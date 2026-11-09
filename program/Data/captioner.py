@@ -11,7 +11,7 @@ Only the Python standard library is used (urllib); Pillow is used to shrink the 
 Run it on its own to test the connection:   python3 captioner.py [--url http://127.0.0.1:11434] [image.jpg]
 """
 from __future__ import annotations
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -30,7 +30,7 @@ DEFAULT_LEAVE_OUT = ("face, facial features, eye colour, hair colour, freckles, 
 
 # What the LoRA is for: "character" (default), "style" or "concept". Set by the Datasets steps (and the launch script
 # page's Purpose) so every caption writer uses the right prompt.
-PURPOSE = {"value": "character", "words": ""}
+PURPOSE = {"value": "character", "words": "", "class": ""}   # class: "person" -> "trigger, a person, ..."
 CONCEPT_KINDS = ("object", "worn", "action", "concept")   # Object / item, Worn item, Action / pose, Concept / effect
 CONCEPT_WHAT = {
     "object": ("an OBJECT (an item)", "the object itself: its shape, colours, material, parts and decorations",
@@ -138,7 +138,7 @@ def build_prompt(style: str, trigger: str, leave_out: str, length: int, detail: 
     nsent = "one sentence" if words <= 30 else "one or two sentences" if words <= 60 else "two to four sentences"
     return (f"You write training captions for an image model. Every picture shows the same subject, called {trigger}.\n"
             f"Write ONE caption in plain English: {nsent}, at most {words} words, and nothing else.\n\nRules:\n"
-            f"- Begin with \"{trigger}\" as the subject, for example \"{trigger} sits on a beach chair ...\".\n"
+            + _begin_rule(trigger) +
             f"- Describe only these things, the most important first:\n{what}\n{never}"
             "- No lists, no tags, no quotes, no line breaks, no opinions, and do not start with \"The image\" or \"This photo\".")
 
@@ -265,7 +265,40 @@ def clean(text: str, trigger: str) -> str:
             t = re.sub(r"^(a|the) (woman|man|person|girl|boy|lady|guy)\b", trigger, t, flags=re.I)
         if not re.search(rf"\b{re.escape(trigger)}\b", t, re.I):
             t = f"{trigger}, {t[:1].lower() + t[1:]}" if t else trigger
-    return t
+    return with_class(t, trigger, class_word())
+
+
+def class_word() -> str:
+    """The class word of a character dataset ('' for other purposes)."""
+    return (PURPOSE.get("class") or "").strip() if PURPOSE["value"] == "character" else ""
+
+
+def article(word: str) -> str:
+    return "an" if word[:1].lower() in "aeiou" else "a"
+
+
+def _begin_rule(trigger: str) -> str:
+    cls = class_word()
+    if cls:
+        return (f"- Begin with \"{trigger}, {article(cls)} {cls},\" and go on with what {trigger} does, for example "
+                f"\"{trigger}, {article(cls)} {cls}, sits on a beach chair ...\".\n")
+    return f"- Begin with \"{trigger}\" as the subject, for example \"{trigger} sits on a beach chair ...\".\n"
+
+
+_SUBJECT = r"(?:a|an|the)\s+(?:young\s+|adult\s+)?(?:woman|man|person|girl|boy|lady|guy|female|male|character)"
+
+
+def with_class(t: str, trigger: str, cls: str) -> str:
+    """A sentence caption that starts 'trigger, a <class>, ...' (trigger word and class word once, in front)."""
+    if not cls or not trigger or not t:
+        return t
+    head = f"{trigger}, {article(cls)} {cls},"
+    if t.lower().startswith(head.lower()):
+        return t
+    rest = re.sub(rf"^\s*{re.escape(trigger)}\b\s*[,:]?\s*", "", t, flags=re.I)
+    rest = re.sub(rf"^(?:{_SUBJECT}|(?:a|an|the)\s+{re.escape(cls)})\b\s*,?\s*", "", rest, flags=re.I)
+    rest = re.sub(r"^(?:is|who is)\s+", "", rest, flags=re.I)
+    return f"{head} {rest[:1].lower() + rest[1:]}".rstrip(" ,") if rest else head.rstrip(",")
 
 
 def clean_tags(text: str, trigger: str, leave_out: str, max_tags: int) -> tuple[str, list[str]]:

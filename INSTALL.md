@@ -74,7 +74,7 @@ The installer explains each step as it goes. What it asks:
 1. **The notice**: sd-scripts and musubi-tuner belong to kohya-ss, LoRA Studio is only a GUI for them. Type `yes`.
 2. **sd-scripts** (trains SDXL, Illustrious, Pony, Anima, FLUX.1, SD 1.5, …): *install it for me*, *I have it
    already* (it asks for the folder), or *none*.
-3. **musubi-tuner** (trains Z-Image Turbo, Qwen-Image, FLUX.2): the same three choices.
+3. **musubi-tuner** (trains Z-Image Turbo and Base, Qwen-Image, FLUX.2): the same three choices.
 4. **Ollama**: install it, use one that is already running, or none.
 5. **Your graphics card**: detected by itself. A computer with both an AMD and an NVIDIA card (most gaming laptops)
    is asked which one to train on.

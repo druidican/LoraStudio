@@ -24,13 +24,13 @@ Run it on its own to print the table:  python Training_Recommendations.py
 """
 
 from __future__ import annotations
-__version__ = "1.071126c"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import os
 import re
 
-VERSION = "1.1"
-UPDATED = "2026-10-15"
+VERSION = "1.2"
+UPDATED = "2026-11-09"
 HARDWARE = "AMD Radeon RX 9070 XT, 16 GB VRAM, ROCm (PyTorch 2.13 + ROCm 10), 32 GB RAM"
 
 SOURCES = [
@@ -53,7 +53,8 @@ PRIORITIES = {"balanced": "Balanced", "quality": "Best quality", "fast": "Fastes
 
 # LoRA type -> family (subtypes such as Pony use their base type)
 FAMILY = {"sdxl": "sdxl", "illustrious": "sdxl", "sd15": "sd15", "flux": "flux", "chroma": "chroma",
-          "anima": "anima", "sd3": "sd3", "lumina": "lumina", "hunyuan": "hunyuan", "zimage": "zimage", "qwenimage": "qwenimage", "flux2": "flux2"}
+          "anima": "anima", "sd3": "sd3", "lumina": "lumina", "hunyuan": "hunyuan", "zimage": "zimage", "zimagebase": "zimagebase",
+          "qwenimage": "qwenimage", "flux2": "flux2"}
 
 # ---------------------------------------------------------------------------------------------------------------
 # Per family and purpose. views = views per image over the whole run; steps_min/steps_max bound the step target;
@@ -62,6 +63,7 @@ FAMILY = {"sdxl": "sdxl", "illustrious": "sdxl", "sd15": "sd15", "flux": "flux",
 RECS = {
     "sdxl": {
         "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=12, lr="1e-4", dim=32, alpha=32, noise_offset=0.0357,
+                          te_lr="5e-5",
                           notes=["Caption with booru tags, trigger word first; drop tags for permanent traits (hair/eye "
                                  "colour, horns) so they bind to the trigger, keep clothes, pose, background, expression.",
                                  "Illustrious and Pony are trained the same way; generate with clip skip 2 as usual for them.",
@@ -84,8 +86,12 @@ RECS = {
         "concept": dict(views=40, steps_min=1200, steps_max=2400, epochs=12, lr="1e-4", dim=16, alpha=8, notes=[]),
     },
     "flux": {
-        "character": dict(views=40, steps_min=1200, steps_max=2200, epochs=10, lr="1e-4", dim=16, alpha=16,
-                          notes=["Natural-language captions starting with the trigger word work best (T5)."]),
+        "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32,
+                          notes=["Natural-language captions starting with the trigger word work best (T5).",
+                                 "Rank 32 / alpha 32 and up to 3000 steps since LoRA Studio 1.091126: rank 16 and about "
+                                 "2000 steps gave weak likeness for a person.",
+                                 "Still blurry or weak? --fp8_base stores the frozen model in 8 bit, which can cost detail "
+                                 "on some AMD cards: take it out and add --blocks_to_swap 18 instead (slower, full precision)."]),
         "style": dict(views=35, steps_min=1500, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32,
                       notes=["Styles want a higher rank than characters (16 for simple styles, 32+ for detailed ones); "
                              "20-40 varied images; describe the content of each image in sentences."]),
@@ -120,13 +126,28 @@ RECS = {
 RECS["zimage"] = {
     # Z-Image Turbo through musubi-tuner + the ostris training adapter. 6B model, so a lower LR than the tiny-rank
     # defaults of the SDXL family is not needed; 1e-4 at rank 16 with AdamW is the usual starting point.
-    "character": dict(views=50, steps_min=1600, steps_max=2800, epochs=10, lr="1e-4", dim=32, alpha=32,
+    "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32,
                       notes=["Z-Image Turbo needs the training adapter (--base_weights); the finished LoRA is used WITHOUT it.",
+                             "Weak likeness at the last epoch? Try Discrete flow shift 3.0 (More settings) instead of 2.0: a "
+                             "higher shift spends more of the training on the large shapes, where a face and its proportions "
+                             "are learned; 2.0 favours fine texture.",
+                             "Turbo is a distilled model, so LoRAs trained on it have a ceiling. For the best likeness, train "
+                             "on Z-Image Base (its own LoRA type) and use the LoRA on Turbo.",
                              "Captions: short natural sentences starting with the trigger word (Qwen3 reads them); leave out "
                              "the face, hair colour, freckles and tattoos so the trigger word learns them.",
                              "Raised in v1.1 from rank 16 / 1200-2200 steps / 768 px: that gave weak likeness for a real person."]),
     "style": dict(views=30, steps_min=1500, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32,
                   notes=["Styles want more rank than characters; describe what is IN each picture, not the style."]),
+    "concept": dict(views=40, steps_min=1200, steps_max=2200, epochs=10, lr="1e-4", dim=16, alpha=16, notes=[]),
+}
+RECS["zimagebase"] = {
+    # Z-Image Base through musubi-tuner (docs/zimage.md: shift 2.0, LR 1e-4, rank 32), no training adapter.
+    "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32,
+                      notes=["Z-Image Base trains without the adapter, so the LoRA learns the undistilled model: better "
+                             "likeness than Turbo, and it also works on Turbo.",
+                             "Weak likeness at the last epoch? Try Discrete flow shift 3.0 (More settings), then rank 64 / "
+                             "alpha 64 with 50+ pictures."]),
+    "style": dict(views=30, steps_min=1500, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32, notes=[]),
     "concept": dict(views=40, steps_min=1200, steps_max=2200, epochs=10, lr="1e-4", dim=16, alpha=16, notes=[]),
 }
 RECS["qwenimage"] = {
@@ -161,14 +182,15 @@ RESOLUTION = {
     "qwenimage": {"balanced": None, "quality": 1328, "fast": 768},   # 1328 is Qwen-Image's native size; musubi: dataset.toml
     "flux2": {"balanced": None, "quality": None, "fast": 768},
     "zimage": {"balanced": None, "quality": None, "fast": 768},     # preset is 1024; musubi: written into dataset.toml
+    "zimagebase": {"balanced": None, "quality": None, "fast": 768},
 }
 
 # Images smaller than about side x side pixels get upscaled by bucketing (the analysis warns about them)
 MIN_SIDE = {"sdxl": 896, "sd15": 448, "flux": 896, "chroma": 896, "anima": 768, "sd3": 896, "lumina": 896,
-            "hunyuan": 1536, "zimage": 896, "qwenimage": 896, "flux2": 896}
+            "hunyuan": 1536, "zimage": 896, "zimagebase": 896, "qwenimage": 896, "flux2": 896}
 # Caption style the analysis checks for ("natural" = warn when captions are only short tag lists)
 CAPTIONS = {"flux": "natural", "chroma": "natural", "sd3": "natural", "lumina": "natural", "hunyuan": "natural",
-            "zimage": "natural", "qwenimage": "natural", "flux2": "natural"}
+            "zimage": "natural", "zimagebase": "natural", "qwenimage": "natural", "flux2": "natural"}
 
 # Flags to add or remove per family (on top of Lora_Datatypes.py), and why
 FLAGS = {
@@ -235,6 +257,15 @@ def apply(tkey: str, cfg: dict, purpose: str = "character", priority: str = "bal
         notes.append(f"Network dim {r['dim'] * 2}, alpha {r['alpha']}: extra capacity for the detail of a style.")
     else:
         notes.append(f"Network dim {r['dim']}, alpha {r['alpha']}, LR {r['lr']}.")
+    if r.get("te_lr"):
+        # the text encoders learn too, slowly: an invented trigger word gets a meaning of its own (likeness)
+        flags = [re.sub(r"(^|\s)--network_train_unet_only(?=\s|$)", " ", x).strip() for x in flags]
+        flags = [x for x in flags if x and not re.match(r"--text_encoder_lr\b", x)] + [f"--text_encoder_lr {r['te_lr']}"]
+        out["max_batch"] = min(int(cfg.get("max_batch", 4)), 4)
+        notes.append(f"Text encoders trained too, at {r['te_lr']} (half the LR): the trigger word is a new word, and "
+                     "training the text encoders lightly lets it stand for this character. It needs more video memory, "
+                     f"so the batch size stays at {out['max_batch']} or less. Out of memory or odd colours? Put "
+                     "--network_train_unet_only back.")
     if "noise_offset" in r:
         flags = _sub(flags, r"--noise_offset[ =]\S+", f"--noise_offset {r['noise_offset']}")
 

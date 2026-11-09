@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.081126"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -826,6 +826,11 @@ def build(app, show):
                                         info="Unticked: the detailed sort also looks for watermarks, stamps and site names "
                                              "and offers a crop in step 6.")
                     s3_trig = gr.Textbox(label="Trigger word (first word of every caption)")
+                    s3_class = gr.Textbox(label="Class word (sentence captions)", placeholder="person",
+                                          info="For a character: what the trigger word is (person, woman, man, robot, "
+                                               "cat …). Sentence captions (FLUX, Chroma, Z-Image …) begin \"trigger, a "
+                                               "class word, …\": the text encoder then knows what kind of thing the new "
+                                               "word means, which helps likeness. Tag captions are not changed.")
                     with gr.Row(elem_classes=["ls-bar", "ds-bottom"]):
                         s3_next = gr.Button("Continue →", variant="primary", size="sm", scale=0, min_width=160)
                     s3_msg = gr.Markdown()
@@ -1149,7 +1154,7 @@ def build(app, show):
     # ---- step loaders
     def s3_load(s):
         if s.get("view") != "flow" or s.get("step") != 3 or not s.get("ds"):
-            return [gr.update()] * 7
+            return [gr.update()] * 8
         m = F.meta(s["ds"])
         imgs = F.images(s["ds"])
         strip = "".join(f'<img src="{thumb(p, 110)}" alt="">' for p in imgs[:24])
@@ -1158,7 +1163,8 @@ def build(app, show):
         return (m["types"], m["purpose"], m["wm_removed"], m["trigger"] or s["ds"], pics,
                 gr.update(value=m.get("concept_words") or "", visible=m["purpose"] in F.CONCEPT_KINDS,
                           label=F.CONCEPT_ASK.get(m["purpose"], F.CONCEPT_ASK["object"])),
-                gr.update(value=m.get("worn_kind") or "jewelry", visible=m["purpose"] == "worn"))
+                gr.update(value=m.get("worn_kind") or "jewelry", visible=m["purpose"] == "worn"),
+                gr.update(value=m.get("class_word", "person"), visible=DC.base_purpose(m["purpose"]) == "character"))
 
     def s4_load(s):
         if s.get("view") != "flow" or s.get("step") != 4 or not s.get("ds"):
@@ -1189,6 +1195,7 @@ def build(app, show):
         if S.CAP is not None:
             S.CAP.PURPOSE["value"] = purpose
             S.CAP.PURPOSE["words"] = m.get("concept_words") or ""
+            S.CAP.PURPOSE["class"] = m.get("class_word", "person")
         return (s7_sets_html(s["ds"]), gr.update(visible=len(F.caption_sets(s["ds"])) > 1), s7_rec_html(purpose),
                 gr.update(visible=purpose == "character"), leave_update(purpose, leave, m.get("concept_words") or ""))
 
@@ -1242,7 +1249,7 @@ def build(app, show):
         return gr.update(visible=bool(cur) and FT.can_train(cur))
 
     all_outs = (nav_outs + [n_list] + [e_list, e_head, e_steps] + [i_head, i_html, i_what] + [s2_md, s2_grid, s2_show, s2_extra]
-                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words, s3_worn] + [s4_box, s4_status] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode]
+                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words, s3_worn, s3_class] + [s4_box, s4_status] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode]
                 + [s6_max, s6_sum, s6_table, s6_go, s6_crop] + [s7_sets, s7_mirror_row, s7_rec, s7_cons, UI["oc"]["leave"]] + [s8_tree, s8_checks, s8_grid, s8_cap2]
                 + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, sync, s9_calc, s9_eff] + s9_vals)
 
@@ -1527,7 +1534,7 @@ def build(app, show):
         after_nav(b.click(lambda s: go(s, step=3), st, st))
 
     # ---- 3 Setup
-    def s3_save(s, types, purpose, wm, trig, words, worn="jewelry"):
+    def s3_save(s, types, purpose, wm, trig, words, worn="jewelry", cls="person"):
         m = F.meta(s["ds"])
         # what you picked is kept even when something is still missing: the page is drawn again after Continue,
         # and without this it went back to the saved purpose (and hid the words field), so step 3 just repeated
@@ -1535,6 +1542,8 @@ def build(app, show):
             m["types"] = list(types)
         m.update(purpose=purpose or "character", wm_removed=bool(wm), trigger=(trig or s["ds"]).strip(),
                  concept_words=(words or "").strip())
+        if DC.base_purpose(purpose or "character") == "character":
+            m["class_word"] = re.sub(r"^(an?|the)\s+", "", (cls or "").strip(), flags=re.I)
         if purpose == "worn":
             m["worn_kind"] = worn or "jewelry"
         if not types:
@@ -1547,10 +1556,10 @@ def build(app, show):
         m["steps"]["setup"] = {"at": time.strftime("%Y-%m-%d %H:%M")}
         F.meta_save(s["ds"], m)
         return go(s, step=4, tkey=types[0]), ""
-    after_nav(s3_next.click(s3_save, [st, s3_types, s3_purpose, s3_wm, s3_trig, s3_words, s3_worn], [st, s3_msg]))
+    after_nav(s3_next.click(s3_save, [st, s3_types, s3_purpose, s3_wm, s3_trig, s3_words, s3_worn, s3_class], [st, s3_msg]))
     s3_purpose.change(lambda p: (gr.update(visible=p in F.CONCEPT_KINDS, label=F.CONCEPT_ASK.get(p, F.CONCEPT_ASK["object"])),
-                                 gr.update(visible=p == "worn")),
-                      s3_purpose, [s3_words, s3_worn], show_progress="hidden")
+                                 gr.update(visible=p == "worn"), gr.update(visible=DC.base_purpose(p or "") == "character")),
+                      s3_purpose, [s3_words, s3_worn, s3_class], show_progress="hidden")
 
     # ---- 4 Sort
     def s4_run(s):
@@ -1695,6 +1704,7 @@ def build(app, show):
         if S.CAP is not None:
             S.CAP.PURPOSE["value"] = F.meta(ds)["purpose"]
             S.CAP.PURPOSE["words"] = F.meta(ds).get("concept_words") or ""
+            S.CAP.PURPOSE["class"] = F.meta(ds).get("class_word", "person")
         sets = F.caption_sets(ds)
         url, model = (url or S.oc_settings()[0]), (model or S.oc_settings()[1])
         msg = ""

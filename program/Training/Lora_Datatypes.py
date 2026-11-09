@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.071126c"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -145,7 +145,7 @@ PRESETS = {
         ],
         "sample_extra": "--sample_sampler euler_a",
         "notes": [
-            "LR 1e-4 is the standard for dim 32 / alpha 16 with AdamW8bit; values around "
+            "LR 1e-4 is the standard for dim 32 / alpha 32 with AdamW8bit; values around "
             "1e-5 to 3e-5 usually undertrain (weak likeness).",
             "NaN mid-run? Retry with --lr 5e-5, then 1e-5, or Adafactor with --optimizer_args "
             "scale_parameter=False relative_step=False warmup_init=False.",
@@ -277,7 +277,7 @@ PRESETS.update({
     },
     "flux": {
         "label": "FLUX.1 (dev / schnell)", "suffix": "FLUX", "max_batch": 1,
-        "steps": 1600, "epochs": 10, "views": 40, "targets": (1200, 1600, 2200),
+        "steps": 2200, "epochs": 10, "views": 50, "targets": (1600, 2200, 3000),
         "lr": "1e-4", "optimizer": "AdamW8bit", "scheduler": "cosine", "warmup": 80,
         "script": "flux_train_network.py", "sample_args": "--w 1024 --h 1024 --s 20 --g 3.5",
         "prompts_name": "FLUXprompts.txt", "script_name": "{name}FLUXtraining.sh",
@@ -287,7 +287,7 @@ PRESETS.update({
         "flags": [
             "--resolution 1024,1024",
             "--enable_bucket --min_bucket_reso 512 --max_bucket_reso 1536 --bucket_reso_steps 64",
-            "--network_module networks.lora_flux", "--network_dim 16 --network_alpha 16",
+            "--network_module networks.lora_flux", "--network_dim 32 --network_alpha 32",
             "--mixed_precision bf16 --save_precision bf16", "--sdpa --gradient_checkpointing",
             "--cache_latents --cache_latents_to_disk",
             "--cache_text_encoder_outputs --cache_text_encoder_outputs_to_disk",
@@ -302,7 +302,7 @@ PRESETS.update({
     },
     "lumina": {
         "label": "Lumina Image 2.0", "suffix": "LUM", "max_batch": 2,
-        "steps": 1600, "epochs": 10, "views": 40, "targets": (1200, 1600, 2200),
+        "steps": 2200, "epochs": 10, "views": 50, "targets": (1600, 2200, 3000),
         "lr": "1e-4", "optimizer": "AdamW8bit", "scheduler": "cosine", "warmup": 80,
         "script": "lumina_train_network.py", "sample_args": "--w 1024 --h 1024 --s 36 --l 4.0",
         "prompts_name": "LUMprompts.txt", "script_name": "{name}LUMtraining.sh",
@@ -357,7 +357,7 @@ PRESETS.update({
     # and real CFG (--l) with embedded guidance off (--g 0.0).
     "chroma": {
         "label": "Chroma1-HD (FLUX.1-schnell based)", "suffix": "CHROMA", "max_batch": 1,
-        "steps": 1600, "epochs": 10, "views": 40, "targets": (1200, 1600, 2200),
+        "steps": 2200, "epochs": 10, "views": 50, "targets": (1600, 2200, 3000),
         "lr": "1e-4", "optimizer": "AdamW8bit", "scheduler": "cosine", "warmup": 80,
         "script": "flux_train_network.py",
         "detect": r"--model_type[ =]\"?chroma",     # tells a Chroma script from a FLUX.1 one (same trainer)
@@ -372,7 +372,7 @@ PRESETS.update({
             "--model_type chroma",
             "--resolution 1024,1024",
             "--enable_bucket --min_bucket_reso 512 --max_bucket_reso 1536 --bucket_reso_steps 64",
-            "--network_module networks.lora_flux", "--network_dim 16 --network_alpha 16",
+            "--network_module networks.lora_flux", "--network_dim 32 --network_alpha 32",
             "--mixed_precision bf16 --save_precision bf16", "--sdpa --gradient_checkpointing",
             "--cache_latents --cache_latents_to_disk",
             # T5 outputs cached -> the 9 GB text encoder is not in VRAM while training; no caption shuffling
@@ -399,8 +399,9 @@ PRESETS.update({
             "teach less. Text-encoder outputs are cached, so the order stays as written.",
             "Sample images use real CFG (--l 4.0) with embedded guidance off (--g 0.0) and need a negative prompt, "
             "which the prompts file includes. In ComfyUI use CFG 3-4.5, ~30-40 steps, with a negative prompt.",
-            "Weak likeness at the last epoch: retrain at --lr 2e-4 or with --network_dim 32 --network_alpha 16 "
-            "instead of adding many epochs. NaN loss: halve the LR.",
+            "Rank 32 / alpha 32 since LoRA Studio 1.091126 (rank 16 learned faces poorly). Weak likeness at the last "
+            "epoch: retrain at --learning_rate 2e-4, or rank 64 / alpha 64 with 50+ pictures, instead of adding many "
+            "epochs. Keep alpha = dim: a lower alpha makes the LoRA learn at a fraction of its strength. NaN loss: halve the LR.",
             "A Chroma LoRA works on Chroma models (HD, Base); it is not interchangeable with FLUX.1-dev LoRAs. "
             "Test the first saved epoch in ComfyUI before a long run.",
         ],
@@ -418,7 +419,7 @@ PRESETS.update({
         # --base_weights must be a Z-Image LoRA (the ostris training adapter): musubi merges by layer name, so a LoRA
         # for another model merges NOTHING without an error, and Turbo then trains without its adapter (blurry results)
         "base_weights_check": r"layers[._]\d+[._](attention|feed_forward|adaln)",    # musubi stage 6 (path inside src/musubi_tuner); None = the LoRA is used as saved
-        "steps": 2200, "epochs": 10, "views": 50, "targets": (1600, 2200, 2800),   # a face needs more than a style
+        "steps": 2400, "epochs": 10, "views": 50, "targets": (1600, 2400, 3000),   # a face needs more than a style
         "lr": "1e-4", "optimizer": "AdamW8bit", "scheduler": "cosine", "warmup": 80,
         "script": "zimage_train_network.py",
         "prompts_name": "ZITprompts.txt", "script_name": "{name}ZIT_lora.sh",
@@ -457,7 +458,31 @@ PRESETS.update({
         ],
         "template": True,
     },
+})
 
+# Z-Image Base: the undistilled model, trained the same way as Turbo by musubi-tuner but WITHOUT the training adapter.
+# A LoRA trained on Base keeps likeness better and also works on Turbo (often at a strength of 1.0-1.5).
+PRESETS["zimagebase"] = {
+    **PRESETS["zimage"],
+    "label": "Z-Image Base (musubi-tuner)", "suffix": "ZIB",
+    "base_weights_check": None,
+    "prompts_name": "ZIBprompts.txt", "script_name": "{name}ZIB_lora.sh",
+    "model_args": [("--dit", _PH + "z_image_bf16.safetensors"),
+                   ("--vae", _PH + "ae.safetensors"),
+                   ("--text_encoder", _PH + "qwen_3_4b.safetensors")],
+    "notes": [
+        "Z-Image Base is the undistilled model: no training adapter is needed. Trained with musubi-tuner, like Turbo "
+        "(the same one-run script: check files, dataset config, cache, train, convert for ComfyUI).",
+        "Model files: z_image_bf16.safetensors (Comfy-Org/z_image), and the same Qwen3 4B text encoder and AE as Turbo.",
+        "Use the LoRA on Base (about 30 steps, CFG 3.5-5) or on Turbo (8 steps, CFG 1); on Turbo it may need a strength "
+        "of 1.2-1.5 to look as strong.",
+        "Captions: short natural sentences that start with the trigger word and the class word; never the face, hair "
+        "colour, freckles or tattoos of a person: those go into the trigger word.",
+        "NaN loss: retrain at --learning_rate 5e-5. Out of memory? Raise --blocks_to_swap (max 28) or lower the resolution to 768.",
+    ],
+    "template": True,
+}
+PRESETS.update({
     # Qwen-Image (20B MMDiT, Qwen2.5-VL-7B text encoder, Qwen-Image VAE) with musubi-tuner (docs/qwen_image.md).
     # 20B does not fit 16 GB / 32 GB RAM in bf16: fp8_scaled (applied at load time to the bf16 file) plus block swapping.
     "qwenimage": {

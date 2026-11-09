@@ -396,7 +396,7 @@ One script sets up everything in one folder. It asks three questions first, one 
 | Part | The answers |
 |---|---|
 | **sd-scripts** (SDXL, Illustrious, Pony, Anima, FLUX.1, SD 1.5, ...) | install it for me · I have it already (give its folder and venv) · none |
-| **musubi-tuner** (Z-Image Turbo, Qwen-Image, FLUX.2) | install it for me · I have it already · none |
+| **musubi-tuner** (Z-Image Turbo and Base, Qwen-Image, FLUX.2) | install it for me · I have it already · none |
 | **Ollama** (the detailed sort, captions, the consistency check) | install it for me (Linux only, with Ollama's own installer, then offers the vision model `qwen2.5vl:7b`) · it runs already, here or on another computer (give its address) · none |
 
 **None** means: LoRA Studio still makes the launch scripts and prepares datasets, but it cannot run a training with
@@ -830,7 +830,7 @@ Turbo). It is created and run like every other type, but the launch script is **
 2. **Prepare dataset**: `dataset.toml` is built from your `<N>_name` folders (resolution, batch size and repeats), and the
    cache folder `<musubi-tuner>/cache/<name>` is emptied (the cache lives outside the dataset, because the Library
    scans every `.safetensors` file under a dataset)
-3. **Cache latents**, 4. **Cache text encoder**, 5. **Train LoRA** (AdamW8bit, 1024 px, rank/alpha 32 = 32, about 2200 steps, block swapping 10 instead of fp8)
+3. **Cache latents**, 4. **Cache text encoder**, 5. **Train LoRA** (AdamW8bit, 1024 px, rank/alpha 32 = 32, 1600–3000 steps for a character, block swapping 10 instead of fp8)
 6. **Convert for ComfyUI**: every saved LoRA is converted in place (once; the model folder keeps `.comfy_converted`),
    so the Library and Personal sync see the files you can use directly. Use them in ComfyUI on the normal Z-Image
    Turbo model **without** the training adapter.
@@ -838,6 +838,11 @@ Turbo). It is created and run like every other type, but the launch script is **
 Batch size and resolution are variables at the top of the script (`BATCH_SIZE`, `RESOLUTION`), and the form fields of
 the tab edit them. No sample images are made. `--network_alpha` is always set (musubi defaults it to 1). The type is a
 `[template]`: press **Check flags** (it reads the real option list of your musubi-tuner) before the first run.
+
+**Z-Image Base** is its own LoRA type (suffix `ZIB`), trained exactly the same way but on the undistilled model
+(`z_image_bf16.safetensors` from Comfy-Org/z_image) and **without** the training adapter, so the script has no
+`--base_weights`. LoRAs trained on Base keep likeness better than Turbo LoRAs, and they also work on Turbo (often at a
+strength of 1.2–1.5). Weak likeness on either: try *Discrete flow shift* 3.0 instead of 2.0 (More settings).
 
 ### Qwen-Image and FLUX.2 klein (musubi-tuner)
 

@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.071126b"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import copy
 import difflib
@@ -158,7 +158,7 @@ FORM_GROUPS = [
     ("Advanced", [
         ("network_module", "Network module"), ("attn_mode", "Attn mode (Anima)"),
         ("noise_offset", "Noise offset"), ("min_snr_gamma", "Min SNR gamma"),
-        ("max_grad_norm", "Max grad norm"), ("keep_tokens", "Keep tokens"), ("weighting_scheme", "Weighting scheme"),
+        ("text_encoder_lr", "Text encoder LR"), ("max_grad_norm", "Max grad norm"), ("keep_tokens", "Keep tokens"), ("weighting_scheme", "Weighting scheme"),
         ("model_version", "Model version (FLUX.2 / Qwen)"),
         ("clip_skip", "Clip skip"), ("timestep_sampling", "Timestep sampling"),
         ("discrete_flow_shift", "Discrete flow shift"), ("blocks_to_swap", "Blocks to swap")]),

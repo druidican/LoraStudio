@@ -14,27 +14,27 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.081126"
-VERSION = "1.081126"
+__version__ = "1.091126"
+VERSION = "1.091126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.011126",
-    "version.py": "1.081126",
+    "version.py": "1.091126",
     "program/lspaths.py": "1.011126",
     "program/Training/sdgui.py": "1.071126b",
-    "program/Training/sd_script.py": "1.071126b",
-    "program/Data/sd_prepare.py": "1.031126",
+    "program/Training/sd_script.py": "1.091126",
+    "program/Data/sd_prepare.py": "1.091126",
     "program/Training/sd_settings.py": "1.051126b",
-    "program/Data/datasets_ui.py": "1.081126",
-    "program/Data/dsflow.py": "1.051126",
+    "program/Data/datasets_ui.py": "1.091126",
+    "program/Data/dsflow.py": "1.091126",
     "program/Training/training_ui.py": "1.011126",
-    "program/Settings/settings_ui.py": "1.051126b",
-    "program/Gallery/lora_library.py": "1.031126",
+    "program/Settings/settings_ui.py": "1.091126",
+    "program/Gallery/lora_library.py": "1.091126",
     "program/Training/comfytest.py": "1.011126",
-    "program/Data/captioner.py": "1.031126",
+    "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.051126",
     "program/Settings/ghupdate.py": "1.011126",
-    "program/Settings/hfdownload.py": "1.011126",
+    "program/Settings/hfdownload.py": "1.091126",
     "program/Settings/ollamactl.py": "1.011126",
     "program/Data/datacheck.py": "1.031126",
     "program/Data/consistency.py": "1.011126",
@@ -44,7 +44,7 @@ RELEASE: dict = {
     "program/Data/trim.py": "1.011126",
     "program/Data/housekeeping.py": "1.011126",
     "program/Gallery/completed.py": "1.011126",
-    "program/Gallery/model_guide.py": "1.011126",
+    "program/Gallery/model_guide.py": "1.091126",
     "program/Gallery/trainingcard.py": "1.011126",
     "program/Gallery/insights.py": "1.011126",
     "program/Other/ticker.py": "1.011126",
@@ -56,7 +56,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.071126b",
+    "selftest.py": "1.091126",
     "program/Settings/machinecheck.py": "1.051126b",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -64,16 +64,17 @@ RELEASE: dict = {
     "program/Other/manual.py": "1.011126",
     "program/Settings/notice.py": "1.011126",
     "program/Settings/venvcheck.py": "1.011126",
-    "program/Settings/features.py": "1.011126",
+    "program/Settings/features.py": "1.091126",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.071126c",
-    "program/Training/Training_Recommendations.py": "1.071126c",
+    "program/Training/Lora_Datatypes.py": "1.091126",
+    "program/Training/Training_Recommendations.py": "1.091126",
     "program/Other/lora_studio.css": "1.011126",
     "install.sh": "1.051126b",
     "start.sh": "1.051126",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.091126", "Character settings revised: SDXL, Illustrious and Pony train the text encoders lightly (5e-5); FLUX and Chroma use rank 32 / alpha 32 and up to 3000 steps; Z-Image Turbo up to 3000 steps; new LoRA type Z-Image Base (no training adapter); a class word in step 3 makes sentence captions begin 'trigger, a class word, ...'."),
     ("1.081126", "Datasets: the error 'desc_load didn't return enough output values' in the terminal when moving between pages is gone."),
     ("1.071126c", "SDXL, Illustrious and Pony character LoRAs now train with alpha = dim (32/32) instead of 32/16, which learned at half strength."),
     ("1.071126b", "Launch scripts: sampling is never written or run without a prompts file (sd-scripts stopped at the first sample), and SDXL, Illustrious and Pony scripts no longer get --clip_skip. A script that has them is fixed when it runs."),

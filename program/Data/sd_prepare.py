@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -66,6 +66,7 @@ OC_FAMILY = {
     "lumina": ("sentences", "Gemma-2", "a language model: sentences"),
     "hunyuan": ("sentences", "Qwen2.5-VL + ByT5", "a language model: sentences"),
     "zimage": ("sentences", "Qwen3 4B", "a language model: sentences, not booru tags"),
+    "zimagebase": ("sentences", "Qwen3 4B", "a language model: sentences, not booru tags"),
     "qwenimage": ("sentences", "Qwen2.5-VL 7B", "a language model trained on long descriptions: sentences"),
     "flux2": ("sentences", "Qwen3", "a language model: sentences"),
 }
@@ -892,6 +893,7 @@ def ap_caption(ds, tkey, purpose, url, model, leave_out, choice, log=None):
              (S.CAP.STYLE_LEAVE_OUT if S.CAP and purpose == "style" else ""))
     if S.CAP is not None:
         S.CAP.PURPOSE["value"] = purpose or "character"
+        S.CAP.PURPOSE["class"] = ""
     trigger = re.sub(r"[^A-Za-z0-9_]+", "", ds).lower() or "ohwx"
     last = ""
     for last in oc_run(ds, url, model, trigger, leave, False, True, style, length, detail,

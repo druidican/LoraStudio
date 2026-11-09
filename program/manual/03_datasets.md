@@ -47,6 +47,10 @@ folder, and the setting switches itself off again when a launch script is saved.
   and how the pictures are judged. A **worn item** is clothes, equipment or jewelry that people wear (a collection of
   rings and hair clips, a jacket, an armour); pick which of the three, so step 7 knows which tags describe the item.
 - **Trigger word**: the first word of every caption, the word you put in a prompt to call the LoRA (`pip`).
+- **Class word** (character): what the trigger word is, in one general word (`robot`, `person`, `cat`). Sentence
+  captions (FLUX, Chroma, Z-Image …) then begin `pip, a robot, …`, so the text encoder knows what kind of thing the
+  new word means, which helps likeness. Tag captions are not changed. Leave it empty to start with the trigger word
+  alone.
 
 ## 4 · Sort
 
@@ -165,6 +169,18 @@ score_7_up, source_anime` in front of every caption, an **Illustrious** one with
 it. The launch script adds them while training (`--caption_prefix` / `--caption_suffix`, the caption files stay as
 they are; for Pony `--keep_tokens` keeps them and the trigger word in front), and new sample prompts get them too
 (an existing prompts file is kept as you wrote it).
+
+**Character defaults per model** (since 1.091126; *Why these settings* explains each):
+
+| LoRA type | Rank / alpha | Learning rate | Steps | Also |
+|---|---|---|---|---|
+| SDXL, Illustrious, Pony | 32 / 32 | 1e-4, text encoders 5e-5 | 1600–3000 | the text encoders learn the trigger word too; batch at most 4 |
+| Anima | 16 / 16 | 1e-4 | 1200–2200 | |
+| FLUX.1, Chroma | 32 / 32 | 1e-4 | 1600–3000 | without `--fp8_base` and with block swapping if results stay blurry |
+| Z-Image Turbo | 32 / 32 | 1e-4 | 1600–3000 | with the training adapter; try *Discrete flow shift* 3.0 for weak likeness |
+| Z-Image Base | 32 / 32 | 1e-4 | 1600–3000 | no adapter; the LoRA also works on Turbo (strength 1.0–1.5) |
+
+Alpha is always the same as the rank: a lower alpha makes the LoRA learn at a fraction of its strength.
 
 **Save as new version** writes `pipILLV1.sh`, the next one `pipILLV2.sh`; older scripts move to `_old_runs/`. *Add to
 the queue* sends it to Training › Run.

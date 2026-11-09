@@ -34,7 +34,7 @@ Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import contextlib
 import copy
@@ -712,7 +712,7 @@ def main_file(files: list) -> tuple[Path, bool, list]:
 
 
 def strip_base_suffix(name: str, bases: list[str]) -> str:
-    tokens = ["sdxl", "ill", "illustrious", "ani", "anima", "pony", "flux", "zit", "zimage", "qwi", "f2k",
+    tokens = ["sdxl", "ill", "illustrious", "ani", "anima", "pony", "flux", "zit", "zib", "zimage", "qwi", "f2k",
               "lora", "xl"] + [b.lower().replace("-", "") for b in bases]
     s = name
     changed = True
@@ -1670,7 +1670,7 @@ def render_dataset_only(ds: Dataset) -> str:
             f'<span class="ll-warn-text">No trained LoRA found</span></div>')
 
 
-BASE_ABBR = {"illustrious": "ILL", "pony": "PO", "anima": "ANI", "flux": "F1", "chroma": "CHR", "zimage": "ZI", "qwenimage": "QWI", "flux2": "F2", "sdxl": "XL",
+BASE_ABBR = {"illustrious": "ILL", "pony": "PO", "anima": "ANI", "flux": "F1", "chroma": "CHR", "zimage": "ZI", "zimagebase": "ZIB", "qwenimage": "QWI", "flux2": "F2", "sdxl": "XL",
              "sd15": "15", "sd3": "SD3", "lumina": "LUM", "hunyuan": "HY", "hunyuanimage": "HY", "unknown": "?"}
 
 

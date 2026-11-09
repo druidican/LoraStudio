@@ -15,7 +15,7 @@ Gated repos (FLUX.1-dev, FLUX.2-dev, SD 3.5): accept the licence once on the rep
 huggingface.co, with the account the token belongs to.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import os
 import re
@@ -70,6 +70,9 @@ KNOWN: dict[str, dict[str, tuple]] = {
                "text_encoder": ("Comfy-Org/z_image_turbo", "split_files/text_encoders/qwen_3_4b.safetensors", 1),
                "vae": ("Comfy-Org/z_image_turbo", "split_files/vae/ae.safetensors", 1),
                "base_weights": ("ostris/zimage_turbo_training_adapter", "zimage_turbo_training_adapter_v2.safetensors", 1)},
+    "zimagebase": {"dit": ("Comfy-Org/z_image", "split_files/diffusion_models/z_image_bf16.safetensors", 1),
+                   "text_encoder": ("Comfy-Org/z_image_turbo", "split_files/text_encoders/qwen_3_4b.safetensors", 1),
+                   "vae": ("Comfy-Org/z_image_turbo", "split_files/vae/ae.safetensors", 1)},
     "qwenimage": {"dit": ("Comfy-Org/Qwen-Image_ComfyUI", "split_files/diffusion_models/qwen_image_bf16.safetensors", 1),
                   "text_encoder": ("Comfy-Org/Qwen-Image_ComfyUI", "split_files/text_encoders/qwen_2.5_vl_7b.safetensors", 1),
                   "vae": ("Comfy-Org/Qwen-Image_ComfyUI", "split_files/vae/qwen_image_vae.safetensors", 1)},

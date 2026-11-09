@@ -15,7 +15,7 @@ Results of identify() are cached in model_ids.json (keyed by path, size and modi
 """
 
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.091126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -40,7 +40,7 @@ KIND_LABEL = {
     "t5xxl": "T5-XXL text encoder", "clip_l": "CLIP-L text encoder", "clip_g": "CLIP-G text encoder",
     "qwen_image": "Qwen-Image model", "flux2": "FLUX.2 model", "flux2_vae": "FLUX.2 AE (32-channel VAE)",
     "qwen3_8b": "Qwen3 8B text encoder (FLUX.2 klein 9B)",
-    "zimage": "Z-Image Turbo model", "qwen3_4b": "Qwen3 4B text encoder (Z-Image)",
+    "zimage": "Z-Image model (Turbo or Base)", "qwen3_4b": "Qwen3 4B text encoder (Z-Image)",
     "zimage_adapter": "Z-Image Turbo training adapter", "lora": "LoRA for another model (not a Z-Image adapter)",
     "zimage_lora": "Z-Image LoRA (a character/style LoRA, not the training adapter)",
     "qwen3": "Qwen3 text encoder", "gemma2": "Gemma-2 text encoder", "qwen25vl": "Qwen2.5-VL text encoder",
@@ -65,6 +65,7 @@ REQUIREMENTS = {
     "zimage": {"dit": ["zimage"], "vae": ["flux_ae"], "text_encoder": ["qwen3_4b"],
                "base_weights": ["zimage_adapter"]},     # ONLY the ostris adapter: any other LoRA merges nothing
 }
+REQUIREMENTS["zimagebase"] = {"dit": ["zimage"], "vae": ["flux_ae"], "text_encoder": ["qwen3_4b"]}   # no adapter
 REQUIREMENTS["qwenimage"] = {"dit": ["qwen_image"], "vae": ["qwen_vae"], "text_encoder": ["qwen25vl"]}
 REQUIREMENTS["flux2"] = {"dit": ["flux2"], "vae": ["flux2_vae"], "text_encoder": ["qwen3_4b", "qwen3_8b"]}
 BASE_FLAGS = ("pretrained_model_name_or_path", "dit")      # the slot that holds the diffusion model
@@ -81,7 +82,8 @@ OFFICIAL_HF = {
     "lumina": ["Alpha-VLLM/Lumina-Image-2.0"], "hunyuan": ["tencent/HunyuanImage-2.1"],
     "qwen_image": ["Comfy-Org/Qwen-Image_ComfyUI", "Qwen/Qwen-Image"],
     "flux2": ["black-forest-labs/FLUX.2-klein-base-4B", "black-forest-labs/FLUX.2-klein-base-9B", "black-forest-labs/FLUX.2-dev"],
-    "zimage": ["Tongyi-MAI/Z-Image-Turbo", "Comfy-Org/z_image_turbo", "ostris/zimage_turbo_training_adapter"],
+    "zimage": ["Tongyi-MAI/Z-Image-Turbo", "Comfy-Org/z_image_turbo", "ostris/zimage_turbo_training_adapter",
+               "Tongyi-MAI/Z-Image", "Comfy-Org/z_image"],
 }
 SD_SCRIPTS_DOCS = {
     "flux": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/flux_train_network.md",
@@ -93,6 +95,7 @@ SD_SCRIPTS_DOCS = {
     "sd15": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/train_network.md",
     "hunyuan": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/hunyuan_image_train_network.md",
     "zimage": "https://github.com/kohya-ss/musubi-tuner/blob/main/docs/zimage.md",
+    "zimagebase": "https://github.com/kohya-ss/musubi-tuner/blob/main/docs/zimage.md",
     "qwenimage": "https://github.com/kohya-ss/musubi-tuner/blob/main/docs/qwen_image.md",
     "flux2": "https://github.com/kohya-ss/musubi-tuner/blob/main/docs/flux_2.md",
 }

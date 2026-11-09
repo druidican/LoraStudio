@@ -8,7 +8,7 @@ hidden, and its places are greyed out with **(… missing)** so you can see what
 | Part | What it does | Without it |
 |---|---|---|
 | **sd-scripts** | trains SDXL, Illustrious, Pony, Anima, FLUX.1, SD 1.5, … | launch scripts are still made; you run them where sd-scripts is |
-| **musubi-tuner** | trains Z-Image Turbo, Qwen-Image and FLUX.2 | the same, for those types |
+| **musubi-tuner** | trains Z-Image Turbo and Base, Qwen-Image and FLUX.2 | the same, for those types |
 | **Ollama** | the detailed sort (pass 2), writing captions, the AI consistency check | the quick sort, captions you write yourself, the word-list consistency check |
 
 `install.sh` asks about each one: **install it for me**, **I have it already** (it asks for the folder), or
