@@ -14,15 +14,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.101126c"
-VERSION = "1.101126c"
+__version__ = "1.101126d"
+VERSION = "1.101126d"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.101126c",
-    "version.py": "1.101126c",
+    "version.py": "1.101126d",
     "program/lspaths.py": "1.011126",
     "program/Training/sdgui.py": "1.101126c",
-    "program/Training/sd_script.py": "1.101126c",
+    "program/Training/sd_script.py": "1.101126d",
     "program/Data/sd_prepare.py": "1.091126",
     "program/Training/sd_settings.py": "1.051126b",
     "program/Data/datasets_ui.py": "1.101126",
@@ -60,7 +60,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.101126c",
+    "selftest.py": "1.101126d",
     "program/Settings/machinecheck.py": "1.051126b",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -70,7 +70,7 @@ RELEASE: dict = {
     "program/Settings/venvcheck.py": "1.011126",
     "program/Settings/features.py": "1.091126",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.091126b",
+    "program/Training/Lora_Datatypes.py": "1.101126d",
     "program/Training/Training_Recommendations.py": "1.091126",
     "program/Other/lora_studio.css": "1.011126",
     "install.sh": "1.051126b",
@@ -78,6 +78,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.101126d", "Z-Image, Qwen-Image and FLUX.2 (musubi-tuner): a dataset with a second caption set trained on no pictures at all (musubi did not recognise IMG.sentences.txt). The pictures are now linked into musubi's cache with the right captions, and a missing caption set stops the run with a clear message."),
     ("1.101126c", "Speed: much less work for the browser. The start-up loaders run as one event, the status strip and the queue refresh without Gradio events, the shared timer sleeps while nothing runs and redraws only what changed, and launch scripts are no longer re-read on every list redraw. Typing and clicks no longer stutter, and switching tabs is near instant."),
     ("1.101126b", "Detailed scan: a face crop and a detail crop that show nearly the same (a wreath on the head) become one new picture instead of two near-duplicates."),
     ("1.101126", "Detailed scan for character datasets (step 4): finds gaps in angles, poses, expressions, outfits, places and light, and suggests per picture what to add, upscale, sharpen or crop into a new picture (step 5, only when ticked). Upscaling and sharpening use your own ComfyUI workflow, for example SeedVR2 (Settings › Test pictures), with the size and noise set per picture."),

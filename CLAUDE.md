@@ -68,6 +68,8 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
 - **Caption sets:** one per caption style (`IMG.txt`, `IMG.<style>.txt`); every launch script gets
   `--caption_extension` of its own set (`dsflow.caption_ext`). Anima, FLUX and Chroma read both styles: step 3
   chooses tags / sentences / both, step 9 picks the set per script (`train_style` in the dataset's meta).
+  musubi pairs captions by cutting ONE extension (IMG.sentences.txt never matches IMG.png), so musubi scripts link
+  the pictures into `cache/<name>/images/<repeat folder>` with the chosen captions as IMG.txt (`CAPTION_EXT`).
 - **Class word** (step 3, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).
 - **Detailed scan** (`Data/detailscan.py`, characters, on per dataset in step 4): an extra Ollama question per
   picture, coverage over the kept pictures, suggestions in step 5 (add / upscale / sharpen / crop into a new picture),

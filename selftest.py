@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.101126c"  # LoRA Studio version, see version.py
+__version__ = "1.101126d"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -178,7 +178,8 @@ def _capsets():
         F.meta_save(DS, {**old, "types": ["illustrious", "zimage"], "caption_choice": "auto", "train_style": {}})
         need([x["ext"] for x in F.caption_sets(DS)] == [".txt", ".sentences.txt"], F.caption_sets(DS))
         zit = G.make_plan(DS, "zimage")["script_text"]
-        need('caption_extension = \\".sentences.txt\\"' in zit, "Z-Image does not train on the sentence set")
+        need('CAPTION_EXT=".sentences.txt"' in zit and 'caption_extension = \\".txt\\"' in zit,
+             "Z-Image does not train on the sentence set")
         need('--caption_extension ".txt"' in G.make_plan(DS, "illustrious")["script_text"], "Illustrious lost IMG.txt")
         F.meta_save(DS, {**F.meta(DS), "types": ["illustrious", "anima"], "caption_choice": "both"})
         need(len(F.train_sets(DS, "anima")) == 2 and len(F.train_sets(DS, "illustrious")) == 1, "anima should have both")
@@ -187,7 +188,7 @@ def _capsets():
         t = G.make_plan(DS, "anima")["script_text"]
         need('--caption_extension ".sentences.txt"' in t, "the pick in step 9 is not used")
         need('--caption_extension ".txt"' in SS.set_caption_ext(t, ".txt"), "set_caption_ext")
-        need('\\".tags.txt\\"' in SS.set_caption_ext(zit, ".tags.txt"), "set_caption_ext (musubi)")
+        need('CAPTION_EXT=".tags.txt"' in SS.set_caption_ext(zit, ".tags.txt"), "set_caption_ext (musubi)")
     finally:
         F.meta_save(DS, old)
 

@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.091126b"  # LoRA Studio version, see version.py
+__version__ = "1.101126d"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -1039,10 +1039,13 @@ PYCHECK"""] if cfg.get("base_weights_check") and any(fl == "--base_weights" for 
         '[ -n "${CHARACTER_NAME}" ] || fail_stage "empty character name"',
         'rm -rf "${CACHE_DIR}"',
         'mkdir -p "${CACHE_DIR}" "${OUTPUT_DIR}"',
+        # musubi pairs a caption with its picture by cutting off ONE extension, so IMG.sentences.txt never matches
+        # IMG.png: the pictures of each repeat folder are linked into the cache with their captions as IMG.txt
+        f'CAPTION_EXT="{cfg.get("caption_ext") or ".txt"}"',
         '{',
         '  echo "[general]"',
         '  echo "resolution = [${RESOLUTION}]"',
-        f'  echo "caption_extension = \\"{cfg.get("caption_ext") or ".txt"}\\""',
+        '  echo "caption_extension = \\".txt\\""',
         '  echo "batch_size = ${BATCH_SIZE}"',
         '  echo "enable_bucket = true"',
         '  echo "bucket_no_upscale = false"',
@@ -1053,12 +1056,20 @@ PYCHECK"""] if cfg.get("base_weights_check") and any(fl == "--base_weights" for 
         '  d="${d%/}"; b="$(basename "$d")"; rep="${b%%_*}"',
         # LoraManager = LoRA Studio's Personal sync folder (previews / example images), never training data
         '  case "${b,,}" in *_loramanager) echo "skipped: ${b} (LoRA previews, not training images)"; continue;; esac',
-        "  imgs=$(find \"$d\" -maxdepth 1 -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.bmp' \\) | wc -l)",
-        '  [ "${imgs}" -gt 0 ] || continue',
+        '  src="${CACHE_DIR}/images/${b}"; mkdir -p "${src}"',
+        '  imgs=0; nocap=0',
+        "  while IFS= read -r -d '' f; do",
+        '    base="${f%.*}"; name="$(basename "${base}")"',
+        '    if [ -f "${base}${CAPTION_EXT}" ]; then',
+        '      ln -s "$f" "${src}/$(basename "$f")" && cp "${base}${CAPTION_EXT}" "${src}/${name}.txt" && imgs=$((imgs+1))',
+        '    else nocap=$((nocap+1)); fi',
+        "  done < <(find \"$d\" -maxdepth 1 -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.bmp' \\) -print0)",
+        '  [ "${nocap}" -eq 0 ] || echo "WARNING: ${nocap} pictures in ${b} have no caption (*${CAPTION_EXT}) and are left out"',
+        '  [ "${imgs}" -gt 0 ] || { [ "${nocap}" -eq 0 ] || fail_stage "no captions (*${CAPTION_EXT}) for the pictures in ${b}: write them in Datasets › 7 Tags (this LoRA type uses that caption set)"; continue; }',
         '  {',
         '    echo ""',
         '    echo "[[datasets]]"',
-        '    echo "image_directory = \\"${d}\\""',
+        '    echo "image_directory = \\"${src}\\""',
         '    echo "cache_directory = \\"${CACHE_DIR}/${b}\\""',
         '    echo "num_repeats = ${rep}"',
         '  } >> "${DATASET_TOML}"',

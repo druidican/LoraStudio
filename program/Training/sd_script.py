@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.101126c"  # LoRA Studio version, see version.py
+__version__ = "1.101126d"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -597,8 +597,14 @@ def caption_ext_for(ds, tkey) -> str:
 _TOML_EXT = re.compile(r'(caption_extension = \\")([^"\\]*)(\\")')
 
 
+_CAP_VAR = re.compile(r'^(CAPTION_EXT=")([^"]*)(")', re.M)
+
+
 def set_caption_ext(text: str, ext: str) -> str:
-    """Point a launch script at another caption set: --caption_extension, or the dataset.toml line of a musubi script."""
+    """Point a launch script at another caption set: --caption_extension, or the CAPTION_EXT of a musubi script (older
+    musubi scripts: the dataset.toml line)."""
+    if _CAP_VAR.search(text or ""):
+        return _CAP_VAR.sub(lambda m: m.group(1) + ext + m.group(3), text)
     if _TOML_EXT.search(text or ""):
         return _TOML_EXT.sub(lambda m: m.group(1) + ext + m.group(3), text)
     m = _arg_re("caption_extension").search(text or "")
