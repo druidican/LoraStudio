@@ -14,20 +14,20 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.101126b"
-VERSION = "1.101126b"
+__version__ = "1.101126c"
+VERSION = "1.101126c"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.011126",
-    "version.py": "1.101126b",
+    "lora_studio.py": "1.101126c",
+    "version.py": "1.101126c",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.071126b",
-    "program/Training/sd_script.py": "1.091126b",
+    "program/Training/sdgui.py": "1.101126c",
+    "program/Training/sd_script.py": "1.101126c",
     "program/Data/sd_prepare.py": "1.091126",
     "program/Training/sd_settings.py": "1.051126b",
     "program/Data/datasets_ui.py": "1.101126",
     "program/Data/dsflow.py": "1.091126b",
-    "program/Training/training_ui.py": "1.011126",
+    "program/Training/training_ui.py": "1.101126c",
     "program/Settings/settings_ui.py": "1.101126",
     "program/Gallery/lora_library.py": "1.091126",
     "program/Training/comfytest.py": "1.011126",
@@ -49,7 +49,9 @@ RELEASE: dict = {
     "program/Gallery/model_guide.py": "1.091126",
     "program/Gallery/trainingcard.py": "1.011126",
     "program/Gallery/insights.py": "1.011126",
-    "program/Other/ticker.py": "1.011126",
+    "program/Other/livepoll.py": "1.101126c",
+    "program/Other/loadjoin.py": "1.101126c",
+    "program/Other/ticker.py": "1.101126c",
     "program/Other/statusbar.py": "1.051126b",
     "program/Other/gpusmi.py": "1.051126b",
     "program/Training/savepoint.py": "1.011126",
@@ -58,7 +60,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.101126b",
+    "selftest.py": "1.101126c",
     "program/Settings/machinecheck.py": "1.051126b",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -76,6 +78,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.101126c", "Speed: much less work for the browser. The start-up loaders run as one event, the status strip and the queue refresh without Gradio events, the shared timer sleeps while nothing runs and redraws only what changed, and launch scripts are no longer re-read on every list redraw. Typing and clicks no longer stutter, and switching tabs is near instant."),
     ("1.101126b", "Detailed scan: a face crop and a detail crop that show nearly the same (a wreath on the head) become one new picture instead of two near-duplicates."),
     ("1.101126", "Detailed scan for character datasets (step 4): finds gaps in angles, poses, expressions, outfits, places and light, and suggests per picture what to add, upscale, sharpen or crop into a new picture (step 5, only when ticked). Upscaling and sharpening use your own ComfyUI workflow, for example SeedVR2 (Settings › Test pictures), with the size and noise set per picture."),
     ("1.091126b", "Caption sets: Anima, FLUX and Chroma can use tags, sentences or both (step 3); with both, step 9 picks the set a launch script trains on. Fixed: a second LoRA type in a dataset trained on the first caption set instead of its own."),
@@ -124,6 +127,8 @@ PARTS = [
     ("program/Gallery/model_guide.py", "model guide"),
     ("program/Gallery/trainingcard.py", "the training card of a LoRA: its training data in separate fields"),
     ("program/Gallery/insights.py", "Insights: the datasets behind good and weak LoRAs, what your graphics card managed"),
+    ("program/Other/livepoll.py", "the status strip and queue, refreshed by the page itself"),
+    ("program/Other/loadjoin.py", "the start-up loaders as one event"),
     ("program/Other/ticker.py", "the one page timer"),
     ("program/Other/statusbar.py", "status bar"),
     ("program/Other/gpusmi.py", "AMD GPU values: amd-smi (ROCm 10 and newer) or rocm-smi"),

@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.071126b"  # LoRA Studio version, see version.py
+__version__ = "1.101126c"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -983,17 +983,47 @@ def dataset_of_script(path) -> str:
     """Dataset a launch script belongs to: its folder directly under the dataset folder
     (images/mychar/mycharANIMA_lora.sh -> mychar), else the folder the script is in."""
     p = Path(path)
+    root = images_dir()
+    if root is not None:                       # the quick way first: no symlink lookups (slow on synced folders)
+        try:
+            return p.relative_to(root).parts[0]
+        except (ValueError, IndexError):
+            pass
     try:
-        return p.resolve().relative_to(images_dir().resolve()).parts[0]
-    except (ValueError, IndexError):
+        return p.resolve().relative_to(Path(root).resolve()).parts[0]
+    except (ValueError, IndexError, TypeError):
         return p.parent.name
 
 
-def script_type(path, text=None) -> str:
-    """LoRA type key of a launch script (sdxl, anima, illustrious, flux, pony, ...), '' if unknown."""
+_TYPE_CACHE: dict = {}
+
+
+def _settings_sig():
     try:
-        text = text if text is not None else Path(path).read_text(encoding="utf-8", errors="ignore")
-        return infer_type(text, merged_presets()[1], "") or ""
+        st = settings_path().stat()
+        return st.st_mtime_ns, st.st_size
+    except OSError:
+        return 0, 0
+
+
+def script_type(path, text=None) -> str:
+    """LoRA type key of a launch script (sdxl, anima, illustrious, flux, pony, ...), '' if unknown.
+    Remembered per script text and settings.txt (the subtypes live there): the lists ask for it very often."""
+    try:
+        if text is None:
+            st = Path(path).stat()
+            fkey = (str(path), st.st_mtime_ns, st.st_size, _settings_sig())
+            if fkey in _TYPE_CACHE:
+                return _TYPE_CACHE[fkey]
+            text = Path(path).read_text(encoding="utf-8", errors="ignore")
+            _TYPE_CACHE[fkey] = script_type(path, text)
+            return _TYPE_CACHE[fkey]
+        key = (hash(text), _settings_sig())
+        if key not in _TYPE_CACHE:
+            if len(_TYPE_CACHE) > 5000:
+                _TYPE_CACHE.clear()
+            _TYPE_CACHE[key] = infer_type(text, merged_presets()[1], "") or ""
+        return _TYPE_CACHE[key]
     except Exception:
         return ""
 

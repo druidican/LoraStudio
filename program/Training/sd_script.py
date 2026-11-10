@@ -5,9 +5,10 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.091126b"  # LoRA Studio version, see version.py
+__version__ = "1.101126c"  # LoRA Studio version, see version.py
 
 import copy
+import functools
 import difflib
 import json
 import math
@@ -175,6 +176,7 @@ STUDIO_TABLE = {"max_train_epochs", "train_batch_size", "learning_rate", "networ
 MODEL_FIELDS = {name for name, _ in FORM_GROUPS[3][1]}
 
 
+@functools.lru_cache(maxsize=None)
 def _arg_re(name: str):
     return re.compile(rf"((?<![\w-])--{name}(?:=|[ \t]+))(\"[^\"]*\"|'[^']*'|[^\s\\]+)")
 
@@ -186,6 +188,7 @@ MUSUBI_VARS = {"dit": "DIT", "vae": "VAE", "text_encoder": "TEXT_ENCODER", "base
                "model_version": "MODEL_VERSION"}
 
 
+@functools.lru_cache(maxsize=None)
 def _var_re(var: str):
     return re.compile(rf"^({var}=)(\"[^\"]*\"|'[^']*'|\S*)", re.M)
 
@@ -200,6 +203,14 @@ def read_form(text: str):
             v = v[1:-1]
         vals.append(v)
     return vals
+
+
+def form_value(text: str, name: str) -> str:
+    """One field of read_form (much cheaper than reading all of them)."""
+    musubi = S.is_musubi_text(text)
+    m = (_var_re(MUSUBI_VARS[name]).search(text) if musubi and name in MUSUBI_VARS else None) or _arg_re(name).search(text)
+    v = m.group(2) if m else ""
+    return v[1:-1] if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'" else v
 
 
 def form_dict(text: str) -> dict:
@@ -284,7 +295,8 @@ def infer_type(text, presets, fallback):
         return detected[0]
     cands = [k for k in cands if not presets[k].get("detect")] or cands
     # the output name carries the type's suffix (e.g. mycharPONYV1), so look there first, then in the script head
-    for hay in (form_dict(text).get("output_name", ""), form_dict(text).get("output_name", "") + " " + text[:600]):
+    out_name = form_value(text, "output_name")
+    for hay in (out_name, out_name + " " + text[:600]):
         for k in sorted(cands, key=lambda k: -len(presets[k].get("suffix", ""))):
             suf = presets[k].get("suffix", "")
             if suf and suf in hay:

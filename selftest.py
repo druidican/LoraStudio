@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.101126b"  # LoRA Studio version, see version.py
+__version__ = "1.101126c"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -356,6 +356,30 @@ def _detailscan():
             (F.root(DS) / ".lsflow" / "sort.json").unlink(missing_ok=True)
         else:
             F._save(DS, "sort.json", old_sort)
+
+
+@check("speed: start-up loaders join into one event; a launch script's type is remembered")
+def _speed():
+    import gradio as gr
+    import loadjoin as LJ
+    calls = []
+    with gr.Blocks() as app:
+        LJ.catch(app)
+        a, b, c = gr.Textbox(), gr.Textbox(), gr.Textbox()
+        app.load(lambda: "x", None, a).then(lambda v: (calls.append(v), v + "y")[1], a, b)
+        app.load(lambda: gr.update(visible=False), None, c)
+        need(len(LJ.STEPS) == 3, f"steps: {len(LJ.STEPS)}")
+        real = app._ls_real_load
+        app._ls_real_load = lambda fn, i, o, **k: globals().__setitem__("_LJ_RUN", (fn, i, o))
+        LJ.build(app)
+        app._ls_real_load = real
+    fn, ins, outs = globals().pop("_LJ_RUN")
+    res = fn(*[None] * len(ins))
+    need(res[1] == "xy" and calls == ["x"], f"a later step must see an earlier one's value: {res}")
+    need(isinstance(res[2], dict) and res[2].get("visible") is False, res)
+    G._TYPE_CACHE.clear()
+    t = 'accelerate launch sdxl_train_network.py --output_name "pipILLV1"\n'
+    need(G.script_type("x.sh", t) == "illustrious" and len(G._TYPE_CACHE) == 1, "type cache")
 
 
 @check("sentence captions of a character begin 'trigger, a class word, ...'")

@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.101126c"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -915,7 +915,11 @@ def build_run(app):
         h = queue_html()
         return (gr.update(), prev) if h == prev else (h, h)
     import ticker
-    ticker.timer(2.0, q_tick, last, [q_html, last], show_progress="hidden")
+    if ticker.ACTIVE["on"]:                    # in LoRA Studio the page fetches the queue itself (livepoll.py)
+        import livepoll
+        livepoll.register("tr_queue", queue_html)
+    else:
+        ticker.timer(2.0, q_tick, last, [q_html, last], show_progress="hidden")
     ticker.timer(1.0, live_tick, seen, [live, head, stage, prog, loss, sp, log, seen], show_progress="hidden")
     return {"scripts": s_html, "queue": q_html, "show_done": show_done,
             "refresh": (lambda sd: (scripts_html(sd), queue_html()), [show_done], [s_html, q_html])}

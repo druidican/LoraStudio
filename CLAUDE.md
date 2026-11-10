@@ -88,6 +88,15 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
 - Model choice matters as much as settings: the owner trains and generates Illustrious LoRAs on
   Illustrious-XL v0.1 by choice. Watermarks in training pictures are learned; step 6 removes them, but check.
 
+## Speed (1.101126c)
+
+Every Gradio event costs the browser ~0.3 s on this big page, whatever it outputs. So: the start-up loaders are
+joined into one event (`Other/loadjoin.py`, `LS_SEPARATE_LOADS=1` to compare); the status strip and the queue are
+fetched by the page itself from `/ls_live` (`Other/livepoll.py`, behind the login); the shared timer
+(`Other/ticker.py`) redraws only parts that changed and sleeps while nothing runs (the page wakes it).
+`script_type` is cached per file. Measure with a test copy at the owner's size (80 datasets, 200 LoRAs) and
+Playwright long tasks; `LS_TICK_DEBUG=1` prints what each tick changes.
+
 ## Testing
 
 - `python selftest.py` (needs gradio etc.; use the program's venv).

@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.101126c"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -223,6 +223,7 @@ def _profile(app):
 def main():
     import launchopts
     import statusbar
+    import livepoll
     lo = launchopts.load()
     ap = argparse.ArgumentParser(description="LoRA Studio: your LoRA collection, datasets and training",
                                  epilog="Defaults come from Settings > Launch options (launch_settings.json).")
@@ -263,7 +264,7 @@ def main():
     import datasets_ui
     import manual
     head = ll.head_html(s["style"]) + STUDIO_JS % (settings_ui.NAV_JS + datasets_ui.GRID_JS + manual.JS,
-                                                   "true" if lo["notify"] else "false")
+                                                   "true" if lo["notify"] else "false") + livepoll.JS
     css = sdgui.CSS + "\n" + ll.CSS + "\n" + studio_css.CSS
     style_in_launch = "css" in inspect.signature(gr.Blocks.launch).parameters
     blocks_kwargs = {"title": f"LoRA Studio {version.VERSION}"}
@@ -273,6 +274,9 @@ def main():
 
     ticker.ACTIVE["on"] = True                 # the parts register their refreshes; one timer does them all
     with gr.Blocks(**blocks_kwargs) as app:
+        import loadjoin
+        if not os.environ.get("LS_SEPARATE_LOADS"):
+            loadjoin.catch(app)                 # the start-up loaders become one event (see loadjoin.py)
         import notice                       # the very first page, confirmed once: who owns sd-scripts / musubi-tuner
         notice.build_gate(app, notice.logo_data_url())
         with gr.Row(elem_id="ls_top"):
@@ -349,7 +353,7 @@ def main():
                                         "version": lambda: settings_ui.version_panel(app)})
 
         # the status strip, and moving between pages
-        ticker.timer(2.0, statusbar.strip_html, None, strip, show_progress="hidden")
+        livepoll.register("ls_strip", statusbar.strip_html)     # refreshed by the page itself (livepoll.py)
         def _busy():
             import dsflow
             return sdgui.RUN.running() or dsflow.BATCH.get("running") or bool(sdgui.QUEUE.get("running"))
@@ -366,6 +370,7 @@ def main():
         except Exception:                      # noqa: BLE001
             pass
         ticker.build()                          # the one timer for the whole page (see ticker.py)
+        loadjoin.build(app)
 
         # "Train a new version": Datasets › Edit existing › 9 Launch script of that dataset
         def to_step9(cur, ds):
@@ -456,7 +461,9 @@ def main():
         if gz:
             kw["app_kwargs"] = {"middleware": [gz]}
     app.launch(server_name=args.host, server_port=args.port, allowed_paths=allowed,
-               inbrowser=not args.no_browser, **kw)
+               inbrowser=not args.no_browser, prevent_thread_lock=True, **kw)
+    livepoll.mount(app)                        # /ls_live: the status strip and the queue (see livepoll.py)
+    app.block_thread()
 
 
 def _gzip_middleware():
