@@ -15,7 +15,7 @@
 It judges how well a picture shows things (visible, sharp, big enough, which angle), never whose face it is.
 """
 from __future__ import annotations
-__version__ = "1.101126"  # LoRA Studio version, see version.py
+__version__ = "1.101126b"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -109,6 +109,49 @@ def _crop_box(box, W, H, grow: float, side_min: int):
     return [int(left), int(top), int(left + w_), int(top + h_)]
 
 
+def _inside(a, b) -> float:
+    """How much of box a lies inside box b (0-1)."""
+    w = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    h = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    return w * h / max(1, (a[2] - a[0]) * (a[3] - a[1]))
+
+
+def _crops(p, name, x, W, H, need, side) -> list[dict]:
+    """The crop suggestions of one picture. A face crop and a detail crop that mostly show the same (a wreath on the
+    head, earrings next to the face) become one crop of both."""
+    if not W or not H:
+        return []
+    found = []
+    for k, small, what, grow in (("face_box", FACE_SMALL, "face", 2.4), ("detail_box", DETAIL_SMALL, "detail", 1.8)):
+        b = x.get(k)
+        if not b:
+            continue
+        area = (b[2] - b[0]) * (b[3] - b[1]) / (W * H)
+        if area >= small or (what == "detail" and not x.get("detail")):
+            continue
+        label = "face" if what == "face" else re.sub(r"^(an?|the)\s+", "", x.get("detail") or "detail", flags=re.I)
+        found.append({"what": what, "label": label, "area": area, "src": b,
+                      "box": _crop_box(b, W, H, grow, MIN_CROP)})
+    if len(found) == 2:
+        f, d = found
+        if _inside(d["src"], f["box"]) >= 0.8 or _inside(d["box"], f["box"]) >= 0.6 or _inside(f["box"], d["box"]) >= 0.6:
+            box = [min(f["box"][0], d["box"][0]), min(f["box"][1], d["box"][1]),
+                   max(f["box"][2], d["box"][2]), max(f["box"][3], d["box"][3])]
+            if _inside(d["src"], f["box"]) >= 0.8:
+                box = f["box"]                           # the face crop already shows the detail
+            found = [{"what": "face", "label": f"face and {d['label']}", "area": f["area"], "box": box}]
+    out = []
+    for c in found:
+        box = c["box"]
+        cs = min(box[2] - box[0], box[3] - box[1])
+        if cs < MIN_CROP:
+            continue
+        up = f", upscaled {cs} → {side} px" if cs < need else ""
+        out.append({"kind": "crop", "path": p, "box": box, "what": c["what"], "target": side, "need": need,
+                    "label": f"{name}: new picture of the {c['label']} ({cs} px{up})",
+                    "why": f"the {c['label'].split(' and ')[0]} is only {max(c['area'], 0.01):.0%} of the picture"})
+    return out
+
 def coverage(entries: list[dict]) -> tuple[dict, list[str], dict]:
     """(counts per dimension, gap lines, {dim: [missing or rare values]})"""
     counts = {d: Counter(e[d] for e in entries if e.get(d)) for d in DIMS}
@@ -198,22 +241,7 @@ def run(ds, url: str | None = None, model: str | None = None):
             items.append({"kind": "sharpen", "path": p, "target": short,
                           "label": f"{name}: sharpen (same size)", "why": "slightly soft"})
         W, H = x.get("W") or x["w"], x.get("H") or x["h"]
-        for k, small, what, grow in (("face_box", FACE_SMALL, "face", 2.4), ("detail_box", DETAIL_SMALL, "detail", 1.8)):
-            b = x.get(k)
-            if not b or not W or not H:
-                continue
-            area = (b[2] - b[0]) * (b[3] - b[1]) / (W * H)
-            label = "face" if what == "face" else re.sub(r"^(an?|the)\s+", "", x.get("detail") or "detail", flags=re.I)
-            if area >= small or (what == "detail" and not x.get("detail")):
-                continue
-            box = _crop_box(b, W, H, grow, MIN_CROP)
-            cs = min(box[2] - box[0], box[3] - box[1])
-            if cs < MIN_CROP:
-                continue
-            up = f", upscaled {cs} → {side} px" if cs < need else ""
-            items.append({"kind": "crop", "path": p, "box": box, "what": what, "target": side,
-                          "label": f"{name}: new picture of the {label} ({cs} px{up})",
-                          "why": f"the {label} is only {max(area, 0.01):.0%} of the picture", "need": need})
+        items += _crops(p, name, x, W, H, need, side)
     for n, it in enumerate(items):
         it["id"] = f"{n}:{it['kind']}:{Path(it['path']).name}"
     res = {"at": time.strftime("%Y-%m-%d %H:%M"), "side": side, "counts": {d: dict(c) for d, c in counts.items()},

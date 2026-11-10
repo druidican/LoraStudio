@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.101126"
-VERSION = "1.101126"
+__version__ = "1.101126b"
+VERSION = "1.101126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.011126",
-    "version.py": "1.101126",
+    "version.py": "1.101126b",
     "program/lspaths.py": "1.011126",
     "program/Training/sdgui.py": "1.071126b",
     "program/Training/sd_script.py": "1.091126b",
@@ -32,7 +32,7 @@ RELEASE: dict = {
     "program/Gallery/lora_library.py": "1.091126",
     "program/Training/comfytest.py": "1.011126",
     "program/Training/comfyupscale.py": "1.101126",
-    "program/Data/detailscan.py": "1.101126",
+    "program/Data/detailscan.py": "1.101126b",
     "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.051126",
     "program/Settings/ghupdate.py": "1.011126",
@@ -58,7 +58,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.101126",
+    "selftest.py": "1.101126b",
     "program/Settings/machinecheck.py": "1.051126b",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -76,6 +76,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.101126b", "Detailed scan: a face crop and a detail crop that show nearly the same (a wreath on the head) become one new picture instead of two near-duplicates."),
     ("1.101126", "Detailed scan for character datasets (step 4): finds gaps in angles, poses, expressions, outfits, places and light, and suggests per picture what to add, upscale, sharpen or crop into a new picture (step 5, only when ticked). Upscaling and sharpening use your own ComfyUI workflow, for example SeedVR2 (Settings › Test pictures), with the size and noise set per picture."),
     ("1.091126b", "Caption sets: Anima, FLUX and Chroma can use tags, sentences or both (step 3); with both, step 9 picks the set a launch script trains on. Fixed: a second LoRA type in a dataset trained on the first caption set instead of its own."),
     ("1.091126", "Character settings revised: SDXL, Illustrious and Pony train the text encoders lightly (5e-5); FLUX and Chroma use rank 32 / alpha 32 and up to 3000 steps; Z-Image Turbo up to 3000 steps; new LoRA type Z-Image Base (no training adapter); a class word in step 3 makes sentence captions begin 'trigger, a class word, ...'."),

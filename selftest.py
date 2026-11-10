@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.101126"  # LoRA Studio version, see version.py
+__version__ = "1.101126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -338,6 +338,9 @@ def _detailscan():
         need(("upscale", pics[1].name) in kinds, f"the small picture is not suggested: {kinds}")
         need(("crop", pics[0].name) in kinds, f"the small face is not suggested: {kinds}")
         need(any("side" in g for g in r["gaps"]), r["gaps"])
+        both = DSC._crops("p.png", "p.png", {"face_box": [535, 350, 725, 525], "detail_box": [490, 250, 795, 425],
+                                             "detail": "a wreath"}, 1344, 1728, 896, 1024)
+        need(len(both) == 1 and "face and wreath" in both[0]["label"], f"overlapping crops not merged: {both}")
         crop = next(i for i in r["items"] if i["kind"] == "crop")
         add = next(i for i in r["items"] if i["kind"] == "add")
         out = list(DSC.apply(DS, [crop["id"], add["id"]]))
