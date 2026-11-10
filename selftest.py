@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.091126b"  # LoRA Studio version, see version.py
+__version__ = "1.101126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -24,6 +24,7 @@ import sys
 import tempfile
 import time
 import traceback
+import urllib.parse
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -189,6 +190,169 @@ def _capsets():
         need('\\".tags.txt\\"' in SS.set_caption_ext(zit, ".tags.txt"), "set_caption_ext (musubi)")
     finally:
         F.meta_save(DS, old)
+
+
+UPSCALE_WF = {"nodes": [
+    {"id": 1, "type": "LoadImage", "mode": 0, "inputs": [{"name": "image", "type": "COMBO", "widget": {"name": "image"},
+     "link": None}, {"name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": None}],
+     "outputs": [{"name": "IMAGE", "type": "IMAGE"}], "widgets_values": ["x.png", "image"]},
+    {"id": 2, "type": "CompileSettings", "mode": 4, "inputs": [], "outputs": [{"name": "ARGS", "type": "ARGS"}],
+     "widgets_values": []},
+    {"id": 3, "type": "SeedVR2LoadDiTModel", "mode": 0, "inputs": [{"name": "compile", "type": "ARGS", "link": 2},
+     {"name": "model", "type": "COMBO", "widget": {"name": "model"}, "link": None}],
+     "outputs": [{"name": "DIT", "type": "SEEDVR2_DIT"}], "widgets_values": ["pip_upscaler-Q8_0.gguf"]},
+    {"id": 4, "type": "SeedVR2VideoUpscaler", "mode": 0, "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 1}, {"name": "dit", "type": "SEEDVR2_DIT", "link": 3},
+        {"name": "seed", "type": "INT", "widget": {"name": "seed"}, "link": None},
+        {"name": "resolution", "type": "INT", "widget": {"name": "resolution"}, "link": None},
+        {"name": "max_resolution", "type": "INT", "widget": {"name": "max_resolution"}, "link": None},
+        {"name": "input_noise_scale", "type": "FLOAT", "widget": {"name": "input_noise_scale"}, "link": None},
+        {"name": "latent_noise_scale", "type": "FLOAT", "widget": {"name": "latent_noise_scale"}, "link": None}],
+     "outputs": [{"name": "IMAGE", "type": "IMAGE"}], "widgets_values": [42, "fixed", 2048, 2048, 0, 0]},
+    {"id": 5, "type": "SaveImage", "mode": 0, "inputs": [{"name": "images", "type": "IMAGE", "link": 4},
+     {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": None}],
+     "outputs": [], "widgets_values": ["ComfyUI"]},
+    {"id": 6, "type": "Note", "mode": 0, "inputs": [], "outputs": [], "widgets_values": ["a note"]}],
+    "links": [[1, 1, 0, 4, 0, "IMAGE"], [2, 2, 0, 3, 0, "ARGS"], [3, 3, 0, 4, 1, "SEEDVR2_DIT"],
+              [4, 4, 0, 5, 0, "IMAGE"]]}
+
+
+def _pretend_comfy(folder: Path):
+    """A tiny ComfyUI in this process: takes an uploaded picture and 'upscales' it to the requested short side."""
+    from PIL import Image
+    import threading
+    import uuid
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    hist = {}
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def _send(self, b, ctype="application/json"):
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+
+        def do_GET(self):
+            u = urllib.parse.urlparse(self.path)
+            if u.path == "/system_stats":
+                return self._send(b"{}")
+            if u.path.startswith("/history/"):
+                pid = u.path.rsplit("/", 1)[-1]
+                return self._send(json.dumps({pid: hist[pid]} if pid in hist else {}).encode())
+            if u.path == "/view":
+                return self._send((folder / urllib.parse.parse_qs(u.query)["filename"][0]).read_bytes(), "image/png")
+            self._send(b"{}")
+
+        def do_POST(self):
+            raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            if self.path == "/upload/image":
+                b = self.headers["Content-Type"].split("boundary=")[1].encode()
+                part = next(x for x in raw.split(b"--" + b) if b'name="image"' in x)
+                head, body = part.split(b"\r\n\r\n", 1)
+                name = head.split(b'filename="')[1].split(b'"')[0].decode()
+                (folder / name).write_bytes(body[:-2])
+                return self._send(json.dumps({"name": name, "subfolder": "lorastudio"}).encode())
+            g = json.loads(raw)["prompt"]
+            src = next(v["inputs"]["image"] for v in g.values() if v["class_type"] == "LoadImage").split("/")[-1]
+            up = next(v["inputs"] for v in g.values() if v["class_type"] == "SeedVR2VideoUpscaler")
+            im = Image.open(folder / src)
+            f = up["resolution"] / min(im.size)
+            pid = uuid.uuid4().hex
+            im.resize((round(im.width * f), round(im.height * f))).save(folder / f"{pid}.png")
+            hist[pid] = {"status": {"status_str": "success", "completed": True},
+                         "outputs": {"5": {"images": [{"filename": f"{pid}.png", "subfolder": "", "type": "output"}]}}}
+            self._send(json.dumps({"prompt_id": pid, "node_errors": {}}).encode())
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+@check("upscale workflow: your ComfyUI workflow gets the picture, the size and the noise")
+def _upscalewf():
+    from PIL import Image
+    import comfytest as CT
+    import comfyupscale as U
+    api = U.to_api(UPSCALE_WF)
+    need(set(api) == {"1", "3", "4", "5"}, f"bypassed / note nodes: {sorted(api)}")
+    need(api["1"]["inputs"] == {"image": "x.png"} and "compile" not in api["3"]["inputs"], api)
+    need(api["4"]["inputs"]["resolution"] == 2048 and api["4"]["inputs"]["seed"] == 42, api["4"])
+    pl = U.plan(512, 768, 1024)
+    need(pl["resolution"] == 1024 and pl["factor"] == 2.0 and pl["input_noise"] == 0.1, pl)
+    need(U.plan(1024, 1024, 1024)["input_noise"] == 0.0 and U.plan(200, 200, 1024)["latent_noise"] > 0, "noise rule")
+    g = U.graph(api, "lorastudio/a.png", pl, "p")
+    need(g["4"]["inputs"]["resolution"] == 1024 and g["1"]["inputs"]["image"] == "lorastudio/a.png", g)
+    tmp = Path(tempfile.mkdtemp())
+    srv = _pretend_comfy(tmp)
+    old = (U.WF, U.FILE, CT.settings, U._free_ollama)
+    try:
+        U.WF, U.FILE = tmp / "wf.json", tmp / "up.json"
+        U.WF.write_text(json.dumps(UPSCALE_WF))
+        url = f"http://127.0.0.1:{srv.server_address[1]}"
+        CT.settings = lambda: {"url": url}
+        U._free_ollama = lambda: None
+        src = tmp / "small.png"
+        Image.new("RGB", (300, 400), (10, 120, 200)).save(src)
+        r = U.upscale(src, tmp / "big.png", 1024)
+        with Image.open(tmp / "big.png") as im:
+            need(min(im.size) == 1024, f"upscaled to {im.size}")
+        need(r["factor"] > 3, r)
+    finally:
+        U.WF, U.FILE, CT.settings, U._free_ollama = old
+        srv.shutdown()
+
+
+@check("detailed scan: gaps, and suggestions to add, upscale and crop (characters)")
+def _detailscan():
+    from PIL import Image
+    import detailscan as DSC
+    import dsflow as F
+    old_meta, old_ask, old_sort = F.meta(DS), DSC.ask, F.sort_result(DS)
+    rep = F.root(DS)
+    pics = sorted(p for p in rep.rglob("*.png") if "_originals" not in p.parts)[:4]
+    try:
+        F.meta_save(DS, {**old_meta, "purpose": "character", "types": ["illustrious"], "detailed_scan": True, "pins": {}})
+        need(DSC.enabled(DS), "not enabled")
+        Image.new("RGB", (2048, 2048), (90, 90, 90)).save(pics[0])
+        Image.new("RGB", (640, 640), (90, 90, 90)).save(pics[1])
+        sort = {"pics": {str(p): {"cat": "good", "framing": "upper body", "outfit": "coat", "place": "park", "w": 1024,
+                                  "h": 1024, "warn": [], "why": ""} for p in pics}}
+        sort["pics"][str(pics[0])].update(w=2048, h=2048)
+        sort["pics"][str(pics[1])].update(w=640, h=640)
+        sort["pics"][str(pics[3])].update(cat="alike", why="one of 4 alike")
+        F._save(DS, "sort.json", sort)
+        answers = {pics[0].name: {"angle": "front", "pose": "standing", "face_box": [1000, 300, 1160, 460]},
+                   pics[3].name: {"angle": "back", "pose": "standing"}}
+        DSC.ask = lambda url, model, p: {"angle": "front", "pose": "standing", "expression": "neutral",
+                                         "lighting": "daylight", "face_box": None, "detail_box": None, "detail": "",
+                                         "W": 0, "H": 0, **answers.get(Path(p).name, {})}
+        for line in DSC.run(DS, "http://x", "m"):
+            pass
+        r = DSC.result(DS)
+        kinds = {(i["kind"], Path(i["path"]).name) for i in r["items"]}
+        need(("add", pics[3].name) in kinds, f"the back view is not suggested: {kinds}")
+        need(("upscale", pics[1].name) in kinds, f"the small picture is not suggested: {kinds}")
+        need(("crop", pics[0].name) in kinds, f"the small face is not suggested: {kinds}")
+        need(any("side" in g for g in r["gaps"]), r["gaps"])
+        crop = next(i for i in r["items"] if i["kind"] == "crop")
+        add = next(i for i in r["items"] if i["kind"] == "add")
+        out = list(DSC.apply(DS, [crop["id"], add["id"]]))
+        new = list(pics[0].parent.glob(pics[0].stem + "_face*.png"))
+        need(new and F.pin_of(F.pins(DS), new[0]) == "keep" and F.pin_of(F.pins(DS), pics[3]) == "keep", out[-1])
+        for f in new:
+            f.unlink()
+    finally:
+        DSC.ask = old_ask
+        F.meta_save(DS, old_meta)
+        (F.root(DS) / ".lsflow" / "detail.json").unlink(missing_ok=True)
+        if old_sort is None:
+            (F.root(DS) / ".lsflow" / "sort.json").unlink(missing_ok=True)
+        else:
+            F._save(DS, "sort.json", old_sort)
 
 
 @check("sentence captions of a character begin 'trigger, a class word, ...'")

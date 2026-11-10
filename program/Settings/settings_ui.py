@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.101126"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -831,6 +831,44 @@ def comfy_panel(app):
         names = CT.lora_names(u)
         return f"✔ ComfyUI answers at `{u}` ({len(names)} LoRAs in its list)."
     test.click(do_test, url, tmsg)
+    upscale_card(app)
+
+
+def upscale_card(app):
+    """Settings › Test pictures › Upscale workflow: your ComfyUI workflow for upscaling and sharpening pictures."""
+    import comfyupscale as U
+    with gr.Column(elem_classes=["ls-card"]):
+        gr.Markdown("**Upscale workflow** (dataset pictures)")
+        gr.Markdown("Used by the **Detailed scan** (Datasets › Sort, characters) to upscale small pictures, sharpen "
+                    "soft ones and enlarge detail crops. Give it your own upscale workflow, for example SeedVR2, saved "
+                    "from ComfyUI (Workflow › Save or Export (API)). It runs as it is, with your models (GGUF too); "
+                    "LoRA Studio only puts the picture into its Load Image node and, in a SeedVR2 Video Upscaler node, "
+                    "sets the size (the short side the LoRA type trains at) and the noise. The originals stay in "
+                    "`_originals/`.", elem_classes=["ls-note"])
+        uinfo = gr.Markdown()
+        uup = gr.File(label="Your upscale workflow (.json)", file_types=[".json"], height=110)
+        noise = gr.Radio(U.NOISE_CHOICES, label="SeedVR2 noise", value="auto",
+                         info="Automatic: none for sharpening at the same size, input noise 0.1-0.4 the more a picture "
+                              "grows (it hides the blocks and smearing of small sources), and a little latent noise "
+                              "above 3×, which can soften detail.")
+        umsg = gr.Markdown()
+
+    def uload():
+        s = U.settings()
+        return (f"Workflow: `{s['name']}` · {s['note']}" if U.ready() else "No upscale workflow yet."), s["noise"]
+    app.load(uload, None, [uinfo, noise])
+
+    def on_up(f):
+        if not f:
+            return gr.update(), ""
+        try:
+            note = U.import_workflow(f if isinstance(f, str) else f.name)
+        except Exception as e:                           # noqa: BLE001
+            return gr.update(), f"❌ Could not use that workflow: {e}"
+        return uload()[0], note
+    uup.upload(on_up, uup, [uinfo, umsg])
+    noise.input(lambda v: (U.save_settings(noise=v), "✔ Saved.")[1], noise, umsg)
+    return uinfo, noise, uload
 
 
 # --------------------------------------------------------------------------- the page

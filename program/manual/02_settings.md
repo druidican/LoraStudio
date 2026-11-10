@@ -109,6 +109,18 @@ model family once (Workflow › Save in ComfyUI). LoRA Studio then makes test pi
 with the same model, sampler and size as your workflow: how many prompts, and whether they are made by themselves
 when a run ends.
 
+**Upscale workflow** (dataset pictures): your own ComfyUI workflow for the Detailed scan's upscales, sharpening and
+detail crops, for example **SeedVR2** (with a GGUF model if your video memory needs it). Save it in ComfyUI (*Workflow ›
+Save*, or *Export (API)*) and drop the file here. It runs as it is; LoRA Studio only puts each picture into its *Load
+Image* node and takes the result from its *Save Image* node. In a *SeedVR2 Video Upscaler* node it also sets:
+
+- the **size**: the short side the LoRA type trains at, and a cap for the long side;
+- the **noise** (*Automatic*): none for sharpening at the same size; input noise 0.1 up to 0.4 the more a picture grows
+  (it hides the blocks and smearing of small sources); a little latent noise above 3×, which can soften detail.
+  *The workflow's own values* leaves them as you set them.
+
+Before an upscale, LoRA Studio unloads the Ollama models, so the two don't share the video memory.
+
 ## Look and base models
 
 How the Collection looks and how it tells which base model a LoRA was trained on:

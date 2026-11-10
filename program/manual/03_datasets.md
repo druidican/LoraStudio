@@ -69,6 +69,13 @@ only plain hands or feet (a tail, horns or a tattoo stay as detail shots). Sharp
 that show the character equally well. It takes about a second or two per picture. Without Ollama only pass 1 runs,
 and step 5 then picks by quality alone.
 
+**Detailed scan** (characters; tick it above *Sort*, it is remembered per dataset): after the sort, LoRA Studio
+looks at the dataset as a whole. It asks the Ollama model once more per picture (angle, pose, expression, light, where
+the face is and a detail worth a close-up) and counts framings, angles, poses, expressions, outfits, places and light
+over the pictures the sort keeps. What is missing or rare is a **gap** (*Angle: side (none)*). It takes about twice
+the time of the sort. It judges how well a picture shows things (visible, sharp, big enough, from which side), never
+whose face it is.
+
 ## 5 · Select
 
 ![Step 5: the suggested size and the mix of framings](img/step5.jpg)
@@ -77,6 +84,21 @@ A suggested number of pictures for the type and purpose, and a selection: **Safe
 **Varied** more close-ups, angles, outfits and details. When you have rated LoRAs, a line says what your good LoRAs of
 this type had (pictures, close-ups, full body; see [Insights](#collection)). Untick what you don't want; *Confirm
 selection* moves the rest to `_reserve/`; *Move all back from _reserve* undoes it.
+
+**Detailed scan** card (after a detailed scan): the gaps, the counts, and the suggestions, each with a thumbnail and
+the reason. **Nothing happens until you tick a suggestion and press *Do the ticked***:
+
+- ➕ **add**: a picture the sort left out that fills a gap; it gets an 📌 Always pin.
+- ⤢ **upscale**: a kept picture smaller than the LoRA type needs, enlarged to the size it trains at (1024 px, 512 for
+  SD 1.5).
+- ✦ **sharpen**: a kept picture that is a little soft, run through the upscaler at the same size.
+- ✂ **new picture of the face / a detail**: a small face or detail in a big picture is cut out as a **new picture**
+  next to the original (`b07_face1.png`), upscaled when it is small, and pinned 📌 Always. It has no caption yet:
+  step 7 *Only pictures without a caption* writes it.
+
+Upscaling and sharpening use your **upscale workflow** in ComfyUI (Settings › Test pictures (ComfyUI)); without it,
+upscales use LoRA Studio's own picture tools when they are installed, and sharpening waits. The originals, and the crops
+as they were cut, stay in `_originals/`.
 
 The sort can still be wrong. Under each picture: **📌 Always** keeps it whatever the rules say (a unique detail the
 sort dropped), **⛔ Never** leaves it out (useless content the sort kept). Pins are saved at once, stay after a new

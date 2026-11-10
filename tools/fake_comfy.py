@@ -30,7 +30,23 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/log": return self._json(LOG)
         self._json({}, 404)
     def do_POST(self):
-        n = int(self.headers.get("Content-Length") or 0); d = json.loads(self.rfile.read(n) or b"{}")
+        n = int(self.headers.get("Content-Length") or 0); raw = self.rfile.read(n)
+        if self.path == "/upload/image":                  # multipart: keep the picture in OUT/input/
+            b = self.headers["Content-Type"].split("boundary=")[1].encode()
+            part = next(x for x in raw.split(b"--" + b) if b'name="image"' in x)
+            head, body = part.split(b"\r\n\r\n", 1)
+            name = head.split(b'filename="')[1].split(b'"')[0].decode()
+            (OUT / "input").mkdir(exist_ok=True); (OUT / "input" / name).write_bytes(body[:-2])
+            return self._json({"name": name, "subfolder": "lorastudio", "type": "input"})
+        d = json.loads(raw or b"{}")
+        if self.path == "/prompt" and any(v["class_type"] == "LoadImage" for v in d["prompt"].values()):
+            g = d["prompt"]; pid = str(uuid.uuid4()); LOG.append(g)     # an upscale workflow: resize the picture
+            src = OUT / "input" / next(v["inputs"]["image"] for v in g.values() if v["class_type"] == "LoadImage").split("/")[-1]
+            up = next((v["inputs"] for v in g.values() if v["class_type"] == "SeedVR2VideoUpscaler"), {})
+            im = Image.open(src); f = (up.get("resolution") or min(im.size)) / min(im.size)
+            fn = f"{pid[:8]}.png"; im.resize((round(im.width * f), round(im.height * f))).save(OUT / fn)
+            HIST[pid] = {"status": {"status_str": "success", "completed": True}, "outputs": {"15": {"images": [{"filename": fn, "subfolder": "", "type": "output"}]}}}
+            return self._json({"prompt_id": pid, "number": 1, "node_errors": {}})
         if self.path == "/prompt":
             g = d["prompt"]; pid = str(uuid.uuid4()); LOG.append(g)
             lora = next((v["inputs"]["lora_name"] for v in g.values() if v["class_type"] == "LoraLoader"), "")

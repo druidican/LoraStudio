@@ -69,13 +69,18 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
   `--caption_extension` of its own set (`dsflow.caption_ext`). Anima, FLUX and Chroma read both styles: step 3
   chooses tags / sentences / both, step 9 picks the set per script (`train_style` in the dataset's meta).
 - **Class word** (step 3, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).
+- **Detailed scan** (`Data/detailscan.py`, characters, on per dataset in step 4): an extra Ollama question per
+  picture, coverage over the kept pictures, suggestions in step 5 (add / upscale / sharpen / crop into a new picture),
+  done only when ticked. Upscales go through the owner's ComfyUI workflow (`Training/comfyupscale.py`: UI or API
+  format, SeedVR2 size and noise set per picture), else the picture tools. Judges visibility, never identity.
 - **Worn item** purpose (clothes / equipment / jewelry): kinds and places, *Make the words the same*, balance check.
 - **Quality words:** Pony trains with `score_9, score_8_up, score_7_up, source_anime` as `--caption_prefix`
   (keep_tokens raised to cover them), Illustrious with `masterpiece, best quality` as `--caption_suffix`; caption
   files stay untouched; new sample prompts get them too.
 - **SDXL / Illustrious / Pony characters: dim 32, alpha 32** (1.071126c). The owner's test: 32/16 learned at half
-  strength and was clearly worse. Anima characters use 16/16. The SDXL scripts are unet-only at lr 1e-4, so
-  `--unet_lr` adds nothing.
+  strength and was clearly worse. Anima characters use 16/16. Since 1.091126 SDXL-family characters also train the
+  text encoders at 5e-5 (batch ≤ 4); FLUX / Chroma characters rank 32/32, 1600-3000 steps; Z-Image Base is its own
+  type (no adapter).
 - **Never sample without prompts:** sd-scripts crashes at the first sample when `--sample_every_n_epochs` has no
   `--sample_prompts`; `sdgui.fix_flags` removes it (and `--clip_skip` from SDXL scripts, which ignore it) when
   saving, when a form field is applied and when a script runs.

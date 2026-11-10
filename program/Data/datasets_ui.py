@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.091126b"  # LoRA Studio version, see version.py
+__version__ = "1.101126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -20,6 +20,7 @@ from pathlib import Path
 import gradio as gr
 
 import datacheck as DC
+import detailscan as DSC
 import dsflow as F
 import features as FT
 
@@ -354,6 +355,32 @@ def s5_grid(ds, keep_n):
     head = (f'<div class="ds-count">{k} ticked · {n_drop} go to _reserve/'
             + (f' · {n_in} from outside join the repeat folder' if n_in else "") + '</div>')
     return mix, head + grid(cells, ticks=True, click=False, elem="s5")
+
+
+KIND_ICON = {"add": "➕", "upscale": "⤢", "sharpen": "✦", "crop": "✂"}
+
+
+def detail_html(ds, r: dict) -> str:
+    """Step 5: the detailed scan's gaps and its suggestions, each with a thumbnail and the reason."""
+    gaps = "".join(f"<li>{esc(g)}</li>" for g in r.get("gaps") or []) or "<li>No gaps: every framing, angle, pose and "\
+        "expression it looks for is there at least twice.</li>"
+    counts = " · ".join(f"<b>{esc(DSC.DIMS[d][0])}</b> " + ", ".join(f"{esc(v)} {n}" for v, n in
+                                                                      sorted(c.items(), key=lambda t: -t[1])[:6])
+                        for d, c in (r.get("counts") or {}).items() if c)
+    rows = []
+    for it in r.get("items") or []:
+        rows.append(f'<div class="dsc-row"><img src="{thumb(it["path"], 96)}" loading="lazy">'
+                    f'<div><b>{KIND_ICON.get(it["kind"], "")} {esc(it["label"])}</b><br>'
+                    f'<span class="ls-note">{esc(it["why"])}</span></div></div>')
+    import comfyupscale as U
+    why = U.why_not()
+    up_note = ("" if not why else f'<div class="ls-missing-note">Upscaling and sharpening: {esc(why)}. Upscales then '
+               "use LoRA Studio's own picture tools when they are installed; sharpening waits for ComfyUI.</div>")
+    return (f'<div class="rs-label">DETAILED SCAN · {esc(r.get("at", ""))} · {r.get("kept", 0)} pictures kept by the sort'
+            f'</div><div><b>Gaps</b><ul>{gaps}</ul></div><div class="ls-note">{counts}</div>{up_note}'
+            f'<style>.dsc-row{{display:flex;gap:10px;align-items:center;margin:6px 0}}.dsc-row img{{width:72px;'
+            f'height:72px;object-fit:cover;border-radius:6px}}</style>'
+            + ("".join(rows) or "<p>No suggestions.</p>"))
 
 
 # --------------------------------------------------------------------------- 6 Resize
@@ -854,6 +881,13 @@ def build(app, show):
                 gr.Markdown("**Pass 2 · detailed (Ollama missing)**: only the quick pass runs, so framing, outfits, places "
                             "and watermarks are not known (step 5 then picks by quality only).",
                             elem_classes=["ls-missing-note"])
+            s4_detail = gr.Checkbox(label="Detailed scan (characters): after the sort, look at the dataset as a whole",
+                                    visible=False,
+                                    info="Counts framings, angles, poses, expressions, outfits, places and light, and "
+                                         "suggests per picture: left-out pictures that fill a gap, small pictures to "
+                                         "upscale, soft ones to sharpen, and small faces or details to crop into a new "
+                                         "picture (step 5; nothing happens until you tick it). One more Ollama question "
+                                         "per picture: about twice the time of the sort.")
             with gr.Row(elem_classes=["ls-bar"]):
                 s4_go = gr.Button("Sort" if FT.have("ollama") else "Sort (quick pass only)", variant="primary",
                                   size="sm", scale=0, min_width=120 if FT.have("ollama") else 200)
@@ -881,6 +915,15 @@ def build(app, show):
             with gr.Row(elem_classes=["ls-bar"]):
                 s5_all = gr.Button("Tick all", size="sm", scale=0, min_width=100)
                 s5_none = gr.Button("Untick all", size="sm", scale=0, min_width=110)
+            with gr.Column(visible=False, elem_classes=["ls-card"]) as s5_dcard:
+                s5_dhtml = gr.HTML()
+                s5_dpick = gr.CheckboxGroup(choices=[], label="Tick what to do (nothing happens until you press the button)",
+                                            elem_id="ds_s5dpick")
+                with gr.Row(elem_classes=["ls-bar"]):
+                    s5_dall = gr.Button("Tick all suggestions", size="sm", scale=0, min_width=170)
+                    s5_dgo = gr.Button("Do the ticked", variant="primary", size="sm", scale=0, min_width=150)
+                    s5_dstop = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=90)
+                s5_dmsg = gr.Markdown()
             s5_gridh = gr.HTML()
             s5_sel = gr.Textbox(visible=False)
             with gr.Row(elem_classes=["ls-bar", "ds-bottom"]):
@@ -1178,16 +1221,25 @@ def build(app, show):
 
     def s4_load(s):
         if s.get("view") != "flow" or s.get("step") != 4 or not s.get("ds"):
-            return gr.update(), gr.update()
-        return s4_html(s["ds"]), ""
+            return gr.update(), gr.update(), gr.update()
+        m = F.meta(s["ds"])
+        return (s4_html(s["ds"]), "", gr.update(value=bool(m.get("detailed_scan")), visible=FT.have("ollama")
+                                                and DC.base_purpose(m["purpose"]) == "character"))
 
     def s5_load(s):
         if s.get("view") != "flow" or s.get("step") != 5 or not s.get("ds"):
-            return [gr.update()] * 5
+            return [gr.update()] * 8
         n, rng, why = F.suggest_size(s["ds"])
         mix, g = s5_grid(s["ds"], n)
         mode = F.meta(s["ds"]).get("select_mode") or F.batch_settings().get("select_mode") or "safe"
-        return s5_suggest_html(s["ds"], n, rng, why), n, mix, g, mode
+        return (s5_suggest_html(s["ds"], n, rng, why), n, mix, g, mode) + s5_detail_view(s["ds"])
+
+    def s5_detail_view(ds):
+        r = DSC.result(ds)
+        if not r or not DSC.enabled(ds):
+            return gr.update(visible=False), "", gr.update(choices=[], value=[])
+        return gr.update(visible=True), detail_html(ds, r), gr.update(choices=[(i["label"], i["id"]) for i in r["items"]],
+                                                                       value=[])
 
     def s6_load(s):
         if s.get("view") != "flow" or s.get("step") != 6 or not s.get("ds"):
@@ -1277,7 +1329,7 @@ def build(app, show):
         return gr.update(visible=bool(cur) and FT.can_train(cur))
 
     all_outs = (nav_outs + [n_list] + [e_list, e_head, e_steps] + [i_head, i_html, i_what] + [s2_md, s2_grid, s2_show, s2_extra]
-                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words, s3_worn, s3_class, s3_caps] + [s4_box, s4_status] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode]
+                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words, s3_worn, s3_class, s3_caps] + [s4_box, s4_status, s4_detail] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode, s5_dcard, s5_dhtml, s5_dpick]
                 + [s6_max, s6_sum, s6_table, s6_go, s6_crop] + [s7_sets, s7_mirror_row, s7_rec, s7_cons, UI["oc"]["leave"]] + [s8_tree, s8_checks, s8_grid, s8_cap2]
                 + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, s9_caps, sync, s9_calc, s9_eff] + s9_vals)
 
@@ -1604,9 +1656,20 @@ def build(app, show):
             if line == "done":
                 break
             yield f"⏳ {line}", gr.update()
-        yield "", s4_html(ds)
+        extra = ""
+        if DSC.enabled(ds) and (F.sort_result(ds) or {}).get("ai") and not F.STOP.is_set():
+            for line in DSC.run(ds, url, model):
+                if line == "done":
+                    r = DSC.result(ds) or {}
+                    ni, ng = len(r.get("items") or []), len(r.get("gaps") or [])
+                    extra = (f"✔ Detailed scan: {ni} suggestion{'s' * (ni != 1)}, {ng} gap{'s' * (ng != 1)}. "
+                             "See step 5.")
+                    break
+                yield f"⏳ {line}", gr.update()
+        yield extra, s4_html(ds)
     s4_go.click(s4_run, st, [s4_status, s4_box]).then(lambda s: (bar_html(s), stepper_html(s)), st, [f_bar, f_step])
     s4_stop.click(lambda: F.STOP.set(), None, None, queue=False)
+    s4_detail.input(lambda s, v: DSC.set_enabled(s["ds"], v), [st, s4_detail], None)
     after_nav(s4_next.click(lambda s: go(s, step=5), st, st))
 
     # ---- 5 Select
@@ -1633,6 +1696,18 @@ def build(app, show):
         return go(s, step=6), F.apply_select(s["ds"], keep)
     after_nav(s5_go.click(s5_apply, [st, s5_sel], [st, s5_msg], js=TICKED_JS.replace("(x)", "(s, x)").replace("=> [", "=> [s, ")))
     after_nav(s5_back.click(lambda s: (s, "✔ {} pictures put back.".format(F.back_from_reserve(s["ds"])[0])), st, [st, s5_msg]))
+
+    def s5_detail_do(s, ids, k):
+        for line in DSC.apply(s["ds"], ids):
+            if line.startswith(("✔", "⚠")):
+                mix, g = s5_grid(s["ds"], k)
+                v = s5_detail_view(s["ds"])
+                yield line, mix, g, v[1], gr.update(value=[])
+                return
+            yield f"⏳ {line}", gr.update(), gr.update(), gr.update(), gr.update()
+    s5_dall.click(lambda s: [i["id"] for i in (DSC.result(s["ds"]) or {}).get("items") or []], st, s5_dpick)
+    s5_dgo.click(s5_detail_do, [st, s5_dpick, s5_keep], [s5_dmsg, s5_mix, s5_gridh, s5_dhtml, s5_dpick])
+    s5_dstop.click(lambda: F.STOP.set(), None, None, queue=False)
 
     # ---- 6 Resize
     def s6_refresh(s, ms):

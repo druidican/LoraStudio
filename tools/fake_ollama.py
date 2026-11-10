@@ -46,6 +46,17 @@ class H(BaseHTTPRequestHandler):
                               "collage_or_screenshot": False, "framing": fr,
                               "outfit": ["red dress", "red dress", "jeans and t-shirt", "armor"][h % 4],
                               "place": ["forest", "forest", "city street", "studio"][(h >> 3) % 4], "note": "", "teaches": [1, 3, 4, 5, 5][(h >> 5) % 5], "face_size": ["tiny", "small", "medium", "large"][(h >> 7) % 4], "features_visible": (h >> 9) % 6 != 0, "part_only": "feet" if h % 13 == 0 else "", "unique_detail": "a red scarf" if h % 7 == 0 else ""})
+        elif prompt.startswith("Look at this picture of a character"):   # the detailed scan
+            import hashlib
+            h = int(hashlib.md5(d["messages"][-1]["images"][0][:4000].encode()).hexdigest(), 16)
+            w, hh = [int(x) for x in re.search(r"(\d+)x(\d+) pixels", prompt).groups()]
+            out = json.dumps({"angle": ["front", "front", "three-quarter", "side", "back"][h % 5],
+                              "pose": ["standing", "standing", "sitting", "walking"][(h >> 3) % 4],
+                              "expression": ["neutral", "smiling", "neutral", "laughing"][(h >> 5) % 4],
+                              "lighting": ["daylight", "daylight", "indoor"][(h >> 7) % 3],
+                              "face_box": [w * 0.45, hh * 0.1, w * 0.53, hh * 0.18] if h % 3 == 0 else None,
+                              "detail": "a red scarf" if h % 4 == 0 else "",
+                              "detail_box": [w * 0.4, hh * 0.3, w * 0.5, hh * 0.38] if h % 4 == 0 else None})
         elif prompt.startswith("This picture shows a character"):
             out = json.dumps({"details": ["long white hair", "blue eyes", "curved ram horns", "Pale skin"]})
         elif "should have these details" in prompt:
