@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.111126c"  # LoRA Studio version, see version.py
+__version__ = "1.111126e"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -957,8 +957,10 @@ def _sortkeep():
 # ---------------------------------------------------------------- the page
 @check("the training page builds")
 def _page():
-    demo = G.build_ui("")
-    n = len(demo.blocks) if hasattr(demo, "blocks") else 0
+    import gradio as gr
+    with gr.Blocks() as demo:
+        G.build_ui(demo)
+    n = len(demo.blocks)
     need(n > 50, f"only {n} parts on the page")
     return f"{n} components"
 

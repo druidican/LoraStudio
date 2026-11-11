@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.111126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126e"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -256,7 +256,6 @@ def main():
             ll._write_values(v)
             ll.LIB.settings["sd_scripts_dir"] = path
     sdgui.ON_SD_DIR.append(sd_dir_saved)
-    sample_dir = s["sample_dir"] or str(sdgui.ROOT / "output")
 
     theme = ll.make_theme()
     import settings_ui
@@ -283,7 +282,7 @@ def main():
             gr.HTML(f'<div class="ls-title">{logo_img(40)}<h1>LoRA Studio</h1><span class="ls-ver">{version.VERSION}</span></div>')
             gr.Button("Dark / Normal", size="sm", scale=0).click(None, None, None, js=ll.TOGGLE_JS)
         strip = gr.HTML(statusbar.strip_html(), elem_id="ls_strip")
-        sdgui.build_ui(sample_dir, parent=app, detach_settings=True)      # the training pages, placed below
+        sdgui.build_ui(app)                 # the training pages, placed below
         B, UI = sdgui.BLOCKS, sdgui.UI
 
         def show(key):

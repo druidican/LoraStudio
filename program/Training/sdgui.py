@@ -1,40 +1,20 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """
-sdgui.py - small Gradio front-end for your existing sd-scripts launch scripts.
+sdgui.py - the training engine of LoRA Studio, and the shared parts of the launch script and dataset pages.
 
-It does NOT touch your sd-scripts install or its venv. It:
-  * finds your *.sh launch scripts in <root>/ and <root>/images/** (recursively)
-  * runs the saved script (bash, default working dir = <root>) and streams the log
-  * can resume a crashed run from a saved --save_state folder (adds --resume to a temp copy)
-  * Stop button (Ctrl+C first, then escalates to SIGTERM / SIGKILL)
-  * Create Data Launch Script tab: pick a LoRA folder and an existing launch script (settings are loaded
-    into a form) or '+ New launch script' (recommended settings for any sd-scripts architecture, with the
-    reasoning and step calculation). Edit the form or the raw text, save over the script or as a new one.
-    All LoRA types come from Lora_Datatypes.py (imported fresh each time, not copied).
-    Saving also creates the missing <N>_name repeat folder plus model/ and log/ folders; sample images are a yes/no checkbox.
-  * Settings tab: model / VAE / text-encoder files per LoRA type (folder + file dropdown), saved in <sd-scripts>/settings.txt
-    and used for new launch scripts
-  * Monitor tab: newest sample images from disk + optional TensorBoard
-  * GPU status (top right) from amd-smi (ROCm 10+) or rocm-smi: load, VRAM, temperature, power; Hugging Face token status
-    (token read from <sd-scripts>/huggingtoken.txt and written into `export HF_TOKEN=` in launch scripts)
-  * Scan library button: finds new image libraries in <sd-scripts>/images
-  * Repeat folders panel: rename a folder to the correct <N>_name format
+  runs           Run: one training run (bash on a temporary copy of the launch script, the log streamed and kept in
+                 userdata/gui_logs/), its stages (##LS_STAGE markers of the musubi pipelines), loss and NaN watch
+  the queue      QUEUE and _queue_worker: one script after the other, making room in video memory when the model
+                 changes, stop on fail, Completed marks after a run that wrote its final LoRA
+  launch scripts reading and writing their options (the form), the LoRA types (Lora_Datatypes.py) and the
+                 recommendations; split over sd_script.py, sd_prepare.py and sd_settings.py, imported back here
+  build_ui(app)  the training parts of the page, built hidden in BLOCKS for lora_studio.py / datasets_ui.py to place
 
-Install (in its OWN venv, not your training venv):
-    python3 -m venv ~/sdgui-venv
-    ~/sdgui-venv/bin/pip install "gradio>=5" tensorboard
-
-Run:
-    ~/sdgui-venv/bin/python sdgui.py --root ~/sd-scripts
-    then open http://127.0.0.1:7860
-
-Security: this runs shell text from a web page and edits files. By default it binds to 127.0.0.1 only.
-To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
-(only do this on a network you trust; never expose it to the internet).
+Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
+otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.111126d"  # LoRA Studio version, see version.py
-import argparse
+__version__ = "1.111126e"  # LoRA Studio version, see version.py
 import atexit
 import codecs
 import contextlib
@@ -60,10 +40,6 @@ from pathlib import Path
 
 import gradio as gr
 
-if __name__ == "__main__":   # run on its own: the parts (sd_*.py) import this file as "sdgui": the same copy
-    sys.modules.setdefault("sdgui", sys.modules[__name__])
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    __import__("lspaths").bootstrap()
 import lspaths as _LP  # noqa: E402
 
 try:                                   # shared "Completed" marks (completed.py next to this file)
@@ -115,125 +91,86 @@ REPEAT_RE = re.compile(r"^(\d+)_")
 IGNORE_DIRS = {"model", "models", "output", "outputs", "samples", "sample", "log", "logs",
                "loramanager", "_set_aside", "_reserve", "_originals", ".lsflow", "_old_runs", "_extra"}   # never dataset folders (LoraManager = Personal sync: previews and examples)
 ARCHIVE_RENAMED_RE = re.compile(r"^\d+_loramanager$", re.I)   # a LoraManager folder renamed into a repeat folder
-CSS = ("#wm_tool {display:none !important;} #tree_df .table-wrap, #q_df .table-wrap {height: 236px !important; min-height: 236px !important; "
-       "max-height: 236px !important; overflow-y: auto !important;} "
-       "#tree_df td, #q_df td {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;} "
-       "#tree_df thead, #q_df thead {position: sticky; top: 0; z-index: 3;} "
-       "#tree_df thead tr, #q_df thead tr, #tree_df th, #q_df th {background: var(--block-background-fill) !important;} "
-       "#tree_df .table-wrap::-webkit-scrollbar, #q_df .table-wrap::-webkit-scrollbar {width: 9px;} "
-       "#tree_df .table-wrap::-webkit-scrollbar-thumb, #q_df .table-wrap::-webkit-scrollbar-thumb "
-       "{background: var(--border-color-primary); border-radius: 5px;} "
-       "#tree_df .table-wrap, #q_df .table-wrap {scrollbar-width: thin; scrollbar-gutter: stable;} "
-       ".ls-bar {gap: 8px !important; align-items: center !important; flex-wrap: wrap;} "
-       ".ls-bar > * {flex-grow: 0;} .ls-bar .block {padding: 4px 8px !important;} "
-       ".ls-sel {font-size: 12.5px; opacity: .85; min-height: 22px;} .ls-sel p {margin: 2px 0;} "
-       ".ls-prog {position: relative; height: 32px; border-radius: 8px; overflow: hidden; "
-       "background: var(--block-background-fill); border: 1px solid var(--border-color-primary);} "
-       ".ls-prog-fill {position: absolute; left: 0; top: 0; bottom: 0; transition: width .9s ease; "
-       "background: linear-gradient(90deg, #a85a08, #e8a33d);} "
-       ".ls-prog-ok .ls-prog-fill {background: linear-gradient(90deg, #1f7a72, #4fb3a9);} "
-       ".ls-prog-bad .ls-prog-fill {background: linear-gradient(90deg, #8e2a1f, #f07c6a);} "
-       ".ls-prog-text {position: relative; z-index: 1; line-height: 32px; padding: 0 12px; white-space: nowrap; "
-       "overflow: hidden; text-overflow: ellipsis; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; "
-       "text-shadow: 0 1px 2px rgba(0,0,0,.45);} "
-       "#gpu_status, #hf_status {text-align: right;} #gpu_status p, #hf_status p {margin: 0;} "
-       "#gpu_status .grow {display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center;} "
-       "#gpu_status .gname {font-weight: 600; margin-right: 2px;} #gpu_status .gmsg {opacity: .7;} "
-       "#gpu_status .gbar {position: relative; width: 175px; height: 22px; border-radius: 6px; overflow: hidden; "
-       "background: #5b6470;} "
-       "#gpu_status .gfill {position: absolute; inset: 0 auto 0 0; transition: width .6s ease, background .6s;} "
-       "#gpu_status .gtxt {position: relative; display: flex; justify-content: space-between; padding: 0 8px; "
-       "line-height: 22px; font-size: .78rem; white-space: nowrap;} "
-       "#gpu_status .gtxt, #gpu_status .gtxt * {color: #fff !important; text-shadow: 0 1px 2px rgba(0,0,0,.6);} "
- "#loss_box .lossbox {--ls-ok:#2e9e5b; --ls-warn:#d98a1a; --ls-bad:#d64545; --ls-info:#8a93a0; --ls-line:#4c7fd6; "
-       "padding: 10px 12px; border-radius: 8px; background: rgba(128,128,128,.10); font-size: .9rem;} "
-       "#loss_box .lossmuted {opacity: .72; font-size: .8rem;} "
-       "#loss_box .losscells {display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0;} "
-       "#loss_box .losscell {padding: 6px 10px; background: rgba(128,128,128,.12); border-radius: 6px;} "
-       "@media (max-width: 700px) {#loss_box .losscells {grid-template-columns: 1fr;}} "
-       "#loss_box .losschart {display:block; background: rgba(128,128,128,.08); border-radius: 6px;} "
-       "#progress_line textarea, #progress_line input {font-family: monospace; font-size: 0.95em;} "
-       "#stage_box .lsstage {padding: 8px 10px; border-radius: 8px; background: rgba(128,128,128,.10);} "
-       "#stage_box .lschips {display: flex; flex-wrap: wrap; gap: 6px;} "
-       "#stage_box .lschip {padding: 3px 10px; border-radius: 14px; font-size: .85rem; border: 1px solid var(--border-color-primary); "
-       "background: rgba(128,128,128,.12); opacity: .75;} "
-       "#stage_box .lschip-run {background: #a85a08; color: #fff; opacity: 1; border-color: #e8a33d;} "
-       "#stage_box .lschip-done {background: #1f7a72; color: #fff; opacity: 1; border-color: #4fb3a9;} "
-       "#stage_box .lschip-fail {background: #8e2a1f; color: #fff; opacity: 1; border-color: #f07c6a;} "
-       "#stage_box .lschip-stopped {background: #5b6470; color: #fff; opacity: 1;} "
-       "#stage_box .lsdur {opacity: .8; margin-left: 6px; font-size: .78rem;} "
-       "#stage_box .lsmsg {margin-top: 6px; font-size: .9rem;} "
-       "#stage_box .lsbad {color: #f07c6a;} #stage_box .lsok {color: #4fb3a9;} "
-       "#wm_html .wm-row {display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border-color-primary); flex-wrap: wrap;} "
-       "#wm_html .wm-src {width: 260px;} #wm_html .wm-src img {max-width: 260px; max-height: 260px; border-radius: 6px; display: block;} "
-       "#wm_html .wm-src .wm-name {font-weight: 600; font-size: .85rem; margin-top: 4px; word-break: break-all;} "
-       "#wm_html .wm-src .wm-marks {font-size: .8rem; opacity: .85;} "
-       "#wm_html .wm-opts {display: flex; gap: 10px; flex-wrap: wrap; flex: 1;} "
-       "#wm_html .wm-opt {all: unset; cursor: pointer; width: 200px; border: 2px solid var(--border-color-primary); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 4px; font-size: .8rem;} "
-       "#wm_html .wm-opt img {max-width: 200px; max-height: 200px; border-radius: 4px; display: block; margin: 0 auto;} "
-       "#wm_html .wm-opt .wm-big {height: 120px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; opacity: .6;} "
-       "#wm_html .wm-opt.sel {border-color: #e8a33d; background: rgba(232,163,61,.12);} "
-       "#wm_html .wm-opt b {font-size: .85rem;} #wm_html .wm-now {color: #4fb3a9; font-weight: 600;} "
-       "#cc_box, #ad_box, #tm_box {display: none !important;} "
-       "#tm_html .tm-guide {border-color: #E8A33D; border-style: double; border-width: 4px;} "
-       "#tm_view {position: sticky; top: 8px; align-self: flex-start;} "
-       ".tm-slot h3 {margin: 0 0 4px; font-size: 1rem;} "
-       ":is(#ad_html, #tm_html) .ad-grid {display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px;} "
-       ":is(#ad_html, #tm_html) .ad-cell {border: 2px solid #21857C; border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 4px; font-size: .8rem;} "
-       ":is(#ad_html, #tm_html) .ad-cell.ad-off {border-color: var(--border-color-primary); opacity: .62;} "
-       ":is(#ad_html, #tm_html) .ad-cell.ad-sel {outline: 3px solid #E8A33D;} "
-       ":is(#ad_html, #tm_html) .ad-img {all: unset; cursor: zoom-in;} :is(#ad_html, #tm_html) .ad-img img {width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; display: block;} "
-       ":is(#ad_html, #tm_html) .ad-tick {display: flex; gap: 6px; align-items: center; font-weight: 600; cursor: pointer; min-width: 0;} "
-       ":is(#ad_html, #tm_html) .ad-tick input {appearance: auto; -webkit-appearance: checkbox; accent-color: #21857C; width: 15px; height: 15px; flex: none;} "
-       ":is(#ad_html, #tm_html) .ad-name {overflow: hidden; text-overflow: ellipsis; white-space: nowrap;} "
-       ":is(#ad_html, #tm_html) .ad-size {opacity: .65; font-family: monospace;} "
-       ":is(#ad_html, #tm_html) ul {margin: 0; padding-left: 16px;} :is(#ad_html, #tm_html) li {font-size: .78rem;} "
-       ":is(#ad_html, #tm_html) li.ad-bad {color: #c0392b;} :is(#ad_html, #tm_html) li.ad-add {color: #21857C;} :is(#ad_html, #tm_html) li.ad-warn {color: #a86a0c;} "
-       ":is(#ad_html, #tm_html) .ad-bar {display: flex; gap: 10px; align-items: center; margin-bottom: 8px;} "
-       ":is(#ad_html, #tm_html) .ad-bar button {all: unset; cursor: pointer; padding: 3px 10px; border: 1px solid var(--border-color-primary); border-radius: 6px; font-size: .8rem;} "
-       ":is(#ad_html, #tm_html) .ad-count {font-weight: 600; font-family: monospace;} "
-       "#ad_view {position: sticky; top: 8px; align-self: flex-start;} "
-       "#cc_html input[type=radio] {appearance: auto; -webkit-appearance: radio; accent-color: #E8A33D; width: 14px; height: 14px; margin: 0 4px 0 0; vertical-align: -2px; opacity: 1;} "
-       "#cc_html label {cursor: pointer;} "
-       "#cc_html .cc-group {border: 1px solid var(--border-color-primary); border-radius: 10px; padding: 10px 12px; margin: 0 0 10px;} "
-       "#cc_html .cc-head {display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;} "
-       "#cc_html .cc-trait {font-weight: 700; font-size: 1rem;} #cc_html .cc-cov {opacity: .7; font-size: .85rem;} "
-       "#cc_html .cc-kind {font-size: .72rem; font-weight: 600; padding: 1px 8px; border-radius: 99px;} "
-       "#cc_html .cc-lock {background: #262A31; color: #F4C06F;} #cc_html .cc-exc {margin-top: 8px; font-size: .82rem; opacity: .8;} "
-       "#cc_html .cc-contra {background: #FBE9C8; color: #8F560B;} #cc_html .cc-same {background: #21857C; color: #fff;} "
-       "#cc_html .cc-vals {display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0;} "
-       "#cc_html .cc-val {padding: 3px 10px; border-radius: 8px; border: 1px solid var(--border-color-primary); font-size: .88rem;} "
-       "#cc_html .cc-val.cc-main {border-color: #E8A33D;} #cc_html .cc-val small {opacity: .7;} "
-       "#cc_html .cc-word {font: inherit; font-weight: 600; background: transparent; color: inherit; border: 0; border-bottom: 1px dashed #E8A33D;} "
-       "#cc_html .cc-modes {display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: .9rem;} "
-       "#cc_html .cc-modes i {color: #21857C; font-style: normal; font-size: .78rem; margin-left: 4px;} "
-       "#cc_html .cc-oddhead {margin: 10px 0 6px; font-size: .85rem; opacity: .85;} "
-       "#cc_html .cc-odds {display: flex; gap: 10px; flex-wrap: wrap;} "
-       "#cc_html .cc-odd {display: flex; gap: 8px; width: 330px; padding: 6px; border: 2px solid var(--border-color-primary); border-radius: 8px;} "
-       "#cc_html .cc-odd.cc-sel {border-color: #E8A33D;} "
-       "#cc_html .cc-look {all: unset; cursor: zoom-in;} #cc_html .cc-look img {width: 96px; height: 96px; object-fit: cover; border-radius: 6px; display: block;} "
-       "#cc_html .cc-oddtxt {display: flex; flex-direction: column; gap: 3px; font-size: .82rem; min-width: 0;} "
-       "#cc_html .cc-name {font-weight: 600; word-break: break-all;} "
-       "#cc_view {position: sticky; top: 8px; align-self: flex-start;} "
-       "#dc_html .dctable {width: 100%; border-collapse: collapse;} #dc_html .dctable td {vertical-align: top; padding: 6px;} "
-       "#dc_html .dctable tr {border-bottom: 1px solid var(--border-color-primary);} "
-       "#dc_html img {width: 120px; height: 120px; object-fit: cover; border-radius: 6px;} "
-       "#dc_html ul {margin: 4px 0 0 18px; padding: 0;} #dc_html li {font-size: .88rem;} "
-       "#dc_html li.dcbad {color: #f07c6a;} #dc_html li.dcwarn {color: #d9a23d;} "
-       "#dc_html .dctag {margin-left: 8px; padding: 1px 8px; border-radius: 10px; font-size: .75rem; color: #fff;} "
-       "#dc_html .dctag-bad {background: #b03a2e;} #dc_html .dctag-warn {background: #a07012;} "
-              "#oc_ex .ocex {padding: 8px 12px; border-radius: 8px; background: rgba(128,128,128,.10);} "
-       "#oc_ex .ochead {font-size: .82rem; opacity: .85; margin-bottom: 4px;} "
-       "#oc_ex .octext {font-family: var(--font-mono, monospace); font-size: .9rem; line-height: 1.45;} "
-       "#oc_ex .ocnote {font-size: .8rem; opacity: .85; margin-top: 4px;} #oc_ex .ocnote.bad {color: #f07c6a; opacity: 1;} "
-       "#oc_ex .ocbar {height: 8px; border-radius: 4px; background: rgba(128,128,128,.25); margin-top: 6px; overflow: hidden;} "
-       "#oc_ex .ocfill {height: 100%; border-radius: 4px;} #oc_ex .ocfill.ok {background: #1f9e8f;} "
-       "#oc_ex .ocfill.bad {background: #d9534f;} "
-              "#stage_box .lstail {margin: 6px 0 0; padding: 6px 8px; max-height: 170px; overflow: auto; font-size: .78rem; "
-       "background: rgba(0,0,0,.18); border-radius: 6px; white-space: pre-wrap;}")
-LAUNCH_HAS_CSS = "css" in inspect.signature(gr.Blocks.launch).parameters   # Gradio 6 moved css to launch()
+CSS = ('#wm_tool {display:none !important;} '
+       '.ls-bar {gap: 8px !important; align-items: center !important; flex-wrap: wrap;} '
+       '.ls-bar > * {flex-grow: 0;} .ls-bar .block {padding: 4px 8px !important;} '
+       '.ls-prog {position: relative; height: 32px; border-radius: 8px; overflow: hidden; background: var(--block-background-fill); border: 1px solid var(--border-color-primary);} '
+       '.ls-prog-fill {position: absolute; left: 0; top: 0; bottom: 0; transition: width .9s ease; background: linear-gradient(90deg, #a85a08, #e8a33d);} '
+       '.ls-prog-ok .ls-prog-fill {background: linear-gradient(90deg, #1f7a72, #4fb3a9);} '
+       '.ls-prog-bad .ls-prog-fill {background: linear-gradient(90deg, #8e2a1f, #f07c6a);} '
+       ".ls-prog-text {position: relative; z-index: 1; line-height: 32px; padding: 0 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; text-shadow: 0 1px 2px rgba(0,0,0,.45);} "
+       '#loss_box .lossbox {--ls-ok:#2e9e5b; --ls-warn:#d98a1a; --ls-bad:#d64545; --ls-info:#8a93a0; --ls-line:#4c7fd6; padding: 10px 12px; border-radius: 8px; background: rgba(128,128,128,.10); font-size: .9rem;} '
+       '#loss_box .lossmuted {opacity: .72; font-size: .8rem;} '
+       '#loss_box .losscells {display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0;} '
+       '#loss_box .losscell {padding: 6px 10px; background: rgba(128,128,128,.12); border-radius: 6px;} '
+       '@media (max-width: 700px) {#loss_box .losscells {grid-template-columns: 1fr;}} '
+       '#loss_box .losschart {display:block; background: rgba(128,128,128,.08); border-radius: 6px;} '
+       '#progress_line textarea, #progress_line input {font-family: monospace; font-size: 0.95em;} '
+       '#stage_box .lsstage {padding: 8px 10px; border-radius: 8px; background: rgba(128,128,128,.10);} '
+       '#stage_box .lschips {display: flex; flex-wrap: wrap; gap: 6px;} '
+       '#stage_box .lschip {padding: 3px 10px; border-radius: 14px; font-size: .85rem; border: 1px solid var(--border-color-primary); background: rgba(128,128,128,.12); opacity: .75;} '
+       '#stage_box .lschip-run {background: #a85a08; color: #fff; opacity: 1; border-color: #e8a33d;} '
+       '#stage_box .lschip-done {background: #1f7a72; color: #fff; opacity: 1; border-color: #4fb3a9;} '
+       '#stage_box .lschip-fail {background: #8e2a1f; color: #fff; opacity: 1; border-color: #f07c6a;} '
+       '#stage_box .lschip-stopped {background: #5b6470; color: #fff; opacity: 1;} '
+       '#stage_box .lsdur {opacity: .8; margin-left: 6px; font-size: .78rem;} '
+       '#stage_box .lsmsg {margin-top: 6px; font-size: .9rem;} #stage_box .lsbad {color: #f07c6a;} '
+       '#stage_box .lsok {color: #4fb3a9;} '
+       '#wm_html .wm-row {display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border-color-primary); flex-wrap: wrap;} '
+       '#wm_html .wm-src {width: 260px;} '
+       '#wm_html .wm-src img {max-width: 260px; max-height: 260px; border-radius: 6px; display: block;} '
+       '#wm_html .wm-src .wm-name {font-weight: 600; font-size: .85rem; margin-top: 4px; word-break: break-all;} '
+       '#wm_html .wm-src .wm-marks {font-size: .8rem; opacity: .85;} '
+       '#wm_html .wm-opts {display: flex; gap: 10px; flex-wrap: wrap; flex: 1;} '
+       '#wm_html .wm-opt {all: unset; cursor: pointer; width: 200px; border: 2px solid var(--border-color-primary); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 4px; font-size: .8rem;} '
+       '#wm_html .wm-opt img {max-width: 200px; max-height: 200px; border-radius: 4px; display: block; margin: 0 auto;} '
+       '#wm_html .wm-opt .wm-big {height: 120px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; opacity: .6;} '
+       '#wm_html .wm-opt.sel {border-color: #e8a33d; background: rgba(232,163,61,.12);} '
+       '#wm_html .wm-opt b {font-size: .85rem;} #wm_html .wm-now {color: #4fb3a9; font-weight: 600;} '
+       '#cc_box {display: none !important;} '
+       '#cc_html input[type=radio] {appearance: auto; -webkit-appearance: radio; accent-color: #E8A33D; width: 14px; height: 14px; margin: 0 4px 0 0; vertical-align: -2px; opacity: 1;} '
+       '#cc_html label {cursor: pointer;} '
+       '#cc_html .cc-group {border: 1px solid var(--border-color-primary); border-radius: 10px; padding: 10px 12px; margin: 0 0 10px;} '
+       '#cc_html .cc-head {display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;} '
+       '#cc_html .cc-trait {font-weight: 700; font-size: 1rem;} '
+       '#cc_html .cc-cov {opacity: .7; font-size: .85rem;} '
+       '#cc_html .cc-kind {font-size: .72rem; font-weight: 600; padding: 1px 8px; border-radius: 99px;} '
+       '#cc_html .cc-lock {background: #262A31; color: #F4C06F;} '
+       '#cc_html .cc-exc {margin-top: 8px; font-size: .82rem; opacity: .8;} '
+       '#cc_html .cc-contra {background: #FBE9C8; color: #8F560B;} '
+       '#cc_html .cc-same {background: #21857C; color: #fff;} '
+       '#cc_html .cc-vals {display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0;} '
+       '#cc_html .cc-val {padding: 3px 10px; border-radius: 8px; border: 1px solid var(--border-color-primary); font-size: .88rem;} '
+       '#cc_html .cc-val.cc-main {border-color: #E8A33D;} #cc_html .cc-val small {opacity: .7;} '
+       '#cc_html .cc-word {font: inherit; font-weight: 600; background: transparent; color: inherit; border: 0; border-bottom: 1px dashed #E8A33D;} '
+       '#cc_html .cc-modes {display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: .9rem;} '
+       '#cc_html .cc-modes i {color: #21857C; font-style: normal; font-size: .78rem; margin-left: 4px;} '
+       '#cc_html .cc-oddhead {margin: 10px 0 6px; font-size: .85rem; opacity: .85;} '
+       '#cc_html .cc-odds {display: flex; gap: 10px; flex-wrap: wrap;} '
+       '#cc_html .cc-odd {display: flex; gap: 8px; width: 330px; padding: 6px; border: 2px solid var(--border-color-primary); border-radius: 8px;} '
+       '#cc_html .cc-odd.cc-sel {border-color: #E8A33D;} #cc_html .cc-look {all: unset; cursor: zoom-in;} '
+       '#cc_html .cc-look img {width: 96px; height: 96px; object-fit: cover; border-radius: 6px; display: block;} '
+       '#cc_html .cc-oddtxt {display: flex; flex-direction: column; gap: 3px; font-size: .82rem; min-width: 0;} '
+       '#cc_html .cc-name {font-weight: 600; word-break: break-all;} '
+       '#cc_view {position: sticky; top: 8px; align-self: flex-start;} '
+       '#dc_html .dctable {width: 100%; border-collapse: collapse;} '
+       '#dc_html .dctable td {vertical-align: top; padding: 6px;} '
+       '#dc_html .dctable tr {border-bottom: 1px solid var(--border-color-primary);} '
+       '#dc_html img {width: 120px; height: 120px; object-fit: cover; border-radius: 6px;} '
+       '#dc_html ul {margin: 4px 0 0 18px; padding: 0;} #dc_html li {font-size: .88rem;} '
+       '#dc_html li.dcbad {color: #f07c6a;} #dc_html li.dcwarn {color: #d9a23d;} '
+       '#dc_html .dctag {margin-left: 8px; padding: 1px 8px; border-radius: 10px; font-size: .75rem; color: #fff;} '
+       '#dc_html .dctag-bad {background: #b03a2e;} #dc_html .dctag-warn {background: #a07012;} '
+       '#oc_ex .ocex {padding: 8px 12px; border-radius: 8px; background: rgba(128,128,128,.10);} '
+       '#oc_ex .ochead {font-size: .82rem; opacity: .85; margin-bottom: 4px;} '
+       '#oc_ex .octext {font-family: var(--font-mono, monospace); font-size: .9rem; line-height: 1.45;} '
+       '#oc_ex .ocnote {font-size: .8rem; opacity: .85; margin-top: 4px;} '
+       '#oc_ex .ocnote.bad {color: #f07c6a; opacity: 1;} '
+       '#oc_ex .ocbar {height: 8px; border-radius: 4px; background: rgba(128,128,128,.25); margin-top: 6px; overflow: hidden;} '
+       '#oc_ex .ocfill {height: 100%; border-radius: 4px;} #oc_ex .ocfill.ok {background: #1f9e8f;} '
+       '#oc_ex .ocfill.bad {background: #d9534f;} '
+       '#stage_box .lstail {margin: 6px 0 0; padding: 6px 8px; max-height: 170px; overflow: auto; font-size: .78rem; background: rgba(0,0,0,.18); border-radius: 6px; white-space: pre-wrap;} ')
 LAST_CHANGE = {"desc": "", "files": {}}   # last caption edit, for Undo
-SETTINGS_BLOCK = None   # the Settings panel when build_ui(detach_settings=True)
 
 
 # --------------------------------------------------------------------------- run state
@@ -273,21 +210,6 @@ def fmt(sec: float) -> str:
     h, r = divmod(sec, 3600)
     m, s = divmod(r, 60)
     return f"{h:d}:{m:02d}:{s:02d}"
-
-
-def status_text() -> str:
-    if RUN.proc is None:
-        return "**Status:** idle"
-    el = (RUN.ended or time.time()) - RUN.started
-    if RUN.running():
-        st = ""
-        if RUN.stages and RUN.stage_no:
-            st = f", stage {RUN.stage_no}/{len(RUN.stages)} **{RUN.stages[min(RUN.stage_no, len(RUN.stages)) - 1]['name']}**"
-        nan = " ⚠️ **loss is NaN**" if RUN.nan_at else ""
-        return f"**Status:** 🟢 running `{RUN.name}`, {fmt(el)} elapsed{st}{nan}"
-    why = run_failure(RUN, RUN.proc.returncode) if RUN.ended else ""
-    return (f"**Status:** ⚪ finished `{RUN.name}`, exit code {RUN.proc.returncode}, {fmt(el)}"
-            + (f" — 🔴 **{why}**" if why else ""))
 
 
 def log_text() -> str:
@@ -975,10 +897,6 @@ def runner_save(wd, venv, trace, sd_path="", mu_path=""):
             "Used by the next Start or queued script, and by new launch scripts."), st_raw()
 
 
-# ---- the left column of the Train tab: scripts with their saved states and epoch files
-TREE: dict = {}          # row id -> {"kind": script|state|file, "path": script, "state": dir, "file": path}
-
-
 def dataset_of_script(path) -> str:
     """Dataset a launch script belongs to: its folder directly under the dataset folder
     (images/mychar/mycharANIMA_lora.sh -> mychar), else the folder the script is in."""
@@ -1051,15 +969,13 @@ def mark_completed_after_run(run, code) -> str:
     if run.nan_at:
         return f"--- {nan_text(run)}: this dataset + type is NOT marked Completed ---"
     p = Path(run.script)
-    text = p.read_text(encoding="utf-8", errors="ignore")
-    out_dir, out_name = script_args(text, script_home(p))
-    if not out_name:
+    final = final_lora(run.script)
+    if final is None:
         return ""
-    root = Path(os.path.expanduser(out_dir)) if out_dir else script_home(p) / "model"
-    final = root / f"{out_name}.safetensors"
-    if not final.is_file() or final.stat().st_mtime < run.started - 5:
+    if not wrote_final(run):
         return "--- no new final LoRA file found, so this dataset + type is NOT marked Completed ---"
-    t = script_type(p, text)
+    out_name = final.stem
+    t = script_type(p)
     if not t:
         return ""
     ds = dataset_of_script(p)
@@ -1075,42 +991,6 @@ def mark_completed_after_run(run, code) -> str:
 # --------------------------------------------------------------------------- queue of scripts and states
 QUEUE = {"items": [], "running": False, "stop_flag": False, "stop_on_fail": True, "killed": False}
 QLOCK = threading.Lock()
-
-
-def _q_name(it):
-    nm = f"{Path(it['path']).parent.name}/{Path(it['path']).name}"
-    return nm + (f" ← resume {Path(it['resume']).name}" if it.get("resume") else "")
-
-
-def queue_rows():
-    with QLOCK:
-        items = [dict(i) for i in QUEUE["items"]]
-    icon = {"queued": "⏳ queued", "running": "🟢 running", "done": "✅ done", "failed": "❌ failed", "stopped": "⏹ stopped"}
-    return [[n, _q_name(it), icon.get(it["state"], it["state"]), it.get("note", "")] for n, it in enumerate(items, 1)]
-
-
-def queue_head():
-    with QLOCK:
-        items = [dict(i) for i in QUEUE["items"]]
-        running = QUEUE["running"]
-    counts = [(w, sum(i["state"] == k for i in items)) for w, k in
-              (("waiting", "queued"), ("done", "done"), ("failed", "failed"), ("stopped", "stopped"))]
-    return ("Queue: running" if running else "Queue: idle") + " · " + ", ".join(
-        f"{n} {w}" for w, n in counts if n or w in ("waiting", "done"))
-
-
-def queue_df_update(force=False):
-    return gr.update(value=queue_rows(), label=queue_head())
-
-
-def _q_out(sel=None):
-    n = len(QUEUE["items"])
-    keep = sel if sel is not None and 0 <= sel < n else None
-    msg = "Click a queue item to select it."
-    if keep is not None:
-        it = QUEUE["items"][keep]
-        msg = f"**Selected:** {keep + 1}. `{_q_name(it)}` ({it['state']})"
-    return queue_df_update(force=True), keep, msg
 
 
 def queue_failstop(v):
@@ -1304,20 +1184,29 @@ def _queue_worker():
                 pass
 
 
-def wrote_final(run) -> bool:
-    """Did this run write its final LoRA (<output_name>.safetensors, newer than the start)? A run stopped with
-    Ctrl+C can still end with exit code 0, so the exit code alone does not say it finished."""
+def final_lora(script) -> Path | None:
+    """The final LoRA file a launch script writes (<output_dir>/<output_name>.safetensors), None when unknown."""
     try:
-        p = Path(run.script)
+        p = Path(script)
         text = p.read_text(encoding="utf-8", errors="ignore")
         out_dir, out_name = script_args(text, script_home(p))
-        if not out_name:
-            return True                                    # nothing to check against
-        root = Path(os.path.expanduser(out_dir)) if out_dir else script_home(p) / "model"
-        final = root / f"{out_name}.safetensors"
-        return final.is_file() and final.stat().st_mtime >= run.started - 5
-    except Exception:                                      # noqa: BLE001
-        return True
+    except (OSError, TypeError):
+        return None
+    if not out_name:
+        return None
+    return (Path(os.path.expanduser(out_dir)) if out_dir else script_home(p) / "model") / f"{out_name}.safetensors"
+
+
+def wrote_final(run) -> bool:
+    """Did this run write its final LoRA (newer than the start)? A run stopped with Ctrl+C can still end with exit
+    code 0, so the exit code alone does not say it finished."""
+    final = final_lora(run.script)
+    if final is None:
+        return True                                        # nothing to check against
+    try:
+        return final.stat().st_mtime >= run.started - 5
+    except OSError:
+        return False
 
 
 def run_failure(run, code) -> str:
@@ -1345,27 +1234,26 @@ def run_failure(run, code) -> str:
 def queue_start(stop_on_fail):
     if QUEUE["running"]:
         gr.Warning("The queue is already running.")
-        return _q_out()
+        return
     if RUN.running():
         gr.Warning("A run is in progress. Wait for it to finish (or press Stop now), then start the queue.")
-        return _q_out()
+        return
     try:
         import speedjobs
         if speedjobs.busy():
             gr.Warning("A speed test is running (Settings › Speed test). Start the queue when it has finished, "
                        "or stop it there.")
-            return _q_out()
+            return
     except ImportError:
         pass
     with QLOCK:
         if not any(i["state"] == "queued" for i in QUEUE["items"]):
             gr.Warning("No waiting items in the queue.")
-            return _q_out()
+            return
         QUEUE["running"], QUEUE["stop_flag"], QUEUE["stop_on_fail"] = True, False, bool(stop_on_fail)
         QUEUE["killed"] = False
     threading.Thread(target=_queue_worker, daemon=True).start()
     gr.Info("Queue started.")
-    return _q_out()
 
 
 def queue_stop_after_current():
@@ -1585,11 +1473,6 @@ def loss_html() -> str:
             f"{icon} Loss indicator</div>{msgs}<div class='losscells'>{cells}</div>{svg}{ep}{note}</div>")
 
 
-def tick(seen):
-    v = RUN.version
-    return status_text(), (log_text() if v != seen else gr.update()), v, progress_html(), loss_html(), stage_html()
-
-
 # --------------------------------------------------------------------------- monitor
 
 
@@ -1803,10 +1686,7 @@ def S_NVIDIA() -> bool:
         return False
 
 
-# --------------------------------------------------------------------------- GPU status (rocm-smi)
-_GPU = {"t": 0.0, "txt": "**GPU:** checking..."}
-
-
+# --------------------------------------------------------------------------- GPU (rocm-smi on old ROCm, see gpusmi.py)
 def _num_in(v):
     m = re.search(r"-?\d+(?:\.\d+)?", str(v))
     return float(m.group()) if m else None
@@ -1840,44 +1720,6 @@ def parse_rocm_smi(data):
     return cards
 
 
-_GPU_PEAK = {"power": 300.0}
-
-
-def _bar(label, frac, text, warn=0.6, crit=0.85):
-    """One colored meter: label on the left, value inside the bar. frac is 0..1."""
-    frac = min(max(frac or 0.0, 0.0), 1.0)
-    color = "#2e9e5b" if frac < warn else ("#d99a1f" if frac < crit else "#d64545")
-    return (f'<div class="gbar" title="{label}"><div class="gfill" style="width:{frac * 100:.0f}%;background:{color}"></div>'
-            f'<div class="gtxt"><span>{label}</span><b>{text}</b></div></div>')
-
-
-def format_gpu(cards):
-    if not cards:
-        import gpusmi
-        return f'<div class="gmsg">GPU: no data from {gpusmi.label()}</div>'
-    out = []
-    for c in cards:
-        bars = []
-        if c["load"] is not None:
-            bars.append(_bar("Load", c["load"] / 100, f"{c['load']:.0f}%"))
-        if c["vram_total"]:
-            div = 1024 ** 3 if c["vram_total"] > 1e6 else 1024.0      # bytes or MB
-            used, tot = (c["vram_used"] or 0) / div, c["vram_total"] / div
-            bars.append(_bar("VRAM", used / tot if tot else 0, f"{used:.1f} / {tot:.1f} GiB", 0.75, 0.92))
-        t = c["junction"] if c["junction"] is not None else c["temp"]
-        if t is not None:
-            txt = f"{c['temp']:.0f}°C" if c["temp"] is not None else f"{t:.0f}°C"
-            if c["junction"] is not None:
-                txt += f" · jct {c['junction']:.0f}°C"
-            bars.append(_bar("Temp", t / 110, txt, 0.64, 0.8))
-        if c["power"] is not None:
-            _GPU_PEAK["power"] = max(_GPU_PEAK["power"], c["power"])
-            bars.append(_bar("Power", c["power"] / _GPU_PEAK["power"], f"{c['power']:.0f} W", 0.7, 0.92))
-        name = str(c["card"]).replace("card", "GPU ")
-        out.append(f'<div class="grow"><span class="gname">{name}</span>{"".join(bars)}</div>')
-    return "".join(out)
-
-
 _GPU_NAME: dict = {}
 
 
@@ -1900,24 +1742,6 @@ def gpu_name() -> str:
     return name
 
 
-def gpu_status_text():
-    now = time.time()
-    if now - _GPU["t"] < 2.0:
-        return _GPU["txt"]
-    import gpusmi
-    if not gpusmi.tool():
-        txt = '<div class="gmsg">GPU: amd-smi / rocm-smi not found</div>'
-    else:
-        try:
-            txt = format_gpu(gpusmi.cards())
-        except subprocess.TimeoutExpired:
-            txt = f'<div class="gmsg">GPU: {gpusmi.label()} timed out</div>'
-        except Exception:
-            txt = f'<div class="gmsg">GPU: could not read {gpusmi.label()} output</div>'
-    _GPU["t"], _GPU["txt"] = now, txt
-    return txt
-
-
 # ---- the launch script page, preparing a dataset and the trainer settings live in sd_script.py,
 # sd_prepare.py and sd_settings.py (imported back here, so sdgui.<name> works as before)
 from sd_script import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
@@ -1930,7 +1754,6 @@ from sd_script import (  # noqa: F401  (also used as sdgui.<name> by the other p
     OLD_RUNS,
     PRESETS_ERROR,
     RESERVED_TYPES,
-    STUDIO_MODE,
     STUDIO_TABLE,
     SUBTYPE_BASES,
     _PH,
@@ -1954,7 +1777,6 @@ from sd_script import (  # noqa: F401  (also used as sdgui.<name> by the other p
     cs_suggest,
     custom_subtypes,
     dataset_stats,
-    datatypes_status,
     ensure_folders,
     explain_for,
     export_report,
@@ -1977,7 +1799,6 @@ from sd_script import (  # noqa: F401  (also used as sdgui.<name> by the other p
     with_virtual_row,
 )
 from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
-    AP_ASK,
     CC_JS,
     CC_OPEN_JS,
     OC_FAMILY,
@@ -1987,8 +1808,6 @@ from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other 
     _dc_min_side,
     _oc_check,
     _oc_family,
-    ap_caption,
-    ap_prepare,
     cc_apply,
     cc_find,
     cc_leave_out,
@@ -2041,7 +1860,6 @@ from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other
     get_gfx,
     gfx_load,
     gfx_pick,
-    header_status,
     hf_path,
     hf_status_text,
     mask_token,
@@ -2218,7 +2036,7 @@ def auto_script(ds, tkey) -> str:
 
 # --------------------------------------------------------------------------- LoRA Studio pages: helpers
 ON_SD_DIR: list = []   # callbacks(path) when Settings > Trainers saves a new sd-scripts folder
-BLOCKS: dict = {}      # page name -> gr.Column(render=False), placed by lora_studio.py (build_ui(detach_settings=True))
+BLOCKS: dict = {}      # page name -> gr.Column(render=False), placed by lora_studio.py and datasets_ui.py
 UI: dict = {}          # components and chains lora_studio.py wires across pages
 
 
@@ -2591,464 +2409,408 @@ def model_vis(tkey, *vals):
 _FIN_MEMO: dict = {}
 
 
-def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
-    """Standalone: returns a new Blocks with one tab per page. With `parent` (an open gr.Blocks) it renders into
-    that app instead. With `detach_settings` (LoRA Studio) every page is built hidden in BLOCKS (a gr.Column made
-    with render=False) for the caller to place with .render(); key components are in UI."""
-    global SETTINGS_BLOCK
+def build_ui(parent):
+    """The training parts of LoRA Studio, built into the open gr.Blocks `parent`: every page hidden in BLOCKS (a
+    gr.Column made with render=False) for lora_studio.py / datasets_ui.py to place with .render(); the components
+    other pages wire to are in UI."""
     global ST_N
-    studio = bool(detach_settings)
     BLOCKS.clear()
     UI.clear()
-    SETTINGS_BLOCK = None
     try:
         ST_N = max(4, max(len(v.get("model_args", [])) for v in merged_presets()[1].values()))
     except Exception:
         ST_N = 4
     sname = Path(settings_path()).name
-    ctx = (gr.Blocks(title="sd-scripts launcher", **({} if LAUNCH_HAS_CSS else {"css": CSS}))
-           if parent is None else contextlib.nullcontext(parent))
 
-    def page(key, title):
-        if studio:
-            BLOCKS[key] = gr.Column(render=False)
-            return BLOCKS[key]
-        return gr.Tab(title)
+    def page(key, title=""):
+        BLOCKS[key] = gr.Column(render=False)
+        return BLOCKS[key]
+    sub = page                                  # a part of a page, placed by datasets_ui
 
-    def sub(key):
-        """A part of a page: its own block in LoRA Studio (placed by datasets_ui), inline when standalone."""
-        if studio:
-            BLOCKS[key] = gr.Column(render=False)
-            return BLOCKS[key]
-        return contextlib.nullcontext()
-
-    STUDIO_MODE["on"] = bool(studio)
-
-    with ctx as demo:
-        # header: standalone only (LoRA Studio shows the status strip instead); the components stay for the timers
-        with gr.Row(visible=not studio):
-            with gr.Column(scale=3):
-                gr.Markdown("## sd-scripts launcher")
-            with gr.Column(scale=2):
-                gpu_md = gr.HTML(gpu_status_text(), elem_id="gpu_status")
-                hf_md = gr.Markdown(hf_status_text(), elem_id="hf_status")
-        status = gr.Markdown(status_text(), visible=not studio)
+    with contextlib.nullcontext(parent) as demo:
+        hf_md = gr.Markdown(visible=False)      # the token status (shown in Settings › Model files)
         _types = type_choices()
         _purposes = [("Character / person", "character"), ("Art style", "style"), ("Object / item", "object"),
                      ("Worn item (clothes, equipment, jewelry)", "worn"),
                      ("Action / pose", "action"), ("Concept / effect", "concept")]
         _oc_url, _oc_model = oc_settings()
 
-        with (contextlib.nullcontext() if studio else gr.Tabs()):
-            # ================================================================ Training > Launch script
-            with page("script", "Launch script"):
-                # LoRA Studio places the parts in Datasets › 9 in its own order (sub-pages); standalone shows them here
-                with sub("s9_head"):
-                    gr.Markdown(datatypes_status(), visible=not studio)
-                    if SCAN_SCRIPT is not None:
-                        gr.Markdown("Pick a dataset, then an **existing launch script** (its settings are loaded into the "
-                                    "form) or **+ New launch script** (recommended settings for the LoRA type, with the "
-                                    "reasoning and the step calculation). Nothing is written until you press a Save button. "
-                                    "Prepare the pictures first in Datasets › Prepare.", visible=not studio)
-                    with gr.Row():
-                        cs_ds = gr.Dropdown(choices=list_lora_dirs(), value=None, label="Dataset", scale=3,
-                                            visible=not studio)
-                        cs_script = gr.Dropdown(choices=[("+ New launch script", NEW)], value=NEW,
-                                                label="Launch script", scale=4)
-                        cs_type = gr.Dropdown(choices=_types, value=_types[0][1] if _types else None,
-                                              label="LoRA type (model architecture)", scale=3, visible=not studio)
-                        cs_purpose = gr.Dropdown(choices=_purposes, value="character", label="Purpose", scale=2)
-                        cs_priority = gr.Dropdown(choices=[("Balanced", "balanced"), ("Best quality", "quality"),
-                                                           ("Fastest", "fast")], value="balanced", label="Priority", scale=2)
-                        cs_refresh = gr.Button("Scan library", scale=1, visible=not studio)
-                    cs_status = gr.Markdown("")
-                with sub("s9_opts"):
-                    with gr.Row():
-                        cs_steps = gr.Number(label="Target total steps (0 = recommended for the type, press Enter)",
-                                             value=0, precision=0, scale=2)
-                        cs_userep = gr.Checkbox(label=("Plan with the recommended repeat count (the repeat folder is "
-                                                       "renamed by Fill with recommended)") if studio else
-                                                "Plan with the recommended repeat count (shows a rename command)",
-                                                value=True, scale=3)
-                        cs_hfauto = gr.Checkbox(label="Fill HF_TOKEN from the token file", value=True, scale=2)
-                        cs_samples = gr.State(False)   # sample images are not made (removed as an option)
-                        if not studio:
-                            cs_suggest_btn = gr.Button("Fill with recommended settings", scale=2)
-                    with gr.Row():
-                        with gr.Column(scale=3):
-                            cs_recs_md = gr.Markdown(recs_status())
-                        cs_export_btn = gr.Button("Export report for Claude", scale=1, size="sm" if studio else "lg")
-                        cs_export_file = gr.File(label="Report", visible=False, scale=2)
-                with sub("s9_why"):
-                    with (contextlib.nullcontext() if studio else gr.Accordion("Why these settings, with the step calculation", open=True)):
-                        cs_explain = gr.Markdown("")
-                with sub("s9_fields"):
-                    cs_fields = []
-                    for gname, flds in FORM_GROUPS:
-                        with gr.Accordion(gname + (" (only the files this LoRA type uses)" if gname == "Model files" else ""),
-                                          open=(gname in ("Training", "Model files")) and not studio):
-                            per = 2 if gname == "Model files" else 4
-                            for i in range(0, len(flds), per):
-                                with gr.Row():
-                                    for name, label in flds[i:i + per]:
-                                        cs_fields.append(gr.Textbox(label=label, info=f"--{name}",
-                                                                    visible=not (studio and name in STUDIO_TABLE)))
-                    model_fields = cs_fields[-len(FORM_GROUPS[3][1]):]
-                    with gr.Row():
-                        cs_read_btn = gr.Button("Read form from script text", visible=not studio)
-                        cs_apply_btn = gr.Button("Apply form to script text", variant="primary", visible=not studio)
-                        cs_models_btn = gr.Button("Use model files from Settings", size="sm" if studio else "lg")
-                        if not studio:
-                            cs_check_btn = gr.Button("Check flags against my trainer")
-                        cs_hf_fill = gr.Button("Fill HF_TOKEN in the script text", size="sm" if studio else "lg")
-                    cs_makedirs = gr.Checkbox(
-                        label="Create missing folders when saving: the repeat folder (<N>_<name>), model and log. "
-                              "Images lying directly in the dataset folder are moved into a newly created repeat folder.",
-                        value=True)
-                with sub("s9_text"):
-                    if not studio:
-                        cs_check_out = gr.Markdown("")
-                    cs_text = gr.Code(language="shell", label=("The script text (edit by hand; the settings above follow "
-                                                               "it, and it follows them)") if studio else
-                                      "Launch script (not written until you save)",
-                                      lines=26, interactive=True, elem_id="cs_text")
-                    cs_prompts_path = gr.State("")       # no sample prompts file (sample images were removed)
-                    cs_prompts_text = gr.State("")
-                with sub("s9_save"):
-                    with gr.Row(elem_classes=["ls-bar"] if studio else None, elem_id="s9_bar"):
-                        if studio:
-                            cs_suggest_btn = gr.Button("Fill with recommended settings", size="sm", scale=0, min_width=230)
-                            cs_check_btn = gr.Button("Check flags against my trainer", size="sm", scale=0, min_width=240)
-                        cs_save_over_btn = gr.Button("Save (overwrite the selected script)" if not studio else "Save",
-                                                     variant="primary", visible=False,
-                                                     size="sm" if studio else "lg", scale=0 if studio else None,
-                                                     min_width=110 if studio else None)
-                        cs_newname = gr.Textbox(label="File name for a new launch script" if not studio else "Save as",
-                                                scale=3 if not studio else 0, min_width=None if not studio else 220)
-                        cs_save_new_btn = gr.Button("Save as new launch script" if not studio else "Save as new version",
-                                                    variant="primary", scale=2 if not studio else 0,
-                                                    size="sm" if studio else "lg", min_width=None if not studio else 200)
-                        cs_queue_btn = gr.Button("Add to the queue →", size="sm", scale=0, min_width=180, visible=studio)
-                    if studio:
-                        cs_check_out = gr.Markdown("")
-                    cs_save_msg = gr.Markdown("")
-                cs_plan = gr.State({})
-
-            # ================================================================ Datasets > Prepare
-            # The Datasets flow (datasets_ui.py) places these parts in its steps: p_wm in 6 Resize, p_caption and
-            # p_cons in 7 Tags, p_repeat and the launch script page in 9 Launch script. "prepare" holds the shared
-            # controls and the full picture check; LoRA Studio keeps it hidden.
-            with page("prepare", "Prepare"):
+        # ================================================================ Training > Launch script
+        with page("script", "Launch script"):
+            # LoRA Studio places the parts in Datasets › 9 in its own order (sub-pages)
+            with sub("s9_head"):
                 with gr.Row():
-                    pp_ds = gr.Dropdown(choices=list_lora_dirs(), value=None, label="Dataset", scale=3)
-                    pp_type = gr.Dropdown(choices=_types, value=_types[0][1] if _types else None,
-                                          label="LoRA type", scale=3)
-                    pp_purpose = gr.Dropdown(choices=_purposes, value="character", label="Purpose", scale=2)
-                pp_html = gr.HTML(pp_status(None, None), elem_id="pp_html")
-                with gr.Row(elem_classes=["ls-bar"]):
-                    ap_btn = gr.Button("Run all steps", variant="primary", size="sm", scale=1, min_width=150)
-                    ap_auto = gr.Checkbox(label="Also run them when a LoRA type is picked for a dataset without a launch "
-                                                "script", value=not studio, scale=3)
-                    pp_next = gr.Button("Next: write the launch script  →", size="sm", scale=1, min_width=230)
-                ap_md = gr.Markdown("")
+                    cs_ds = gr.Dropdown(choices=list_lora_dirs(), value=None, label="Dataset", scale=3,
+                                        visible=False)
+                    cs_script = gr.Dropdown(choices=[("+ New launch script", NEW)], value=NEW,
+                                            label="Launch script", scale=4)
+                    cs_type = gr.Dropdown(choices=_types, value=_types[0][1] if _types else None,
+                                          label="LoRA type (model architecture)", scale=3, visible=False)
+                    cs_purpose = gr.Dropdown(choices=_purposes, value="character", label="Purpose", scale=2)
+                    cs_priority = gr.Dropdown(choices=[("Balanced", "balanced"), ("Best quality", "quality"),
+                                                       ("Fastest", "fast")], value="balanced", label="Priority", scale=2)
+                    cs_refresh = gr.Button("Scan library", scale=1, visible=False)
+                cs_status = gr.Markdown("")
+            with sub("s9_opts"):
                 with gr.Row():
-                    ap_q = gr.Radio(choices=list(AP_ASK), label="Existing captions", visible=False, scale=4)
-                    ap_go = gr.Button("Continue", variant="primary", size="sm", visible=False, scale=1)
-                with gr.Accordion("1 · Check pictures: quality, content and balance", open=True):
-                    gr.Markdown("Finds pictures that are **not recommended** for training and says why. **Technical** "
-                                "(no AI, seconds): too small for the LoRA type, blurry, near-duplicates, extreme crops, heavy "
-                                "JPEG compression. **Content** (the Ollama model from Settings › AI helpers, a few seconds per "
-                                "picture, remembered): subject visible and in focus, number of people, face hidden, text / "
-                                "watermark, filters, collages and screenshots. **Balance**: framing, outfits and places that "
-                                "repeat too much. The rules follow the *Purpose* above.")
-                    with gr.Row():
-                        dc_checks = gr.CheckboxGroup(choices=[("Technical", "technical"), ("Content (Ollama)", "content"),
-                                                              ("Balance (Ollama)", "balance")],
-                                                     value=["technical", "content", "balance"], label="Checks", scale=3)
-                        dc_btn = gr.Button("Check pictures", variant="primary", size="sm", scale=1, min_width=140)
-                        dc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=70)
-                    dc_sum = gr.Markdown("")
-                    dc_html = gr.HTML("", elem_id="dc_html")
-                    dc_pick = gr.CheckboxGroup(choices=[], value=[], label="Pictures to set aside (not recommended ones are ticked)")
-                    with gr.Row(elem_classes=["ls-bar"]):
-                        dc_aside_btn = gr.Button("Move ticked to _set_aside", variant="stop", size="sm", scale=1)
-                        dc_back_btn = gr.Button("Move all back", size="sm", scale=1)
-                    dc_msg = gr.Markdown("")
-            with page("p_wm", "Watermarks"):
-                gr.Markdown("Pictures where the sort found marks **added on top** of the picture (watermarks, site "
-                            "names, logo stamps, signatures, date stamps): remove them (picture tools), crop them off, set "
-                            "the picture aside, or keep it (it may be learned). Text that belongs to the scene (signs, shirts) is left alone.",
-                            elem_classes=["ls-note"])
-                wm_sum = gr.Markdown("")
-                wm_html = gr.HTML("", elem_id="wm_html")
-                wm_box = gr.Textbox(visible=False)
-                with gr.Row(elem_classes=["ls-bar"], elem_id="wm_btnrow"):
-                    wm_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=1,
-                                             elem_id="wm_apply_btn")
-                    wm_reco_btn = gr.Button("Use the recommended option for the undecided ones", size="sm", scale=2,
-                                            elem_id="wm_reco_btn")
-                wm_msg = gr.Markdown("")
-                wm_tool = gr.Textbox(elem_id="wm_tool", show_label=False, container=False)
-                with gr.Column(visible=False, elem_classes=["ls-card"], elem_id="wm_panel") as wm_panel:
-                    wm_ptitle = gr.Markdown()
-                    with gr.Column(visible=True) as wm_paint_col:
-                        gr.Markdown("Paint over the mark with the brush (a little over its edges is fine). The "
-                                    "picture tools fill in what is under it; the rest of the picture stays as it is.",
-                                    elem_classes=["ls-note"])
-                        wm_editor = gr.ImageEditor(type="pil", image_mode="RGBA", sources=(), transforms=(),
-                                                   layers=False, height=560, show_label=False,
-                                                   brush=gr.Brush(colors=["#ff3b30"], default_color="#ff3b30",
-                                                                  default_size=28, color_mode="fixed"),
-                                                   buttons=[], elem_id="wm_editor")
-                    with gr.Column(visible=False) as wm_crop_col:
-                        gr.Markdown("Move the edges until the mark is outside; the shaded part is cut off.",
-                                    elem_classes=["ls-note"])
-                        wm_cimg = gr.Image(type="pil", interactive=False, height=420, show_label=False)
-                        wm_aspect = gr.Radio(["free", "3:4", "1:1", "4:3"], value="free", label="Shape")
-                        with gr.Row():
-                            wm_l = gr.Slider(0, 100, value=0, step=1, label="Left %")
-                            wm_r = gr.Slider(0, 100, value=100, step=1, label="Right %")
-                        with gr.Row():
-                            wm_t = gr.Slider(0, 100, value=0, step=1, label="Top %")
-                            wm_b = gr.Slider(0, 100, value=100, step=1, label="Bottom %")
-                        wm_cres = gr.Markdown()
-                    with gr.Row(elem_classes=["ls-bar"]):
-                        wm_paint_go = gr.Button("Remove what I painted", variant="primary", size="sm", scale=0,
-                                                min_width=200)
-                        wm_crop_go = gr.Button("Use this crop", variant="primary", size="sm", scale=0,
-                                               min_width=160, visible=False)
-                        wm_close = gr.Button("Close", size="sm", scale=0, min_width=100)
-                    wm_pmsg = gr.Markdown()
-                    wm_rel = gr.State("")
-            with page("p_repeat", "Repeat folder"):
-                rp_info = gr.Markdown("")
+                    cs_steps = gr.Number(label="Target total steps (0 = recommended for the type, press Enter)",
+                                         value=0, precision=0, scale=2)
+                    cs_userep = gr.Checkbox(label=("Plan with the recommended repeat count (the repeat folder is "
+                                                   "renamed by Fill with recommended)"), value=True, scale=3)
+                    cs_hfauto = gr.Checkbox(label="Fill HF_TOKEN from the token file", value=True, scale=2)
+                    cs_samples = gr.State(False)   # sample images are not made (removed as an option)
                 with gr.Row():
-                    rp_folder = gr.Dropdown(choices=[], label="Image folder", scale=4)
-                    rp_repeats = gr.Number(label="Repeats", value=0, precision=0, scale=1)
-                    rp_newname = gr.Textbox(label="New folder name", scale=3)
-                with gr.Row():
-                    rp_confirm = gr.Checkbox(label="Allow moving images that sit directly in the dataset folder into a new repeat folder",
-                                             value=False, scale=3)
-                    rp_btn = gr.Button("Rename / create repeat folder", variant="primary", scale=2)
-                    rp_epochs_btn = gr.Button("Set epochs to hit the target steps", scale=2)
-                    rp_make_btn = gr.Button("Create missing folders now (repeat folder, model, log)", scale=2)
-                rp_msg = gr.Markdown("")
-            with page("p_caption", "Captions"):
-                gr.Markdown(
-                    "The Ollama model (Settings › AI helpers) looks at every picture and writes a caption that starts "
-                    "with the trigger word. For a person, captions describe what changes (clothes, pose, place, light, "
-                    "framing) and leave out what is always that person, so the trigger word learns it. **Try on 3 "
-                    "pictures** writes nothing; **Write captions** replaces the `.txt` captions (Undo restores them).",
-                    elem_classes=["ls-note"])
-                with gr.Row():
-                    oc_trigger = gr.Textbox(label="Trigger word (first word of every caption)", scale=1)
-                    oc_leave = gr.Textbox(label="Never describe (always part of the person)",
-                                          value=CAP.DEFAULT_LEAVE_OUT if CAP else "", scale=3)
-                with gr.Row():
-                    oc_style = gr.Radio(choices=[("Sentences", "sentences"), ("Tags", "tags")], value="sentences",
-                                        label="Caption format", scale=1)
-                    oc_length = gr.Slider(1, 5, value=3, step=1, label="Length (1 very short ... 5 very long)", scale=2)
-                    oc_detail = gr.Slider(1, 4, value=3, step=1, label="Detail (1 basic ... 4 everything)", scale=2)
-                    oc_rec_btn = gr.Button("Use recommended", size="sm", scale=0, min_width=140)
-                oc_rec = gr.Markdown("", elem_id="oc_rec")
-                oc_ex = gr.HTML("", elem_id="oc_ex")
-                with gr.Row(elem_classes=["ls-bar"]):
-                    oc_hints = gr.Checkbox(label="Give the old tags to the model as hints (they can be wrong)", value=False, scale=3)
-                    oc_unload = gr.Checkbox(label="Free the VRAM when done", value=True, scale=2)
-                    oc_prev_btn = gr.Button("Try on 3 pictures", size="sm", scale=1, min_width=120)
-                    oc_run_btn = gr.Button("Write captions", variant="primary", size="sm", scale=1, min_width=150)
-                    oc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=1, min_width=70)
-                    oc_undo_btn = gr.Button("Undo last change", size="sm", scale=1, min_width=130)
-                oc_out = gr.Markdown("")
-            with page("p_cons", "Consistency"):
-                gr.Markdown("The traits of the character itself that the captions mention (hair, eyes, build, skin, "
-                            "horns, tattoos, a signature object): the same in most pictures is **taken out of the "
-                            "captions** so the trigger word learns it; words that mean the same (athletic, fit, toned) "
-                            "become one word; **odd pictures** that say something else are shown so you can look. "
-                            "Clothes, places, poses, expressions and light stay in each caption.",
-                            elem_classes=["ls-note"])
-                with gr.Row(elem_classes=["ls-bar"]):
-                    cc_btn = gr.Button("Check the captions", size="sm", scale=0, min_width=170)
-                    cc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=70)
-                    cc_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=0, min_width=150)
-                cc_sum = gr.Markdown("")
-                cc_box = gr.Textbox(elem_id="cc_box", show_label=False, container=False)
-                with gr.Row(equal_height=False):
                     with gr.Column(scale=3):
-                        cc_html = gr.HTML("", elem_id="cc_html", **({"js_on_load": CC_OPEN_JS} if "js_on_load" in
-                                          inspect.signature(gr.HTML.__init__).parameters else {}))
-                    with gr.Column(scale=2, elem_id="cc_view"):
-                        cc_img = gr.Image(label="Picture", type="filepath", interactive=False, height=420)
-                        cc_cap = gr.Markdown("*Click a picture that says something else to look at it with its caption.*")
-                cc_msg = gr.Markdown("")
-                cc_confirm = gr.Checkbox(label="Confirm", value=False, visible=False)
-
-            # ================================================================ Settings > Trainers and GPU
-            with page("trainers", "Trainers + GPU"):
-                gr.Markdown("The two trainers and the GPU they run on. Saved in "
-                            f"`{sname}` under `[general]`.")
-                with gr.Row(equal_height=False):
-                    rn_sd = gr.Textbox(label="sd-scripts folder", scale=1,
-                                       info="Illustrious, SDXL, Pony, Anima, FLUX.1, SD 1.5 ...")
-                    rn_mu = gr.Textbox(label="musubi-tuner folder", scale=1,
-                                       info="Z-Image Turbo, Qwen-Image, FLUX.2 klein (with its own venv/). Empty = ~/musubi-tuner.")
-                tr_facts = gr.HTML("", elem_id="tr_facts")
-                with gr.Column(elem_classes=["ls-card"]):
-                    gr.Markdown("**Picture tools** · quality rating, look-alikes, crops around the person, watermark "
-                                "removal (LaMa) and gentle upscaling (Real-ESRGAN). They run in the sd-scripts venv on "
-                                "your GPU, never during a training run, and stop after 5 idle minutes.")
-                    pt_status = gr.HTML("")
-                    with gr.Row():
-                        pt_install = gr.Button("Install the picture tools", size="sm", scale=0, min_width=220)
-                        pt_check = gr.Button("Check again", size="sm", scale=0, min_width=130)
-                    pt_msg = gr.Markdown()
-                with gr.Accordion("Advanced: low-level trainer and GPU values", open=False):
-                    with gr.Row():
-                        rn_workdir = gr.Textbox(label="Working folder", scale=1,
-                                                info="Scripts run from here, so relative paths like venv/bin/activate work.")
-                        rn_venv = gr.Textbox(label="Venv to activate first (optional)", scale=1,
-                                             info="Folder or .../bin/activate. Your script's own activate line still runs after it.")
-                    rn_trace = gr.Checkbox(label="Write a full trace to the log (set -x; for bug reports)")
-                    _nv = S_NVIDIA()
-                    gr.Markdown(("**GPU and CUDA environment (NVIDIA).** Used by the program, put into every new launch "
-                                 "script, and written into existing scripts with the button below. The AMD ROCm values "
-                                 "(GFX version, AOTriton, ROCm allocator) are not needed on NVIDIA and are left out.")
-                                if _nv else
-                                "**GPU and ROCm environment.** Change the GFX version when you change GPU. Used by the "
-                                "program, put into every new launch script, and written into existing scripts with the "
-                                "button below.")
-                    with gr.Row(visible=not _nv):
-                        gx_pick = gr.Dropdown(choices=[(f"{lab}: {val}", val) for lab, val in KNOWN_GFX], label="Known GPUs",
-                                              scale=3)
-                        gx_val = gr.Textbox(label="GFX version override", placeholder="e.g. 12.0.1", scale=1, min_width=110)
-                    gx_extra = [gr.Textbox(label=lab, placeholder=f"empty = preset default ({d})")
-                                for _, lab, d in ENV_EXTRA]
-                    with gr.Row(elem_classes=["ls-bar"]):
-                        gx_detect = gr.Button("Detect GPU", size="sm", scale=1, visible=not _nv)
-                        gx_save_btn = gr.Button("Save environment", size="sm", scale=1)
-                    with gr.Row():
-                        gx_confirm = gr.Checkbox(label="Yes, rewrite the export line in all my launch scripts (a .bak is kept)", value=False, scale=3)
-                        gx_upd_btn = gr.Button("Update all launch scripts", scale=1)
-                    gx_msg = gr.Markdown("")
-                with gr.Row(elem_classes=["ls-bar"]):
-                    rn_save_btn = gr.Button("Save", variant="primary", size="sm", scale=0, min_width=120)
-                rn_msg = gr.Markdown("")
-
-            # ================================================================ Settings > Model files
-            with page("models", "Model files"):
-                gr.Markdown(f"Model, VAE and text-encoder files for each LoRA type, saved in `{sname}`. Pick the type, then "
-                            "for every file type or paste a folder (press Enter) and pick a file. New launch scripts use "
-                            "these files instead of the preset defaults.")
-                _st_types = type_choices()
-                with gr.Row(elem_classes=["ls-bar"]):
-                    st_type = gr.Dropdown(choices=_st_types, value=_st_types[0][1] if _st_types else None,
-                                          label="LoRA type", scale=3)
-                    st_rec = gr.Checkbox(label="Also list files in subfolders (2 levels)", value=True, scale=2)
-                    st_reload = gr.Button("Reload from file", size="sm", scale=1)
-                    st_refresh_btn = gr.Button("Refresh file lists", size="sm", scale=1)
-                st_info = gr.Markdown("")
-                st_flags = gr.State([""] * ST_N)
-                st_rows, st_dirs, st_files, st_dl_btns = [], [], [], []
-                for i in range(ST_N):
-                    with gr.Row(visible=False, equal_height=True) as _row:
-                        _d = gr.Textbox(label="Folder", scale=2)
-                        _f = gr.Dropdown(choices=[], label="File", allow_custom_value=True, scale=3)
-                        _b = gr.Button("⬇ From Hugging Face", size="sm", visible=False, scale=0, min_width=170)
-                    st_rows.append(_row)
-                    st_dirs.append(_d)
-                    st_files.append(_f)
-                    st_dl_btns.append(_b)
+                        cs_recs_md = gr.Markdown(recs_status())
+                    cs_export_btn = gr.Button("Export report for Claude", scale=1, size="sm")
+                    cs_export_file = gr.File(label="Report", visible=False, scale=2)
+            with sub("s9_why"):
+                cs_explain = gr.Markdown("")
+            with sub("s9_fields"):
+                cs_fields = []
+                for gname, flds in FORM_GROUPS:
+                    with gr.Accordion(gname + (" (only the files this LoRA type uses)" if gname == "Model files" else ""),
+                                      open=False):
+                        per = 2 if gname == "Model files" else 4
+                        for i in range(0, len(flds), per):
+                            with gr.Row():
+                                for name, label in flds[i:i + per]:
+                                    cs_fields.append(gr.Textbox(label=label, info=f"--{name}",
+                                                                visible=name not in STUDIO_TABLE))
+                model_fields = cs_fields[-len(FORM_GROUPS[3][1]):]
                 with gr.Row():
-                    st_save_btn = gr.Button(f"Save to {sname}", variant="primary")
-                    st_dl_all = gr.Button("⬇ Download all missing files", visible=False)
-                    st_dl_stop = gr.Button("Stop download", variant="stop", size="sm", scale=0, min_width=140)
-                st_dl_md = gr.Markdown("")
-                with gr.Accordion("Download any file from Hugging Face (paste its link)", open=False):
-                    gr.Markdown("For a file that is not in the built-in list, or another version of it: open the file on "
-                                "huggingface.co and copy the link from the address bar (…/blob/main/…) or from its download "
-                                "button (…/resolve/main/…). Your Hugging Face token is used, so gated repos work once you "
-                                "have accepted their licence there. The file goes into your models folder (or the slot's "
-                                "folder) and the slot is saved. A file in several parts (…-00001-of-00003) is fetched whole.")
-                    with gr.Row():
-                        st_dl_slot = gr.Dropdown(choices=[], label="For the slot", scale=2)
-                        st_dl_link = gr.Textbox(label="Hugging Face file link", scale=5,
-                                                placeholder="https://huggingface.co/<owner>/<repo>/blob/main/<file>.safetensors")
-                        st_dl_go = gr.Button("⬇ Download", variant="primary", scale=1)
-                st_msg = gr.Markdown("")
-                with gr.Accordion("Suggestions: which files fit this LoRA type and base model", open=True):
-                    gr.Markdown("Every model file in the slot folders (and the `models` folder above them) is identified from "
-                                "its header: model family, text encoder / VAE kind, fp16 / fp8 / ComfyUI fp8_scaled. The best "
-                                "match for each slot is marked ★. **Apply suggestions** fills the empty or unsuitable slots "
-                                "(the base model only with a file of the same family); nothing is saved until you press Save.")
-                    st_sug_md = gr.Markdown("")
-                    st_sug_picks = gr.State({})
-                    with gr.Row():
-                        st_sug_apply = gr.Button("Apply suggestions", variant="secondary", scale=1)
-                        st_sug_all = gr.Checkbox(label="Also replace files that already fit", value=False, scale=1)
-                        st_sug_rescan = gr.Button("Check again", scale=1)
-                        st_online_btn = gr.Button("Look up online (Hugging Face, Civitai)", scale=1)
-                    st_online_md = gr.Markdown("")
-                with gr.Accordion("LoRA subtypes (for example Pony: its own model files and file tag)", open=False):
-                    gr.Markdown("A subtype trains exactly like its base type (same trainer, flags and recommended settings) "
-                                "but has its own model files and file tag, so launch scripts are named `<folder><TAG>_lora.sh` "
-                                f"and the LoRA `<folder><TAG>V1`. Saved in `{sname}` as a section such as `[pony]` with "
-                                "`base = sdxl`, `label` and `tag`, plus the model files. After adding one, pick it as "
-                                "**LoRA type** above and choose its files.")
-                    sub_md = gr.Markdown(sub_list_md())
-                    with gr.Row():
-                        sub_name = gr.Textbox(label="Name", info="e.g. Pony", scale=2)
-                        sub_base = gr.Dropdown(choices=[("SDXL", "sdxl"), ("Anima", "anima")], value="sdxl", label="Based on", scale=1)
-                        sub_tag = gr.Textbox(label="File tag", info="empty = the name in capitals (PONY)", scale=2)
-                        sub_add_btn = gr.Button("Add subtype", variant="primary", scale=1)
-                    with gr.Row():
-                        sub_rm = gr.Dropdown(choices=sub_choices(), label="Subtype to remove", scale=3)
-                        sub_confirm = gr.Checkbox(label=f"Yes, remove its section from {sname}", value=False, scale=3)
-                        sub_rm_btn = gr.Button("Remove subtype", variant="stop", scale=1)
-                    sub_msg = gr.Markdown("")
-                with gr.Accordion(f"{sname} as it is on disk", open=False):
-                    st_raw_box = gr.Textbox(value=st_raw(), lines=14, interactive=False, show_label=False)
+                    cs_models_btn = gr.Button("Use model files from Settings", size="sm")
+                    cs_hf_fill = gr.Button("Fill HF_TOKEN in the script text", size="sm")
+                cs_makedirs = gr.Checkbox(
+                    label="Create missing folders when saving: the repeat folder (<N>_<name>), model and log. "
+                          "Images lying directly in the dataset folder are moved into a newly created repeat folder.",
+                    value=True)
+            with sub("s9_text"):
+                cs_text = gr.Code(language="shell", label=("The script text (edit by hand; the settings above follow "
+                                                           "it, and it follows them)"),
+                                  lines=26, interactive=True, elem_id="cs_text")
+                cs_prompts_path = gr.State("")       # no sample prompts file (sample images were removed)
+                cs_prompts_text = gr.State("")
+            with sub("s9_save"):
+                with gr.Row(elem_classes=["ls-bar"], elem_id="s9_bar"):
+                    cs_suggest_btn = gr.Button("Fill with recommended settings", size="sm", scale=0, min_width=230)
+                    cs_check_btn = gr.Button("Check flags against my trainer", size="sm", scale=0, min_width=240)
+                    cs_save_over_btn = gr.Button("Save", variant="primary", visible=False, size="sm", scale=0,
+                                                 min_width=110)
+                    cs_newname = gr.Textbox(label="Save as", scale=0, min_width=220)
+                    cs_save_new_btn = gr.Button("Save as new version", variant="primary", scale=0, size="sm",
+                                                min_width=200)
+                    cs_queue_btn = gr.Button("Add to the queue →", size="sm", scale=0, min_width=180)
+                cs_check_out = gr.Markdown("")
+                cs_save_msg = gr.Markdown("")
+            cs_plan = gr.State({})
 
-            # ================================================================ Settings > AI helpers
-            with page("ai", "AI helpers"):
-                gr.Markdown("#### Ollama: reads pictures and writes captions")
+        # ================================================================ Datasets > Prepare
+        # The Datasets flow (datasets_ui.py) places these parts in its steps: p_wm in 6 Resize, p_caption and
+        # p_cons in 7 Tags, p_repeat and the launch script page in 9 Launch script. "prepare" holds the shared
+        # controls and the full picture check; LoRA Studio keeps it hidden.
+        with page("prepare", "Prepare"):
+            with gr.Row():
+                pp_ds = gr.Dropdown(choices=list_lora_dirs(), value=None, label="Dataset", scale=3)
+                pp_type = gr.Dropdown(choices=_types, value=_types[0][1] if _types else None,
+                                      label="LoRA type", scale=3)
+                pp_purpose = gr.Dropdown(choices=_purposes, value="character", label="Purpose", scale=2)
+            pp_html = gr.HTML(pp_status(None, None), elem_id="pp_html")
+            with gr.Accordion("1 · Check pictures: quality, content and balance", open=True):
+                gr.Markdown("Finds pictures that are **not recommended** for training and says why. **Technical** "
+                            "(no AI, seconds): too small for the LoRA type, blurry, near-duplicates, extreme crops, heavy "
+                            "JPEG compression. **Content** (the Ollama model from Settings › AI helpers, a few seconds per "
+                            "picture, remembered): subject visible and in focus, number of people, face hidden, text / "
+                            "watermark, filters, collages and screenshots. **Balance**: framing, outfits and places that "
+                            "repeat too much. The rules follow the *Purpose* above.")
+                with gr.Row():
+                    dc_checks = gr.CheckboxGroup(choices=[("Technical", "technical"), ("Content (Ollama)", "content"),
+                                                          ("Balance (Ollama)", "balance")],
+                                                 value=["technical", "content", "balance"], label="Checks", scale=3)
+                    dc_btn = gr.Button("Check pictures", variant="primary", size="sm", scale=1, min_width=140)
+                    dc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=70)
+                dc_sum = gr.Markdown("")
+                dc_html = gr.HTML("", elem_id="dc_html")
+                dc_pick = gr.CheckboxGroup(choices=[], value=[], label="Pictures to set aside (not recommended ones are ticked)")
+                with gr.Row(elem_classes=["ls-bar"]):
+                    dc_aside_btn = gr.Button("Move ticked to _set_aside", variant="stop", size="sm", scale=1)
+                    dc_back_btn = gr.Button("Move all back", size="sm", scale=1)
+                dc_msg = gr.Markdown("")
+        with page("p_wm", "Watermarks"):
+            gr.Markdown("Pictures where the sort found marks **added on top** of the picture (watermarks, site "
+                        "names, logo stamps, signatures, date stamps): remove them (picture tools), crop them off, set "
+                        "the picture aside, or keep it (it may be learned). Text that belongs to the scene (signs, shirts) is left alone.",
+                        elem_classes=["ls-note"])
+            wm_sum = gr.Markdown("")
+            wm_html = gr.HTML("", elem_id="wm_html")
+            wm_box = gr.Textbox(visible=False)
+            with gr.Row(elem_classes=["ls-bar"], elem_id="wm_btnrow"):
+                wm_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=1,
+                                         elem_id="wm_apply_btn")
+                wm_reco_btn = gr.Button("Use the recommended option for the undecided ones", size="sm", scale=2,
+                                        elem_id="wm_reco_btn")
+            wm_msg = gr.Markdown("")
+            wm_tool = gr.Textbox(elem_id="wm_tool", show_label=False, container=False)
+            with gr.Column(visible=False, elem_classes=["ls-card"], elem_id="wm_panel") as wm_panel:
+                wm_ptitle = gr.Markdown()
+                with gr.Column(visible=True) as wm_paint_col:
+                    gr.Markdown("Paint over the mark with the brush (a little over its edges is fine). The "
+                                "picture tools fill in what is under it; the rest of the picture stays as it is.",
+                                elem_classes=["ls-note"])
+                    wm_editor = gr.ImageEditor(type="pil", image_mode="RGBA", sources=(), transforms=(),
+                                               layers=False, height=560, show_label=False,
+                                               brush=gr.Brush(colors=["#ff3b30"], default_color="#ff3b30",
+                                                              default_size=28, color_mode="fixed"),
+                                               buttons=[], elem_id="wm_editor")
+                with gr.Column(visible=False) as wm_crop_col:
+                    gr.Markdown("Move the edges until the mark is outside; the shaded part is cut off.",
+                                elem_classes=["ls-note"])
+                    wm_cimg = gr.Image(type="pil", interactive=False, height=420, show_label=False)
+                    wm_aspect = gr.Radio(["free", "3:4", "1:1", "4:3"], value="free", label="Shape")
+                    with gr.Row():
+                        wm_l = gr.Slider(0, 100, value=0, step=1, label="Left %")
+                        wm_r = gr.Slider(0, 100, value=100, step=1, label="Right %")
+                    with gr.Row():
+                        wm_t = gr.Slider(0, 100, value=0, step=1, label="Top %")
+                        wm_b = gr.Slider(0, 100, value=100, step=1, label="Bottom %")
+                    wm_cres = gr.Markdown()
+                with gr.Row(elem_classes=["ls-bar"]):
+                    wm_paint_go = gr.Button("Remove what I painted", variant="primary", size="sm", scale=0,
+                                            min_width=200)
+                    wm_crop_go = gr.Button("Use this crop", variant="primary", size="sm", scale=0,
+                                           min_width=160, visible=False)
+                    wm_close = gr.Button("Close", size="sm", scale=0, min_width=100)
+                wm_pmsg = gr.Markdown()
+                wm_rel = gr.State("")
+        with page("p_repeat", "Repeat folder"):
+            rp_info = gr.Markdown("")
+            with gr.Row():
+                rp_folder = gr.Dropdown(choices=[], label="Image folder", scale=4)
+                rp_repeats = gr.Number(label="Repeats", value=0, precision=0, scale=1)
+                rp_newname = gr.Textbox(label="New folder name", scale=3)
+            with gr.Row():
+                rp_confirm = gr.Checkbox(label="Allow moving images that sit directly in the dataset folder into a new repeat folder",
+                                         value=False, scale=3)
+                rp_btn = gr.Button("Rename / create repeat folder", variant="primary", scale=2)
+                rp_epochs_btn = gr.Button("Set epochs to hit the target steps", scale=2)
+                rp_make_btn = gr.Button("Create missing folders now (repeat folder, model, log)", scale=2)
+            rp_msg = gr.Markdown("")
+        with page("p_caption", "Captions"):
+            gr.Markdown(
+                "The Ollama model (Settings › AI helpers) looks at every picture and writes a caption that starts "
+                "with the trigger word. For a person, captions describe what changes (clothes, pose, place, light, "
+                "framing) and leave out what is always that person, so the trigger word learns it. **Try on 3 "
+                "pictures** writes nothing; **Write captions** replaces the `.txt` captions (Undo restores them).",
+                elem_classes=["ls-note"])
+            with gr.Row():
+                oc_trigger = gr.Textbox(label="Trigger word (first word of every caption)", scale=1)
+                oc_leave = gr.Textbox(label="Never describe (always part of the person)",
+                                      value=CAP.DEFAULT_LEAVE_OUT if CAP else "", scale=3)
+            with gr.Row():
+                oc_style = gr.Radio(choices=[("Sentences", "sentences"), ("Tags", "tags")], value="sentences",
+                                    label="Caption format", scale=1)
+                oc_length = gr.Slider(1, 5, value=3, step=1, label="Length (1 very short ... 5 very long)", scale=2)
+                oc_detail = gr.Slider(1, 4, value=3, step=1, label="Detail (1 basic ... 4 everything)", scale=2)
+                oc_rec_btn = gr.Button("Use recommended", size="sm", scale=0, min_width=140)
+            oc_rec = gr.Markdown("", elem_id="oc_rec")
+            oc_ex = gr.HTML("", elem_id="oc_ex")
+            with gr.Row(elem_classes=["ls-bar"]):
+                oc_hints = gr.Checkbox(label="Give the old tags to the model as hints (they can be wrong)", value=False, scale=3)
+                oc_unload = gr.Checkbox(label="Free the VRAM when done", value=True, scale=2)
+                oc_prev_btn = gr.Button("Try on 3 pictures", size="sm", scale=1, min_width=120)
+                oc_run_btn = gr.Button("Write captions", variant="primary", size="sm", scale=1, min_width=150)
+                oc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=1, min_width=70)
+                oc_undo_btn = gr.Button("Undo last change", size="sm", scale=1, min_width=130)
+            oc_out = gr.Markdown("")
+        with page("p_cons", "Consistency"):
+            gr.Markdown("The traits of the character itself that the captions mention (hair, eyes, build, skin, "
+                        "horns, tattoos, a signature object): the same in most pictures is **taken out of the "
+                        "captions** so the trigger word learns it; words that mean the same (athletic, fit, toned) "
+                        "become one word; **odd pictures** that say something else are shown so you can look. "
+                        "Clothes, places, poses, expressions and light stay in each caption.",
+                        elem_classes=["ls-note"])
+            with gr.Row(elem_classes=["ls-bar"]):
+                cc_btn = gr.Button("Check the captions", size="sm", scale=0, min_width=170)
+                cc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=70)
+                cc_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=0, min_width=150)
+            cc_sum = gr.Markdown("")
+            cc_box = gr.Textbox(elem_id="cc_box", show_label=False, container=False)
+            with gr.Row(equal_height=False):
+                with gr.Column(scale=3):
+                    cc_html = gr.HTML("", elem_id="cc_html", **({"js_on_load": CC_OPEN_JS} if "js_on_load" in
+                                      inspect.signature(gr.HTML.__init__).parameters else {}))
+                with gr.Column(scale=2, elem_id="cc_view"):
+                    cc_img = gr.Image(label="Picture", type="filepath", interactive=False, height=420)
+                    cc_cap = gr.Markdown("*Click a picture that says something else to look at it with its caption.*")
+            cc_msg = gr.Markdown("")
+            cc_confirm = gr.Checkbox(label="Confirm", value=False, visible=False)
+
+        # ================================================================ Settings > Trainers and GPU
+        with page("trainers", "Trainers + GPU"):
+            gr.Markdown("The two trainers and the GPU they run on. Saved in "
+                        f"`{sname}` under `[general]`.")
+            with gr.Row(equal_height=False):
+                rn_sd = gr.Textbox(label="sd-scripts folder", scale=1,
+                                   info="Illustrious, SDXL, Pony, Anima, FLUX.1, SD 1.5 ...")
+                rn_mu = gr.Textbox(label="musubi-tuner folder", scale=1,
+                                   info="Z-Image Turbo, Qwen-Image, FLUX.2 klein (with its own venv/). Empty = ~/musubi-tuner.")
+            tr_facts = gr.HTML("", elem_id="tr_facts")
+            with gr.Column(elem_classes=["ls-card"]):
+                gr.Markdown("**Picture tools** · quality rating, look-alikes, crops around the person, watermark "
+                            "removal (LaMa) and gentle upscaling (Real-ESRGAN). They run in the sd-scripts venv on "
+                            "your GPU, never during a training run, and stop after 5 idle minutes.")
+                pt_status = gr.HTML("")
+                with gr.Row():
+                    pt_install = gr.Button("Install the picture tools", size="sm", scale=0, min_width=220)
+                    pt_check = gr.Button("Check again", size="sm", scale=0, min_width=130)
+                pt_msg = gr.Markdown()
+            with gr.Accordion("Advanced: low-level trainer and GPU values", open=False):
+                with gr.Row():
+                    rn_workdir = gr.Textbox(label="Working folder", scale=1,
+                                            info="Scripts run from here, so relative paths like venv/bin/activate work.")
+                    rn_venv = gr.Textbox(label="Venv to activate first (optional)", scale=1,
+                                         info="Folder or .../bin/activate. Your script's own activate line still runs after it.")
+                rn_trace = gr.Checkbox(label="Write a full trace to the log (set -x; for bug reports)")
+                _nv = S_NVIDIA()
+                gr.Markdown(("**GPU and CUDA environment (NVIDIA).** Used by the program, put into every new launch "
+                             "script, and written into existing scripts with the button below. The AMD ROCm values "
+                             "(GFX version, AOTriton, ROCm allocator) are not needed on NVIDIA and are left out.")
+                            if _nv else
+                            "**GPU and ROCm environment.** Change the GFX version when you change GPU. Used by the "
+                            "program, put into every new launch script, and written into existing scripts with the "
+                            "button below.")
+                with gr.Row(visible=not _nv):
+                    gx_pick = gr.Dropdown(choices=[(f"{lab}: {val}", val) for lab, val in KNOWN_GFX], label="Known GPUs",
+                                          scale=3)
+                    gx_val = gr.Textbox(label="GFX version override", placeholder="e.g. 12.0.1", scale=1, min_width=110)
+                gx_extra = [gr.Textbox(label=lab, placeholder=f"empty = preset default ({d})")
+                            for _, lab, d in ENV_EXTRA]
+                with gr.Row(elem_classes=["ls-bar"]):
+                    gx_detect = gr.Button("Detect GPU", size="sm", scale=1, visible=not _nv)
+                    gx_save_btn = gr.Button("Save environment", size="sm", scale=1)
+                with gr.Row():
+                    gx_confirm = gr.Checkbox(label="Yes, rewrite the export line in all my launch scripts (a .bak is kept)", value=False, scale=3)
+                    gx_upd_btn = gr.Button("Update all launch scripts", scale=1)
+                gx_msg = gr.Markdown("")
+            with gr.Row(elem_classes=["ls-bar"]):
+                rn_save_btn = gr.Button("Save", variant="primary", size="sm", scale=0, min_width=120)
+            rn_msg = gr.Markdown("")
+
+        # ================================================================ Settings > Model files
+        with page("models", "Model files"):
+            gr.Markdown(f"Model, VAE and text-encoder files for each LoRA type, saved in `{sname}`. Pick the type, then "
+                        "for every file type or paste a folder (press Enter) and pick a file. New launch scripts use "
+                        "these files instead of the preset defaults.")
+            _st_types = type_choices()
+            with gr.Row(elem_classes=["ls-bar"]):
+                st_type = gr.Dropdown(choices=_st_types, value=_st_types[0][1] if _st_types else None,
+                                      label="LoRA type", scale=3)
+                st_rec = gr.Checkbox(label="Also list files in subfolders (2 levels)", value=True, scale=2)
+                st_reload = gr.Button("Reload from file", size="sm", scale=1)
+                st_refresh_btn = gr.Button("Refresh file lists", size="sm", scale=1)
+            st_info = gr.Markdown("")
+            st_flags = gr.State([""] * ST_N)
+            st_rows, st_dirs, st_files, st_dl_btns = [], [], [], []
+            for i in range(ST_N):
+                with gr.Row(visible=False, equal_height=True) as _row:
+                    _d = gr.Textbox(label="Folder", scale=2)
+                    _f = gr.Dropdown(choices=[], label="File", allow_custom_value=True, scale=3)
+                    _b = gr.Button("⬇ From Hugging Face", size="sm", visible=False, scale=0, min_width=170)
+                st_rows.append(_row)
+                st_dirs.append(_d)
+                st_files.append(_f)
+                st_dl_btns.append(_b)
+            with gr.Row():
+                st_save_btn = gr.Button(f"Save to {sname}", variant="primary")
+                st_dl_all = gr.Button("⬇ Download all missing files", visible=False)
+                st_dl_stop = gr.Button("Stop download", variant="stop", size="sm", scale=0, min_width=140)
+            st_dl_md = gr.Markdown("")
+            with gr.Accordion("Download any file from Hugging Face (paste its link)", open=False):
+                gr.Markdown("For a file that is not in the built-in list, or another version of it: open the file on "
+                            "huggingface.co and copy the link from the address bar (…/blob/main/…) or from its download "
+                            "button (…/resolve/main/…). Your Hugging Face token is used, so gated repos work once you "
+                            "have accepted their licence there. The file goes into your models folder (or the slot's "
+                            "folder) and the slot is saved. A file in several parts (…-00001-of-00003) is fetched whole.")
+                with gr.Row():
+                    st_dl_slot = gr.Dropdown(choices=[], label="For the slot", scale=2)
+                    st_dl_link = gr.Textbox(label="Hugging Face file link", scale=5,
+                                            placeholder="https://huggingface.co/<owner>/<repo>/blob/main/<file>.safetensors")
+                    st_dl_go = gr.Button("⬇ Download", variant="primary", scale=1)
+            st_msg = gr.Markdown("")
+            with gr.Accordion("Suggestions: which files fit this LoRA type and base model", open=True):
+                gr.Markdown("Every model file in the slot folders (and the `models` folder above them) is identified from "
+                            "its header: model family, text encoder / VAE kind, fp16 / fp8 / ComfyUI fp8_scaled. The best "
+                            "match for each slot is marked ★. **Apply suggestions** fills the empty or unsuitable slots "
+                            "(the base model only with a file of the same family); nothing is saved until you press Save.")
+                st_sug_md = gr.Markdown("")
+                st_sug_picks = gr.State({})
+                with gr.Row():
+                    st_sug_apply = gr.Button("Apply suggestions", variant="secondary", scale=1)
+                    st_sug_all = gr.Checkbox(label="Also replace files that already fit", value=False, scale=1)
+                    st_sug_rescan = gr.Button("Check again", scale=1)
+                    st_online_btn = gr.Button("Look up online (Hugging Face, Civitai)", scale=1)
+                st_online_md = gr.Markdown("")
+            with gr.Accordion("LoRA subtypes (for example Pony: its own model files and file tag)", open=False):
+                gr.Markdown("A subtype trains exactly like its base type (same trainer, flags and recommended settings) "
+                            "but has its own model files and file tag, so launch scripts are named `<folder><TAG>_lora.sh` "
+                            f"and the LoRA `<folder><TAG>V1`. Saved in `{sname}` as a section such as `[pony]` with "
+                            "`base = sdxl`, `label` and `tag`, plus the model files. After adding one, pick it as "
+                            "**LoRA type** above and choose its files.")
+                sub_md = gr.Markdown(sub_list_md())
+                with gr.Row():
+                    sub_name = gr.Textbox(label="Name", info="e.g. Pony", scale=2)
+                    sub_base = gr.Dropdown(choices=[("SDXL", "sdxl"), ("Anima", "anima")], value="sdxl", label="Based on", scale=1)
+                    sub_tag = gr.Textbox(label="File tag", info="empty = the name in capitals (PONY)", scale=2)
+                    sub_add_btn = gr.Button("Add subtype", variant="primary", scale=1)
+                with gr.Row():
+                    sub_rm = gr.Dropdown(choices=sub_choices(), label="Subtype to remove", scale=3)
+                    sub_confirm = gr.Checkbox(label=f"Yes, remove its section from {sname}", value=False, scale=3)
+                    sub_rm_btn = gr.Button("Remove subtype", variant="stop", scale=1)
+                sub_msg = gr.Markdown("")
+            with gr.Accordion(f"{sname} as it is on disk", open=False):
+                st_raw_box = gr.Textbox(value=st_raw(), lines=14, interactive=False, show_label=False)
+
+        # ================================================================ Settings > AI helpers
+        with page("ai", "AI helpers"):
+            gr.Markdown("#### Ollama: reads pictures and writes captions")
+            with gr.Row(equal_height=True):
+                oc_url = gr.Textbox(label="Ollama address", value=_oc_url, scale=3)
+                oc_find_btn = gr.Button("Test", size="sm", scale=0, min_width=90)
+                ai_stopall = gr.Button("Stop Ollama", variant="stop", size="sm", scale=0, min_width=130)
+            oc_model = gr.Dropdown(choices=[_oc_model] if _oc_model else [], value=_oc_model or None,
+                                   label="Default model (captions, sorting and picture checks)",
+                                   info="Only models that can read pictures are listed. It is started when a step "
+                                        "needs it; the Start buttons below only load it ahead of time.",
+                                   allow_custom_value=True, elem_id="ai_default")
+            oc_find_md = gr.Markdown("")
+            ai_box = gr.Textbox(elem_id="ai_box", show_label=False, container=False)
+            ai_html = gr.HTML("", elem_id="ai_models")
+            ai_msg = gr.Markdown("")
+            with gr.Accordion("Get another model", open=False):
                 with gr.Row(equal_height=True):
-                    oc_url = gr.Textbox(label="Ollama address", value=_oc_url, scale=3)
-                    oc_find_btn = gr.Button("Test", size="sm", scale=0, min_width=90)
-                    ai_stopall = gr.Button("Stop Ollama", variant="stop", size="sm", scale=0, min_width=130)
-                oc_model = gr.Dropdown(choices=[_oc_model] if _oc_model else [], value=_oc_model or None,
-                                       label="Default model (captions, sorting and picture checks)",
-                                       info="Only models that can read pictures are listed. It is started when a step "
-                                            "needs it; the Start buttons below only load it ahead of time.",
-                                       allow_custom_value=True, elem_id="ai_default")
-                oc_find_md = gr.Markdown("")
-                ai_box = gr.Textbox(elem_id="ai_box", show_label=False, container=False)
-                ai_html = gr.HTML("", elem_id="ai_models")
-                ai_msg = gr.Markdown("")
-                with gr.Accordion("Get another model", open=False):
-                    with gr.Row(equal_height=True):
-                        ai_pull_name = gr.Textbox(label="Model name", placeholder="e.g. minicpm-v:8b", scale=3)
-                        ai_pull_btn = gr.Button("Download", size="sm", scale=0, min_width=110)
-                    ai_pull_md = gr.Markdown("")
-                    with gr.Row(equal_height=True):
-                        ai_rm = gr.Dropdown(choices=[], label="Model to remove", scale=3)
-                        ai_rm_ok = gr.Checkbox(label="Yes, remove it from Ollama", value=False, scale=2)
-                        ai_rm_btn = gr.Button("Remove", variant="stop", size="sm", scale=0, min_width=100)
-                gr.Markdown("Only one model runs at a time: **Start** on another model stops the running one first. "
-                            "The **default model** (at the top, or the round button in the table) is used for captions, "
-                            "sorting and picture checks; models that cannot read pictures cannot be picked. Starting a training run stops Ollama to free video memory; it is "
-                            "not started again by itself. The top bar always shows which model is running.",
-                            elem_classes=["ls-note"])
-                gr.Markdown("#### Hugging Face token")
-                gr.Markdown(f"Kept in `{hf_path()}` (readable only by you) and written into `export HF_TOKEN=\"...\"` of "
-                            "launch scripts that download models. The token is masked in the run log.")
-                with gr.Row():
-                    cs_hf_tok = gr.Textbox(label="Current token", value=read_hf_token(), type="password", interactive=False, scale=4)
-                    cs_hf_show = gr.Checkbox(label="Show", value=False, scale=1)
-                    cs_hf_reload = gr.Button("Reload token file", scale=1)
-                with gr.Row():
-                    hf_new = gr.Textbox(label="Paste a new token", type="password", placeholder="hf_...", scale=4)
-                    hf_save_btn = gr.Button("Save token", variant="primary", scale=1)
-                hf_msg = gr.Markdown("")
+                    ai_pull_name = gr.Textbox(label="Model name", placeholder="e.g. minicpm-v:8b", scale=3)
+                    ai_pull_btn = gr.Button("Download", size="sm", scale=0, min_width=110)
+                ai_pull_md = gr.Markdown("")
+                with gr.Row(equal_height=True):
+                    ai_rm = gr.Dropdown(choices=[], label="Model to remove", scale=3)
+                    ai_rm_ok = gr.Checkbox(label="Yes, remove it from Ollama", value=False, scale=2)
+                    ai_rm_btn = gr.Button("Remove", variant="stop", size="sm", scale=0, min_width=100)
+            gr.Markdown("Only one model runs at a time: **Start** on another model stops the running one first. "
+                        "The **default model** (at the top, or the round button in the table) is used for captions, "
+                        "sorting and picture checks; models that cannot read pictures cannot be picked. Starting a training run stops Ollama to free video memory; it is "
+                        "not started again by itself. The top bar always shows which model is running.",
+                        elem_classes=["ls-note"])
+            gr.Markdown("#### Hugging Face token")
+            gr.Markdown(f"Kept in `{hf_path()}` (readable only by you) and written into `export HF_TOKEN=\"...\"` of "
+                        "launch scripts that download models. The token is masked in the run log.")
+            with gr.Row():
+                cs_hf_tok = gr.Textbox(label="Current token", value=read_hf_token(), type="password", interactive=False, scale=4)
+                cs_hf_show = gr.Checkbox(label="Show", value=False, scale=1)
+                cs_hf_reload = gr.Button("Reload token file", scale=1)
+            with gr.Row():
+                hf_new = gr.Textbox(label="Paste a new token", type="password", placeholder="hf_...", scale=4)
+                hf_save_btn = gr.Button("Save token", variant="primary", scale=1)
+            hf_msg = gr.Markdown("")
 
         # ================================================================ events
         def pp_after(ev):
@@ -3068,7 +2830,7 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
 
         def rn_load():
             wd, venv, trace, sd, mu = runner_load()
-            return wd, venv, trace, sd or (str(ROOT) if studio else ""), mu
+            return wd, venv, trace, sd or str(ROOT), mu
         rn_save_btn.click(rn_save, [rn_workdir, rn_venv, rn_trace, rn_sd, rn_mu], [rn_msg, st_raw_box]) \
             .then(trainer_facts_html, None, tr_facts)
         demo.load(rn_load, None, [rn_workdir, rn_venv, rn_trace, rn_sd, rn_mu]).then(trainer_facts_html, None, tr_facts)
@@ -3101,8 +2863,6 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         cs_ret = [cs_ds, cs_script, cs_type, cs_text, cs_steps, cs_userep, cs_hfauto, cs_samples]
         rp_outs = [rp_folder, rp_repeats, rp_newname, rp_info]
         rp_in = [cs_ds, cs_type, cs_steps]
-        ap_in = [cs_ds, cs_script, cs_type, cs_steps, cs_purpose, oc_url, oc_model, oc_leave, ap_auto]
-        ap_out = [ap_md, ap_q, ap_go, dc_sum, dc_html, dc_pick]
         mvis = lambda ev: ev.then(model_vis, [cs_type] + model_fields, model_fields)
 
         def ds_both(v):
@@ -3121,7 +2881,6 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
 
         def type_chain(ev):
             ev = ev.then(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs) \
-                   .then(ap_prepare, ap_in, ap_out).then(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs) \
                    .then(wm_render, cs_ds, [wm_sum, wm_html])
             return pp_after(mvis(ev))
 
@@ -3129,7 +2888,7 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         ds_chain(pp_ds.input(lambda v: v, pp_ds, cs_ds))
         type_chain(cs_type.input(lambda v: v, cs_type, pp_type))
         type_chain(pp_type.input(lambda v: v, pp_type, cs_type))
-        UI.update(ds_chain=ds_chain, ds_both=ds_both, cs_ds=cs_ds, pp_ds=pp_ds, pp_next=pp_next, cs_type=cs_type,
+        UI.update(ds_chain=ds_chain, ds_both=ds_both, cs_ds=cs_ds, pp_ds=pp_ds, cs_type=cs_type,
                   pp_type=pp_type, cs_purpose=cs_purpose, pp_purpose=pp_purpose, cs_retype=(cs_retype, cs_ret, cs_outs),
                   rp_refresh=(rp_refresh, rp_in, rp_outs), wm=(wm_render, [wm_sum, wm_html]),
                   cc=(cc_render, [cc_sum, cc_html]), oc=dict(trigger=oc_trigger, leave=oc_leave, style=oc_style,
@@ -3140,11 +2899,6 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
                   cs_models=(cs_use_settings, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs),
                   cc_apply_btn=cc_apply_btn, cs_queue_btn=cs_queue_btn, cs_save_msg=cs_save_msg)
         mvis(cs_script.input(cs_script_change, cs_ctl, cs_outs))
-        pp_after(ap_btn.click(lambda *a: (yield from ap_prepare(*a, manual=True)), ap_in, ap_out)
-                 .then(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs).then(wm_render, cs_ds, [wm_sum, wm_html]))
-        pp_after(ap_go.click(lambda ds, tk, pu, u, m, lv, ch: (yield from ap_caption(ds, tk, pu, u, m, lv, ch)),
-                             [cs_ds, cs_type, cs_purpose, oc_url, oc_model, oc_leave, ap_q], ap_out)
-                 .then(cs_retype, cs_ret, cs_outs))
         cs_steps.submit(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs)
 
         def purpose_chain(ev):
@@ -3227,14 +2981,12 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         cs_hf_reload.click(lambda: (read_hf_token(), hf_status_text()), None, [cs_hf_tok, hf_md])
         hf_save_btn.click(save_hf_token, hf_new, [hf_msg, cs_hf_tok, hf_md]).then(lambda: "", None, hf_new)
         cs_hf_fill.click(cs_fill_hf, [cs_text, cs_plan], cs_outs)
-        cs_read_btn.click(cs_read, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs)
-        cs_apply_btn.click(cs_apply, [cs_ds, cs_type, cs_script, cs_text, cs_plan] + cs_fields, cs_outs)
-        if studio:                          # the form and the text follow each other, without buttons
-            for fld, (fname, _) in zip(cs_fields, FORM_FIELDS):
-                if fname not in STUDIO_TABLE:
-                    fld.blur(cs_apply_quiet, [cs_ds, cs_type, cs_script, cs_text, cs_plan] + cs_fields, cs_outs,
-                             show_progress="hidden")
-            cs_text.change(cs_read, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs, show_progress="hidden")
+        # the form and the text follow each other, without buttons
+        for fld, (fname, _) in zip(cs_fields, FORM_FIELDS):
+            if fname not in STUDIO_TABLE:
+                fld.blur(cs_apply_quiet, [cs_ds, cs_type, cs_script, cs_text, cs_plan] + cs_fields, cs_outs,
+                         show_progress="hidden")
+        cs_text.change(cs_read, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs, show_progress="hidden")
         cs_models_btn.click(cs_use_settings, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs)
         cs_check_btn.click(cs_check, cs_text, cs_check_out)
         pp_after(cs_save_over_btn.click(cs_save_over, [cs_ds, cs_script, cs_text, cs_type, cs_plan, cs_makedirs], cs_status)
@@ -3301,10 +3053,6 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         gx_save_btn.click(env_save, [gx_val] + gx_extra, [gx_msg, st_raw_box])
         gx_upd_btn.click(env_update_scripts, gx_confirm, gx_msg).then(lambda: False, None, gx_confirm)
         demo.load(gfx_load, None, [gx_val, gx_pick, gx_msg] + gx_extra)
-
-        if not studio:
-            gr.Timer(1.0).tick(lambda: status_text(), None, status)
-            gr.Timer(3.0).tick(header_status, None, [gpu_md, hf_md])
     return demo
 
 
@@ -3313,56 +3061,3 @@ def detect_venv() -> str:
         if (c / "bin" / "activate").is_file():
             return str(c)
     return ""
-
-
-def main():
-    global ROOT, DEFAULT_VENV, SCAN_SCRIPT, IMAGES_DIR
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default=str(HOME / "sd-scripts"), help="your sd-scripts folder")
-    ap.add_argument("--scripts-dir", action="append", default=[],
-                    help="extra folder searched recursively for *.sh (repeatable)")
-    ap.add_argument("--venv", help="venv folder to pre-fill (default: <root>/venv, else ~/sd-script/venv)")
-    ap.add_argument("--images-dir", help="your dataset folder (default: <root>/images)")
-    ap.add_argument("--datatypes", "--scan-script", dest="scan_script",
-                    help="path to Lora_Datatypes.py, the file with all LoRA types (default: next to sdgui.py, in <root>, in ~)")
-    ap.add_argument("--sample-dir", help="folder scanned for sample images (default: <root>/output)")
-    ap.add_argument("--allow-path", action="append", default=[],
-                    help="extra folder the gallery may serve images from (repeatable)")
-    ap.add_argument("--port", type=int, default=7860)
-    ap.add_argument("--host", default="127.0.0.1",
-                    help="address to listen on: 127.0.0.1 (this computer only, default) or 0.0.0.0 (whole network)")
-    ap.add_argument("--auth", help="login for the web page as user:password (recommended with --host 0.0.0.0); "
-                                   "or set SDGUI_AUTH=user:password")
-    args = ap.parse_args()
-
-    ROOT = Path(os.path.expanduser(args.root)).absolute()
-    if args.images_dir:
-        IMAGES_DIR = Path(os.path.expanduser(args.images_dir)).absolute()
-    EXTRA_SCRIPT_DIRS.extend(Path(os.path.expanduser(d)).absolute() for d in args.scripts_dir)
-    DEFAULT_VENV = os.path.expanduser(args.venv) if args.venv else detect_venv()
-    SCAN_SCRIPT = find_scan_script(args.scan_script)
-    apply_gfx_env()
-    sample_dir = args.sample_dir or str(ROOT / "output")
-    allowed = [str(ROOT), str(images_dir())] + [str(d) for d in EXTRA_SCRIPT_DIRS] + [os.path.expanduser(p) for p in args.allow_path] \
-        + [os.path.expanduser(sample_dir)]
-
-    demo = build_ui(sample_dir)
-    allowed.append(str(CACHE_DIR))
-    kw = {"css": CSS} if LAUNCH_HAS_CSS else {}
-    global BIND_HOST
-    BIND_HOST = args.host
-    auth = args.auth or os.environ.get("SDGUI_AUTH")
-    if auth:
-        user, sep, pw = auth.partition(":")
-        if not sep or not user or not pw:
-            ap.error("--auth must look like user:password")
-        kw["auth"] = (user, pw)
-    if args.host not in ("127.0.0.1", "localhost", "::1"):
-        print(f"\n*** Listening on {args.host}:{args.port}: anyone on your network can open the GUI and run shell commands "
-              f"through it. {'A login is required.' if auth else 'No login is set: use --auth user:password.'} ***")
-        print(f"*** Open it from other computers at http://{display_host()}:{args.port} ***\n")
-    demo.launch(server_name=args.host, server_port=args.port, allowed_paths=allowed, **kw)
-
-
-if __name__ == "__main__":
-    main()

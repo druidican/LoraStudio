@@ -5,7 +5,7 @@ and the GPU / GFX values.
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.051126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126e"  # LoRA Studio version, see version.py
 
 import glob
 import json
@@ -53,9 +53,6 @@ def hf_status_text() -> str:
         return f"**HF token:** `{mask_token(tok)}` (from {HF_FILE})"
     return f"**HF token:** not set. Put it in `{hf_path()}`"
 
-
-def header_status():
-    return S.gpu_status_text(), hf_status_text()
 
 
 def get_export(text: str, name: str):

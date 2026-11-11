@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE */
-/* LoRA Studio version 1.011126 */
+/* LoRA Studio version 1.111126e */
 /* LoRA Studio: the look of the pages (colours come from the --ll-* variables of the Collection style).
    Edit freely. For your own changes that survive updates, use custom.css next to this file instead:
    it is loaded after this one, and an update never replaces it. Reload the page after a change
    (restart LoRA Studio for changes to this file). */
 /* ---- shared ---- */
-.ls-hidden, #ai_box, #ds_box, #tr_box, #rs_box, #col_box { display:none !important; }
+.ls-hidden, #ai_box, #ds_box, #tr_box, #rs_box { display:none !important; }
 .ls-note, .ls-note p { color:var(--ll-muted); font-size:13px; }
 .ls-bar > .ls-note, .ls-bar .ls-note { flex:1 1 240px !important; min-width:200px !important; }
 .ls-card { background:var(--ll-card); border:1px solid var(--ll-line); border-radius:12px; padding:14px 16px; }
@@ -255,7 +255,7 @@ table.ds-calc { border-collapse:collapse; font-size:14px; } .ds-calc td { paddin
 /* cards and folds: the same corner, border and inside space */
 .ls-card { border-radius:var(--ls-radius) !important; padding:14px 16px !important; gap:10px !important; }
 .gradio-container .block.ls-card { border:1px solid var(--ll-line) !important; }
-.gradio-container .accordion, .gradio-container details.ls-fold { border:1px solid var(--ll-line) !important;
+.gradio-container .accordion { border:1px solid var(--ll-line) !important;
   border-radius:var(--ls-radius) !important; background:var(--ll-card) !important; padding:4px 14px !important; }
 .gradio-container .accordion > .label-wrap, .gradio-container .accordion > button.label-wrap { font-weight:600; font-size:14px; }
 .gradio-container h3 { margin:6px 0 8px !important; font-size:18px !important; }
@@ -278,7 +278,7 @@ details.ds-fold[open] > summary { margin-bottom:6px; }
 
 /* the step pages: the same top space, and the bottom bar of each step sits apart from the content */
 #ds_s2, #ds_s3, #ds_s4, #ds_s5, #ds_s6, #ds_s7, #ds_s8, #ds_s9 { gap:12px !important; }
-#s6_bottom, #s9_bottom { border-top:1px solid var(--ll-line); padding-top:12px !important; margin-top:4px; }
+#s6_bottom { border-top:1px solid var(--ll-line); padding-top:12px !important; margin-top:4px; }
 .ds-bottom { border-top:1px solid var(--ll-line); padding-top:12px !important; margin-top:4px; }
 #ds_s3 .ds-bottom { border-top:0; padding-top:0 !important; }
 /* the consistency picture only takes room when there is a picture to look at */
@@ -333,4 +333,3 @@ table.ds-calc tr:first-child td { border-top:0 !important; }
 .ds-srow.ds-missing b { color:var(--ll-muted); font-weight:500; }
 .ls-missing, .ls-missing * { color:var(--ll-muted) !important; }
 .ls-missing-note { color:var(--ll-muted); font-size:13px; border:1px dashed var(--ll-line); border-radius:10px; padding:10px 14px; }
-button.ls-off-tab, .ls-off-tab { opacity:.55; }

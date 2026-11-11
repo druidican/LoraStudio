@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.111126c"  # LoRA Studio version, see version.py
+__version__ = "1.111126e"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -92,7 +92,7 @@ _LOGSCRIPT: dict = {}
 def log_script(logfile: Path) -> str:
     """The launch script of a run: the ##LS_SCRIPT line, else the script with the log's name (remembered per log)."""
     hit = _LOGSCRIPT.get(logfile.name)
-    if hit and (not hit or Path(hit).is_file()):
+    if hit and Path(hit).is_file():
         return hit
     v = _log_script(logfile)
     if v:
@@ -109,11 +109,21 @@ def _log_script(logfile: Path) -> str:
     except OSError:
         pass
     m = sg.RUN_LOG_RE.match(logfile.name)
-    stem = m.group(3) if m else ""
-    for _, p in sg.list_scripts():
-        if Path(p).stem == stem:
-            return p
-    return ""
+    return _scripts_by_stem().get(m.group(3) if m else "", "")
+
+
+_STEMS = {"t": 0.0, "map": {}}
+
+
+def _scripts_by_stem() -> dict:
+    """{script name without .sh: path} of every launch script, looked up at most every 30 s (old logs without a
+    ##LS_SCRIPT line each searched all dataset folders, on every refresh of the lists)."""
+    if time.time() - _STEMS["t"] > 30:
+        found = {}
+        for _, p in sg.list_scripts():
+            found.setdefault(Path(p).stem, p)
+        _STEMS.update(t=time.time(), map=found)
+    return _STEMS["map"]
 
 
 def runs(limit: int = 200) -> list[dict]:
@@ -1167,7 +1177,7 @@ def _cmp_status(running, waiting) -> str:
     return out
 
 
-def build_results(app, on_new_version=None):
+def build_results(app):
     with gr.Column(visible=True) as list_col:
         with gr.Row(elem_classes=["ls-bar"]):
             ds = gr.Dropdown(["All"] + sg.list_lora_dirs(), value="All", label="Dataset", scale=0, min_width=220)

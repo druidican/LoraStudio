@@ -5,13 +5,12 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.111126e"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
 import html
 import json
-import re
 import time
 from collections import Counter
 from datetime import datetime
@@ -767,142 +766,6 @@ def dc_back(ds):
         return "No set-aside pictures in this dataset."
     moved, err = S.DC.move_back(S.lora_path(ds))
     return f"✔ {moved} picture(s) moved back to their repeat folders." + ("\n\n" + "; ".join(err[:5]) if err else "")
-
-
-# ---- Automatic preparation of a dataset without launch scripts: check + set aside, repeats + rename, folders,
-# captions (asks first when captions exist). Uses the same functions as the buttons of this tab.
-AP_ASK = ("Recaption all pictures", "Only pictures without a caption", "Keep the captions as they are")
-
-
-def _ap_ollama(url, model):
-    """(url, model, note): model '' when Ollama or a vision model is not available."""
-    url = (url or "").strip() or oc_settings()[0]
-    model = model or oc_settings()[1]
-    if S.CAP is None:
-        return url, "", "captioner.py is missing"
-    if S.RUN.running():
-        return url, "", "a training run is active (it would share the GPU)"
-    try:
-        ms = S.CAP.list_models(url)
-    except Exception:                       # noqa: BLE001
-        return url, "", f"Ollama is not reachable at {url}"
-    vis = [m["name"] for m in ms if m["vision"]]
-    if model not in vis:
-        model = vis[0] if vis else ""
-    return url, model, "" if model else "no vision model in Ollama (ollama pull qwen2.5vl:7b)"
-
-
-def ap_prepare(ds, script, tkey, steps, purpose, url, model, leave_out, auto_on, manual=False):
-    """Generator: (log markdown, ask radio update, continue button update, dc_sum, dc_html, dc_pick)."""
-    keep = gr.update()
-    hide = gr.update(visible=False)
-    if not ds or not tkey:
-        if manual:
-            yield "Pick a LoRA folder and a LoRA type first.", hide, hide, keep, keep, keep
-        return
-    if not manual and (not auto_on or script != S.NEW or S.launch_scripts(ds)):
-        return                               # only automatic for a dataset that has no launch script yet
-    if S.RUN.running() and S.script_home(S.RUN.script or "/") == S.lora_path(ds):
-        yield "A training run of this dataset is active: preparation skipped.", hide, hide, keep, keep, keep
-        return
-    log = [f"### Preparing **{ds}** for {S.merged_presets()[1].get(tkey, {}).get('label', tkey)} ({purpose})"]
-    out = lambda extra="": "\n".join(log + ([extra] if extra else []))
-    url, model, why = _ap_ollama(url, model)
-    if why:
-        log.append(f"- ⚠️ Ollama steps skipped: {why}. Run *Check dataset pictures* and *Recaption with Ollama* "
-                   "below once it is available.")
-    # 1. check pictures, set aside the not-recommended ones
-    checks = ["technical"] + (["content", "balance"] if model else [])
-    last = None
-    for last in dc_run(ds, tkey, purpose, checks, url, model):
-        if isinstance(last, tuple) and str(last[0]).startswith("⏳"):
-            yield out(f"- {last[0]}"), hide, hide, keep, keep, keep
-    summary, table, pick = last if last else ("", "", gr.update())
-    bad = (pick.get("value") if isinstance(pick, dict) else None) or []
-    if S.DC is not None and S.DC.marks_load(S.lora_path(ds)):
-        msg = wm_apply(ds, "", only_pending=True)
-        if msg != "Nothing changed.":
-            log.append(f"- Watermarks and stamps: {msg.split(' The step plan')[0].lstrip('✔ ')} (recommended options; "
-                       "change them under *Watermarks, stamps and site names* in *Check dataset pictures*).")
-        bad = [b for b in bad if Path(b).exists()]
-    if bad and S.DC is not None:
-        moved, err = wm_set_aside(S.lora_path(ds), [Path(p) for p in bad])
-        log.append(f"- Checked the pictures: **{moved} not recommended** set aside to `_set_aside/` "
-                   "(see the list in *Check dataset pictures*; **Move all back** undoes it).")
-    else:
-        log.append("- Checked the pictures: none set aside." + ("" if model else " (technical checks only)"))
-    yield out(), hide, hide, summary, table, gr.update(choices=[], value=[])
-    # 2. repeats + rename / create the repeat folder
-    rows = S.folder_rows(ds)
-    rec = S.recommended_repeats(ds, tkey, steps)
-    lora = S.lora_path(ds)
-    if not rows:
-        log.append("- No pictures left in the dataset: stopped.")
-        yield out(), hide, hide, keep, keep, keep
-        return
-    if len(rows) == 1:
-        f, r, n = rows[0]
-        if r != rec:
-            base = lora.name.lower() if f == lora else S.base_name(f.name)
-            msg, _ = S.rp_rename(ds, str(f), f"{rec}_{base}", True)
-            log.append(f"- Repeats: **{rec}** for {n} pictures. {msg}")
-        else:
-            log.append(f"- Repeats: `{f.name}` already has the recommended {rec}.")
-    else:
-        log.append(f"- Repeats: {len(rows)} repeat folders found, left as they are (recommended in total: {rec}; "
-                   "use *Repeat folders* below to change them).")
-    # 3. model / log folders
-    try:
-        plan = S.make_plan(ds, tkey, steps)
-        notes = S.ensure_folders(ds, plan["script_text"], S._plan_state(plan), tkey)
-        log.append("- Folders: " + ("; ".join(notes) if notes else "`model` and `log` already exist") + ".")
-    except Exception as e:                  # noqa: BLE001
-        log.append(f"- Folders: could not plan ({e}).")
-    yield out(), hide, hide, keep, keep, keep
-    # 4. captions
-    if not model:
-        log.append("- Captions: skipped (no Ollama).")
-        yield out(), hide, hide, keep, keep, keep
-        return
-    imgs = oc_images(ds)
-    have = sum(1 for im in imgs if S.read_caption(im))
-    if have:
-        log.append(f"- Captions: **{have} of {len(imgs)}** pictures already have one. What should happen with them? "
-                   "Choose below and press **Continue**.")
-        yield (out(), gr.update(visible=True, value=AP_ASK[1] if have < len(imgs) else AP_ASK[2]),
-               gr.update(visible=True), keep, keep, keep)
-        return
-    yield from ap_caption(ds, tkey, purpose, url, model, leave_out, AP_ASK[0], log)
-
-
-def ap_caption(ds, tkey, purpose, url, model, leave_out, choice, log=None):
-    keep, hide = gr.update(), gr.update(visible=False)
-    log = list(log or [f"### Captions for **{ds}**"])
-    out = lambda extra="": "\n".join(log + ([extra] if extra else []))
-    if choice == AP_ASK[2]:
-        log.append("- Captions: kept as they are. ✔ Preparation done.")
-        yield out(), hide, hide, keep, keep, keep
-        return
-    url, model, why = _ap_ollama(url, model)
-    if why:
-        log.append(f"- Captions: skipped ({why}).")
-        yield out(), hide, hide, keep, keep, keep
-        return
-    _, style, length, detail = oc_recommend(tkey, purpose)
-    leave = ((leave_out or (S.CAP.DEFAULT_LEAVE_OUT if S.CAP else "")) if purpose == "character" else
-             (S.CAP.STYLE_LEAVE_OUT if S.CAP and purpose == "style" else ""))
-    if S.CAP is not None:
-        S.CAP.PURPOSE["value"] = purpose or "character"
-        S.CAP.PURPOSE["class"] = ""
-    trigger = re.sub(r"[^A-Za-z0-9_]+", "", ds).lower() or "ohwx"
-    last = ""
-    for last in oc_run(ds, url, model, trigger, leave, False, True, style, length, detail,
-                       only_missing=(choice == AP_ASK[1])):
-        yield out(f"- Captions ({style}, trigger `{trigger}`): {last.splitlines()[0]}"), hide, hide, keep, keep, keep
-    log.append(f"- Captions ({style}, trigger `{trigger}`): " + last.replace("\n", " "))
-    log.append("✔ Preparation done. The launch script below is planned for the pictures that remain; press **Save as "
-               "new launch script** when it looks right.")
-    yield out(), hide, hide, keep, keep, keep
 
 
 def oc_stop():

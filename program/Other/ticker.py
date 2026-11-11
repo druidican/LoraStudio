@@ -7,10 +7,9 @@ register what they want refreshed here, and lora_studio.py makes ONE timer that 
 A tick answers with one small hidden value per part; only a part with something new changes its value, and that
 value's change event redraws just that part (an idle tick used to cost the browser 0.3-0.6 s, every part being an
 output of the one event).
-Standalone (sdgui.py on its own) nothing is registered and the parts keep their own timers.
 """
 from __future__ import annotations
-__version__ = "1.111126d"  # LoRA Studio version, see version.py
+__version__ = "1.111126e"  # LoRA Studio version, see version.py
 
 import os
 

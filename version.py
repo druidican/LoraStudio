@@ -14,20 +14,20 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.111126d"
-VERSION = "1.111126d"
+__version__ = "1.111126e"
+VERSION = "1.111126e"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.111126b",
-    "version.py": "1.111126d",
+    "lora_studio.py": "1.111126e",
+    "version.py": "1.111126e",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.111126d",
-    "program/Training/sd_script.py": "1.111126b",
-    "program/Data/sd_prepare.py": "1.091126",
-    "program/Training/sd_settings.py": "1.051126b",
+    "program/Training/sdgui.py": "1.111126e",
+    "program/Training/sd_script.py": "1.111126e",
+    "program/Data/sd_prepare.py": "1.111126e",
+    "program/Training/sd_settings.py": "1.111126e",
     "program/Data/datasets_ui.py": "1.101126",
     "program/Data/dsflow.py": "1.091126b",
-    "program/Training/training_ui.py": "1.111126c",
+    "program/Training/training_ui.py": "1.111126e",
     "program/Settings/settings_ui.py": "1.111126d",
     "program/Gallery/lora_library.py": "1.111126d",
     "program/Training/comfytest.py": "1.011126",
@@ -53,7 +53,7 @@ RELEASE: dict = {
     "program/Gallery/insights.py": "1.011126",
     "program/Other/livepoll.py": "1.101126c",
     "program/Other/loadjoin.py": "1.111126d",
-    "program/Other/ticker.py": "1.111126d",
+    "program/Other/ticker.py": "1.111126e",
     "program/Other/statusbar.py": "1.111126d",
     "program/Other/gpusmi.py": "1.051126b",
     "program/Training/savepoint.py": "1.011126",
@@ -62,7 +62,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.111126c",
+    "selftest.py": "1.111126e",
     "program/Settings/machinecheck.py": "1.111126d",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -72,14 +72,15 @@ RELEASE: dict = {
     "program/Settings/venvcheck.py": "1.011126",
     "program/Settings/features.py": "1.091126",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.101126d",
+    "program/Training/Lora_Datatypes.py": "1.111126e",
     "program/Training/Training_Recommendations.py": "1.091126",
-    "program/Other/lora_studio.css": "1.011126",
+    "program/Other/lora_studio.css": "1.111126e",
     "install.sh": "1.051126b",
     "start.sh": "1.051126",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.111126e", "Clean-up 2 (Training): the old stand-alone sdgui.py program is gone (LoRA Studio is the only way in; it had no Run page any more), with its own header, GPU display, timers and the hidden 'Run all steps' preparation, which also ran three extra steps every time you picked a LoRA type in step 9. Leftovers of the old queue table removed. Training › Results no longer searches all dataset folders for every old log without a script line on each refresh. Nothing you use changes."),
     ("1.111126d", "Clean-up 1 (status strip, timer, start-up, Settings): the page is quicker to open. Fields that the start-up already filled no longer each send their own event afterwards (the model file fields made four, the Collection's base-model filter, the caption example and the speed test list one each), the shared timer no longer redraws parts that have nothing new, and the training venv status loads with the other start-up parts. On a test copy with 80 datasets and 200 LoRAs the browser was busy about 9 s instead of 22 s while opening the page. Leftovers removed. LS_LOAD_DEBUG=1 prints how long each start-up part takes."),
     ("1.111126c", "Runs stopped before their final LoRA count as not run: listed as stopped, ticked by 'Tick the ones not run', and can be queued again."),
     ("1.111126b", "New: Settings › Speed test. Tick the LoRA types to test (quick, full, or only how fast they train now); each trains a few steps on an invented test dataset with different speed settings. Results stay per type, and 'Use the faster settings' makes new launch scripts of that type use the fastest one. Fixed: live parts with one output (for example download progress) could show 'Error' since 1.101126c."),

@@ -772,11 +772,6 @@ so edits apply without a restart; the tab shows which file is used and how many 
 tested on your machine: set their model files in Settings › Model files and press **Check flags** first.
 Subtypes such as Pony (a type with its own model files) are still added in Settings › Model files.
 
-### Automatic preparation (standalone sdgui.py only)
-
-The one-click preparation of earlier versions (check, repeats, folders, captions in a row) is only in `sdgui.py` run
-on its own. In LoRA Studio the Datasets steps do the same, one step at a time, so you can look at each.
-
 ### Recaption with Ollama (tags or sentences)
 
 **Datasets › 7 Tags** has a local vision model in [Ollama](https://ollama.com)
@@ -1057,7 +1052,3 @@ pictures and LoRA Manager data under the right names.
 The **Dark / Normal** button at the top switches straight away. The default for each start is set in
 Settings › Library.
 
-## Running the parts on their own
-
-Both still work alone: `python sdgui.py --root ~/sd-scripts --images-dir <dataset folder>` (then it uses
-`<sd-scripts>/settings.txt` and `huggingtoken.txt` as before) and `python lora_library.py`.

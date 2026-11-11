@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.111126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126e"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -32,19 +32,6 @@ _PH = "/PATH/TO/"          # placeholder for model files this tool cannot know
 # All LoRA types (SDXL, Illustrious, Anima, SD 1.5, SD3, FLUX, Lumina, HunyuanImage, ...) live in Lora_Datatypes.py.
 EXTRA_PRESETS: dict = {}   # kept empty for compatibility; add new types to Lora_Datatypes.py instead
 PRESETS_ERROR = {"msg": ""}  # why Lora_Datatypes.py could not be loaded (shown on the Create Data Launch Script tab)
-
-
-def datatypes_status() -> str:
-    """One line for the Create Data Launch Script tab: which Lora_Datatypes.py is used and how many types it has."""
-    if S.SCAN_SCRIPT is None:
-        return (f"**Lora_Datatypes.py not found.** Put it next to `sdgui.py` (or in your sd-scripts folder) or start with "
-                "`--datatypes /path/to/Lora_Datatypes.py`, then restart. Without it no LoRA types are available and only "
-                "editing existing launch scripts works.")
-    sc, presets = builtin_presets()
-    if sc is None:
-        return (f"**Could not load `{S.SCAN_SCRIPT}`:** {PRESETS_ERROR['msg']}. Fix the file and press "
-                "**Fill with recommended settings** again (it is re-read every time).")
-    return f"LoRA types: **{len(presets)}** from `{S.SCAN_SCRIPT}`."
 
 
 def builtin_presets():
@@ -1003,7 +990,6 @@ def type_dataset_checks(cfg, stats) -> list:
     return out
 
 
-STUDIO_MODE = {"on": False}       # LoRA Studio: Datasets › 9 shows the step plan itself and renames the repeat folder
 
 
 def explain_md(ds, tkey, cfg, stats, text, rec, existing, planned_repeats=None, rename=None, create=None):
@@ -1032,29 +1018,6 @@ def explain_md(ds, tkey, cfg, stats, text, rec, existing, planned_repeats=None, 
     miss = imgs - stats["captioned"]
     L.append(f"**Dataset `{ds}`:** {imgs} images in {len(rows)} repeat folder(s), {stats['captioned']} with captions"
              + (f", **{miss} without**" if miss else "") + ".")
-    compact = STUDIO_MODE["on"]          # the plan card and the settings table above show these already
-    L += [] if compact else ["", "**How the step count is calculated**", "", "| Quantity | Calculation | Result |", "|---|---|---|",
-          f"| Images | counted in the repeat folders | {imgs} |",
-          f"| Samples per epoch | images × repeats ({rep_txt}) | {samples} |",
-          f"| Effective batch | batch size × accumulation = {bs} × {ga} | {eff} |",
-          f"| Steps per epoch | ceil({samples} / {eff}) | {spe} |"]
-    if total and not compact:
-        L += [f"| Total steps | {spe} steps × {ep} epochs | **{total}** |",
-              f"| Views per image | total steps × effective batch / images | {views:.0f} |"]
-    L += [] if compact else ["", f"**Recommended for {cfg['label']}:** about {lo}-{hi} total steps (aim for {cfg['steps']}), roughly "
-          f"{cfg['views']} views per image ({VIEWS_OK[0]}-{VIEWS_OK[1]} is workable), spread over about "
-          f"{cfg['epochs']} epochs. Steps per epoch are approximate: aspect-ratio bucketing can add a few, so "
-          "check the count the trainer prints at startup."]
-
-    if existing and rec and not compact:
-        cf = form_dict(" ".join(cfg.get("flags", [])))
-        L += ["", "| | Your script | Recommended |", "|---|---|---|",
-              f"| Batch × accumulation | {bs} × {ga} | {rec['bs']} × {rec['ga']} |",
-              f"| Repeats | {rep_txt} | {'/'.join(str(x) for x in rec['repeats'])} |",
-              f"| Epochs | {ep if ep else '?'} | {rec['epochs']} |",
-              f"| Total steps | {total if total else '?'} | ~{rec['total_steps']} |",
-              f"| Learning rate / optimizer | {f.get('learning_rate') or '?'} / {f.get('optimizer_type') or '?'} | {cfg['lr']} / {cfg['optimizer']} |",
-              f"| Network dim / alpha | {f.get('network_dim') or '?'} / {f.get('network_alpha') or '?'} | {cf.get('network_dim') or '?'} / {cf.get('network_alpha') or '?'} |"]
 
     # why these settings
     W = []
@@ -1109,11 +1072,9 @@ def explain_md(ds, tkey, cfg, stats, text, rec, existing, planned_repeats=None, 
     if create:
         A.append(f"There is no `<N>_name` repeat folder yet. **`{create}/` will be created when you save** (with the `model` and `log` "
                  "folders), and images lying directly in the LoRA folder are moved into it, if the checkbox next to Save is ticked.")
-    if rename and STUDIO_MODE["on"]:
+    if rename:
         A.append("The repeat folder gets the recommended repeat count when you press **Fill with recommended settings** "
                  "or save this new script (its copies in `_originals/` and `_reserve/` too).")
-    elif rename:
-        A.append(f"Rename the repeat folder (see **Repeat folders** above, or run `{rename}`): sd-scripts reads the repeat count from the folder name.")
     elif not existing and rec and rec.get("want_repeats") and rec["want_repeats"] != rec["repeats"][0]:
         A.append(f"The folder uses {rec['repeats'][0]} repeats; about {rec['want_repeats']} would hit the step target best.")
     if total is not None:
@@ -1248,7 +1209,7 @@ def export_report():
     L = [f"# LoRA Studio report, {now:%Y-%m-%d %H:%M}", "",
          "Send this file together with `Training_Recommendations.py` to renew the recommendations.", "",
          "## Versions",
-         f"- Training_Recommendations.py: " + (f"v{recs.VERSION} ({recs.UPDATED})" if recs else RECS_ERROR["msg"]),
+         "- Training_Recommendations.py: " + (f"v{recs.VERSION} ({recs.UPDATED})" if recs else RECS_ERROR["msg"]),
          f"- LoRA types: {', '.join(sorted(presets))}",
          f"- sd-scripts: `{S.sd_root()}` " + _cmd(["git", "-C", str(S.sd_root()), "log", "-1", "--format=%h %cd", "--date=short"]),
          f"- musubi-tuner: `{S.musubi_root()}` " + _cmd(["git", "-C", str(S.musubi_root()), "log", "-1", "--format=%h %cd", "--date=short"]),
@@ -1353,7 +1314,7 @@ def cs_load(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
         return _cs_result(status="Pick a LoRA folder.")
     files = launch_scripts(ds)
     if script != NEW and script not in {str(p) for p in files}:
-        if STUDIO_MODE["on"] and tkey:              # the script of the chosen LoRA type, never another type's
+        if tkey:                                    # the script of the chosen LoRA type, never another type's
             script = script_for_type(ds, tkey)
         else:
             script = str(files[0]) if files else NEW
@@ -1417,7 +1378,7 @@ def cs_suggest(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True
     except Exception as e:
         return _cs_result(status=f"**Cannot build a recommendation:** {e}")
     renamed = ""
-    if STUDIO_MODE["on"] and use_rep and plan["rec"].get("rename") and plan["rec"].get("want_repeats"):
+    if use_rep and plan["rec"].get("rename") and plan["rec"].get("want_repeats"):
         renamed = _auto_rename(ds, plan["rec"]["want_repeats"])
         if renamed and not renamed.startswith("⚠"):
             plan = make_plan(ds, tkey, steps_over, use_rep, hf_auto, samples)   # the folder has the count now
@@ -1453,8 +1414,8 @@ def cs_apply_quiet(ds, tkey, script, text, plan, *vals):
 def cs_retype(ds, script, tkey, text, steps_over, use_rep, hf_auto=True, samples=True):
     if script == NEW:
         return cs_load(ds, NEW, tkey, steps_over, use_rep, hf_auto, samples)
-    if STUDIO_MODE["on"] and ds and tkey:
-        # LoRA Studio: another LoRA type means its own script, or a new one with that type's recommended settings;
+    if ds and tkey:
+        # another LoRA type means its own script, or a new one with that type's recommended settings;
         # never the settings of the type that was open before
         try:
             cur = S.script_type(script, Path(script).read_text(encoding="utf-8", errors="ignore"))
@@ -1571,7 +1532,7 @@ def cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, pla
         gr.Warning(f"{name} already exists. Pick another name, or select it and use Save (overwrite).")
         return _cs_result(status=f"`{name}` already exists. Choose another name.", plan=plan) + [gr.update()]
     text, vnote = _bump_if_taken(S.lora_path(ds), S.fix_flags(text or "")[0])
-    if STUDIO_MODE["on"] and (plan or {}).get("rename") and (plan or {}).get("repeats"):
+    if (plan or {}).get("rename") and (plan or {}).get("repeats"):
         r = _auto_rename(ds, plan["repeats"][0])
         if r:
             vnote += f" {r}."
