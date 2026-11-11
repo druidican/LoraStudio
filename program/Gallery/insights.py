@@ -23,7 +23,7 @@ Everything is read on this computer from what LoRA Studio already has; nothing i
 With few LoRAs these are hints, not rules: every number says how many LoRAs or runs it comes from.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.111126g"  # LoRA Studio version, see version.py
 
 import re
 import statistics
@@ -33,7 +33,6 @@ import time
 from collections import Counter
 from pathlib import Path
 
-RATING_LABEL = {0: "not rated", 1: "1 · poor", 2: "2 · weak", 3: "3 · fine", 4: "4 · good", 5: "5 · very good"}
 MIN_PICS_USED = 3                 # pictures made with a version before it counts as used
 _CACHE: dict = {"t": 0.0, "v": None}
 _LOCK = threading.Lock()
@@ -528,30 +527,6 @@ def epochs_hint(tkey: str, epochs: int | None) -> str:
         return (f"in your {s['n']} runs of this type the save point to try first was at about {round(100 * s['ratio'])} "
                 f"% of the run: about {want} of these {epochs} epochs may be enough (save points let you pick)")
     return s["note"]
-
-
-def gpu_hint(tkey: str, batch: int | None, steps: int | None) -> str:
-    """Step 9: what your graphics card did with this type before, and a time estimate from your own runs."""
-    try:
-        v = compute()
-    except Exception:                                  # noqa: BLE001
-        return ""
-    s = next((x for x in v["gpu"] if x["type"] == tkey), None)
-    if not s:
-        return ""
-    bits = []
-    if batch and s["oom_at"] and batch >= s["oom_at"]:
-        bits.append(f"⚠ batch {s['oom_at']} ran out of video memory before for this type"
-                    + (f"; batch {s['safe']} finished" if s["safe"] else ""))
-    elif s["note"]:
-        bits.append(s["note"].capitalize())
-    sps = [c["sps"] for c in s["batches"] if c["sps"] and (batch is None or c["batch"] == batch)]
-    if sps and steps:
-        sec = statistics.median(sps) * steps
-        h, m_ = divmod(int(sec // 60), 60)
-        bits.append(f"about {f'{h} h {m_:02d} min' if h else f'{m_} min'} for {steps} steps "
-                    f"({statistics.median(sps):.2f} s per step in your earlier runs)")
-    return ("On your graphics card: " + "; ".join(bits) + ".") if bits else ""
 
 
 # --------------------------------------------------------------------------- the page

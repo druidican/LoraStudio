@@ -11,7 +11,7 @@ Anima, FLUX, SD3, Lumina, Chroma …) and **musubi-tuner** (Z-Image, Qwen-Image,
 Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps a catalogue of the owner's LoRAs
 (the Collection, with LoRA Manager data), runs a training queue and makes test pictures through ComfyUI.
 
-- `lora_studio.py`: entry point. `start.sh` / `install.sh` (Linux, WSL, macOS without trainers),
+- `lora_studio.py`: entry point (the only one: the old stand-alone sdgui.py / lora_library.py modes were removed in 1.111126e/g). `start.sh` / `install.sh` (Linux, WSL, macOS without trainers),
   `install-windows.ps1` + `Install LoRA Studio.cmd` (installs into WSL2).
 - `program/`: `Data/` (datasets, the nine steps: `dsflow.py`, `datasets_ui.py`, `captioner.py`, `wdtagger.py`,
   `consistency.py`), `Training/` (`sdgui.py` runner/queue, `sd_script.py` launch scripts, `Lora_Datatypes.py`
@@ -99,7 +99,7 @@ Every Gradio event costs the browser ~0.3 s on this big page, whatever it output
 joined into one event (`Other/loadjoin.py`, `LS_SEPARATE_LOADS=1` to compare); the status strip and the queue are
 fetched by the page itself from `/ls_live` (`Other/livepoll.py`, behind the login); the shared timer
 (`Other/ticker.py`) redraws only parts that changed and sleeps while nothing runs (the page wakes it).
-`script_type` is cached per file. Measure with a test copy at the owner's size (80 datasets, 200 LoRAs) and
+`script_type` is cached per file. A Datasets step change is one event (`nav_all`), a new dataset/type one more (`sync_all` with sdgui's `ds_all`); don't add `.change` chains that follow programmatic sets, chain or join instead. `LS_LOAD_DEBUG=1` prints the start-up steps' times. Measure with a test copy at the owner's size (80 datasets, 200 LoRAs) and
 Playwright long tasks; `LS_TICK_DEBUG=1` prints what each tick changes.
 
 ## Testing

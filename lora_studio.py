@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.111126f"  # LoRA Studio version, see version.py
+__version__ = "1.111126g"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -281,9 +281,9 @@ def main():
         with gr.Row(elem_id="ls_top"):
             gr.HTML(f'<div class="ls-title">{logo_img(40)}<h1>LoRA Studio</h1><span class="ls-ver">{version.VERSION}</span></div>')
             gr.Button("Dark / Normal", size="sm", scale=0).click(None, None, None, js=ll.TOGGLE_JS)
-        strip = gr.HTML(statusbar.strip_html(), elem_id="ls_strip")
+        gr.HTML(statusbar.strip_html(), elem_id="ls_strip")
         sdgui.build_ui(app)                 # the training pages, placed below
-        B, UI = sdgui.BLOCKS, sdgui.UI
+        B = sdgui.BLOCKS
 
         def show(key):
             try:
@@ -293,13 +293,13 @@ def main():
 
         with gr.Tabs(selected=start, elem_id="ls_tabs") as top:
             with gr.Tab("Collection", id="collection"):
-                ll.build_library_ui(app, detach_settings=True)
-            with gr.Tab("Datasets", id="datasets") as t_ds:
+                ll.build_library_ui(app)
+            with gr.Tab("Datasets", id="datasets"):
                 import datasets_ui
                 DS = datasets_ui.build(app, show)
             with gr.Tab("Training", id="training"):
                 import training_ui
-                with gr.Tabs(selected="tr_run") as tr_tabs:
+                with gr.Tabs(selected="tr_run"):
                     import features as FT
                     _run_lab = "Run" if (FT.have("sd_scripts") or FT.have("musubi")) else "Run (trainers missing)"
                     with gr.Tab(_run_lab, id="tr_run") as t_run:

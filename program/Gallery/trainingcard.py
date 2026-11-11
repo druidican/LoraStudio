@@ -18,7 +18,7 @@ model when empty and the clip skip (usage_tips; 1 when nothing says otherwise). 
 sync: LoRA Manager's when LoRA Studio has none, the dataset's trigger word when neither has any.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.111126g"  # LoRA Studio version, see version.py
 
 import json
 import math
@@ -47,7 +47,6 @@ FIELDS = [   # (group, key, label)
     ("Result", "trained_on", "Trained on"), ("Result", "duration", "Training time"),
     ("Result", "final_loss", "Final loss"), ("Result", "best_epoch", "Save point to try first"), ("Result", "gpu", "GPU"),
 ]
-LABEL = {k: lab for _, k, lab in FIELDS}
 OLD_RUNS = "_old_runs"
 REPEAT_RE = re.compile(r"^(\d+)_(.+)$")
 IMG_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}

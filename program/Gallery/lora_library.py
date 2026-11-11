@@ -3,7 +3,7 @@
 """
 LoRA Library
 ============
-A standalone Gradio app that catalogues your LoRAs and their datasets.
+The Collection of LoRA Studio: a catalogue of your LoRAs and their datasets.
 
 Expected dataset layout (one folder per dataset inside a "dataset folder"):
 
@@ -29,14 +29,11 @@ Tabs
 Training settings always come from the .safetensors metadata (read-only).
 Edits go to the LoRA Manager sidecar in the dataset (LoraManager/<name>.metadata.json),
 never into the .safetensors file or the LoRA folder.
-
-Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.111126d"  # LoRA Studio version, see version.py
+__version__ = "1.111126g"  # LoRA Studio version, see version.py
 
-import contextlib
 import copy
 import hashlib
 import html
@@ -1578,7 +1575,6 @@ def best_member(members: list):
     return next((m for m in members if v is not None and m.version == v), None)
 
 
-
 BEST_BADGE = ('<span class="ll-done ll-best" title="Marked as the best version in Training › Results: shown first">'
               '&#9733; Best</span>')
 DONE_BADGE = '<span class="ll-done" title="Completed: its launch scripts are hidden in Training › Run">&#10003; Completed</span>'
@@ -2279,12 +2275,6 @@ def write_sidecar(path: Path, data: dict):
 # --------------------------------------------------------------------------- #
 # Personal sync: LoRA folder -> <dataset>/LoraManager/   (the only time the LoRA folder is read)
 # --------------------------------------------------------------------------- #
-
-def _renamed(name: str, old_stem: str, new_stem: str) -> str:
-    """'MyChar_Illustrious.preview.png' -> 'mycharILLV1.preview.png' (files are stored under the dataset file's name)."""
-    if name.lower().startswith(old_stem.lower()):
-        return new_stem + name[len(old_stem):]
-    return f"{new_stem}.{name}"
 
 
 def _sync_one(src: Path, dst: Path, stats: dict) -> None:
@@ -3022,10 +3012,9 @@ def versions_html(lora) -> str:
             '<th>Final loss</th><th>Completed</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
 
 
-def build_library_ui(app, detach_settings=False, maint_extra=None):
-    """Render the Library tabs (Carddex, Library, Details, Gallery, Personal sync, Settings) into the current layout
-    context of `app`. Used standalone by build_app() and inside lora_studio.py. With detach_settings the
-    two settings panels are built hidden (FOLDERS_BLOCK, LOOK_BLOCK) for the caller to .render() elsewhere."""
+def build_library_ui(app, maint_extra=None):
+    """Render the Collection pages into the current layout context of `app` (lora_studio.py). The two settings
+    panels are built hidden (FOLDERS_BLOCK, LOOK_BLOCK) for lora_studio.py to .render() in Settings."""
     global FOLDERS_BLOCK, LOOK_BLOCK
     s = LIB.settings
     # Hidden helper that turns a card/tile click into "open Details". It sits outside the tabs because a tab's
@@ -3141,7 +3130,7 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                         pg_all = gr.Button("Scan all picture folders", scale=1, min_width=170)
                         pg_stop = gr.Button("Stop scan", variant="stop", scale=0, min_width=110)
                     pg_msg = gr.Markdown()
-                    with gr.Accordion("Old names of this LoRA (pictures made before a rename)", open=False) as pg_old_acc:
+                    with gr.Accordion("Old names of this LoRA (pictures made before a rename)", open=False):
                         gr.Markdown("Names found in your pictures that no LoRA file has now, but that look like this LoRA. "
                                     "Tick the ones that are this LoRA under an older name; their pictures join as *old name*.")
                         pg_old = gr.CheckboxGroup(label="Old names", choices=[], value=[])
@@ -3282,76 +3271,74 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
                     maint_extra()
 
         # ---------------- Settings ---------------- #
-        # Two panels (folders / library and look). Standalone they sit in a Settings tab here;
-        # in LoRA Studio they are moved to the Settings top tab (detach_settings=True).
-        with (contextlib.nullcontext() if detach_settings else gr.Tab("Settings", id="settings")):
-            with gr.Column(render=not detach_settings) as FOLDERS_BLOCK:
-                gr.Markdown(f"Where your own data is: datasets, LoRAs, model files and ComfyUI pictures. Saved to "
-                            f"`{SETTINGS_FILE.name}` (you can also edit that file). One folder per line.")
-                st_sd = gr.Textbox(
-                    label="sd-scripts folder",
-                    info="Your sd-scripts install (with venv/ and the *_train_network.py files). "
-                         "Used by the Training LoRA tabs. Changing it needs a restart.",
-                    value=s["sd_scripts_dir"], visible=not detach_settings)
+        # Two panels (folders / library and look), placed in the Settings top tab by lora_studio.py.
+        with gr.Column(render=False) as FOLDERS_BLOCK:
+            gr.Markdown(f"Where your own data is: datasets, LoRAs, model files and ComfyUI pictures. Saved to "
+                        f"`{SETTINGS_FILE.name}` (you can also edit that file). One folder per line.")
+            st_sd = gr.Textbox(
+                label="sd-scripts folder",
+                info="Your sd-scripts install (with venv/ and the *_train_network.py files). "
+                     "Used by the Training LoRA tabs. Changing it needs a restart.",
+                value=s["sd_scripts_dir"], visible=False)
+            with gr.Row():
+                st_ds = gr.Textbox(
+                    label="Dataset folders",
+                    info="Where ALL your datasets are. Each dataset folder holds repeat folders (10_name), "
+                         f"log/, model/, launch scripts and {ARCHIVE_DIR}/. The FIRST one is where the "
+                         "Training tabs list and create datasets.",
+                    lines=4, value="\n".join(s["dataset_dirs"]))
+                st_lora = gr.Textbox(
+                    label="LoRA folders",
+                    info="Where ALL your LoRAs are, with the LoRA Manager files from ComfyUI "
+                         "(.metadata.json, preview and example images). Only read by Personal sync.",
+                    lines=4, value="\n".join(s["lora_dirs"]))
+            with gr.Row():
+                st_scripts = gr.Textbox(
+                    label="Extra launch script folders (optional)",
+                    info="Folders with .sh launch scripts for Training › Run, besides your dataset folders.",
+                    lines=2, value="\n".join(s["script_dirs"]))
+                st_sample = gr.Textbox(
+                    label="Monitor sample folder (optional)",
+                    info="Where the Monitor tab looks for the newest sample images. Empty = <sd-scripts>/output.",
+                    value=s["sample_dir"], visible=False)
+            st_models = gr.Textbox(
+                label="Model folder (optional)",
+                info="Default folder for training model files (base model, text encoder, VAE) when a LoRA type "
+                     "has no folder of its own yet in Settings › Model files.",
+                value=s["models_dir"])
+            st_pics = gr.Textbox(
+                label="ComfyUI picture folder (optional)",
+                info="Where ComfyUI saves your pictures (its output folder). The Gallery tab looks in here for a "
+                     "folder per LoRA type (Anima, Illustrious, Pony, ...).",
+                value=s.get("pictures_dir", ""))
+            st_save = gr.Button("Save folders and rescan", variant="primary")
+            st_msg = gr.Markdown()
+        with gr.Column(render=False) as LOOK_BLOCK:
+            st_style = gr.Radio(["Dark", "Normal"], label="Style (default when the program opens)",
+                                value="Normal" if s["style"] == "normal" else "Dark")
+            st_bases = gr.Textbox(label="Base models: Name = keywords (checked top to bottom)", lines=6,
+                                  value="\n".join(f"{b} = {', '.join(k)}" for b, k in s["bases"]))
+            st_expected = gr.CheckboxGroup(label="Expected bases per character", choices=LIB.base_names(),
+                                           value=[b for b in s["expected_bases"] if b in LIB.base_names()])
+            with gr.Row():
+                st_blur = gr.Checkbox(label="Blur NSFW previews (hover to show)", value=s["nsfw_blur"])
+                st_level = gr.Dropdown(label="Blur at level and above", choices=list(NSFW_LEVELS),
+                                       value=next((k for k, v in NSFW_LEVELS.items() if v == s["nsfw_level"]),
+                                                  "X (8)"))
+                st_unknown = gr.Checkbox(label="Also blur unknown level when model is marked NSFW",
+                                         value=s["blur_unknown_nsfw"])
+            st_save2 = gr.Button("Save settings and rescan", variant="primary")
+            st_msg2 = gr.Markdown()
+            _pc = purpose_colors(LIB)
+            with gr.Group():
+                pc_on = gr.Checkbox(label="Colour the Collection cards by purpose (border and label; off = all "
+                                          "white as before)", value=_pc["on"])
                 with gr.Row():
-                    st_ds = gr.Textbox(
-                        label="Dataset folders",
-                        info="Where ALL your datasets are. Each dataset folder holds repeat folders (10_name), "
-                             f"log/, model/, launch scripts and {ARCHIVE_DIR}/. The FIRST one is where the "
-                             "Training tabs list and create datasets.",
-                        lines=4, value="\n".join(s["dataset_dirs"]))
-                    st_lora = gr.Textbox(
-                        label="LoRA folders",
-                        info="Where ALL your LoRAs are, with the LoRA Manager files from ComfyUI "
-                             "(.metadata.json, preview and example images). Only read by Personal sync.",
-                        lines=4, value="\n".join(s["lora_dirs"]))
-                with gr.Row():
-                    st_scripts = gr.Textbox(
-                        label="Extra launch script folders (optional)",
-                        info="Folders with .sh launch scripts for Training › Run, besides your dataset folders.",
-                        lines=2, value="\n".join(s["script_dirs"]))
-                    st_sample = gr.Textbox(
-                        label="Monitor sample folder (optional)",
-                        info="Where the Monitor tab looks for the newest sample images. Empty = <sd-scripts>/output.",
-                        value=s["sample_dir"], visible=False)
-                st_models = gr.Textbox(
-                    label="Model folder (optional)",
-                    info="Default folder for training model files (base model, text encoder, VAE) when a LoRA type "
-                         "has no folder of its own yet in Settings › Model files.",
-                    value=s["models_dir"])
-                st_pics = gr.Textbox(
-                    label="ComfyUI picture folder (optional)",
-                    info="Where ComfyUI saves your pictures (its output folder). The Gallery tab looks in here for a "
-                         "folder per LoRA type (Anima, Illustrious, Pony, ...).",
-                    value=s.get("pictures_dir", ""))
-                st_save = gr.Button("Save folders and rescan", variant="primary")
-                st_msg = gr.Markdown()
-            with gr.Column(render=not detach_settings) as LOOK_BLOCK:
-                st_style = gr.Radio(["Dark", "Normal"], label="Style (default when the program opens)",
-                                    value="Normal" if s["style"] == "normal" else "Dark")
-                st_bases = gr.Textbox(label="Base models: Name = keywords (checked top to bottom)", lines=6,
-                                      value="\n".join(f"{b} = {', '.join(k)}" for b, k in s["bases"]))
-                st_expected = gr.CheckboxGroup(label="Expected bases per character", choices=LIB.base_names(),
-                                               value=[b for b in s["expected_bases"] if b in LIB.base_names()])
-                with gr.Row():
-                    st_blur = gr.Checkbox(label="Blur NSFW previews (hover to show)", value=s["nsfw_blur"])
-                    st_level = gr.Dropdown(label="Blur at level and above", choices=list(NSFW_LEVELS),
-                                           value=next((k for k, v in NSFW_LEVELS.items() if v == s["nsfw_level"]),
-                                                      "X (8)"))
-                    st_unknown = gr.Checkbox(label="Also blur unknown level when model is marked NSFW",
-                                             value=s["blur_unknown_nsfw"])
-                st_save2 = gr.Button("Save settings and rescan", variant="primary")
-                st_msg2 = gr.Markdown()
-                _pc = purpose_colors(LIB)
-                with gr.Group():
-                    pc_on = gr.Checkbox(label="Colour the Collection cards by purpose (border and label; off = all "
-                                              "white as before)", value=_pc["on"])
-                    with gr.Row():
-                        pc_pick = [gr.ColorPicker(label=lab, value=_pc[k], scale=1) for k, lab in PURPOSES]
-                    with gr.Row(elem_classes=["ls-bar"]):
-                        pc_save = gr.Button("Save colours", size="sm", scale=0, min_width=140)
-                        pc_reset = gr.Button("Default colours", size="sm", scale=0, min_width=150)
-                    pc_msg = gr.Markdown()
+                    pc_pick = [gr.ColorPicker(label=lab, value=_pc[k], scale=1) for k, lab in PURPOSES]
+                with gr.Row(elem_classes=["ls-bar"]):
+                    pc_save = gr.Button("Save colours", size="sm", scale=0, min_width=140)
+                    pc_reset = gr.Button("Default colours", size="sm", scale=0, min_width=150)
+                pc_msg = gr.Markdown()
 
     # ---------------- Callbacks ---------------- #
     filters = [search, base_f, status_f, group_f]
@@ -3940,33 +3927,3 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
     for btn in (st_save, st_save2):
         btn.click(do_save_settings, st_inputs, [st_msg, st_msg2, base_f, st_expected, pick_dd]
                   ).then(do_render, filters, lib_html).then(do_gallery, gal_inputs, gal_html)
-
-
-def build_app():
-    style_in_launch = "css" in inspect.signature(gr.Blocks.launch).parameters
-    theme, head = make_theme(), head_html(LIB.settings["style"])
-    blocks_kwargs = {"title": "LoRA Library"}
-    if not style_in_launch:
-        blocks_kwargs.update(css=CSS, head=head, theme=theme)
-    with gr.Blocks(**blocks_kwargs) as app:
-        with gr.Row(elem_id="ls_top"):
-            gr.Markdown("# LoRA Library")
-            gr.Button("Dark / Normal", size="sm", scale=0).click(None, None, None, js=TOGGLE_JS)
-        build_library_ui(app)
-    launch_kwargs = {"css": CSS, "head": head, "theme": theme} if style_in_launch else {}
-    return app, launch_kwargs
-
-
-if __name__ == "__main__":
-    import argparse
-
-    ap = argparse.ArgumentParser(description="LoRA Library")
-    ap.add_argument("--port", type=int, default=7870)
-    ap.add_argument("--listen", action="store_true", help="Listen on all interfaces (LAN access)")
-    ap.add_argument("--no-browser", action="store_true", help="Don't open a browser tab")
-    args = ap.parse_args()
-    app, extra = build_app()
-    THUMB_DIR.mkdir(exist_ok=True)
-    threading.Thread(target=lambda: (LIB.ensure_loaded(), warm_thumbnails(LIB)), daemon=True).start()
-    app.launch(server_name="0.0.0.0" if args.listen else "127.0.0.1", server_port=args.port,
-               inbrowser=not args.no_browser, allowed_paths=[str(THUMB_DIR)], **extra)

@@ -16,7 +16,7 @@
    (sd-scripts ignores that folder). "Move all back" undoes it.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.111126g"  # LoRA Studio version, see version.py
 
 import hashlib
 import json
@@ -37,7 +37,6 @@ MOVED_FILE = "moved.json"
 STOP = threading.Event()
 SAME_LIMIT = 3
 QUOTA = {"close-up": 0.35, "upper body": 0.35, "full body": 0.2, "other": 0.1}   # character datasets
-GUIDE_SLOTS = ("Full body", "Face close-up", "Random")
 
 GUIDE_PROMPT = """This picture shows a character that a LoRA is trained on. List the details of the CHARACTER ITSELF
 that you can see: hair colour, length and style, eye colour, skin, build, body or species features (horns, ears, tail,
