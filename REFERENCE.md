@@ -302,11 +302,35 @@ the GPU), LoRA Studio tries again every minute until it answers, so you can star
 
 ## Speed
 
-The whole page has **one** timer (`ticker.py`): every 2 seconds while something runs (training, the batch fix, a
-download), every 6 seconds otherwise, and it only sends what changed. Pictures on the Datasets pages are small files
+Every update LoRA Studio sends to the page costs the browser about 0.3 s, so it sends few. When the page opens, all
+parts fill themselves in **one** step (`loadjoin.py`). The status strip and the training queue are fetched by the
+page itself every 2.5 seconds (`livepoll.py`, behind the same login), which costs the browser almost nothing. The one
+shared timer (`ticker.py`) ticks every 2 seconds while something runs (training, the batch fix, a download, test
+pictures), redraws only the parts that changed, and sleeps while nothing runs; the page wakes it within a second or
+two when something starts. Pictures on the Datasets pages are small files
 the browser keeps (in `.thumbs/pages/`, cleaned after 30 days), not data inside every page update. Finished run logs
 are read once. A click runs only the part it is for. To see which actions are slow: `LS_PROFILE=1 ./start.sh` prints
 every action that takes 0.2 s or more.
+
+### Training speed test (terminal)
+
+Which settings train fastest on your computer? `speedtest.py` tries them on one of your own launch scripts:
+
+```bash
+python3 ~/AI/LoraStudio/program/Training/speedtest.py ~/Datasets/pip/pipZITV1.sh            # all variants
+python3 ~/AI/LoraStudio/program/Training/speedtest.py ~/Datasets/pip/pipFLUXV1.sh --quick    # fewer variants
+python3 ~/AI/LoraStudio/program/Training/speedtest.py ~/Datasets/pip/pipZITV1.sh --list      # what it would try
+```
+
+It runs the script up to its training command without training (musubi-tuner scripts make their caches as
+usual), asks the trainer which options it has, and then trains a few steps (`--steps`, default 15) per variant,
+each changing one thing: fewer swapped blocks, pinned memory for block swapping, no gradient checkpointing, other
+attention (flash, sage, xformers), fp8, torch.compile, and the ROCm settings TunableOp, MIOpen fast search and
+expandable memory. It measures seconds per step after the warm-up steps and the peak video memory, notes when a
+variant runs out of memory or gets a NaN loss, tries the faster ones together, and writes
+`speedtest_<script>_<date>.md` next to the launch script with what to change. Your scripts are not changed and the
+test LoRAs are deleted. Close ComfyUI and stop Ollama first; each variant loads the model again, so a full test of
+a slow type takes an hour or more (`--only baseline,pinned,swap6` tests a few).
 
 ## Program version and the self-test
 

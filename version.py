@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.101126d"
-VERSION = "1.101126d"
+__version__ = "1.111126"
+VERSION = "1.111126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.101126c",
-    "version.py": "1.101126d",
+    "version.py": "1.111126",
     "program/lspaths.py": "1.011126",
     "program/Training/sdgui.py": "1.101126c",
     "program/Training/sd_script.py": "1.101126d",
@@ -31,6 +31,7 @@ RELEASE: dict = {
     "program/Settings/settings_ui.py": "1.101126",
     "program/Gallery/lora_library.py": "1.091126",
     "program/Training/comfytest.py": "1.011126",
+    "program/Training/speedtest.py": "1.111126",
     "program/Training/comfyupscale.py": "1.101126",
     "program/Data/detailscan.py": "1.101126b",
     "program/Data/captioner.py": "1.091126",
@@ -60,7 +61,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.101126d",
+    "selftest.py": "1.111126",
     "program/Settings/machinecheck.py": "1.051126b",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -78,6 +79,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.111126", "New: a training speed test for the terminal (program/Training/speedtest.py). It tries faster settings on one of your own launch scripts (block swapping, pinned memory, checkpointing, attention, fp8, torch.compile, ROCm settings), measures seconds per step and video memory, and writes a report with what to change."),
     ("1.101126d", "Z-Image, Qwen-Image and FLUX.2 (musubi-tuner): a dataset with a second caption set trained on no pictures at all (musubi did not recognise IMG.sentences.txt). The pictures are now linked into musubi's cache with the right captions, and a missing caption set stops the run with a clear message."),
     ("1.101126c", "Speed: much less work for the browser. The start-up loaders run as one event, the status strip and the queue refresh without Gradio events, the shared timer sleeps while nothing runs and redraws only what changed, and launch scripts are no longer re-read on every list redraw. Typing and clicks no longer stutter, and switching tabs is near instant."),
     ("1.101126b", "Detailed scan: a face crop and a detail crop that show nearly the same (a wreath on the head) become one new picture instead of two near-duplicates."),
@@ -110,6 +112,7 @@ PARTS = [
     ("program/Settings/settings_ui.py", "Settings"),
     ("program/Gallery/lora_library.py", "Collection (the LoRA library)"),
     ("program/Training/comfytest.py", "test pictures with ComfyUI"),
+    ("program/Training/speedtest.py", "training speed test for a launch script (terminal)"),
     ("program/Training/comfyupscale.py", "upscale and sharpen pictures with your ComfyUI workflow"),
     ("program/Data/detailscan.py", "the detailed scan: gaps and per-picture suggestions"),
     ("program/Data/captioner.py", "captions with Ollama"),

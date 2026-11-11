@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.101126d"  # LoRA Studio version, see version.py
+__version__ = "1.111126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -381,6 +381,17 @@ def _speed():
     G._TYPE_CACHE.clear()
     t = 'accelerate launch sdxl_train_network.py --output_name "pipILLV1"\n'
     need(G.script_type("x.sh", t) == "illustrious" and len(G._TYPE_CACHE) == 1, "type cache")
+
+
+@check("speed test: variants and the changes it reports")
+def _speedtest():
+    import speedtest as ST
+    args = ["--dit", "m.safetensors", "--blocks_to_swap", "10", "--gradient_checkpointing", "--sdpa"]
+    names = [v["name"] for v in ST.variants(args, {"use_pinned_memory_for_block_swap", "sage_attn", "sdpa",
+                                                   "fp8_base", "compile"}, False)]
+    need({"baseline", "swap6", "pinned", "no_checkpointing", "sage_attn", "fp8", "compile"} <= set(names), names)
+    ch = ST.changes(args, ST.setopt(ST.drop(args, "sdpa"), "blocks_to_swap", 6) + ["--sage_attn"])
+    need(("blocks_to_swap", "10", "6") in ch and any(k == "sdpa" and n is ST.MISSING for k, o, n in ch), ch)
 
 
 @check("sentence captions of a character begin 'trigger, a class word, ...'")
