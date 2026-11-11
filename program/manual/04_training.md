@@ -12,7 +12,7 @@ run in Results.
   (Anima → SDXL), the queue also asks ComfyUI to unload its models and waits until the video memory is empty; the
   queue note says how much was free. With the same model the next one starts at once.
 - *Stop the queue when a run fails* is on by default: a failing script does not run the next ones on a broken setup.
-- *Mark as run* hides a script you don't want to train again (a failed or never-run one); *show finished* shows the
+- *Mark Completed* hides a script you don't want to train again (a failed or never-run one); *show finished* shows the
   hidden and Completed ones again.
 - A saved state shows as *Resume from epoch N*: the run goes on from there.
 - *Tick the ones not run* ticks every script that has not finished: never ran, failed, or stopped before its final LoRA was written (a run stopped with Ctrl+C can end without an error, but it still counts as not run and keeps its *Add* button); *Clear finished* empties the done part of the queue,

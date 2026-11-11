@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1829,7 +1829,7 @@ def _improvements(ds) -> list[tuple[str, str]]:
 BATCH = {"running": False, "stop": False, "queue": [], "current": "", "step": "", "results": [], "started": 0.0}
 BATCH_MAX = 50                         # "less is better": at most this many pictures per dataset
 DEFAULT_TYPE = "anima"
-BATCH_FILE = __import__("lspaths").USER / "batch_settings.json"     # Settings › Automatic improvement
+BATCH_FILE = __import__("lspaths").USER / "batch_settings.json"     # Datasets › Improvements › What Fix does
 BATCH_DEFAULTS = {
     "keep_mode": "suggested",      # suggested: the suggestion for the type, at most max_pics · fixed: max_pics
     "select_mode": "safe",         # safe: cleanest pictures first · varied: more close-ups, angles, outfits, details

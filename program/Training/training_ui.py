@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.111126i"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -270,9 +270,9 @@ def scripts_html(show_done: bool = False) -> str:
         tick = (f'<input type="checkbox" class="tr-tick" data-k="{k}" data-notrun="{1 if not_run else 0}" '
                 f'aria-label="Tick {_esc(info["dataset"])} {_esc(info["type"])}"'
                 + (' disabled title="already in the queue"' if path in queued or running else "") + ">")
-        mark = (f'<button class="tr-btn tr-small" title="You ran it another way, or do not need it: mark this version as '
-                f'run and finished (hidden; Show finished shows it again)" onclick="lsSend(\'tr_box\', \'mark|{k}\')">'
-                'Mark as run</button>' if not_run and not is_done and path not in queued else "")
+        mark = (f'<button class="tr-btn tr-small" title="You ran it another way, or do not need it: mark this version '
+                f'Completed (hidden; Show finished shows it again)" onclick="lsSend(\'tr_box\', \'mark|{k}\')">'
+                'Mark Completed</button>' if not_run and not is_done and path not in queued else "")
         extra = ""
         if not FT.can_train_text(info["text"]):          # its trainer is not installed: made here, run elsewhere
             part = "musubi" if "MUSUBI_DIR=" in info["text"] else "sd_scripts"
@@ -290,7 +290,7 @@ def scripts_html(show_done: bool = False) -> str:
                     f'<span>{_esc(info["type"])} {_esc(info["version"])}</span> {done_chip}</div>'
                     f'{state}{mark}{btn}</div>{extra}')
     if not rows:
-        rows.append('<p class="ls-empty">No launch scripts yet. Make one in Datasets › New dataset or Edit existing '
+        rows.append('<p class="ls-empty">No launch scripts yet. Make one in Datasets '
                     '(step 9).</p>' if not hidden else '<p class="ls-empty">Every launch script is completed. Tick '
                     '<i>show finished</i> to see them.</p>')
     note = (f'<p class="ls-note">{hidden} completed launch script{"s" if hidden != 1 else ""} hidden.</p>' if hidden and not show_done else "")
@@ -1309,7 +1309,7 @@ def build_results(app):
                 rep_file = gr.File(label="The report", visible=False, interactive=False, scale=1)
                 rep_msg = gr.Markdown()
             rep_text = gr.Textbox(visible=False)
-            gr.Markdown("A new version opens Datasets › Edit existing › 9 Train for this dataset.",
+            gr.Markdown("A new version opens Datasets › 9 Train for this dataset.",
                         elem_classes=["ls-note"])
             again_msg = gr.Markdown()
             with gr.Accordion("TensorBoard", open=False):

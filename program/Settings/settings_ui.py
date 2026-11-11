@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -23,13 +23,13 @@ from pathlib import Path
 
 import gradio as gr
 
-NAV = [
+NAV = [                                       # grouped like the work: start, datasets, training, results, collection
     ("", [("health", "Health check")]),
-    ("PROGRAM", [("start", "Start and network")]),
-    ("YOUR FILES", [("folders", "Folders"), ("models", "Model files")]),
-    ("TOOLS", [("trainers", "Trainers and GPU"), ("speed", "Speed test"), ("ai", "AI helpers"),
-               ("batch", "Automatic improvement"), ("comfy", "Test pictures (ComfyUI)")]),
-    ("LIBRARY", [("look", "Look and base models")]),
+    ("START", [("start", "Start and network"), ("folders", "Folders")]),
+    ("DATASETS", [("ai", "AI helpers")]),
+    ("TRAINING", [("trainers", "Trainers and GPU"), ("models", "Model files"), ("speed", "Speed test")]),
+    ("RESULTS", [("comfy", "Test pictures (ComfyUI)")]),
+    ("COLLECTION", [("look", "Look and base models")]),
     ("CARE", [("backup", "Backup"), ("updates", "Updates"), ("version", "Version")]),
 ]
 KEYS = [k for _, items in NAV for k, _ in items]

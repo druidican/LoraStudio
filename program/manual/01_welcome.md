@@ -14,7 +14,7 @@ Everything you see here (pictures, runs, losses) is made-up test data.
 | **Datasets** | Making and improving the training pictures, in nine steps, ending with the launch script; Improvements |
 | **Training** | **Run**: the launch scripts and the queue. **Results**: every finished run, what to try first, comparing versions, your rating. **Insights**: what your own runs say |
 | **Manual** | This guide |
-| **Settings** | Folders, model files, trainers and GPU, Ollama, ComfyUI, automatic improvement, backups, updates, version |
+| **Settings** | Folders, model files, trainers and GPU, Ollama, ComfyUI, backups, updates, version |
 
 ## The bar at the top
 

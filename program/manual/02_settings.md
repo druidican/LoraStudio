@@ -14,7 +14,7 @@ shows it again later (or `./start.sh --setup`).
 
 ## Settings
 
-**Settings** has a list on the left, grouped as Program, Your files, Tools, Library and Care. A number next to an item
+**Settings** has a list on the left, grouped like the work: Start, Datasets, Training, Results, Collection and Care. A number next to an item
 says how many things need a look there. It opens on the **Health check**.
 
 ![Settings › Health check: what is set and working, and what needs a look](img/health.jpg)
@@ -115,10 +115,6 @@ shows which model is running.
 
 **Hugging Face token**: for gated models and the downloads above (a *Read* token is enough). It is kept readable only
 by you, written into launch scripts that download models, and masked in the run log.
-
-## Automatic improvement
-
-What *Datasets › Improvements › Fix the ticked datasets* does: see [Automatic improvement](#automatic).
 
 ## Test pictures (ComfyUI)
 

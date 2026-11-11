@@ -1,22 +1,22 @@
 # Making a dataset
 
-**Datasets** has three pages: **New dataset**, **Edit existing** and **Improvements**, and the nine steps they share.
+**Datasets** has two pages: the **dataset list** (with **+ New dataset** on top) and **Improvements**, and the nine steps.
 A dataset is one folder with one repeat folder `<N>_<name>` (for example `10_pip`): **only that folder is the
 dataset**. Pictures anywhere else in the dataset folder (`_reserve/`, `_extra/`, other folders) are left out of every
 count and check, so they never give false warnings.
 
-## 1 · Folder (New dataset)
+## 1 · Folder (+ New dataset)
 
 ![Datasets › New dataset: pick a folder, name the dataset, set the repeats](img/ds_new.jpg)
 
 Pick a folder in your dataset folder. A folder with only pictures becomes a new dataset: LoRA Studio makes the repeat
-folder and moves the pictures in (*Create and continue*). Folders that already are datasets open in **Edit existing**.
+folder and moves the pictures in (*Create and continue*). Folders that already are datasets are in the dataset list.
 
-**Edit existing** lists your datasets with their next step; open one to see every step and its state.
+The **dataset list** shows your datasets with their next step; open one to see every step and its state.
 
-![Datasets › Edit existing › pip: the state of each step](img/ds_steps.jpg)
+![Datasets › pip: the state of each step](img/ds_steps.jpg)
 
-**Add pictures from a folder** (in Edit existing): pictures that are good enough and not already in the dataset are
+**Add pictures from a folder** (an open dataset, above its steps): pictures that are good enough and not already in the dataset are
 copied into its repeat folder (and into `_originals/`). Then sort and select again.
 
 ## What makes good training pictures

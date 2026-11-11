@@ -6,7 +6,7 @@ The patterns are checked in order; the first one that matches wins, so the speci
 log line that matched (shown under the description, for the curious).
 """
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import re
 
@@ -46,7 +46,7 @@ RULES = [
      "No pictures to train on",
      "The trainer found no pictures: the repeat folder is empty, has another name than the script expects, or the "
      "pictures are in a folder the trainer does not read.",
-     "Open the dataset in Datasets › Edit existing: the repeat folder must be <N>_<dataset name> with pictures in it."),
+     "Open the dataset in Datasets: the repeat folder must be <N>_<dataset name> with pictures in it."),
     ("CAPTION", r"caption file not found|captions? (are|is) missing|UnicodeDecodeError",
      "A caption file could not be read",
      "A caption is missing where the script needs one, or a caption file has characters the trainer cannot read.",

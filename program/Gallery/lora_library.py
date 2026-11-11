@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.111126i"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -3181,7 +3181,7 @@ def build_library_ui(app, maint_extra=None):
                     lp_versions = gr.HTML(elem_id="lp_versions")
                     with gr.Row(elem_classes=["ls-bar"]):
                         lp_newv = gr.Button("Train a new version…", size="sm", scale=0, min_width=190)
-                        gr.Markdown("opens Datasets › Edit existing › 9 Train", elem_classes=["ls-note"])
+                        gr.Markdown("opens Datasets › 9 Train", elem_classes=["ls-note"])
                 with gr.Tab("Edit", id="lp_edit"):
                     with gr.Row():
                         e_name = gr.Textbox(label="Display name")

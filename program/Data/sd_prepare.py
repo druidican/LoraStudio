@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.111126f"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -560,7 +560,7 @@ def wm_apply_steps(ds, choices_json, only_pending=False, prefer="remove"):
             if e.get("choice"):
                 continue
             c = _wm_recommended(e)
-            if prefer == "crop":                        # Settings › Automatic improvement
+            if prefer == "crop":                        # Improvements › What Fix does
                 c = "A" if e.get("options") else "aside"
             elif prefer == "aside":
                 c = "aside"

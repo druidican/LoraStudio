@@ -14,22 +14,22 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.111126i"
-VERSION = "1.111126i"
+__version__ = "1.111126j"
+VERSION = "1.111126j"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.111126i",
-    "version.py": "1.111126i",
+    "lora_studio.py": "1.111126j",
+    "version.py": "1.111126j",
     "program/lspaths.py": "1.011126",
     "program/Training/sdgui.py": "1.111126i",
     "program/Training/sd_script.py": "1.111126h",
-    "program/Data/sd_prepare.py": "1.111126f",
+    "program/Data/sd_prepare.py": "1.111126j",
     "program/Training/sd_settings.py": "1.111126f",
-    "program/Data/datasets_ui.py": "1.111126i",
-    "program/Data/dsflow.py": "1.111126h",
-    "program/Training/training_ui.py": "1.111126i",
-    "program/Settings/settings_ui.py": "1.111126h",
-    "program/Gallery/lora_library.py": "1.111126i",
+    "program/Data/datasets_ui.py": "1.111126j",
+    "program/Data/dsflow.py": "1.111126j",
+    "program/Training/training_ui.py": "1.111126j",
+    "program/Settings/settings_ui.py": "1.111126j",
+    "program/Gallery/lora_library.py": "1.111126j",
     "program/Training/comfytest.py": "1.011126",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.111126b",
@@ -61,11 +61,11 @@ RELEASE: dict = {
     "program/Settings/firstrun.py": "1.011126",
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
-    "program/Settings/backup.py": "1.011126",
+    "program/Settings/backup.py": "1.111126j",
     "selftest.py": "1.111126h",
     "program/Settings/machinecheck.py": "1.111126d",
     "program/Settings/selfupdate.py": "1.011126",
-    "program/Training/failcodes.py": "1.111126h",
+    "program/Training/failcodes.py": "1.111126j",
     "program/Other/report.py": "1.011126",
     "program/Other/manual.py": "1.111126d",
     "program/Settings/notice.py": "1.011126",
@@ -80,6 +80,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.111126j", "Redesign 3: Datasets is one list with + New dataset on top (New dataset and Edit existing are no longer two pages). Improvements has its own choices folded on the page (What Fix does; they left Settings) and Check the next fixed dataset, which opens each fixed dataset at step 5 to look it over. Training › Run's Mark as run is now Mark Completed, the one done mark. Settings is grouped like the work: Start, Datasets, Training, Results, Collection, Care."),
     ("1.111126i", "Redesign 2 (from dataset to training in one go): step 9's last button is now Save and add to the queue; with Start the queue when nothing is training ticked (remembered) the run starts at once. When a run ends, clicking the status strip opens that run in Training › Results. Results has Your rating next to the best-version mark, and Insights moved to Training as its third page (Training › Insights). Every click inside the Results lists is one event instead of four or five."),
     ("1.111126h", "Redesign 1 (Datasets steps in a natural order): Setup is now step 2 and the usable scan step 3, so the scan knows which sizes your LoRA types need. Setup shows whether the model files of the ticked types are on this computer, whether their trainer is installed and whether Ollama has a model that reads pictures; missing model files download in the background while you go on (step 9's download button does the same). Steps renamed: 6 Watermarks and size, 7 Captions, 9 Train. The manual's character description example no longer suggests body traits."),
     ("1.111126g", "Clean-up 4 (Collection and start): the old stand-alone lora_library.py program is gone (LoRA Studio is the only way in), and leftover code that nothing used any more is removed. Nothing you use changes. This ends the clean-up run: four releases, about 900 lines less, and a quicker page."),

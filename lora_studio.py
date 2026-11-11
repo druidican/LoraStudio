@@ -6,7 +6,7 @@ LoRA Studio
 One window for your LoRA collection, your datasets and training:
 
   Collection  - Browse (Pictures or Status), the LoRA page (Overview, Pictures, Training, Edit), Maintenance
-  Datasets    - New dataset, Edit existing, Improvements; nine steps from a folder of pictures to the launch script
+  Datasets    - the dataset list (+ New dataset), Improvements; nine steps from a folder of pictures to training
   Training    - Run (launch scripts, the queue, the live run) and Results (every finished run)
   Settings    - a grouped list that opens on a Health check
 
@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.111126i"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -356,7 +356,7 @@ def main():
                 settings_ui.build(app, {"start": lambda: (launchopts.build_ui(), settings_ui.features_panel(app)), "folders": ll.FOLDERS_BLOCK.render,
                                         "models": lambda: show("models"), "trainers": lambda: show("trainers"),
                                         "ai": lambda: (_ollama_note(), show("ai")), "look": _look, "backup": _backup,
-                                        "updates": _updates, "batch": lambda: settings_ui.batch_panel(app),
+                                        "updates": _updates,
                                         "comfy": lambda: settings_ui.comfy_panel(app),
                                         "speed": lambda: settings_ui.speed_panel(app),
                                         "version": lambda: settings_ui.version_panel(app)})
@@ -383,7 +383,7 @@ def main():
         ticker.build()                          # the one timer for the whole page (see ticker.py)
         loadjoin.build(app)
 
-        # "Train a new version": Datasets › Edit existing › 9 Train of that dataset
+        # "Train a new version": Datasets › 9 Train of that dataset
         def to_step9(cur, ds):
             if not ds:
                 return cur, gr.update()

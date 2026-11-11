@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Datasets: New dataset | Edit existing | Improvements, and the nine steps they share.
+"""Datasets: the dataset list (with + New dataset) | Improvements, and the nine steps.
 
-New dataset starts at 1 Folder; Edit existing lists every dataset with its next step and opens the same steps from
-where the dataset is. The steps reuse sdgui's parts where they exist: the watermark choices (6), the caption writer
++ New dataset starts at 1 Folder; the list shows every dataset with its next step and opens the steps from where the
+dataset is. Improvements fixes ticked datasets (its choices are folded on the page) and opens them one by one to check. The steps reuse sdgui's parts where they exist: the watermark choices (6), the caption writer
 and the consistency check (7), the repeat folder and the launch script page (9). What each step does to the folder
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.111126i"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -106,8 +106,10 @@ def nav_updates(st):
     active = mode if flow else view
     outs = [gr.update(visible=view == "new"), gr.update(visible=view == "edit"), gr.update(visible=view == "imp"),
             gr.update(visible=flow)]
-    for k in ("new", "edit", "imp"):
-        outs.append(gr.update(elem_classes=["ds-nav"] + (["ds-nav-on"] if active == k else [])))
+    outs.append(gr.update())                               # + New dataset keeps its look
+    for k in ("edit", "imp"):
+        on = active == k or (k == "edit" and active == "new")
+        outs.append(gr.update(elem_classes=["ds-nav"] + (["ds-nav-on"] if on else [])))
     for n in FLOW:
         outs.append(gr.update(visible=flow and st.get("step") == n))
     outs.append(bar_html(st) if flow else "")
@@ -124,7 +126,7 @@ def new_list_html(chosen="") -> str:
     for f in fs:
         if f["kind"] == "dataset":
             rows.append(f'<div class="ds-frow"><span class="ds-fname">{esc(f["name"])}/</span><span class="ls-chip">dataset</span>'
-                        f'<button class="tr-btn tr-small" onclick="{send("edit|" + f["name"])}">Edit existing</button></div>')
+                        f'<button class="tr-btn tr-small" onclick="{send("edit|" + f["name"])}">Open</button></div>')
         elif f["kind"] == "pictures":
             on = " ds-frow-on" if f["name"] == chosen else ""
             rows.append(f'<button class="ds-frow ds-frow-pick{on}" onclick="{send("folder|" + f["name"])}">'
@@ -547,7 +549,7 @@ def batch_what() -> str:
     t = F.batch_summary()
     t = _h.escape(t).replace("`_reserve/`", "<code>_reserve/</code>")
     return ('<div class="ls-note"><b>Fix the ticked datasets automatically</b> (less is better): ' + t +
-            ' <a href="#" onclick="lsSetNav(\'batch\'); return false;">Change this in Settings › Automatic improvement →</a></div>')
+            ' Change it under <i>What Fix does</i> below.</div>')
 
 
 def batch_html() -> str:
@@ -790,23 +792,24 @@ def build(app, show):
     S = sg()
     UI = S.UI
     _types = S.type_choices()
-    st = gr.State({"view": "new", "mode": "new", "ds": "", "step": 2})
+    st = gr.State({"view": "edit", "mode": "edit", "ds": "", "step": 2})
     box = gr.Textbox(elem_id="ds_box", show_label=False, container=False)
     navbox = gr.Textbox(visible=False)
     sync = gr.Textbox(visible=False)
     with gr.Row(elem_id="ds_navrow"):
-        b_new = gr.Button("New dataset", elem_classes=["ds-nav", "ds-nav-on"], size="sm", scale=0, min_width=150)
-        b_edit = gr.Button("Edit existing", elem_classes=["ds-nav"], size="sm", scale=0, min_width=150)
+        b_edit = gr.Button("Datasets", elem_classes=["ds-nav", "ds-nav-on"], size="sm", scale=0, min_width=150)
         b_imp = gr.Button("Improvements", elem_classes=["ds-nav"], size="sm", scale=0, min_width=150)
 
-    # ---- New dataset: 1 Folder
-    with gr.Column(visible=True) as p_new:
+    # ---- New dataset: 1 Folder (opened with + New dataset above the dataset list)
+    with gr.Column(visible=False) as p_new:
+        with gr.Row(elem_classes=["ls-bar"]):
+            n_back = gr.Button("← All datasets", size="sm", scale=0, min_width=150)
         gr.HTML(stepper_html({"ds": "", "step": 1}))
         with gr.Row(equal_height=False):
             with gr.Column(scale=3, elem_classes=["ls-card"]):
                 gr.Markdown("### Pick a folder in your dataset folder")
-                gr.Markdown("A folder with only pictures becomes a new dataset. Folders that already are datasets open in "
-                            "**Edit existing**.", elem_classes=["ls-note"])
+                gr.Markdown("A folder with only pictures becomes a new dataset. Folders that already are datasets are in "
+                            "the dataset list.", elem_classes=["ls-note"])
                 n_list = gr.HTML(elem_id="ds_newlist")
                 n_out = gr.Textbox(label="Or a folder somewhere else (the pictures are copied in)",
                                    placeholder="~/Pictures/…")
@@ -820,10 +823,11 @@ def build(app, show):
                 n_msg = gr.Markdown()
         n_src = gr.State("")
 
-    # ---- Edit existing
-    with gr.Column(visible=False) as p_edit:
+    # ---- the dataset list (and an open dataset's header)
+    with gr.Column(visible=True) as p_edit:
         with gr.Row(equal_height=False):
             with gr.Column(scale=1, min_width=260, elem_classes=["ls-filters"]):
+                b_new = gr.Button("+ New dataset", variant="primary", size="sm")
                 e_find = gr.Textbox(label="Find a dataset", placeholder="name")
                 e_list = gr.HTML(elem_id="ds_editlist")
             with gr.Column(scale=4):
@@ -855,6 +859,12 @@ def build(app, show):
             i_sel = gr.Textbox(visible=False)
             i_msg = gr.Markdown()
             i_prog = gr.HTML(elem_id="ds_batch")
+            with gr.Row(elem_classes=["ls-bar"]):
+                i_next = gr.Button("Check the next fixed dataset →", size="sm", scale=0, min_width=260)
+                i_next_msg = gr.Markdown()
+        with gr.Accordion("What Fix does: the choices (pictures to keep, LoRA type, watermarks, captions)", open=False):
+            import settings_ui
+            settings_ui.batch_panel(app)
         i_html = gr.HTML(elem_id="ds_imp")
 
     # ---- the steps 2..9 (2 Setup, 3 Usable scan, ...)
@@ -1228,7 +1238,7 @@ def build(app, show):
                            for t, x in items)
             cards.append(f'<div class="ls-card ds-impcard"><div class="ds-imph"><label class="ds-tick ds-imptick">'
                          f'<input type="checkbox" data-ds="{esc(ds)}"><b>{esc(ds)}</b></label>'
-                         f'<button class="tr-btn tr-small" onclick="{send("edit|" + ds)}">Open in Edit existing</button></div>{body}</div>')
+                         f'<button class="tr-btn tr-small" onclick="{send("edit|" + ds)}">Open</button></div>{body}</div>')
         head = f'<div class="rs-big">{len(cards)} of {len(dss)} datasets could be better</div>'
         return head, "".join(cards) or '<p class="ls-empty">Nothing to improve that is known.</p>'
 
@@ -1554,9 +1564,20 @@ def build(app, show):
     navbox.change(nav_all, [st, e_find, s8_show, UI["cs_text"], UI["oc"]["leave"], UI["oc"]["trigger"]],
                   all_outs + [s7_desc_card, s7_desc, s7_desc_msg, s7_desc_title] + MV_OUT + WORN_OUT,
                   show_progress="hidden")
-    for b, view in ((b_new, "new"), (b_edit, "edit"), (b_imp, "imp")):
-        after_nav(b.click(lambda s, v=view: go(s, view=v, mode=v if v != "imp" else s.get("mode", "new")), st, st,
+    for b, view in ((b_new, "new"), (n_back, "edit"), (b_edit, "edit"), (b_imp, "imp")):
+        after_nav(b.click(lambda s, v=view: go(s, view=v, mode=v if v != "imp" else s.get("mode", "edit")), st, st,
                           show_progress="hidden"))
+
+    def check_next(s):
+        """Improvements › Fix, then: open the fixed datasets one by one at step 5 (Select) to look them over."""
+        done = [r["ds"] for r in F.BATCH["results"] if r.get("ok")]
+        seen = list(s.get("checked") or [])
+        todo = [d for d in done if d not in seen]
+        if not todo:
+            return s, ("All fixed datasets are looked at." if done else "Fix some datasets first.")
+        return go(s, view="flow", mode="edit", ds=todo[0], step=5, checked=seen + [todo[0]]), \
+            f"Opened {todo[0]} at step 5; {len(todo) - 1} more after it."
+    after_nav(i_next.click(check_next, st, [st, i_next_msg], show_progress="hidden"))
     after_nav(app.load(lambda s: s, st, st))
     e_find.change(lambda s, f: edit_list(s, f), [st, e_find], e_list, show_progress="hidden")
     i_ref.click(lambda s: list(load_imp(s)) + [batch_what()], st, [i_head, i_html, i_what])
@@ -1614,7 +1635,7 @@ def build(app, show):
         return go(s, view="flow", mode="new", ds=ds, step=2, src=""), msg
     after_nav(n_go.click(create, [st, n_src, n_name, n_rep, n_out], [st, n_msg]))
 
-    # ---- Edit existing: add pictures from a folder
+    # ---- an open dataset: add pictures from a folder
     def add_pics(s, folder, sub):
         ds = s.get("ds")
         if not ds:

@@ -7,7 +7,7 @@ A backup is one zip, LoraStudio-backup-<date>-<time>.zip, with
   hash_cache.json, model_ids.json                   file hashes and model identification (saves time)
   picture_index.json                                the Gallery's picture index
   launch_settings.json                              Settings > Launch options (port, login, start page, ...)
-  batch_settings.json                               Settings > Automatic improvement
+  batch_settings.json                               Datasets › Improvements › What Fix does
   huggingtoken.txt                                  only when "include the token" is ticked
   gui_logs/                                         training logs shown by the Monitor
   manifest.json                                     when and where it was made
@@ -18,7 +18,7 @@ Restoring on another computer or user: paths that started with the old home fold
 folder are changed to the new ones. The current files are kept in restore_backups/<time>/ first.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.111126j"  # LoRA Studio version, see version.py
 
 import json
 import os
