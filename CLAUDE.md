@@ -116,6 +116,14 @@ Playwright long tasks; `LS_TICK_DEBUG=1` prints what each tick changes.
 
 ## Open
 
+- **Redesign, bold part (owner approved 2026-11-11, moderate part done in 1.111126h-j):** a Home tab as start page
+  (what needs a look: Health check + Improvements + Collection warnings; what is training; last results; continue
+  where you left off); one page per dataset with Prepare (steps 1-8), Train (step 9 + its queue items), Results (its
+  runs, rating, compare) and LoRA (the Collection's LoRA page); a Queue tab (Training › Run); Collection tiles open the
+  dataset page; Manual as a ? button opening the chapter of the current page. Then the manual rewritten with new pip
+  screenshots. Every release removes the code it replaces (owner: no leftovers, no loops). The plan and the task
+  walk-throughs are in the owner's walkthrough document (Usability tab) and the "LoRA Studio flow" whiteboard.
+
 - Worn items, later (owner deferred): sort and crop around the item; weight per kind.
 - amd-smi: values that stay empty on real hardware need the owner's `amd-smi metric --json` output.
 - WD tagger on Ubuntu 26.10: if it still fails, the error text it now shows is needed.
