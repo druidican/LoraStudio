@@ -1,6 +1,6 @@
 # The Collection
 
-The Collection has four pages: **Browse**, **LoRA page**, **Insights** and **Maintenance**.
+The Collection has three pages: **Browse**, **LoRA page** and **Maintenance**.
 
 ## Browse
 
@@ -40,32 +40,11 @@ Click a tile for its **LoRA page**; the *Version* menu at the top switches betwe
   to try first). They are read from the LoRA file, its launch script and its logs, once per version; *Read the
   training again* after you changed the script or the log. *Train a new version…* opens Datasets › 9 Train.
 - **Edit**: display name, character (groups it in Browse), version (shown in ComfyUI's LoRA Manager), clip skip,
-  **Your rating** (4-5 good, 1-2 weak, for Insights), trigger words, description, notes, strength and CLIP strength,
+  **Your rating** (4-5 good, 1-2 weak, for Training › Insights; the same rating as on the run's page in Results), trigger words, description, notes, strength and CLIP strength,
   the preview's NSFW level, favorite, and a flag with its reason. Saved in LoRA Manager's format in the dataset's
   `LoraManager/` folder (a `.bak` is kept).
 
 ![The training card of pip V2](img/lp_training.jpg)
-
-## Insights
-
-![Collection › Insights: the datasets behind your good and weak LoRAs](img/insights.jpg)
-
-**Insights** compares your own LoRAs, read on this computer. Rate versions on their LoRA page › Edit (*Your rating*:
-4-5 good, 1-2 weak; without a rating the ★ best version and versions you made pictures with count as good). Per LoRA
-type it shows:
-
-- **Datasets behind good and weak LoRAs**: pictures, repeats, steps, close-ups, full body, outfits, places, detail
-  shots, caption length. Step 5 shows what your good LoRAs of the type had.
-- **Your graphics card**: the batch sizes that finished, the ones that ran out of video memory, and the seconds per
-  step. Step 9 warns when the batch ran out of memory before and estimates the time from your own runs.
-- **Settings that work for you**: learning rate, dim / alpha, epochs, steps and optimizer of your good LoRAs next to the
-  others; step 9 shows them next to the recommendations.
-- **Training too long?**: where in the run the save point to try first was; step 9 suggests fewer epochs when your runs
-  usually peaked early.
-- **How you use your LoRAs**: pictures made with each, the strength you use, when last, and LoRAs you never used. The
-  LoRA page says how often you used a LoRA and offers that strength.
-
-With few LoRAs these are hints, not rules: each says how many LoRAs it comes from. *Read again* after new runs.
 
 ## Maintenance
 

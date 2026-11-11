@@ -10,9 +10,9 @@ Everything you see here (pictures, runs, losses) is made-up test data.
 
 | Tab | What it is for |
 |---|---|
-| **Collection** | Your finished LoRAs: one tile per dataset, the LoRA page with versions, pictures made with it, its training data; Insights; Maintenance (sync with LoRA Manager) |
+| **Collection** | Your finished LoRAs: one tile per dataset, the LoRA page with versions, pictures made with it, its training data; Maintenance (sync with LoRA Manager) |
 | **Datasets** | Making and improving the training pictures, in nine steps, ending with the launch script; Improvements |
-| **Training** | **Run**: the launch scripts and the queue. **Results**: every finished run, what to try first, comparing versions |
+| **Training** | **Run**: the launch scripts and the queue. **Results**: every finished run, what to try first, comparing versions, your rating. **Insights**: what your own runs say |
 | **Manual** | This guide |
 | **Settings** | Folders, model files, trainers and GPU, Ollama, ComfyUI, automatic improvement, backups, updates, version |
 

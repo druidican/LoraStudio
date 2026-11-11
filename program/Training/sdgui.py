@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.111126i"  # LoRA Studio version, see version.py
 import atexit
 import codecs
 import contextlib
@@ -505,7 +505,8 @@ def _announce_done(run, code):
             advice = fc["title"] if fc else ""
         except Exception:                   # noqa: BLE001
             advice = ""
-    SB.DONE_EVENTS.append({"t": time.time(), "name": run.name, "ok": code == 0, "advice": advice})
+    SB.DONE_EVENTS.append({"t": time.time(), "name": run.name, "ok": code == 0, "advice": advice,
+                           "log": Path(run.logfile).name if run.logfile else ""})
     del SB.DONE_EVENTS[:-20]
 
 
@@ -2439,7 +2440,11 @@ def build_ui(parent):
                     cs_newname = gr.Textbox(label="Save as", scale=0, min_width=220)
                     cs_save_new_btn = gr.Button("Save as new version", variant="primary", scale=0, size="sm",
                                                 min_width=200)
-                    cs_queue_btn = gr.Button("Add to the queue →", size="sm", scale=0, min_width=180)
+                    cs_queue_btn = gr.Button("Save and add to the queue →", variant="primary", size="sm", scale=0,
+                                             min_width=250)
+                    import launchopts as _LO
+                    cs_autostart = gr.Checkbox(label="Start the queue when nothing is training",
+                                               value=_LO.load()["queue_autostart"], scale=0, min_width=300)
                 cs_check_out = gr.Markdown("")
                 cs_save_msg = gr.Markdown("")
             cs_plan = gr.State({})
@@ -2893,6 +2898,28 @@ def build_ui(parent):
                  .then(lambda s: s, cs_status, cs_save_msg)
                  .then(rp_refresh, rp_in, rp_outs))
         demo.load(model_vis, [cs_type] + model_fields, model_fields)
+
+        at_status = cs_outs.index(cs_status)
+
+        def cs_save_for_queue(ds, script, text, tkey, plan, makedirs, newname, prompts_path, prompts_text):
+            """Save and add to the queue: over the open launch script, or as its new version when none is open."""
+            if script not in (None, "", NEW) and Path(script).is_file():
+                msg = cs_save_over(ds, script, text, tkey, plan, makedirs)
+                out = [gr.update()] * len(cs_outs)
+                out[at_status] = msg
+                return out + [msg]
+            out = list(cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, plan, makedirs)[:-1])
+            return out + [out[at_status]]
+        save_queue_ev = cs_queue_btn.click(
+            cs_save_for_queue, [cs_ds, cs_script, cs_text, cs_type, cs_plan, cs_makedirs, cs_newname, cs_prompts_path,
+                                cs_prompts_text], cs_outs + [cs_save_msg]).then(rp_refresh, rp_in, rp_outs)
+
+        def autostart_save(v):
+            lo = _LO.load()
+            lo["queue_autostart"] = bool(v)
+            _LO.save(lo)
+        cs_autostart.input(autostart_save, cs_autostart, None)
+        UI.update(save_queue_ev=save_queue_ev, cs_autostart=cs_autostart)
 
         # ---- model files settings
         st_slot_outs = []

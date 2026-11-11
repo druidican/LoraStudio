@@ -20,7 +20,7 @@ a few test pictures with it and the final file.
   copies that save point and makes its first picture the preview.
 - **Clean up this run** moves epoch files you did not copy, saved states and caches to the Trash.
 - **This run**: *Train a new version…* opens Datasets › 9 Train for the dataset; *Run it again* puts the same
-  script in the queue; *★ Best version* marks it; *Report for Claude* makes the report file (see [Training](#training)).
+  script in the queue; *★ Best version* marks it; *Your rating* (4-5 good, 1-2 weak) teaches Insights; *Report for Claude* makes the report file (see [Training](#training)).
 - **TensorBoard** (folded): *Start TensorBoard* opens the run's logs in TensorBoard; *End of the run log* shows the
   last lines as the trainer wrote them.
 
@@ -35,3 +35,24 @@ the same prompts* gives every run the same prompts and seeds). **★ Mark as the
 shows that version first, even when a newer one exists.
 
 > **Do** compare two versions that differ in one or two settings: then you know what made the difference.
+
+## Insights (Training › Insights)
+
+![Training › Insights: the datasets behind your good and weak LoRAs](img/insights.jpg)
+
+**Insights** compares your own LoRAs, read on this computer. Rate versions on the run's page in Results or on their LoRA page › Edit (*Your rating*:
+4-5 good, 1-2 weak; without a rating the ★ best version and versions you made pictures with count as good). Per LoRA
+type it shows:
+
+- **Datasets behind good and weak LoRAs**: pictures, repeats, steps, close-ups, full body, outfits, places, detail
+  shots, caption length. Step 5 shows what your good LoRAs of the type had.
+- **Your graphics card**: the batch sizes that finished, the ones that ran out of video memory, and the seconds per
+  step. Step 9 warns when the batch ran out of memory before and estimates the time from your own runs.
+- **Settings that work for you**: learning rate, dim / alpha, epochs, steps and optimizer of your good LoRAs next to the
+  others; step 9 shows them next to the recommendations.
+- **Training too long?**: where in the run the save point to try first was; step 9 suggests fewer epochs when your runs
+  usually peaked early.
+- **How you use your LoRAs**: pictures made with each, the strength you use, when last, and LoRAs you never used. The
+  LoRA page says how often you used a LoRA and offers that strength.
+
+With few LoRAs these are hints, not rules: each says how many LoRAs it comes from. *Read again* after new runs.

@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.111126i"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -160,6 +160,14 @@ window.lsClickTab = function(label){
 window.lsGoQueue = function(){
   window.lsClickTab('Training');
   var n = 0; (function t(){ if (!window.lsClickTab('Run') && ++n < 30) setTimeout(t, 100); })();
+};
+window.lsGoRun = function(log){        // the status strip's finished or failed run: open it in Training › Results
+  window.lsClickTab('Training');
+  var n = 0; (function t(){
+    if (window.lsClickTab('Results') && document.querySelector('#rs_box textarea, #rs_box input')) {
+      window.lsSend('rs_box', 'open|' + log); return; }
+    if (++n < 40) setTimeout(t, 100);
+  })();
 };
 (function(){
   if (!%s || !window.Notification) return;
@@ -306,8 +314,11 @@ def main():
                         TR = training_ui.build_run(app)
                     with gr.Tab("Results", id="tr_results") as t_res:
                         RS = training_ui.build_results(app)
+                    with gr.Tab("Insights", id="tr_insights") as t_ins:
+                        INS = ll.build_insights()
                 t_run.select(*TR["refresh"], show_progress="hidden")
                 t_res.select(*RS["refresh"], show_progress="hidden")
+                t_ins.select(*INS, show_progress="hidden")
             with gr.Tab("Manual", id="manual") as t_man:
                 MN = manual.build(app)
                 t_man.select(*MN["load"], show_progress="hidden")

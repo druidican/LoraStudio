@@ -14,22 +14,22 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.111126h"
-VERSION = "1.111126h"
+__version__ = "1.111126i"
+VERSION = "1.111126i"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.111126h",
-    "version.py": "1.111126h",
+    "lora_studio.py": "1.111126i",
+    "version.py": "1.111126i",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.111126h",
+    "program/Training/sdgui.py": "1.111126i",
     "program/Training/sd_script.py": "1.111126h",
     "program/Data/sd_prepare.py": "1.111126f",
     "program/Training/sd_settings.py": "1.111126f",
-    "program/Data/datasets_ui.py": "1.111126h",
+    "program/Data/datasets_ui.py": "1.111126i",
     "program/Data/dsflow.py": "1.111126h",
-    "program/Training/training_ui.py": "1.111126h",
+    "program/Training/training_ui.py": "1.111126i",
     "program/Settings/settings_ui.py": "1.111126h",
-    "program/Gallery/lora_library.py": "1.111126h",
+    "program/Gallery/lora_library.py": "1.111126i",
     "program/Training/comfytest.py": "1.011126",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.111126b",
@@ -50,14 +50,14 @@ RELEASE: dict = {
     "program/Gallery/completed.py": "1.011126",
     "program/Gallery/model_guide.py": "1.091126",
     "program/Gallery/trainingcard.py": "1.111126g",
-    "program/Gallery/insights.py": "1.111126g",
+    "program/Gallery/insights.py": "1.111126i",
     "program/Other/livepoll.py": "1.101126c",
     "program/Other/loadjoin.py": "1.111126d",
     "program/Other/ticker.py": "1.111126e",
-    "program/Other/statusbar.py": "1.111126d",
+    "program/Other/statusbar.py": "1.111126i",
     "program/Other/gpusmi.py": "1.051126b",
     "program/Training/savepoint.py": "1.011126",
-    "program/Settings/launchopts.py": "1.011126",
+    "program/Settings/launchopts.py": "1.111126i",
     "program/Settings/firstrun.py": "1.011126",
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
@@ -80,6 +80,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.111126i", "Redesign 2 (from dataset to training in one go): step 9's last button is now Save and add to the queue; with Start the queue when nothing is training ticked (remembered) the run starts at once. When a run ends, clicking the status strip opens that run in Training › Results. Results has Your rating next to the best-version mark, and Insights moved to Training as its third page (Training › Insights). Every click inside the Results lists is one event instead of four or five."),
     ("1.111126h", "Redesign 1 (Datasets steps in a natural order): Setup is now step 2 and the usable scan step 3, so the scan knows which sizes your LoRA types need. Setup shows whether the model files of the ticked types are on this computer, whether their trainer is installed and whether Ollama has a model that reads pictures; missing model files download in the background while you go on (step 9's download button does the same). Steps renamed: 6 Watermarks and size, 7 Captions, 9 Train. The manual's character description example no longer suggests body traits."),
     ("1.111126g", "Clean-up 4 (Collection and start): the old stand-alone lora_library.py program is gone (LoRA Studio is the only way in), and leftover code that nothing used any more is removed. Nothing you use changes. This ends the clean-up run: four releases, about 900 lines less, and a quicker page."),
     ("1.111126f", "Clean-up 3 (Datasets): moving between steps and opening a dataset is much quicker. A new step was four events and opening a dataset about eight more; each is now one (on the 80-dataset test copy most step changes went from 4.5-9 s of a busy browser to 1.5-2.7 s). A hidden 'Prepare' page that recalculated after every change is gone, with its unused picture check code. The example text in the character description no longer suggests body traits."),

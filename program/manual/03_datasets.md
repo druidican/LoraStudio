@@ -84,7 +84,7 @@ whose face it is.
 
 A suggested number of pictures for the type and purpose, and a selection: **Safe** takes the cleanest pictures first,
 **Varied** more close-ups, angles, outfits and details. When you have rated LoRAs, a line says what your good LoRAs of
-this type had (pictures, close-ups, full body; see [Insights](#collection)). Untick what you don't want; *Confirm
+this type had (pictures, close-ups, full body; see [Insights](#results)). Untick what you don't want; *Confirm
 selection* moves the rest to `_reserve/`; *Move all back from _reserve* undoes it.
 
 **Detailed scan** card (after a detailed scan): the gaps, the counts, and the suggestions, each with a thumbnail and
@@ -189,7 +189,7 @@ script text** shows the script itself.
 - **Missing model files**: when a model file the script needs is missing, a card offers *⬇ Download from Hugging Face*
   for it (with your token for gated models). It downloads in the background, the same way as in step 2; when it is
   done, *Use model files from Settings* puts the files into a script that is already open.
-- **From your own runs** (after a few rated LoRAs, see [Insights](#collection)): *Your graphics card* warns when this
+- **From your own runs** (after a few rated LoRAs, see [Insights](#results)): *Your graphics card* warns when this
   batch size ran out of video memory before and estimates the time from your runs; *Your good LoRAs* shows their
   settings next to the recommendations; *Epochs* suggests fewer when your runs usually peaked early.
 
@@ -216,8 +216,10 @@ can read): pick *Tags (IMG.txt)* or *Sentences (IMG.sentences.txt)*. It is writt
 (`--caption_extension`) and remembered for the next version. Types that read only one style (Illustrious, Pony,
 Z-Image …) always train on their own set.
 
-**Save as new version** writes `pipILLV1.sh`, the next one `pipILLV2.sh`; older scripts move to `_old_runs/`. *Add to
-the queue* sends it to Training › Run.
+**Save as new version** writes `pipILLV1.sh`, the next one `pipILLV2.sh`; older scripts move to `_old_runs/`.
+**Save and add to the queue** saves the open script (or saves it as its new version when none is open) and puts it in
+the queue. With *Start the queue when nothing is training* ticked (remembered), training starts at once and the status
+strip at the top follows it; otherwise Training › Run starts the queue.
 
 ## Improvements
 

@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.111126i"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -3012,6 +3012,25 @@ def versions_html(lora) -> str:
             '<th>Final loss</th><th>Completed</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
 
 
+def build_insights():
+    """Training › Insights: what your own datasets, LoRAs and runs say. Returns (fn, inputs, outputs) for the tab's
+    select event (filled when the page is opened, not with the start)."""
+    gr.Markdown("### Insights", elem_classes=["ls-h"])
+    gr.Markdown("What your own datasets, LoRAs and runs say, read on this computer: the datasets behind your good "
+                "and weak LoRAs, and what your graphics card managed per LoRA type. Rate runs in Results (or on a "
+                "LoRA page) to teach it. With few LoRAs these are hints, not rules: each says how many it comes from. "
+                "Step 5 and step 9 show the short version.", elem_classes=["ls-note"])
+    with gr.Row(elem_classes=["ls-bar"]):
+        ins_btn = gr.Button("Read again", size="sm", scale=0, min_width=130)
+    ins_html = gr.HTML()
+
+    def do_insights(force=False):
+        import insights
+        return insights.page_html(insights.compute(LIB, force=bool(force)), esc)
+    ins_btn.click(lambda: do_insights(True), None, ins_html)
+    return (lambda: do_insights(False), None, ins_html)
+
+
 def build_library_ui(app, maint_extra=None):
     """Render the Collection pages into the current layout context of `app` (lora_studio.py). The two settings
     panels are built hidden (FOLDERS_BLOCK, LOOK_BLOCK) for lora_studio.py to .render() in Settings."""
@@ -3171,7 +3190,7 @@ def build_library_ui(app, maint_extra=None):
                         e_ver = gr.Textbox(label="Version", info="shown as the version in ComfyUI's LoRA Manager", scale=1)
                         e_cskip = gr.Number(label="Clip skip", value=None, precision=0, minimum=1, scale=1)
                         e_rate = gr.Radio([("–", 0), ("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5)], value=0,
-                                          label="Your rating", info="4-5 good, 1-2 weak: Collection › Insights compares "
+                                          label="Your rating", info="4-5 good, 1-2 weak: Training › Insights compares "
                                           "the datasets behind them", scale=2)
                     e_trig = gr.Textbox(label="Trigger words (one per line)", lines=3)
                     e_desc = gr.Textbox(label="Description", lines=3)
@@ -3191,17 +3210,6 @@ def build_library_ui(app, maint_extra=None):
                                     "(the Training tab) come from the LoRA file, its launch script and its log and cannot be edited.",
                                     elem_classes=["ls-note"])
                     e_msg = gr.Markdown()
-
-        # ---------------- Insights: what your datasets, LoRAs and runs say ---------------- #
-        with gr.Tab("Insights", id="insights") as ins_tab:
-            gr.Markdown("### Insights", elem_classes=["ls-h"])
-            gr.Markdown("What your own datasets, LoRAs and runs say, read on this computer: the datasets behind your good "
-                        "and weak LoRAs, and what your graphics card managed per LoRA type. With few LoRAs these are "
-                        "hints, not rules: each says how many it comes from. Step 5 and step 9 show the short version.",
-                        elem_classes=["ls-note"])
-            with gr.Row(elem_classes=["ls-bar"]):
-                ins_btn = gr.Button("Read again", size="sm", scale=0, min_width=130)
-            ins_html = gr.HTML()
 
         # ---------------- Maintenance: Sync | Clean up ---------------- #
         with gr.Tab("Maintenance", id="maint"):
@@ -3667,13 +3675,6 @@ def build_library_ui(app, maint_extra=None):
         return TC.scan_all(LIB, bool(force), progress)
 
     tc_btn.click(do_cards, tc_force, tc_msg)
-
-    def do_insights(force=False):
-        import insights
-        return insights.page_html(insights.compute(LIB, force=bool(force)), esc)
-
-    ins_tab.select(lambda: do_insights(False), None, ins_html)
-    ins_btn.click(lambda: do_insights(True), None, ins_html)
 
     def rescan_one(key):
         import trainingcard as TC

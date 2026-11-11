@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.111126i"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -680,7 +680,7 @@ def calc(ds, tkey, text):
                 sps = sorted(same)[len(same) // 2]
             if g["oom_at"] and bs >= g["oom_at"]:
                 gnote = (f"batch {g['oom_at']} ran out of video memory before"
-                         + (f"; batch {g['safe']} finished" if g["safe"] else "") + " (Collection › Insights)")
+                         + (f"; batch {g['safe']} finished" if g["safe"] else "") + " (Training › Insights)")
             elif g["safe"] and bs <= g["safe"]:
                 gnote = f"batch {bs} has finished before on this computer"
     except Exception:                                    # noqa: BLE001
@@ -691,7 +691,7 @@ def calc(ds, tkey, text):
         import insights as IN
         sh, eh = IN.settings_hint(tkey), IN.epochs_hint(tkey, ep)
         if sh:
-            eff.append(("Your good LoRAs", "for comparison", sh[:1].upper() + sh[1:] + " (Collection › Insights)."))
+            eff.append(("Your good LoRAs", "for comparison", sh[:1].upper() + sh[1:] + " (Training › Insights)."))
         if eh:
             eff.append(("Epochs", "maybe fewer", eh[:1].upper() + eh[1:] + "."))
     except Exception:                                    # noqa: BLE001
@@ -1978,8 +1978,20 @@ def build(app, show):
             if any(i["path"] == str(p) and i["state"] in ("queued", "running") for i in S.QUEUE["items"]):
                 return f"`{p.name}` is already in the queue."
             S.QUEUE["items"].append({"path": str(p), "resume": "", "state": "queued", "note": ""})
-        return f"✔ `{p.name}` added to the queue: Training › Run." + (
-            " (Save first to queue the changes you made.)" if cur is None else "")
-    UI["cs_queue_btn"].click(s9_queue_fn, [st, UI["cs_script"]], UI["cs_save_msg"])
+        return f"✔ `{p.name}` added to the queue."
+
+    def s9_queue_start(s, script, auto, saved):
+        """After Save: into the queue, and the queue started when nothing is training (and you want that)."""
+        if not str(saved or "").lstrip().startswith(("✔", "**Saved")):
+            return saved                                  # the save said why not
+        msg = s9_queue_fn(s, script)
+        if msg.startswith("✔") and auto and not S.QUEUE.get("running") and not S.RUN.running():
+            S.queue_start(S.QUEUE.get("stop_on_fail", True))
+            if S.QUEUE.get("running"):
+                return msg + " Training starts now: the status strip at the top follows it."
+        waiting = sum(1 for i in S.QUEUE["items"] if i["state"] == "queued")
+        return msg + f" {waiting} waiting; Training › Run starts the queue."
+    UI["save_queue_ev"].then(s9_queue_start, [st, UI["cs_script"], UI["cs_autostart"], UI["cs_save_msg"]],
+                             UI["cs_save_msg"])
 
     return {"state": st, "open_flow": lambda: None, "after_nav": after_nav, "go": go}

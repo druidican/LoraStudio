@@ -5,7 +5,7 @@ GPU: amd-smi or rocm-smi (AMD, see gpusmi.py) or nvidia-smi (NVIDIA); CPU and RA
 two seconds, so many open pages share one reading. A missing tool just leaves that part out.
 """
 from __future__ import annotations
-__version__ = "1.111126d"  # LoRA Studio version, see version.py
+__version__ = "1.111126i"  # LoRA Studio version, see version.py
 
 import html
 import re
@@ -154,8 +154,12 @@ def strip_html() -> str:
     done_id = str(int(DONE_EVENTS[-1]["t"])) if DONE_EVENTS else ""
     done_txt = html.escape(DONE_EVENTS[-1]["name"] + (" finished" if DONE_EVENTS[-1]["ok"] else " failed")
                            + (": " + DONE_EVENTS[-1]["advice"] if DONE_EVENTS[-1].get("advice") else "")) if DONE_EVENTS else ""
+    log = DONE_EVENTS[-1].get("log", "") if DONE_EVENTS and state in ("done", "fail") else ""
+    go = (f"window.lsGoRun && lsGoRun('{html.escape(log)}')" if log and re.fullmatch(r"[\w.\-]+", log)
+          else "window.lsGoQueue && lsGoQueue()")
+    where = "Open this run in Training › Results" if "lsGoRun" in go else "Open Training › Run"
     return (f'<div class="ls-strip ls-st-{state}" data-done="{done_id}" data-done-text="{done_txt}">'
-            f'<div class="ls-run" onclick="window.lsGoQueue && lsGoQueue()" title="Open Training › Run">{line}</div>'
+            f'<div class="ls-run" onclick="{go}" title="{where}">{line}</div>'
             f'<div class="ls-machine">{machine_html()}{ollama_html()}</div></div>')
 
 

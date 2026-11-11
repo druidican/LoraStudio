@@ -1,7 +1,9 @@
 # Training
 
 **Training › Run** lists one launch script per dataset and LoRA type, with when it last ran and how. Tick several and
-*Add the ticked to the queue*, or press *Add* on one. *Start queue* trains them one after the other.
+*Add the ticked to the queue*, or press *Add* on one. *Start queue* trains them one after the other. (Datasets › 9 Train
+can put a script in the queue and start it in one go.) When a run ends, the status strip says so; click it to open that
+run in Results.
 
 ![Training › Run: the launch scripts and the queue](img/run.jpg)
 

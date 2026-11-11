@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.111126i"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -1007,6 +1007,51 @@ def is_best_run(info) -> bool:
     return v is not None and sg.COMPLETED.best_version(info["dataset"], info["tkey"]) == v
 
 
+def _lora_of(info):
+    """The Collection's LoRA of a run (by its output name and dataset), or None before the Collection has seen it."""
+    if not info or not info.get("out_name"):
+        return None
+    try:
+        import lora_library as LL
+        LL.LIB.ensure_loaded()
+        for l in LL.LIB.loras.values():
+            if l.stem == info["out_name"] and (l.dataset is None or l.dataset.name == info["dataset"]):
+                return l
+    except Exception:                                    # noqa: BLE001
+        pass
+    return None
+
+
+def rating_of(info) -> int:
+    l = _lora_of(info)
+    if l is None:
+        return 0
+    import lora_library as LL
+    return int(LL.LIB.overrides(l.key).get("rating") or 0)
+
+
+def set_rating(st: dict, rate) -> str:
+    """Your rating of the run's LoRA (the same one as on its LoRA page › Edit; Insights counts it)."""
+    info = script_info(st["script"]) if st and st.get("script") and Path(st["script"]).is_file() else None
+    l = _lora_of(info)
+    if l is None:
+        return ("The Collection does not know this LoRA yet: press Collection › Browse › *Rescan folders*, "
+                "then rate it.")
+    import lora_library as LL
+    ov = LL.LIB.overrides(l.key)
+    if rate:
+        ov["rating"] = int(rate)
+    else:
+        ov.pop("rating", None)
+    LL.LIB.save_data()
+    try:
+        import insights
+        insights.forget()
+    except Exception:                                    # noqa: BLE001
+        pass
+    return f"✔ Rated {rate} of 5: Insights counts it." if rate else "✔ Rating removed."
+
+
 def toggle_best(logname: str) -> str:
     """Mark the version of a run as the best one of its dataset + LoRA type (again: remove the mark)."""
     f = sg.LOG_DIR / (logname or "")
@@ -1255,6 +1300,8 @@ def build_results(app):
                 again = gr.Button("Run it again", size="sm", scale=0, min_width=130,
                                   visible=FT.have("sd_scripts") or FT.have("musubi"))
                 best_b = gr.Button("★ Best version: mark / unmark", size="sm", scale=0, min_width=240)
+                rate = gr.Radio([("–", 0), ("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5)], value=0, scale=0,
+                                min_width=330, label="Your rating (4-5 good, 1-2 weak; Insights learns from it)")
                 rep_b = gr.Button("Report for Claude", size="sm", scale=0, min_width=170)
             rep_note = gr.Textbox(label="What do you see? (optional, goes into the report)", lines=1,
                                   placeholder="for example: it stopped at epoch 3 / the pictures look burnt")
@@ -1286,7 +1333,7 @@ def build_results(app):
         act, _, rest = (v or "").partition("|")
         arg = rest.rsplit("|", 1)[0] if "|" in rest else rest
         if act != "open":
-            return [gr.update()] * 15
+            return [gr.update()] * 16
         h, t, p, s, c, th, tl, d, st = open_run(arg)
         logdir = ""
         if st.get("script"):
@@ -1294,25 +1341,35 @@ def build_results(app):
                 logdir = str(sg.script_paths(st["script"])[1] or "")
             except Exception:                            # noqa: BLE001
                 logdir = ""
+        info = script_info(st["script"]) if st.get("script") and Path(st["script"]).is_file() else None
         return (gr.update(visible=False), gr.update(visible=True), h, t, p, s, c, th, tl, d, st, logdir, "", "",
-                gr.update(visible=False))
+                gr.update(visible=False), rating_of(info))
 
-    def do_copy(v, st, d, o):
+    open_outs = [list_col, one, head, tryf, plot, sp, clean_md, this, tail, dest, state, tb_dir, cmsg, clean_msg, cmp_col,
+                 rate]
+    at_cmsg = open_outs.index(cmsg)
+
+    def rs_click(v, st, d, o, logs):
+        """Every click inside the Results lists, in ONE event (it was four, each costing the browser time):
+        open a run, copy a save point, use a test picture, mark the best version."""
         act, _, rest = (v or "").partition("|")
         arg = rest.rsplit("|", 1)[0] if "|" in rest else rest
-        return copy_file(st, arg, d, o) if act == "copy" else gr.update()
-
-    open_outs = [list_col, one, head, tryf, plot, sp, clean_md, this, tail, dest, state, tb_dir, cmsg, clean_msg, cmp_col]
-
-    def do_cmp_use(v, st, d, o):
-        act, _, rest = (v or "").partition("|")
-        lab = rest.rsplit("|", 1)[0] if "|" in rest else rest
-        if act != "cmpuse":
-            return gr.update()
-        import comfytest as CT
-        return CT.use(st.get("log"), lab, d, st, o)
-    box.change(do_open, box, open_outs).then(do_copy, [box, state, dest, over], cmsg) \
-        .then(do_cmp_use, [box, state, dest, over], cmsg).then(compare_html, state, cmp_html)
+        out, extra = [gr.update()] * len(open_outs), [gr.update()] * 4      # + cmp_html, cmp_bmsg, cmp_head, again_msg
+        if act == "open":
+            out = list(do_open(v))
+            extra[0] = compare_html(out[open_outs.index(state)])
+        elif act == "copy":
+            out[at_cmsg] = copy_file(st, arg, d, o)
+        elif act == "cmpuse":
+            import comfytest as CT
+            out[at_cmsg] = CT.use(st.get("log"), arg, d, st, o)
+            extra[0] = compare_html(st)
+        elif act == "best":
+            msg = toggle_best(arg)
+            extra[1], extra[2], extra[3] = msg, (compare_head_html(logs) if logs else gr.update()), msg
+        return out + extra
+    box.change(rs_click, [box, state, dest, over, cmp_logs], open_outs + [cmp_html, cmp_bmsg, cmp_head, again_msg],
+               show_progress="hidden")
 
     def cmp_start(st):
         import comfytest as CT
@@ -1356,14 +1413,6 @@ def build_results(app):
         return CT.share_prompts(logs or []), compare_pics_html(logs or [], which)
     cmp_same.click(cmp_same_fn, [cmp_logs, cmp_which], [cmp_bmsg, cmp_pics])
 
-    def do_best(v, logs, st):
-        act, _, rest = (v or "").partition("|")
-        arg = rest.rsplit("|", 1)[0] if "|" in rest else rest
-        if act != "best":
-            return gr.update(), gr.update(), gr.update()
-        msg = toggle_best(arg)
-        return msg, (compare_head_html(logs) if logs else gr.update()), msg
-    box.change(do_best, [box, cmp_logs, state], [cmp_bmsg, cmp_head, again_msg])
 
     def cmp_tick2(logs, which):
         import comfytest as CT
@@ -1383,6 +1432,7 @@ def build_results(app):
         .then(reopen, state, [sp, clean_md, tryf, plot])
     again.click(run_again, state, again_msg)
     best_b.click(lambda st: toggle_best((st or {}).get("log", "")), state, again_msg)
+    rate.input(set_rating, [state, rate], again_msg)
 
     def make_report(st, note):
         import report

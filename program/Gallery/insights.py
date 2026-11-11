@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Insights: what your own datasets, LoRAs and runs say (Collection › Insights, and short hints in the steps).
+"""Insights: what your own datasets, LoRAs and runs say (Training › Insights, and short hints in the steps).
 
 Everything is read on this computer from what LoRA Studio already has; nothing is sent anywhere.
 
@@ -23,7 +23,7 @@ Everything is read on this computer from what LoRA Studio already has; nothing i
 With few LoRAs these are hints, not rules: every number says how many LoRAs or runs it comes from.
 """
 from __future__ import annotations
-__version__ = "1.111126g"  # LoRA Studio version, see version.py
+__version__ = "1.111126i"  # LoRA Studio version, see version.py
 
 import re
 import statistics
@@ -491,7 +491,7 @@ def dataset_hint(tkey: str) -> str:
         bits.append(f"{_fmt(vals['Full body'], True)} full body")
     if vals.get("Outfits") is not None:
         bits.append(f"{_fmt(vals['Outfits'])} outfits")
-    return (f"Your {s['n_good']} good {s['label']} LoRAs had (median) " + ", ".join(bits) + ". Collection › Insights."
+    return (f"Your {s['n_good']} good {s['label']} LoRAs had (median) " + ", ".join(bits) + ". Training › Insights."
             if bits else "")
 
 
