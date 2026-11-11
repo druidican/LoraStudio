@@ -8,13 +8,16 @@ later step reads what an earlier one set (a chosen dataset, a filled list), as i
 be joined (with their own js, or that stream with yield) stay separate events.
 """
 from __future__ import annotations
-__version__ = "1.101126c"  # LoRA Studio version, see version.py
+__version__ = "1.111126d"  # LoRA Studio version, see version.py
 
 import inspect
+import os
+import time
 
 import gradio as gr
 
 STEPS: list = []              # [(fn, inputs, outputs)] in the order the page registered them
+DEBUG = bool(os.environ.get("LS_LOAD_DEBUG"))   # print how long each start-up step takes
 
 
 def _lst(x):
@@ -89,9 +92,13 @@ def build(app):
     def run_all(*vals):
         cur = {id(c): v for c, v in zip(ins, vals)}          # what each component holds now
         res = {}                                             # id -> the update sent at the end
+        times = []
         for fn, i, o in steps:
+            t0 = time.perf_counter()
             try:
                 r = fn(*[cur.get(id(c)) for c in i])
+                if DEBUG:
+                    times.append((time.perf_counter() - t0, getattr(fn, "__qualname__", str(fn))))
             except Exception as e:                           # noqa: BLE001 - one part failing must not stop the others
                 print(f"[start-up] {getattr(fn, '__qualname__', fn)}: {e!r}")
                 continue
@@ -104,6 +111,10 @@ def build(app):
                 val = _value(v)
                 if val is not _NOVAL:
                     cur[id(c)] = val
+        if DEBUG:
+            print(f"[start-up] {sum(t for t, _ in times):.2f} s in {len(times)} steps; slowest:", flush=True)
+            for t, name in sorted(times, reverse=True)[:12]:
+                print(f"   {t:6.3f} s  {name}", flush=True)
         return [res.get(id(c), gr.update()) for c in outs]
 
     real(run_all, ins, outs, show_progress="hidden")

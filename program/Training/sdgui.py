@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.111126c"  # LoRA Studio version, see version.py
+__version__ = "1.111126d"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -3178,8 +3178,9 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         oc_run_evt = oc_run_btn.click(oc_run, [cs_ds, oc_url, oc_model, oc_trigger, oc_leave, oc_hints, oc_unload,
                                                oc_style, oc_length, oc_detail], oc_out)
         oc_ex_in = [oc_style, oc_length, oc_detail, oc_trigger, cs_type]
-        for comp in (oc_style, oc_length, oc_detail, oc_trigger):
-            comp.change(oc_example, oc_ex_in, oc_ex)
+        for comp in (oc_style, oc_length, oc_detail):     # set by you, or by the recommendation (which redraws it)
+            comp.input(oc_example, oc_ex_in, oc_ex)
+        oc_trigger.change(oc_example, oc_ex_in, oc_ex)
         oc_rec_outs = [oc_rec, oc_style, oc_length, oc_detail]
         cs_type.change(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
         cs_purpose.change(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
@@ -3251,40 +3252,48 @@ def build_ui(default_sample_dir: str, parent=None, detach_settings=False):
         for _r, _d, _f in zip(st_rows, st_dirs, st_files):
             st_slot_outs += [_r, _d, _f]
         st_outs = st_slot_outs + [st_flags, st_info]
-        _stv = lambda ev: ev.then(st_dl_visible, [st_type, st_flags] + st_files, st_dl_btns + [st_dl_all, st_dl_slot],
+        sug_in = [st_type, st_flags] + st_dirs + st_files
+        st_dl_vis_in = [st_type, st_flags] + st_files
+        st_dl_vis_out = st_dl_btns + [st_dl_all, st_dl_slot]
+
+        def st_files_changed(*vals):
+            n = len(st_dl_vis_in)
+            return list(st_dl_visible(*vals[:n])) + list(st_suggest(*vals[n:]))
+        # after anything that changes the model file fields: the download buttons and the suggestions follow, in one
+        # event (a .change per field cost four events, also when the page opened)
+        _stv = lambda ev: ev.then(st_files_changed, st_dl_vis_in + sug_in, st_dl_vis_out + [st_sug_md, st_sug_picks],
                                   show_progress="hidden")
         _stv(st_type.input(st_load, [st_type, st_rec], st_outs))
         _stv(demo.load(st_load, [st_type, st_rec], st_outs))
-        st_rec.input(st_refresh_all, [st_rec] + st_dirs + st_files, st_files)
-        st_refresh_btn.click(st_refresh_all, [st_rec] + st_dirs + st_files, st_files)
+        _stv(st_rec.input(st_refresh_all, [st_rec] + st_dirs + st_files, st_files))
+        _stv(st_refresh_btn.click(st_refresh_all, [st_rec] + st_dirs + st_files, st_files))
         for _d, _f in zip(st_dirs, st_files):
-            _d.submit(st_refresh, [_d, st_rec, _f], _f)
-            _d.blur(st_refresh, [_d, st_rec, _f], _f)
+            _stv(_d.submit(st_refresh, [_d, st_rec, _f], _f))
+            _stv(_d.blur(st_refresh, [_d, st_rec, _f], _f))
+            for _ev in (_f.input,):                            # a file picked or typed by you
+                _ev(st_files_changed, st_dl_vis_in + sug_in, st_dl_vis_out + [st_sug_md, st_sug_picks],
+                    show_progress="hidden")
         sub_outs = [sub_msg, st_type, cs_type, sub_rm, sub_md, st_raw_box]
         pp_types = lambda ev: ev.then(lambda t: gr.update(choices=type_choices(), value=t), cs_type, pp_type)
-        pp_types(sub_add_btn.click(sub_add, [sub_name, sub_base, sub_tag], sub_outs).then(st_load, [st_type, st_rec], st_outs))
-        pp_types(sub_rm_btn.click(sub_remove, [sub_rm, sub_confirm, st_type, cs_type], sub_outs)
-                 .then(lambda: False, None, sub_confirm).then(st_load, [st_type, st_rec], st_outs))
-        pp_types(st_reload.click(sub_reload, None, sub_outs).then(st_load, [st_type, st_rec], st_outs))
+        pp_types(_stv(sub_add_btn.click(sub_add, [sub_name, sub_base, sub_tag], sub_outs)
+                      .then(st_load, [st_type, st_rec], st_outs)))
+        pp_types(_stv(sub_rm_btn.click(sub_remove, [sub_rm, sub_confirm, st_type, cs_type], sub_outs)
+                      .then(lambda: False, None, sub_confirm).then(st_load, [st_type, st_rec], st_outs)))
+        pp_types(_stv(st_reload.click(sub_reload, None, sub_outs).then(st_load, [st_type, st_rec], st_outs)))
         st_save_btn.click(st_save, [st_type, st_flags] + st_dirs + st_files, [st_msg, st_raw_box])
-        sug_in = [st_type, st_flags] + st_dirs + st_files
-        st_files[0].change(st_suggest, sug_in, [st_sug_md, st_sug_picks])
         st_type.input(lambda: "", None, st_online_md)
         st_sug_rescan.click(st_suggest, sug_in, [st_sug_md, st_sug_picks])
-        st_sug_apply.click(st_apply_suggestions, [st_type, st_flags, st_sug_picks, st_sug_all, st_rec] + st_dirs + st_files,
-                           st_dirs + st_files).then(st_suggest, sug_in, [st_sug_md, st_sug_picks])
+        _stv(st_sug_apply.click(st_apply_suggestions, [st_type, st_flags, st_sug_picks, st_sug_all, st_rec] + st_dirs
+                                + st_files, st_dirs + st_files))
         st_online_btn.click(st_online, [st_type, st_files[0]], st_online_md)
         # Hugging Face downloads (Settings > Hugging Face token is used)
-        st_dl_vis_in = [st_type, st_flags] + st_files
-        st_dl_vis_out = st_dl_btns + [st_dl_all, st_dl_slot]
         for _i, (_d, _f, _b) in enumerate(zip(st_dirs, st_files, st_dl_btns)):
-            _f.change(st_dl_visible, st_dl_vis_in, st_dl_vis_out, show_progress="hidden")
-            _b.click(lambda t, fl, d, f, i=_i: (yield from st_download(t, fl, i, d, f)), [st_type, st_flags, _d, _f],
-                     [st_dl_md, _d, _f], concurrency_id="hfdl", concurrency_limit=1)
-        st_dl_all.click(st_download_all, [st_type, st_flags, st_rec] + st_dirs + st_files,
-                        [st_dl_md] + st_dirs + st_files, concurrency_id="hfdl", concurrency_limit=1)
-        st_dl_go.click(st_download_link, [st_type, st_flags, st_dl_slot, st_dl_link, st_rec] + st_dirs + st_files,
-                       [st_dl_md] + st_dirs + st_files, concurrency_id="hfdl", concurrency_limit=1)
+            _stv(_b.click(lambda t, fl, d, f, i=_i: (yield from st_download(t, fl, i, d, f)), [st_type, st_flags, _d, _f],
+                          [st_dl_md, _d, _f], concurrency_id="hfdl", concurrency_limit=1))
+        _stv(st_dl_all.click(st_download_all, [st_type, st_flags, st_rec] + st_dirs + st_files,
+                             [st_dl_md] + st_dirs + st_files, concurrency_id="hfdl", concurrency_limit=1))
+        _stv(st_dl_go.click(st_download_link, [st_type, st_flags, st_dl_slot, st_dl_link, st_rec] + st_dirs + st_files,
+                            [st_dl_md] + st_dirs + st_files, concurrency_id="hfdl", concurrency_limit=1))
         st_dl_stop.click(st_download_stop, None, None, queue=False)
         st_type.input(lambda: "", None, st_dl_md)
         gx_pick.input(gfx_pick, gx_pick, gx_val)

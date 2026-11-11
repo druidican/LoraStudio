@@ -10,7 +10,9 @@ output of the one event).
 Standalone (sdgui.py on its own) nothing is registered and the parts keep their own timers.
 """
 from __future__ import annotations
-__version__ = "1.111126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126d"  # LoRA Studio version, see version.py
+
+import os
 
 import gradio as gr
 
@@ -18,8 +20,7 @@ TICKS: list = []
 ACTIVE = {"on": False}
 INTERVAL = 2.0          # while something runs (training, the batch fix, a download)
 IDLE = 10.0             # otherwise (the status strip and the queue refresh without it: livepoll.py)
-import os as _os
-DEBUG = bool(_os.environ.get("LS_TICK_DEBUG"))
+DEBUG = bool(os.environ.get("LS_TICK_DEBUG"))
 BUSY: list = []         # functions that say whether something is running
 
 
@@ -36,6 +37,10 @@ def is_busy() -> bool:
     return False
 
 
+def _empty(v) -> bool:
+    return isinstance(v, dict) and set(v) <= {"__type__"}
+
+
 def timer(interval: float, fn, inputs, outputs, **kw):
     """Like gr.Timer(interval).tick(fn, inputs, outputs): in LoRA Studio it joins the one shared timer."""
     ins = list(inputs) if isinstance(inputs, (list, tuple)) else ([inputs] if inputs is not None else [])
@@ -48,7 +53,6 @@ def timer(interval: float, fn, inputs, outputs, **kw):
 
 def build():
     """Make the one timer (call once, inside the Blocks, after every part has registered)."""
-    import os
     only = os.environ.get("LS_TICK_ONLY")       # diagnostics: keep only the parts whose function name has this text
     if only:
         TICKS[:] = [t for t in TICKS if only in getattr(t[0], "__name__", "")]
@@ -76,7 +80,7 @@ def build():
             out, changed = [], False           # only what changed goes to the browser (each change redraws a part)
             for n, v in enumerate(r):
                 key = hash(repr(v))
-                if last.get(f"{p}.{n}") == key:
+                if _empty(v) or last.get(f"{p}.{n}") == key:     # gr.update() alone changes nothing: no redraw
                     out.append(gr.update())
                 else:
                     last[f"{p}.{n}"] = key

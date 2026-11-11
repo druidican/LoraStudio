@@ -34,7 +34,7 @@ Run:  python lora_library.py            (opens on http://127.0.0.1:7870)
 """
 
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.111126d"  # LoRA Studio version, see version.py
 
 import contextlib
 import copy
@@ -3376,7 +3376,6 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         return (gr.update(visible=not st), gr.update(visible=st), gr.update(visible=st), gr.update(visible=st),
                 gr.update(visible=not st), gr.update(visible=not st), gr.update(visible=not st))
     look.change(set_look, look, [look_pics, look_status, status_f, group_f, gal_sort, gal_prev, gal_fav])
-    gal_base.change(lambda b: LIB.base_names() + ["Unknown"] if b in (None, "", "All") else [b], gal_base, base_f)
 
     def do_render(q, b, st, g):
         return render_library(LIB, q, b, st, g)
@@ -3398,8 +3397,10 @@ def build_library_ui(app, detach_settings=False, maint_extra=None):
         LIB.ensure_loaded(progress)
         return list_updates(q, b, st, g)
 
-    for f in filters:
-        f.change(do_render, filters, lib_html)
+    for f in filters:              # base_f is also set with the list itself (start, rescan, sync): only your changes here
+        (f.input if f is base_f else f.change)(do_render, filters, lib_html)
+    gal_base.change(lambda b: LIB.base_names() + ["Unknown"] if b in (None, "", "All") else [b], gal_base, base_f
+                    ).then(do_render, filters, lib_html)
     rescan.click(do_rescan, filters, [lib_html, base_f, pick_dd, gal_base]).then(do_gallery, gal_inputs, gal_html
                  ).then(lambda g: gr.update(choices=lora_choices(), value=g if g in LIB.groups else None), pg_lora, pg_lora)
     app.load(do_startup, filters, [lib_html, base_f, pick_dd, gal_base]).then(do_gallery, gal_inputs, gal_html

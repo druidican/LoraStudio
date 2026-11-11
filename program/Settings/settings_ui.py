@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.111126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126d"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -462,7 +462,8 @@ def venv_panel(app):
                     "after an update, without downloading anything. **Fix** puts the parts that do not fit back, "
                     "writes the locks in `constraints.txt` again and, when PyTorch itself was upgraded, installs the "
                     "requirements again within the new locks.", elem_classes=["ls-note"])
-        st = gr.HTML(venv_html)
+        st = gr.HTML()
+        app.load(venv_html, None, st)          # with the other start-up loaders (loadjoin.py)
         with gr.Row(elem_classes=["ls-bar"]):
             again = gr.Button("Check again", size="sm", scale=0, min_width=150)
             fixb = gr.Button("Fix the training venv", variant="primary", size="sm", scale=0, min_width=210)
@@ -913,9 +914,9 @@ def speed_panel(app):
     app.load(load, None, [table, pick, which, use, use_msg, rep_md])
     go.click(started, [pick, depth], [msg, live])
     halt.click(lambda: SJ.stop(), None, msg)
-    which.change(show, which, [use, use_msg, rep_md])
+    which.input(show, which, [use, use_msg, rep_md])        # (load and the timer fill these themselves)
     use.input(lambda k, v: SJ.set_use(k, v) if k else "", [which, use], use_msg).then(tbl, None, table)
-    ticker.timer(2.0, live_view, None, live, show_progress="hidden")
+
     def follow(cur):
         """While a test runs and after it: the table, the list of tested types and the shown result follow it."""
         if not (SJ.JOB["running"] or SJ.JOB["done"]):
@@ -924,7 +925,8 @@ def speed_panel(app):
         keys = [k for _, k in tested]
         cur = cur if cur in keys else (SJ.JOB["done"][-1] if SJ.JOB["done"] else (keys[0] if keys else None))
         return (tbl(), gr.update(choices=tested, value=cur)) + show(cur)
-    ticker.timer(2.0, follow, which, [table, which, use, use_msg, rep_md], show_progress="hidden")
+    ticker.timer(2.0, lambda cur: (live_view(), *follow(cur)), which, [live, table, which, use, use_msg, rep_md],
+                 show_progress="hidden")
     ticker.BUSY.append(SJ.busy)
 
 

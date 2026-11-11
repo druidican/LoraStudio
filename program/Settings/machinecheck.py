@@ -12,7 +12,7 @@ The report is written to lorastudio_check_<time>.md in the program folder: no to
 no dataset names (only how many there are). Upload that file when something is not right.
 """
 from __future__ import annotations
-__version__ = "1.051126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126d"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -104,7 +104,7 @@ class Report:
 
     def markdown(self, version) -> str:
         c = self.counts()
-        out = [f"# LoRA Studio machine check", "",
+        out = ["# LoRA Studio machine check", "",
                f"- LoRA Studio {version}, {time.strftime('%Y-%m-%d %H:%M')}",
                f"- Result: {c['ok']} fine, {c['warn']} to look at, {c['bad']} not working", ""]
         sec = None

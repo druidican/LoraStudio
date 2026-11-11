@@ -5,11 +5,10 @@ GPU: amd-smi or rocm-smi (AMD, see gpusmi.py) or nvidia-smi (NVIDIA); CPU and RA
 two seconds, so many open pages share one reading. A missing tool just leaves that part out.
 """
 from __future__ import annotations
-__version__ = "1.051126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126d"  # LoRA Studio version, see version.py
 
-import glob
 import html
-import json
+import re
 import shutil
 import subprocess
 import sys
@@ -114,6 +113,10 @@ def machine_html() -> str:
     return "".join(parts)
 
 
+def _waiting(sg) -> int:
+    return sum(1 for i in sg.QUEUE["items"] if i["state"] == "queued")
+
+
 def run_html() -> tuple[str, str]:
     """(line, state): state = run | idle | done | fail."""
     sg = sys.modules.get("sdgui")
@@ -122,31 +125,27 @@ def run_html() -> tuple[str, str]:
     run = sg.RUN
     if run.running():
         prog = sg.progress_text()
-        import re
         m = re.search(r"(\d+)/(\d+)", prog)
         eta = re.search(r"<([\d:]+)", prog)
         step = f" · step {int(m.group(1)):,}/{int(m.group(2)):,}" if m else ""
         loss = f" · loss {run.loss[-1][1]:.3f}" if run.loss else ""
         left = f" · {eta.group(1)} left" if eta else ""
         nan = " · ⚠ loss is NaN" if run.nan_at else ""
-        q = sg.QUEUE
-        waiting = sum(1 for i in q["items"] if i["state"] == "queued")
+        waiting = _waiting(sg)
         more = f" · {waiting} more in the queue" if waiting else ""
         return f"● Training {html.escape(run.name)}{step}{loss}{left}{nan}{more}", "run"
-    bits = []
-    if DONE_EVENTS and time.time() - DONE_EVENTS[-1]["t"] < 12 * 3600:
+    bits, state = [], "idle"
+    recent = DONE_EVENTS and time.time() - DONE_EVENTS[-1]["t"] < 12 * 3600
+    if recent:
         ev = DONE_EVENTS[-1]
+        state = "done" if ev["ok"] else "fail"
         when = time.strftime("%H:%M", time.localtime(ev["t"]))
         if ev["ok"]:
             bits.append(f"✓ {html.escape(ev['name'])} finished {when}" + (f" · {html.escape(ev['advice'])}" if ev.get("advice") else ""))
         else:
             bits.append(f"✕ {html.escape(ev['name'])} failed {when}" + (f": {html.escape(ev['advice'])}" if ev.get("advice") else ""))
-    q = sg.QUEUE
-    waiting = sum(1 for i in q["items"] if i["state"] == "queued")
+    waiting = _waiting(sg)
     bits.append(f"queue: {waiting} waiting" if waiting else "queue empty")
-    state = "idle"
-    if DONE_EVENTS and time.time() - DONE_EVENTS[-1]["t"] < 12 * 3600:
-        state = "done" if DONE_EVENTS[-1]["ok"] else "fail"
     return ("○ Idle · " if state == "idle" else "") + " · ".join(bits), state
 
 

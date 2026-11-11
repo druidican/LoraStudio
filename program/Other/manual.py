@@ -6,7 +6,7 @@ as ![what it shows](img/name.jpg) and are shown from the program folder. Links t
 [text](#chapter-name) where chapter-name is the file name without the number (04_training.md -> #training).
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.111126d"  # LoRA Studio version, see version.py
 
 import html
 import re
@@ -47,10 +47,8 @@ def page(key: str) -> tuple[str, str]:
     """(html of the chapter, html of the list on the left)."""
     ch = chapters()
     if not ch:
-        return ('<div class="mn-body"><p class="ls-empty">The manual is not installed yet. An update from a LoRA Studio '
-                'older than 1.251026d copies only the program files: install the same LoraStudio.zip once more in '
-                'Settings › Updates (it then adds the manual and the logo), or unpack its <code>manual/</code> folder '
-                'next to the program.</p></div>', "")
+        return ('<div class="mn-body"><p class="ls-empty">The manual is missing: install LoraStudio.zip once more in '
+                'Settings › Updates, or unpack its <code>program/manual/</code> folder.</p></div>', "")
     cur = next((c for c in ch if c["key"] == key), ch[0])
     i = ch.index(cur)
     nav = "".join(f'<button class="mn-item{" mn-on" if c is cur else ""}" onclick="lsManual(\'{c["key"]}\')">'
