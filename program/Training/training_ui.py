@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.101126c"  # LoRA Studio version, see version.py
+__version__ = "1.111126c"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -244,7 +244,7 @@ def scripts_html(show_done: bool = False) -> str:
             state = '<span class="ls-chip warn">running</span>'
         elif not r:
             state = '<span class="tr-muted">never run</span>'
-        elif r["result"] == "done":
+        elif r["result"] == "done" and (is_done or sg.COMPLETED is None):
             state = f'<span class="tr-muted">done {_esc(r["started"][5:10])}</span>'
         elif r["result"].startswith("failed"):
             fc = fail_info(r["log"])
@@ -253,9 +253,10 @@ def scripts_html(show_done: bool = False) -> str:
         else:
             ep = _epoch_of_stop(info)
             state = f'<span class="tr-warn">stopped{f" at epoch {ep}" if ep else ""}</span>'
+        finished = bool(r) and r["result"] == "done" and (is_done or sg.COMPLETED is None)
         btn = ('<span class="ls-chip">in the queue</span>' if path in queued else
-               f'<button class="tr-btn" onclick="lsSend(\'tr_box\', \'add|{k}\')">{"Add again" if r and r["result"] == "done" else "Add"}</button>')
-        not_run = not running and (not r or r["result"] != "done")
+               f'<button class="tr-btn" onclick="lsSend(\'tr_box\', \'add|{k}\')">{"Add again" if finished else "Add"}</button>')
+        not_run = not running and not finished           # stopped, failed or cut off runs count as not run
         tick = (f'<input type="checkbox" class="tr-tick" data-k="{k}" data-notrun="{1 if not_run else 0}" '
                 f'aria-label="Tick {_esc(info["dataset"])} {_esc(info["type"])}"'
                 + (' disabled title="already in the queue"' if path in queued or running else "") + ">")

@@ -13,7 +13,7 @@
 - *Mark as run* hides a script you don't want to train again (a failed or never-run one); *show finished* shows the
   hidden and Completed ones again.
 - A saved state shows as *Resume from epoch N*: the run goes on from there.
-- *Tick the ones not run* ticks every script that never ran; *Clear finished* empties the done part of the queue,
+- *Tick the ones not run* ticks every script that has not finished: never ran, failed, or stopped before its final LoRA was written (a run stopped with Ctrl+C can end without an error, but it still counts as not run and keeps its *Add* button); *Clear finished* empties the done part of the queue,
   *Clear the queue* all of it.
 
 ## The run

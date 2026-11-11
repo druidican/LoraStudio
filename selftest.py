@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.111126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126c"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -414,6 +414,22 @@ def _tickone():
     finally:
         ticker.TICKS[:] = old[0]
         ticker.ACTIVE.clear(); ticker.ACTIVE.update(old[1])
+
+
+@check("a run stopped before its final LoRA counts as not run")
+def _stoppedrun():
+    import types as _t
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / "model").mkdir()
+        sc = d / "pipILLV1.sh"
+        sc.write_text(f'accelerate launch sdxl_train_network.py --output_dir "{d / "model"}" --output_name "pipILLV1"\n')
+        run = _t.SimpleNamespace(script=str(sc), started=time.time())
+        need(not G.wrote_final(run), "no final LoRA, but counted as written")
+        (d / "model" / "pipILLV1.safetensors").write_bytes(b"x")
+        need(G.wrote_final(run), "final LoRA not seen")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 @check("sentence captions of a character begin 'trigger, a class word, ...'")

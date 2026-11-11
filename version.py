@@ -14,20 +14,20 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.111126b"
-VERSION = "1.111126b"
+__version__ = "1.111126c"
+VERSION = "1.111126c"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.111126b",
-    "version.py": "1.111126b",
+    "version.py": "1.111126c",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.111126b",
+    "program/Training/sdgui.py": "1.111126c",
     "program/Training/sd_script.py": "1.111126b",
     "program/Data/sd_prepare.py": "1.091126",
     "program/Training/sd_settings.py": "1.051126b",
     "program/Data/datasets_ui.py": "1.101126",
     "program/Data/dsflow.py": "1.091126b",
-    "program/Training/training_ui.py": "1.101126c",
+    "program/Training/training_ui.py": "1.111126c",
     "program/Settings/settings_ui.py": "1.111126b",
     "program/Gallery/lora_library.py": "1.091126",
     "program/Training/comfytest.py": "1.011126",
@@ -62,7 +62,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.111126b",
+    "selftest.py": "1.111126c",
     "program/Settings/machinecheck.py": "1.051126b",
     "program/Settings/selfupdate.py": "1.011126",
     "program/Training/failcodes.py": "1.011126",
@@ -80,6 +80,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.111126c", "Runs stopped before their final LoRA count as not run: listed as stopped, ticked by 'Tick the ones not run', and can be queued again."),
     ("1.111126b", "New: Settings › Speed test. Tick the LoRA types to test (quick, full, or only how fast they train now); each trains a few steps on an invented test dataset with different speed settings. Results stay per type, and 'Use the faster settings' makes new launch scripts of that type use the fastest one. Fixed: live parts with one output (for example download progress) could show 'Error' since 1.101126c."),
     ("1.111126", "New: a training speed test for the terminal (program/Training/speedtest.py). It tries faster settings on one of your own launch scripts (block swapping, pinned memory, checkpointing, attention, fp8, torch.compile, ROCm settings), measures seconds per step and video memory, and writes a report with what to change."),
     ("1.101126d", "Z-Image, Qwen-Image and FLUX.2 (musubi-tuner): a dataset with a second caption set trained on no pictures at all (musubi did not recognise IMG.sentences.txt). The pictures are now linked into musubi's cache with the right captions, and a missing caption set stops the run with a clear message."),

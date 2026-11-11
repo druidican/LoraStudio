@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.111126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126c"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -1272,7 +1272,9 @@ def _queue_worker():
                 it["state"], it["note"] = "stopped", f"stopped by you after {took}"
                 break
             why = run_failure(run, code)
-            if not why:
+            if not why and not wrote_final(run):
+                it["state"], it["note"] = "stopped", f"ended after {took} without its final LoRA (stopped early?)"
+            elif not why:
                 it["state"], it["note"] = "done", f"finished in {took}" + (f" · {room}" if room else "")
                 if run.logfile:
                     _Q_DONE_LOGS.append(Path(run.logfile).name)
@@ -1300,6 +1302,22 @@ def _queue_worker():
                 comfytest.after_queue(done)
             except Exception:                       # noqa: BLE001
                 pass
+
+
+def wrote_final(run) -> bool:
+    """Did this run write its final LoRA (<output_name>.safetensors, newer than the start)? A run stopped with
+    Ctrl+C can still end with exit code 0, so the exit code alone does not say it finished."""
+    try:
+        p = Path(run.script)
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        out_dir, out_name = script_args(text, script_home(p))
+        if not out_name:
+            return True                                    # nothing to check against
+        root = Path(os.path.expanduser(out_dir)) if out_dir else script_home(p) / "model"
+        final = root / f"{out_name}.safetensors"
+        return final.is_file() and final.stat().st_mtime >= run.started - 5
+    except Exception:                                      # noqa: BLE001
+        return True
 
 
 def run_failure(run, code) -> str:
@@ -2329,6 +2347,8 @@ def run_history(limit: int = 100):
             result, dur = "cut off", fmt(max(0, f.stat().st_mtime - started.timestamp()))
         if "--- FAILED:" in tail and result == "done":
             result = "failed"
+        if result == "done" and "no new final LoRA file found" in tail:
+            result = "stopped (no final LoRA)"            # ended with code 0, but before the end (Ctrl+C)
         row = [started.strftime("%Y-%m-%d %H:%M"), m.group(3), dur, result, loss[-1] if loss else "", f.name]
         if not live:
             _HIST_CACHE[f.name] = (ck, tuple(row))
