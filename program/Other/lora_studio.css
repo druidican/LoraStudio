@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE */
-/* LoRA Studio version 1.111126e */
+/* LoRA Studio version 1.111126h */
 /* LoRA Studio: the look of the pages (colours come from the --ll-* variables of the Collection style).
    Edit freely. For your own changes that survive updates, use custom.css next to this file instead:
    it is loaded after this one, and an update never replaces it. Reload the page after a change
@@ -280,7 +280,7 @@ details.ds-fold[open] > summary { margin-bottom:6px; }
 #ds_s2, #ds_s3, #ds_s4, #ds_s5, #ds_s6, #ds_s7, #ds_s8, #ds_s9 { gap:12px !important; }
 #s6_bottom { border-top:1px solid var(--ll-line); padding-top:12px !important; margin-top:4px; }
 .ds-bottom { border-top:1px solid var(--ll-line); padding-top:12px !important; margin-top:4px; }
-#ds_s3 .ds-bottom { border-top:0; padding-top:0 !important; }
+#ds_s2 .ds-bottom { border-top:0; padding-top:0 !important; }
 /* the consistency picture only takes room when there is a picture to look at */
 #cc_view:not(:has(img)) { display:none !important; }
 .ls-ver-t td { border:0 !important; border-top:1px solid var(--ll-line) !important; padding:5px 8px !important; }
@@ -333,3 +333,5 @@ table.ds-calc tr:first-child td { border-top:0 !important; }
 .ds-srow.ds-missing b { color:var(--ll-muted); font-weight:500; }
 .ls-missing, .ls-missing * { color:var(--ll-muted) !important; }
 .ls-missing-note { color:var(--ll-muted); font-size:13px; border:1px dashed var(--ll-line); border-radius:10px; padding:10px 14px; }
+.ds-ready { margin:6px 0 0 18px; padding:0; } .ds-ready li { margin:3px 0; font-size:13px; }
+.ds-ready li.r-ok { color:#21857C; } .ds-ready li.r-warn { color:#A86A0C; } .ds-ready li.r-bad { color:#C0392B; }

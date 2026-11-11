@@ -14,22 +14,22 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.111126g"
-VERSION = "1.111126g"
+__version__ = "1.111126h"
+VERSION = "1.111126h"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.111126g",
-    "version.py": "1.111126g",
+    "lora_studio.py": "1.111126h",
+    "version.py": "1.111126h",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.111126f",
-    "program/Training/sd_script.py": "1.111126e",
+    "program/Training/sdgui.py": "1.111126h",
+    "program/Training/sd_script.py": "1.111126h",
     "program/Data/sd_prepare.py": "1.111126f",
     "program/Training/sd_settings.py": "1.111126f",
-    "program/Data/datasets_ui.py": "1.111126f",
-    "program/Data/dsflow.py": "1.091126b",
-    "program/Training/training_ui.py": "1.111126e",
-    "program/Settings/settings_ui.py": "1.111126d",
-    "program/Gallery/lora_library.py": "1.111126g",
+    "program/Data/datasets_ui.py": "1.111126h",
+    "program/Data/dsflow.py": "1.111126h",
+    "program/Training/training_ui.py": "1.111126h",
+    "program/Settings/settings_ui.py": "1.111126h",
+    "program/Gallery/lora_library.py": "1.111126h",
     "program/Training/comfytest.py": "1.011126",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.111126b",
@@ -38,7 +38,7 @@ RELEASE: dict = {
     "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.051126",
     "program/Settings/ghupdate.py": "1.011126",
-    "program/Settings/hfdownload.py": "1.091126",
+    "program/Settings/hfdownload.py": "1.111126h",
     "program/Settings/ollamactl.py": "1.011126",
     "program/Data/datacheck.py": "1.031126",
     "program/Data/consistency.py": "1.011126",
@@ -62,24 +62,25 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
     "program/Settings/backup.py": "1.011126",
-    "selftest.py": "1.111126e",
+    "selftest.py": "1.111126h",
     "program/Settings/machinecheck.py": "1.111126d",
     "program/Settings/selfupdate.py": "1.011126",
-    "program/Training/failcodes.py": "1.011126",
+    "program/Training/failcodes.py": "1.111126h",
     "program/Other/report.py": "1.011126",
     "program/Other/manual.py": "1.111126d",
     "program/Settings/notice.py": "1.011126",
     "program/Settings/venvcheck.py": "1.011126",
     "program/Settings/features.py": "1.091126",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.111126e",
+    "program/Training/Lora_Datatypes.py": "1.111126h",
     "program/Training/Training_Recommendations.py": "1.091126",
-    "program/Other/lora_studio.css": "1.111126e",
+    "program/Other/lora_studio.css": "1.111126h",
     "install.sh": "1.051126b",
     "start.sh": "1.051126",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.111126h", "Redesign 1 (Datasets steps in a natural order): Setup is now step 2 and the usable scan step 3, so the scan knows which sizes your LoRA types need. Setup shows whether the model files of the ticked types are on this computer, whether their trainer is installed and whether Ollama has a model that reads pictures; missing model files download in the background while you go on (step 9's download button does the same). Steps renamed: 6 Watermarks and size, 7 Captions, 9 Train. The manual's character description example no longer suggests body traits."),
     ("1.111126g", "Clean-up 4 (Collection and start): the old stand-alone lora_library.py program is gone (LoRA Studio is the only way in), and leftover code that nothing used any more is removed. Nothing you use changes. This ends the clean-up run: four releases, about 900 lines less, and a quicker page."),
     ("1.111126f", "Clean-up 3 (Datasets): moving between steps and opening a dataset is much quicker. A new step was four events and opening a dataset about eight more; each is now one (on the 80-dataset test copy most step changes went from 4.5-9 s of a busy browser to 1.5-2.7 s). A hidden 'Prepare' page that recalculated after every change is gone, with its unused picture check code. The example text in the character description no longer suggests body traits."),
     ("1.111126e", "Clean-up 2 (Training): the old stand-alone sdgui.py program is gone (LoRA Studio is the only way in; it had no Run page any more), with its own header, GPU display, timers and the hidden 'Run all steps' preparation, which also ran three extra steps every time you picked a LoRA type in step 9. Leftovers of the old queue table removed. Training › Results no longer searches all dataset folders for every old log without a script line on each refresh. Nothing you use changes."),

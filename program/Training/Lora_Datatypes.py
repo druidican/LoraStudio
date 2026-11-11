@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.111126e"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -1065,7 +1065,7 @@ PYCHECK"""] if cfg.get("base_weights_check") and any(fl == "--base_weights" for 
         '    else nocap=$((nocap+1)); fi',
         "  done < <(find \"$d\" -maxdepth 1 -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.bmp' \\) -print0)",
         '  [ "${nocap}" -eq 0 ] || echo "WARNING: ${nocap} pictures in ${b} have no caption (*${CAPTION_EXT}) and are left out"',
-        '  [ "${imgs}" -gt 0 ] || { [ "${nocap}" -eq 0 ] || fail_stage "no captions (*${CAPTION_EXT}) for the pictures in ${b}: write them in Datasets › 7 Tags (this LoRA type uses that caption set)"; continue; }',
+        '  [ "${imgs}" -gt 0 ] || { [ "${nocap}" -eq 0 ] || fail_stage "no captions (*${CAPTION_EXT}) for the pictures in ${b}: write them in Datasets › 7 Captions (this LoRA type uses that caption set)"; continue; }',
         '  {',
         '    echo ""',
         '    echo "[[datasets]]"',

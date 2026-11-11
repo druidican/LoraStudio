@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.111126e"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -430,6 +430,14 @@ def _stoppedrun():
         need(G.wrote_final(run), "final LoRA not seen")
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+@check("the steps run in the natural order: Setup before the usable scan")
+def _steporder():
+    import dsflow as F
+    keys = [k for _, k, _ in F.STEPS]
+    need(keys == ["folder", "setup", "scan", "sort", "select", "resize", "tags", "review", "script"], keys)
+    need([n for n, _, _ in F.STEPS] == list(range(1, 10)), "step numbers")
 
 
 @check("sentence captions of a character begin 'trigger, a class word, ...'")

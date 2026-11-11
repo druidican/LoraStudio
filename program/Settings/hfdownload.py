@@ -15,7 +15,7 @@ Gated repos (FLUX.1-dev, FLUX.2-dev, SD 3.5): accept the licence once on the rep
 huggingface.co, with the account the token belongs to.
 """
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import os
 import re
@@ -434,3 +434,39 @@ def fetch_missing(tkey: str, stop=None):
             break
     yield "\n\n".join(log + [f"**{len(done)} of {len(todo)} files downloaded.**"])
     return done
+
+
+# --------------------------------------------------------------------------- downloads in the background
+BG = {"running": False, "line": "", "types": []}
+
+
+def start_background(tkeys) -> str:
+    """Download every missing model file of these LoRA types, one after another, while you go on working (Datasets ›
+    2 Setup and 9 Train start it; the line in BG says how far it is)."""
+    if BG["running"]:
+        return "A download is already running."
+    todo = [t for t in dict.fromkeys(tkeys or []) if missing(t)]
+    if not todo:
+        return "✔ Every model file of these LoRA types is on this computer."
+    BG.update(running=True, line="⏳ starting …", types=todo)
+    STOP.clear()
+
+    def work():
+        try:
+            for t in todo:
+                for line in fetch_missing(t):
+                    BG["line"] = line.strip().splitlines()[-1] if line.strip() else BG["line"]
+                if STOP.is_set():
+                    BG["line"] = "Stopped: the next download goes on from where it stopped."
+                    return
+            BG["line"] = "✔ Downloads finished." if not any(missing(t) for t in todo) else BG["line"]
+        except Exception as e:                           # noqa: BLE001
+            BG["line"] = f"❌ Download failed: {e}"
+        finally:
+            BG["running"] = False
+    threading.Thread(target=work, daemon=True, name="hf-background").start()
+    return "⏳ Downloading in the background: you can go on with the next steps."
+
+
+def bg_text() -> str:
+    return BG["line"] if (BG["running"] or BG["line"]) else ""

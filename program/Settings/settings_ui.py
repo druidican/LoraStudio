@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.111126d"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -302,10 +302,10 @@ def batch_panel(app):
         sel = gr.Radio([("Safe: the cleanest pictures first", "safe"),
                         ("Varied: more close-ups, angles, outfits and details", "varied")],
                        label="How to pick them", value="safe")
-        safety = gr.Slider(5, 100, value=50, step=5, label="Safety: move nothing in step 2 when more than this % "
+        safety = gr.Slider(5, 100, value=50, step=5, label="Safety: move nothing in step 3 when more than this % "
                                                             "of the pictures look not usable")
     with gr.Column(elem_classes=["ls-card"]):
-        gr.Markdown("**LoRA type and purpose** (step 3; only for a dataset that has none yet)")
+        gr.Markdown("**LoRA type and purpose** (step 2; only for a dataset that has none yet)")
         with gr.Row():
             dtype = gr.Dropdown(choices=[], label="LoRA type", scale=1)
             dpurp = gr.Dropdown(choices=F.PURPOSES, value="character", label="Purpose", scale=1)

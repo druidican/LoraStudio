@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.111126g"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -354,7 +354,9 @@ def main():
         livepoll.register("ls_strip", statusbar.strip_html)     # refreshed by the page itself (livepoll.py)
         def _busy():
             import dsflow
-            return sdgui.RUN.running() or dsflow.BATCH.get("running") or bool(sdgui.QUEUE.get("running"))
+            import hfdownload
+            return (sdgui.RUN.running() or dsflow.BATCH.get("running") or bool(sdgui.QUEUE.get("running"))
+                    or hfdownload.BG["running"])
         ticker.BUSY.append(_busy)
         try:
             import comfytest
@@ -370,7 +372,7 @@ def main():
         ticker.build()                          # the one timer for the whole page (see ticker.py)
         loadjoin.build(app)
 
-        # "Train a new version": Datasets › Edit existing › 9 Launch script of that dataset
+        # "Train a new version": Datasets › Edit existing › 9 Train of that dataset
         def to_step9(cur, ds):
             if not ds:
                 return cur, gr.update()

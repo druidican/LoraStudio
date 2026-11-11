@@ -19,7 +19,7 @@ a few test pictures with it and the final file.
 - **Test pictures (ComfyUI)**: the same prompts and seeds with several save points side by side; *Use this one*
   copies that save point and makes its first picture the preview.
 - **Clean up this run** moves epoch files you did not copy, saved states and caches to the Trash.
-- **This run**: *Train a new version…* opens Datasets › 9 Launch script for the dataset; *Run it again* puts the same
+- **This run**: *Train a new version…* opens Datasets › 9 Train for the dataset; *Run it again* puts the same
   script in the queue; *★ Best version* marks it; *Report for Claude* makes the report file (see [Training](#training)).
 - **TensorBoard** (folded): *Start TensorBoard* opens the run's logs in TensorBoard; *End of the run log* shows the
   last lines as the trainer wrote them.

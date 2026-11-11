@@ -6,7 +6,7 @@ The patterns are checked in order; the first one that matches wins, so the speci
 log line that matched (shown under the description, for the curious).
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import re
 
@@ -55,7 +55,7 @@ RULES = [
               r"Decompressed Data Too Large",
      "A picture is broken",
      "One of the pictures could not be opened (damaged, half downloaded, or not really a picture).",
-     "Run Datasets › 2 Usable scan: it finds broken files; move them to _reserve or delete them."),
+     "Run Datasets › 3 Usable scan: it finds broken files; move them to _reserve or delete them."),
     ("GPUFAULT", r"HSA_STATUS_ERROR_MEMORY_FAULT|Memory access fault by GPU|Memory Fault Error|"
                  r"illegal memory access was encountered|hipErrorIllegalAddress",
      "The GPU crashed (memory access fault)",

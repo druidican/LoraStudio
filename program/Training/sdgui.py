@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.111126f"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 import atexit
 import codecs
 import contextlib
@@ -1992,7 +1992,7 @@ except Exception:                           # noqa: BLE001
 
 def script_saved_hook(ds) -> str:
     """After a new launch script: dsflow moves other repeat folders to _extra/ and ends 'look outside the repeat
-    folder' (Datasets › 2). Returns its note ('' when there is nothing to say)."""
+    folder' (Datasets › 3). Returns its note ('' when there is nothing to say)."""
     try:
         import dsflow
         return dsflow.script_saved(ds)
@@ -2445,8 +2445,8 @@ def build_ui(parent):
             cs_plan = gr.State({})
 
         # ================================================================ Datasets > Prepare
-        # The Datasets flow (datasets_ui.py) places these parts in its steps: p_wm in 6 Resize, p_caption and
-        # p_cons in 7 Tags, p_repeat and the launch script page in 9 Launch script.
+        # The Datasets flow (datasets_ui.py) places these parts in its steps: p_wm in 6 Watermarks and size, p_caption and
+        # p_cons in 7 Captions, p_repeat and the launch script page in 9 Train.
         with page("p_wm", "Watermarks"):
             gr.Markdown("Pictures where the sort found marks **added on top** of the picture (watermarks, site "
                         "names, logo stamps, signatures, date stamps): remove them (picture tools), crop them off, set "

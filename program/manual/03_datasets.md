@@ -28,16 +28,7 @@ pictures beat many similar ones. For a style: 30–80 pictures in that style wit
 
 ![Framing: full body, upper body, close-up](img/framing.jpg)
 
-## 2 · Usable scan
-
-![Step 2: size, sharpness and broken files, in seconds, no AI](img/step2.jpg)
-
-*Scan the pictures* finds pictures that are too small for the LoRA type, blurry, broken or duplicates. *Move not
-usable to _reserve* moves them out (never deletes). Tick *Also look at the pictures outside the repeat folder* to let
-steps 2, 4 and 5 see pictures in `_reserve/` and other folders too: the ones you keep in step 5 join the repeat
-folder, and the setting switches itself off again when a launch script is saved.
-
-## 3 · Setup
+## 2 · Setup
 
 ![Step 3: LoRA type, purpose, trigger word](img/step3.jpg)
 
@@ -55,6 +46,17 @@ folder, and the setting switches itself off again when a launch script is saved.
   captions (FLUX, Chroma, Z-Image …) then begin `pip, a robot, …`, so the text encoder knows what kind of thing the
   new word means, which helps likeness. Tag captions are not changed. Leave it empty to start with the trigger word
   alone.
+
+**Ready for these LoRA types?** (the card on the right): for each ticked type, whether its model files are on this computer and its trainer is installed, and whether Ollama has a model that reads pictures (the sort and sentence captions need it). *⬇ Download the missing model files* fetches them from Hugging Face **in the background**: go on with the next steps meanwhile; the line under the button says how far it is.
+
+## 3 · Usable scan
+
+![Step 2: size, sharpness and broken files, in seconds, no AI](img/step2.jpg)
+
+*Scan the pictures* finds pictures that are too small for the LoRA types you ticked in Setup, blurry, broken or duplicates. *Move not
+usable to _reserve* moves them out (never deletes). Tick *Also look at the pictures outside the repeat folder* to let
+steps 3, 4 and 5 see pictures in `_reserve/` and other folders too: the ones you keep in step 5 join the repeat
+folder, and the setting switches itself off again when a launch script is saved.
 
 ## 4 · Sort
 
@@ -117,7 +119,7 @@ than needed are scaled down, never squared or padded. Click a picture to crop it
 suggests a crop, *Use this crop* keeps it. *Resize* does the lot. The originals stay in `_originals/`, and *Put the
 originals back* undoes the step.
 
-## 7 · Tags (captions)
+## 7 · Captions
 
 ![Step 7: captions and the consistency check](img/step7.jpg)
 
@@ -152,10 +154,10 @@ kind in it (*gold ring*) leaves the kind (*ring*) when it moves. Above it, **Kin
 - The person in the pictures is described in full (hair, face, the other clothes, pose, place), so the LoRA learns
   only the item. In ComfyUI you then write `lsjc, ring, on ring finger, …`.
 
-**Character description**: the traits the trigger word learns, in words (*slim build, tall, blonde hair, blue eyes*).
+**Character description**: the traits the trigger word learns, in words (*round glasses, red scarf, silver earrings*).
 They are put next to the trigger word in the LoRA's LoRA Manager data, so ComfyUI offers them with it and you can add
 them to a prompt to make the character stronger. *Suggest from the tags* fills in what the WD tagger saw in most
-pictures; add build and height yourself, then *Save*.
+pictures; add what is missing, then *Save*.
 
 **Caption settings** (the folded section): the length and detail of the captions, the **Never describe** list (what
 sentence captions leave out for a character), and **Try on 3 pictures** to see the result first. *Undo last change*
@@ -174,7 +176,7 @@ other caption set too* takes the same traits out of the second one.
 The last look: pictures without a caption, captions without the trigger word first, very long captions. Click a
 picture to see and edit its caption, then *Save caption changes*.
 
-## 9 · Launch script
+## 9 · Train
 
 ![Step 9: the plan, the settings and their recommendations](img/step9.jpg)
 
@@ -185,7 +187,8 @@ advanced values and the repeat folder; **Why these settings** has the notes and 
 script text** shows the script itself.
 
 - **Missing model files**: when a model file the script needs is missing, a card offers *⬇ Download from Hugging Face*
-  for it (with your token for gated models).
+  for it (with your token for gated models). It downloads in the background, the same way as in step 2; when it is
+  done, *Use model files from Settings* puts the files into a script that is already open.
 - **From your own runs** (after a few rated LoRAs, see [Insights](#collection)): *Your graphics card* warns when this
   batch size ran out of video memory before and estimates the time from your runs; *Your good LoRAs* shows their
   settings next to the recommendations; *Epochs* suggests fewer when your runs usually peaked early.

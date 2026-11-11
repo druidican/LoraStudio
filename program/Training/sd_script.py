@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.111126e"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -519,7 +519,7 @@ def main_repeat_folders(lora: Path, found=None) -> tuple[list, list]:
 def dataset_stats(ds):
     """The training pictures of a dataset: its own repeat folder <N>_<dataset name> only. Pictures anywhere else
     (_reserve/, other repeat folders, other folders, the dataset folder itself) are not part of it: they are listed
-    in 'loose' / 'others' and only used when the usable scan is told to look at them (Datasets › 2)."""
+    in 'loose' / 'others' and only used when the usable scan is told to look at them (Datasets › 3)."""
     lora = S.lora_path(ds)
     rows, loose = [], []
     found = S.repeat_folders(lora)
@@ -581,7 +581,7 @@ def _speed(tkey, cfg) -> dict:
 
 
 def caption_ext_for(ds, tkey) -> str:
-    """The caption set a new launch script of this type trains on (Datasets: step 3 and 9), else IMG.txt."""
+    """The caption set a new launch script of this type trains on (Datasets: step 2 and 9), else IMG.txt."""
     try:
         import dsflow
         return dsflow.caption_ext(ds, tkey) if ds else ".txt"

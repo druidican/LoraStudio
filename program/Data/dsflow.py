@@ -3,21 +3,22 @@
 
   1 Folder        a folder with only pictures becomes a dataset: <N>_<name>/ with the pictures, _originals/ with
                   untouched copies, model/ and log/
-  2 Usable scan   size, sharpness, compression, broken files (no AI); not usable ones can go to _reserve/
-  3 Setup         LoRA types (one or more), purpose, "watermarks already removed"
+  2 Setup         LoRA types (one or more), purpose, trigger and class word, "watermarks already removed"; shows
+                  whether the types' model files and an Ollama picture model are there
+  3 Usable scan   size (for the LoRA types), sharpness, compression, broken files (no AI); not usable -> _reserve/
   4 Sort          pass 1 quick (technical), pass 2 detailed (Ollama: subject, framing, outfit, place, quality,
                   watermarks); groups of pictures that are too alike, duplicates, detail shots (kept), not good enough
   5 Select        a suggested size, picked by quality first and then by what each picture adds; the rest -> _reserve/
-  6 Resize        keep the shape, scale down to a longest side; per picture: keep or crop; originals in _originals/
-  7 Tags          one caption set per caption style (IMG.txt, IMG.sentences.txt), consistency inside
+  6 Watermarks and size  keep the shape, scale down to a longest side; per picture: keep or crop; originals in _originals/
+  7 Captions      one caption set per caption style (IMG.txt, IMG.sentences.txt), consistency inside
   8 Review        the folder, the pictures and their captions, and checks
-  9 Launch script one per LoRA type (sdgui's launch script page)
+  9 Train         one launch script per LoRA type (sdgui's launch script page), then into the queue
 
 State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.json, sort.json, select.json,
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.091126b"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -38,9 +39,9 @@ ORIGINALS = "_originals"
 RESERVE = "_reserve"
 STOP = threading.Event()
 SAME_LIMIT = 3
-STEPS = [(1, "folder", "Folder"), (2, "scan", "Usable scan"), (3, "setup", "Setup"), (4, "sort", "Sort"),
-         (5, "select", "Select"), (6, "resize", "Resize"), (7, "tags", "Tags"), (8, "review", "Review"),
-         (9, "script", "Launch script")]
+STEPS = [(1, "folder", "Folder"), (2, "setup", "Setup"), (3, "scan", "Usable scan"), (4, "sort", "Sort"),
+         (5, "select", "Select"), (6, "resize", "Watermarks and size"), (7, "tags", "Captions"), (8, "review", "Review"),
+         (9, "script", "Train")]
 PURPOSES = [("Character / person", "character"), ("Art style", "style"), ("Object / item", "object"),
             ("Worn item (clothes, equipment, jewelry)", "worn"), ("Action / pose", "action"),
             ("Concept / effect", "concept")]
@@ -164,8 +165,8 @@ def images(ds) -> list[Path]:
 
 
 # Pictures outside the repeat folder (_reserve/, _extra/, other repeat folders, other folders, the dataset folder
-# itself) are left out of everything (counts, checks, Improvements) unless the usable scan (step 2) is told to look
-# at them: then steps 2, 4 and 5 treat them as candidates, the ones kept in step 5 join the repeat folder, and the
+# itself) are left out of everything (counts, checks, Improvements) unless the usable scan (step 3) is told to look
+# at them: then steps 3, 4 and 5 treat them as candidates, the ones kept in step 5 join the repeat folder, and the
 # setting switches itself off again when a launch script is saved.
 NOT_CANDIDATES = {ORIGINALS, FLOW_DIR, "model", "models", "log", "logs", "loramanager", "_old_runs", "output",
                   "outputs", "sample", "samples", "compare"}
@@ -201,7 +202,7 @@ def extra_pictures(ds) -> list[Path]:
 
 
 def candidates(ds) -> list[Path]:
-    """The pictures steps 2, 4 and 5 look at: the repeat folder, plus the others when step 2 says so."""
+    """The pictures steps 3, 4 and 5 look at: the repeat folder, plus the others when step 3 says so."""
     imgs = images(ds)
     return imgs + extra_pictures(ds) if include_extra(ds) else imgs
 
@@ -255,7 +256,7 @@ def script_saved(ds) -> str:
             notes.append(f"could not move `{f.name}/`: {e}")
     if include_extra(ds):
         set_include_extra(ds, False)
-        notes.append("pictures outside the repeat folder are left out again (step 2)")
+        notes.append("pictures outside the repeat folder are left out again (step 3)")
     return "; ".join(notes)
 
 
@@ -493,7 +494,7 @@ def rename_repeats(ds, want: int) -> str:
     return "; ".join(done)
 
 
-# --------------------------------------------------------------------------- 2 Usable scan
+# --------------------------------------------------------------------------- 3 Usable scan
 CAT_WORDS = (("broken", "cannot be read"), ("small", "too small"), ("blurry", "blurry"))
 
 
@@ -873,7 +874,7 @@ def apply_select(ds, keep_paths) -> str:
             + (f" Could not move: {'; '.join(err[:3])}" if err else ""))
 
 
-# --------------------------------------------------------------------------- 6 Resize
+# --------------------------------------------------------------------------- 6 Watermarks and size
 def resize_overrides(ds) -> dict:
     return (_load(ds, "resize.json", {}) or {}).get("over", {})
 
@@ -1063,14 +1064,14 @@ def restore_originals(ds) -> str:
     return f"✔ {n} pictures put back from `{ORIGINALS}/`."
 
 
-# --------------------------------------------------------------------------- 7 Tags
+# --------------------------------------------------------------------------- 7 Captions
 def style_of(tkey) -> str:
     S = sg()
     fam = S._oc_family(tkey)
     return S.OC_FAMILY.get(fam, ("sentences",))[0]
 
 
-# Model families whose text encoder reads both booru tags and sentences: the dataset decides (step 3), and with both
+# Model families whose text encoder reads both booru tags and sentences: the dataset decides (step 2), and with both
 # caption sets the launch script picks one (step 9).
 BOTH_STYLES = {"anima", "flux", "chroma"}
 CAPTION_CHOICES = [("Each type's usual style", "auto"), ("Tags", "tags"), ("Sentences", "sentences"),
@@ -1873,26 +1874,26 @@ def batch_summary(b: dict | None = None) -> str:
     keep += ", picked for variety" if b.get("select_mode") == "varied" else ", the cleanest first"
     wm = {"remove": "removed (cropped if that fails)", "crop": "cropped off", "aside": "set aside",
           "leave": "left as they are"}[b["watermarks"]]
-    return (f"2 Usable scan: not usable pictures to `_reserve/` (nothing moves when more than {b['safety_pct']} % look "
-            f"not usable) · 3 Setup: the dataset's own LoRA type and purpose, else "
+    return (f"2 Setup: the dataset's own LoRA type and purpose, else "
             f"{lab.get(b['default_type'], b['default_type'])} + {PURPOSE_LABEL.get(b['default_purpose'], b['default_purpose'])}"
-            f" · 4 Sort · 5 Select: {keep}, the rest to `_reserve/` · 6 Resize"
-            + (", small pictures upscaled" if b["upscale"] else "") + f", watermarks {wm} · 7 Tags: "
+            f" · 3 Usable scan: not usable pictures to `_reserve/` (nothing moves when more than {b['safety_pct']} % look "
+            f"not usable) · 4 Sort · 5 Select: {keep}, the rest to `_reserve/` · 6 Watermarks and size"
+            + (", small pictures upscaled" if b["upscale"] else "") + f", watermarks {wm} · 7 Captions: "
             + ("captions only for pictures without one" if b["captions"] == "missing" else "every caption written again")
             + (("; the consistency check runs and every trait is answered with “This picture only”" if b["cons_each"]
                 else "; the consistency check runs and its findings wait for you in step 7") if b["consistency"] == "check"
                else "; the consistency check is left out")
             + (" · 9 a launch script with the recommended settings." if b["launch_script"]
-               else ". Review and Launch script are skipped."))
+               else ". Review and Train are skipped."))
 
 
 def _batch_one(ds, url, model, say) -> list[str]:
-    """Steps 2-7 with the defaults. Returns what was done, one line per step."""
+    """Steps 2-7 with the defaults (Setup, Usable scan, Sort, Select, Watermarks and size, Captions). Returns what was done, one line per step."""
     S = sg()
     B = batch_settings()
     done = []
     m = meta(ds)
-    if not m["types"]:                                   # 3 Setup: keep what the dataset has, else the default
+    if not m["types"]:                                   # 2 Setup: keep what the dataset has, else the default
         if B["default_type"] in type_labels():
             m["types"] = [B["default_type"]]
         if not (m.get("steps") or {}).get("setup"):
@@ -1903,12 +1904,12 @@ def _batch_one(ds, url, model, say) -> list[str]:
         return [f"skipped: no LoRA type known and {B['default_type']} is not among the LoRA types"]
     labels = type_labels()
     done.append("setup: " + " + ".join(labels.get(t, t) for t in m["types"]) + f" · {m['purpose']}")
-    say("2 Usable scan")                                 # 2 Usable scan, not usable -> _reserve
+    say("3 Usable scan")                                 # 3 Usable scan, not usable -> _reserve
     sc = usable_scan(ds, m["types"], upscale=B["upscale"])
     bad = [p for p, e in sc["pics"].items() if e["bad"] and Path(p).exists()]
     if bad and len(bad) > len(sc["pics"]) * B["safety_pct"] / 100:   # safety: never empty a dataset without you looking
         done.append(f"usable scan: {len(bad)} of {len(sc['pics'])} not usable — too many to move without you looking; "
-                    "left in place (check step 2 by hand)")
+                    "left in place (check step 3 by hand)")
         bad = []
     elif bad:
         move_to_reserve(ds, bad)
@@ -1937,7 +1938,7 @@ def _batch_one(ds, url, model, say) -> list[str]:
         done.append("select: nothing to keep, skipped (" + msg_none(rows) + ")")
     if BATCH["stop"]:
         return done + ["stopped"]
-    say("6 Resize")                                      # 6 Watermarks (recommended choice) and resize
+    say("6 Watermarks and size")                                      # 6 Watermarks (recommended choice) and resize
     if not m["wm_removed"] and B["watermarks"] != "leave":
         w = S.wm_apply(ds, "", only_pending=True, prefer=B["watermarks"])
         if w and w != "Nothing changed.":
@@ -1950,7 +1951,7 @@ def _batch_one(ds, url, model, say) -> list[str]:
     import features as FT
     if not FT.have("ollama") and any(x["style"] != "tags" for x in caption_sets(ds)):
         done.append("sentence captions: not written (Ollama missing)")
-    for st in [x for x in caption_sets(ds) if FT.have("ollama") or x["style"] == "tags"]:   # 7 Tags: tags by the WD tagger
+    for st in [x for x in caption_sets(ds) if FT.have("ollama") or x["style"] == "tags"]:   # 7 Captions: tags by the WD tagger
         tkey = st["tkeys"][0] if st["tkeys"] else m["types"][0]
         _, style, length, detail = S.oc_recommend(tkey, m["purpose"])
         style = st["style"]
@@ -1967,14 +1968,14 @@ def _batch_one(ds, url, model, say) -> list[str]:
             last = line
             if BATCH["stop"]:
                 STOP.set()
-            say(f"7 Tags · {line}")
+            say(f"7 Captions · {line}")
         c, t = set_count(ds, st["ext"])
         done.append(f"captions IMG{st['ext']}: {c}/{t}" + ("" if c == t else f" ({last[:80]})"))
     m = meta(ds)
     m["steps"]["tags"] = {"at": time.strftime("%Y-%m-%d %H:%M"), "auto": True}
     meta_save(ds, m)
     if B["consistency"] == "check" and m["purpose"] == "character" and not BATCH["stop"]:  # characters only
-        say("7 Tags · consistency check")
+        say("7 Captions · consistency check")
         try:
             msg = S.cc_find(ds, url, model, m.get("trigger") or ds, progress=lambda *a, **k: None)
             import consistency as CC
@@ -1993,7 +1994,7 @@ def _batch_one(ds, url, model, say) -> list[str]:
         except Exception as e:                           # noqa: BLE001
             done.append(f"consistency: not run ({e})")
     if B["launch_script"] and not BATCH["stop"]:
-        say("9 Launch script")
+        say("9 Train")
         for t in m["types"]:
             note = S.auto_script(ds, t)
             done.append("launch script: " + (re.sub(r"[*`]", "", note).strip()[:140] or "not written"))

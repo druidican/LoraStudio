@@ -38,7 +38,7 @@ Click a tile for its **LoRA page**; the *Version* menu at the top switches betwe
 - **Training**: what the version was trained with, in separate fields: the dataset and its repeat folders, epochs and
   how the steps add up, the network and optimizer settings, and the result (training time, final loss, the save point
   to try first). They are read from the LoRA file, its launch script and its logs, once per version; *Read the
-  training again* after you changed the script or the log. *Train a new version…* opens Datasets › 9 Launch script.
+  training again* after you changed the script or the log. *Train a new version…* opens Datasets › 9 Train.
 - **Edit**: display name, character (groups it in Browse), version (shown in ComfyUI's LoRA Manager), clip skip,
   **Your rating** (4-5 good, 1-2 weak, for Insights), trigger words, description, notes, strength and CLIP strength,
   the preview's NSFW level, favorite, and a flag with its reason. Saved in LoRA Manager's format in the dataset's

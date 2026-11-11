@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.111126e"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -1262,7 +1262,7 @@ def build_results(app):
                 rep_file = gr.File(label="The report", visible=False, interactive=False, scale=1)
                 rep_msg = gr.Markdown()
             rep_text = gr.Textbox(visible=False)
-            gr.Markdown("A new version opens Datasets › Edit existing › 9 Launch script for this dataset.",
+            gr.Markdown("A new version opens Datasets › Edit existing › 9 Train for this dataset.",
                         elem_classes=["ls-note"])
             again_msg = gr.Markdown()
             with gr.Accordion("TensorBoard", open=False):

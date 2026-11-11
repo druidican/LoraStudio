@@ -38,7 +38,7 @@ wrong, what it means and what to do, in the queue, the top bar and on the run's 
 | **A model file is missing or broken** | check Settings › Model files, download a broken file again |
 | **The model does not fit this LoRA type** | pick the right base model for the type |
 | **No pictures to train on** | the repeat folder `<N>_<dataset name>` must hold the pictures |
-| **A picture is broken** | Datasets › 2 Usable scan finds it |
+| **A picture is broken** | Datasets › 3 Usable scan finds it |
 | **The GPU could not be used** | Settings › Version › Check this machine |
 | **A program or Python package is missing** | check the venv in Settings › Trainers and GPU |
 | **The trainer does not know an option** | Datasets › 9 › *Check flags against my trainer* |

@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.111126f"  # LoRA Studio version, see version.py
+__version__ = "1.111126h"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -205,8 +205,52 @@ TICKED_JS = ("(x) => [JSON.stringify(Array.from(document.querySelectorAll('#ds_s
              ".map(function(e){ return e.closest('.ds-cell').dataset.p; }))]")
 
 
-# --------------------------------------------------------------------------- 2 Usable scan
-def s2_extra_update(ds):
+# --------------------------------------------------------------------------- 2 Setup: is everything there?
+def setup_ready(types, purpose="character") -> tuple:
+    """(card html, download button update): the model files of the ticked LoRA types and the trainer, and whether
+    Ollama has a picture model (steps 4 and 7). Missing files can download in the background while you go on."""
+    import hfdownload as HD
+    rows, missing = [], False
+    labels = F.type_labels()
+    for t in types or []:
+        lab = esc(labels.get(t, t))
+        if not FT.can_train(t):
+            rows.append(f'<li class="r-bad">✕ {lab}: its trainer is not installed (Settings › Start and network)</li>')
+            continue
+        try:
+            miss = HD.missing(t)
+        except Exception:                                  # noqa: BLE001
+            miss = []
+        if miss:
+            missing = True
+            import sd_settings as SS
+            rows.append(f'<li class="r-warn">⬇ {lab}: missing {esc(", ".join(SS.slot_label(f) for f in miss))}; it '
+                        f'can download while you work on the next steps</li>')
+        else:
+            rows.append(f'<li class="r-ok">✓ {lab}: model files are here</li>')
+    if not types:
+        rows.append('<li>Tick a LoRA type to see whether its model files are here.</li>')
+    if not FT.have("ollama"):
+        rows.append('<li class="r-warn">Ollama is not installed: the sort uses only pass 1, and sentence captions '
+                    'need it</li>')
+    else:
+        try:
+            import ollamactl
+            vis = [m["name"] for m in ollamactl.installed() if m.get("vision")]
+            pick = ollamactl.settings()[1]
+            rows.append(f'<li class="r-ok">✓ Ollama: {esc(pick if pick in vis else vis[0])} reads pictures</li>' if vis else
+                        '<li class="r-warn">Ollama has no model that reads pictures: Settings › AI helpers › Get '
+                        'another model</li>')
+        except Exception:                                  # noqa: BLE001
+            rows.append('<li class="r-warn">Ollama does not answer: start it before the sort (step 4)</li>')
+    if HD.BG["running"]:
+        missing = False                                    # the download is already on its way
+    return (f'<div class="ls-card"><b>Ready for these LoRA types?</b><ul class="ds-ready">{"".join(rows)}</ul></div>',
+            gr.update(visible=missing))
+
+
+# --------------------------------------------------------------------------- 3 Usable scan
+def s3_extra_update(ds):
     """The 'also look outside the repeat folder' checkbox: its label says how many pictures that is."""
     n = len(F.extra_pictures(ds)) if ds else 0
     return gr.update(value=F.include_extra(ds), interactive=bool(n) or F.include_extra(ds),
@@ -215,17 +259,17 @@ def s2_extra_update(ds):
                      "Also look at pictures outside the repeat folder (there are none)")
 
 
-def s2_load(st):
+def s3_load(st):
     ds = st.get("ds")
-    if st.get("view") != "flow" or st.get("step") != 2 or not ds:
+    if st.get("view") != "flow" or st.get("step") != 3 or not ds:
         return gr.update(), gr.update(), gr.update(), gr.update()
     sc = F._load(ds, "scan.json")
     n = len(F.candidates(ds))
     if not sc:
         return (f"**{n} pictures.** Size, sharpness, compression and broken files; no AI, about a second per 10 "
                 "pictures. Skip it when you know the pictures are fine.", "", gr.update(value="Not usable first"),
-                s2_extra_update(ds))
-    return s2_render(ds, sc, "Not usable first") + (gr.update(), s2_extra_update(ds))
+                s3_extra_update(ds))
+    return s3_render(ds, sc, "Not usable first") + (gr.update(), s3_extra_update(ds))
 
 
 def _where(ds, p) -> str:
@@ -240,7 +284,7 @@ def _where(ds, p) -> str:
     return f"from {rel.parts[0]}/ · " if len(rel.parts) > 1 else "from the dataset folder · "
 
 
-def s2_render(ds, sc, show):
+def s3_render(ds, sc, show):
     have = {str(p) for p in F.candidates(ds)}
     pics = {p: e for p, e in sc["pics"].items() if p in have}
     c = {}
@@ -383,7 +427,7 @@ def detail_html(ds, r: dict) -> str:
             + ("".join(rows) or "<p>No suggestions.</p>"))
 
 
-# --------------------------------------------------------------------------- 6 Resize
+# --------------------------------------------------------------------------- 6 Watermarks and size
 MODE_LABEL = {"scale": "Scale down", "none": "Unchanged", "keep": "Keep the original size", "crop": "Crop",
               "upscale": "Upscale (Real-ESRGAN)"}
 
@@ -426,7 +470,7 @@ def s6_html(ds, max_side):
     return sm, table, gr.update(value=label)
 
 
-# --------------------------------------------------------------------------- 7 Tags
+# --------------------------------------------------------------------------- 7 Captions
 def s7_sets_html(ds) -> str:
     sets = F.caption_sets(ds)
     cards = []
@@ -492,7 +536,7 @@ def leave_update(purpose, cur, words=""):
     cur = (cur or "").strip()
     want = defaults.get(purpose, CAP.DEFAULT_LEAVE_OUT)
     if purpose in F.CONCEPT_KINDS and words and cur != words:
-        return gr.update(value=words, label=labels.get(purpose))      # the words you gave in step 3
+        return gr.update(value=words, label=labels.get(purpose))      # the words you gave in Setup
     if cur in ("",) + tuple(v for k, v in defaults.items() if k != purpose):
         return gr.update(value=want, label=labels.get(purpose))
     return gr.update(label=labels.get(purpose))
@@ -547,7 +591,7 @@ def s8_render(ds, show="Problems first"):
     return tree, checks, grid(cells, click=True, elem="s8")
 
 
-# --------------------------------------------------------------------------- 9 Launch script: the calculation
+# --------------------------------------------------------------------------- 9 Train: the calculation
 SETTINGS = [("max_train_epochs", "Epochs", "More passes over the same pictures. Too many steps and the LoRA starts to copy the pictures instead of learning what they share."),
             ("repeats", "Repeats", "Repeats × epochs = views per picture. More repeats with fewer epochs gives the same steps but fewer save points to choose from."),
             ("train_batch_size", "Batch size", "2 halves the steps per epoch and smooths learning, but needs more video memory and a slightly higher learning rate."),
@@ -813,62 +857,67 @@ def build(app, show):
             i_prog = gr.HTML(elem_id="ds_batch")
         i_html = gr.HTML(elem_id="ds_imp")
 
-    # ---- the steps 2..9
+    # ---- the steps 2..9 (2 Setup, 3 Usable scan, ...)
     with gr.Column(visible=False) as p_flow:
         f_bar = gr.HTML(elem_id="ds_barbox")
         f_step = gr.HTML(elem_id="ds_stepbox")
         steps = {}
         with gr.Column(visible=False, elem_id="ds_s2") as steps[2]:
-            gr.Markdown("### Scan for usable pictures (optional)")
-            s2_extra = gr.Checkbox(label="Also look at pictures outside the repeat folder", value=False,
-                                   info="Off: only the repeat folder (<N>_<dataset name>) is the dataset; everything "
-                                        "else is left out of the counts, checks and Improvements. On: the scan, the "
-                                        "sort and the selection also see those pictures, and the ones you keep in step 5 "
-                                        "join the repeat folder. It switches off again when a launch script is saved.")
-            s2_md = gr.Markdown()
-            with gr.Row(elem_classes=["ls-bar"]):
-                s2_skip = gr.Button("Skip", size="sm", scale=0, min_width=100)
-                s2_scan = gr.Button("Scan the pictures", variant="primary", size="sm", scale=0, min_width=170)
-                s2_show = gr.Radio(["Not usable first", "All"], value="Not usable first", show_label=False,
-                                   container=False, scale=0, min_width=260, elem_classes=["ds-seg"])
-            s2_grid = gr.HTML()
-            with gr.Row(elem_classes=["ls-bar"]):
-                s2_move = gr.Button("Move not usable to _reserve", size="sm", scale=0, min_width=230)
-                s2_next = gr.Button("Continue →", variant="primary", size="sm", scale=0, min_width=140)
-            s2_msg = gr.Markdown()
-        with gr.Column(visible=False, elem_id="ds_s3") as steps[3]:
             gr.Markdown("### Set up the dataset")
             with gr.Row(equal_height=False):
                 with gr.Column(scale=3, elem_classes=["ls-card"]):
-                    s3_types = gr.CheckboxGroup(choices=_types, label="LoRA types (one or more)")
+                    s2_types = gr.CheckboxGroup(choices=_types, label="LoRA types (one or more)")
                     gr.Markdown("Several types: sorting uses the strictest size, step 7 writes one caption set per caption "
                                 "style, step 9 one launch script per type.", elem_classes=["ls-note"])
-                    s3_caps = gr.Radio(F.CAPTION_CHOICES, value="auto", visible=False,
+                    s2_caps = gr.Radio(F.CAPTION_CHOICES, value="auto", visible=False,
                                        label="Captions for Anima, FLUX and Chroma: tags, sentences or both",
                                        info="These models read both. Each type's usual style: tags for Anima, sentences "
                                             "for FLUX and Chroma. Both: step 7 writes a tag set and a sentence set, and "
                                             "step 9 lets you pick which one a launch script trains on.")
-                    s3_purpose = gr.Radio(F.PURPOSES, value="character", label="Purpose")
-                    s3_words = gr.Textbox(label=F.CONCEPT_ASK["object"], visible=False,
+                    s2_purpose = gr.Radio(F.PURPOSES, value="character", label="Purpose")
+                    s2_words = gr.Textbox(label=F.CONCEPT_ASK["object"], visible=False,
                                           info="These words go into Never describe in step 7: the captions name the "
                                                "trigger word instead, so it learns what they mean.")
-                    s3_worn = gr.Radio(F.WORN_KINDS, value="jewelry", label="Which kind of worn item", visible=False,
+                    s2_worn = gr.Radio(F.WORN_KINDS, value="jewelry", label="Which kind of worn item", visible=False,
                                        info="Decides which tags step 7 suggests moving to the trigger words (metal and "
                                             "stones; fabric and pattern; material and parts).")
-                    s3_wm = gr.Checkbox(label="Watermarks are already removed",
+                    s2_wm = gr.Checkbox(label="Watermarks are already removed",
                                         info="Unticked: the detailed sort also looks for watermarks, stamps and site names "
                                              "and offers a crop in step 6.")
-                    s3_trig = gr.Textbox(label="Trigger word (first word of every caption)")
-                    s3_class = gr.Textbox(label="Class word (sentence captions)", placeholder="person",
+                    s2_trig = gr.Textbox(label="Trigger word (first word of every caption)")
+                    s2_class = gr.Textbox(label="Class word (sentence captions)", placeholder="person",
                                           info="For a character: what the trigger word is (person, woman, man, robot, "
                                                "cat …). Sentence captions (FLUX, Chroma, Z-Image …) begin \"trigger, a "
                                                "class word, …\": the text encoder then knows what kind of thing the new "
                                                "word means, which helps likeness. Tag captions are not changed.")
                     with gr.Row(elem_classes=["ls-bar", "ds-bottom"]):
-                        s3_next = gr.Button("Continue →", variant="primary", size="sm", scale=0, min_width=160)
-                    s3_msg = gr.Markdown()
+                        s2_next = gr.Button("Continue →", variant="primary", size="sm", scale=0, min_width=160)
+                    s2_msg = gr.Markdown()
                 with gr.Column(scale=2):
-                    s3_pics = gr.HTML()
+                    s2_ready = gr.HTML()
+                    with gr.Row(elem_classes=["ls-bar"]):
+                        s2_dl = gr.Button("⬇ Download the missing model files", size="sm", scale=0, min_width=280,
+                                          visible=False)
+                    s2_dlmsg = gr.Markdown()
+                    s2_pics = gr.HTML()
+        with gr.Column(visible=False, elem_id="ds_s3") as steps[3]:
+            gr.Markdown("### Scan for usable pictures (optional)")
+            s3_extra = gr.Checkbox(label="Also look at pictures outside the repeat folder", value=False,
+                                   info="Off: only the repeat folder (<N>_<dataset name>) is the dataset; everything "
+                                        "else is left out of the counts, checks and Improvements. On: the scan, the "
+                                        "sort and the selection also see those pictures, and the ones you keep in step 5 "
+                                        "join the repeat folder. It switches off again when a launch script is saved.")
+            s3_md = gr.Markdown()
+            with gr.Row(elem_classes=["ls-bar"]):
+                s3_skip = gr.Button("Skip", size="sm", scale=0, min_width=100)
+                s3_scan = gr.Button("Scan the pictures", variant="primary", size="sm", scale=0, min_width=170)
+                s3_show = gr.Radio(["Not usable first", "All"], value="Not usable first", show_label=False,
+                                   container=False, scale=0, min_width=260, elem_classes=["ds-seg"])
+            s3_grid = gr.HTML()
+            with gr.Row(elem_classes=["ls-bar"]):
+                s3_move = gr.Button("Move not usable to _reserve", size="sm", scale=0, min_width=230)
+                s3_next = gr.Button("Continue →", variant="primary", size="sm", scale=0, min_width=140)
+            s3_msg = gr.Markdown()
         with gr.Column(visible=False, elem_id="ds_s4") as steps[4]:
             gr.Markdown("### Sort with Ollama" if FT.have("ollama") else "### Sort")
             gr.Markdown("Pass 1 is quick (no AI): too blurry, too small for your LoRA types, duplicates. Pass 2 looks at "
@@ -1204,9 +1253,9 @@ def build(app, show):
                        show_progress="hidden")
 
     # ---- step loaders
-    def s3_load(s):
-        if s.get("view") != "flow" or s.get("step") != 3 or not s.get("ds"):
-            return [gr.update()] * 9
+    def s2_load(s):
+        if s.get("view") != "flow" or s.get("step") != 2 or not s.get("ds"):
+            return [gr.update()] * 11
         m = F.meta(s["ds"])
         imgs = F.images(s["ds"])
         strip = "".join(f'<img src="{thumb(p, 110)}" alt="">' for p in imgs[:24])
@@ -1217,7 +1266,8 @@ def build(app, show):
                           label=F.CONCEPT_ASK.get(m["purpose"], F.CONCEPT_ASK["object"])),
                 gr.update(value=m.get("worn_kind") or "jewelry", visible=m["purpose"] == "worn"),
                 gr.update(value=m.get("class_word", "person"), visible=DC.base_purpose(m["purpose"]) == "character"),
-                gr.update(value=m.get("caption_choice") or "auto", visible=any(F.can_both(t) for t in m["types"])))
+                gr.update(value=m.get("caption_choice") or "auto", visible=any(F.can_both(t) for t in m["types"]))) \
+            + setup_ready(m["types"], m["purpose"])
 
     def s4_load(s):
         if s.get("view") != "flow" or s.get("step") != 4 or not s.get("ds"):
@@ -1314,13 +1364,11 @@ def build(app, show):
                                                          f"Hugging Face into your models folder.{tok}"))
 
     def s9_dl_fn(s):
-        import hfdownload as HD
         m = F.meta(s["ds"]) if s.get("ds") else {"types": []}
         cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else "")
         if not cur:
-            yield "Pick the LoRA type first."
-            return
-        yield from HD.fetch_missing(cur)
+            return "Pick the LoRA type first."
+        return __import__("hfdownload").start_background([cur])
 
     def s9_queue_vis(s):
         """'Add to the queue' only when the trainer of the type is installed (the script is made either way)."""
@@ -1328,8 +1376,8 @@ def build(app, show):
         cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else "")
         return gr.update(visible=bool(cur) and FT.can_train(cur))
 
-    all_outs = (nav_outs + [n_list] + [e_list, e_head, e_steps] + [i_head, i_html, i_what] + [s2_md, s2_grid, s2_show, s2_extra]
-                + [s3_types, s3_purpose, s3_wm, s3_trig, s3_pics, s3_words, s3_worn, s3_class, s3_caps] + [s4_box, s4_status, s4_detail] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode, s5_dcard, s5_dhtml, s5_dpick]
+    all_outs = (nav_outs + [n_list] + [e_list, e_head, e_steps] + [i_head, i_html, i_what] + [s3_md, s3_grid, s3_show, s3_extra]
+                + [s2_types, s2_purpose, s2_wm, s2_trig, s2_pics, s2_words, s2_worn, s2_class, s2_caps, s2_ready, s2_dl] + [s4_box, s4_status, s4_detail] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode, s5_dcard, s5_dhtml, s5_dpick]
                 + [s6_max, s6_sum, s6_table, s6_go, s6_crop] + [s7_sets, s7_mirror_row, s7_rec, s7_cons, UI["oc"]["leave"]] + [s8_tree, s8_checks, s8_grid, s8_cap2]
                 + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, s9_caps, sync, s9_calc, s9_eff] + s9_vals)
 
@@ -1339,8 +1387,8 @@ def build(app, show):
         out += list(load_edit(s, find))
         out += list(load_imp(s))
         out.append(batch_what() if s.get("view") == "imp" else gr.update())
-        out += list(s2_load(s))
         out += list(s3_load(s))
+        out += list(s2_load(s))
         out += list(s4_load(s))
         out += list(s5_load(s))
         out += list(s6_load(s))
@@ -1588,31 +1636,31 @@ def build(app, show):
                 "blurry or already in the dataset)" if skipped else "") + ". Sort and select again (steps 4 and 5).")
     after_nav(e_add_btn.click(add_pics, [st, e_add_dir, e_add_sub], e_add_msg).then(lambda s: s, st, st))
 
-    # ---- 2 Usable scan
-    def s2_do(s):
+    # ---- 3 Usable scan
+    def s3_do(s):
         ds = s.get("ds")
         sc = F.usable_scan(ds, F.meta(ds)["types"])
-        md, g = s2_render(ds, sc, "Not usable first")
+        md, g = s3_render(ds, sc, "Not usable first")
         return md, g
-    s2_scan.click(s2_do, st, [s2_md, s2_grid])
+    s3_scan.click(s3_do, st, [s3_md, s3_grid])
 
-    def s2_extra_fn(s, on):
+    def s3_extra_fn(s, on):
         ds = s.get("ds")
         if not ds:
             return gr.update(), gr.update(), gr.update()
         F.set_include_extra(ds, on)
         sc = F._load(ds, "scan.json")
         if sc:
-            md, g = s2_render(ds, sc, "Not usable first")
+            md, g = s3_render(ds, sc, "Not usable first")
         else:
             md, g = (f"**{len(F.candidates(ds))} pictures.** Press **Scan the pictures**.", "")
         note = (" Scan again to check the pictures from outside the repeat folder." if on and sc else "")
         return md + (f'<div class="ls-note">{note}</div>' if note else ""), g, s
-    s2_extra.input(s2_extra_fn, [st, s2_extra], [s2_md, s2_grid, st])
-    s2_show.change(lambda s, v: s2_render(s["ds"], F._load(s["ds"], "scan.json"), v) if s.get("ds") and F._load(s["ds"], "scan.json")
-                   else (gr.update(), gr.update()), [st, s2_show], [s2_md, s2_grid])
+    s3_extra.input(s3_extra_fn, [st, s3_extra], [s3_md, s3_grid, st])
+    s3_show.change(lambda s, v: s3_render(s["ds"], F._load(s["ds"], "scan.json"), v) if s.get("ds") and F._load(s["ds"], "scan.json")
+                   else (gr.update(), gr.update()), [st, s3_show], [s3_md, s3_grid])
 
-    def s2_move_fn(s):
+    def s3_move_fn(s):
         sc = F._load(s["ds"], "scan.json")
         if not sc:
             return "Scan first."
@@ -1622,15 +1670,15 @@ def build(app, show):
             return "Nothing to move (only pictures in the repeat folder are moved)."
         n, err = F.move_to_reserve(s["ds"], bad)
         return f"✔ {n} moved to `_reserve/`." + (f" {'; '.join(err[:3])}" if err else "")
-    s2_move.click(s2_move_fn, st, s2_msg).then(s2_do, st, [s2_md, s2_grid])
-    for b in (s2_next, s2_skip):
-        after_nav(b.click(lambda s: go(s, step=3), st, st))
+    s3_move.click(s3_move_fn, st, s3_msg).then(s3_do, st, [s3_md, s3_grid])
+    for b in (s3_next, s3_skip):
+        after_nav(b.click(lambda s: go(s, step=4), st, st))
 
-    # ---- 3 Setup
-    def s3_save(s, types, purpose, wm, trig, words, worn="jewelry", cls="person", caps="auto"):
+    # ---- 2 Setup
+    def s2_save(s, types, purpose, wm, trig, words, worn="jewelry", cls="person", caps="auto"):
         m = F.meta(s["ds"])
         # what you picked is kept even when something is still missing: the page is drawn again after Continue,
-        # and without this it went back to the saved purpose (and hid the words field), so step 3 just repeated
+        # and without this it went back to the saved purpose (and hid the words field), so the Setup step just repeated
         if types:
             m["types"] = list(types)
         m.update(purpose=purpose or "character", wm_removed=bool(wm), trigger=(trig or s["ds"]).strip(),
@@ -1649,20 +1697,21 @@ def build(app, show):
                        "press Continue again: the captions leave these words out, so the LoRA learns them.")
         m["steps"]["setup"] = {"at": time.strftime("%Y-%m-%d %H:%M")}
         F.meta_save(s["ds"], m)
-        return go(s, step=4, tkey=types[0]), ""
-    after_nav(s3_next.click(s3_save, [st, s3_types, s3_purpose, s3_wm, s3_trig, s3_words, s3_worn, s3_class, s3_caps], [st, s3_msg]))
-    s3_types.change(lambda ts: gr.update(visible=any(F.can_both(t) for t in ts or [])), s3_types, s3_caps,
-                    show_progress="hidden")
-    s3_purpose.change(lambda p: (gr.update(visible=p in F.CONCEPT_KINDS, label=F.CONCEPT_ASK.get(p, F.CONCEPT_ASK["object"])),
+        return go(s, step=3, tkey=types[0]), ""
+    after_nav(s2_next.click(s2_save, [st, s2_types, s2_purpose, s2_wm, s2_trig, s2_words, s2_worn, s2_class, s2_caps], [st, s2_msg]))
+    s2_types.input(lambda ts, pu: (gr.update(visible=any(F.can_both(t) for t in ts or [])),) + setup_ready(ts, pu),
+                   [s2_types, s2_purpose], [s2_caps, s2_ready, s2_dl], show_progress="hidden")
+    s2_dl.click(lambda ts: __import__("hfdownload").start_background(ts), s2_types, s2_dlmsg)
+    s2_purpose.change(lambda p: (gr.update(visible=p in F.CONCEPT_KINDS, label=F.CONCEPT_ASK.get(p, F.CONCEPT_ASK["object"])),
                                  gr.update(visible=p == "worn"), gr.update(visible=DC.base_purpose(p or "") == "character")),
-                      s3_purpose, [s3_words, s3_worn, s3_class], show_progress="hidden")
+                      s2_purpose, [s2_words, s2_worn, s2_class], show_progress="hidden")
 
     # ---- 4 Sort
     def s4_run(s):
         ds = s.get("ds")
         m = F.meta(ds)
         if not m["types"]:
-            yield "Set the LoRA type first (step 3).", gr.update()
+            yield "Set the LoRA type first (step 2, Setup).", gr.update()
             return
         url, model = S.oc_settings()
         for line in F.sort_run(ds, m["types"], m["purpose"], m["wm_removed"], url, model):
@@ -1722,7 +1771,7 @@ def build(app, show):
     s5_dgo.click(s5_detail_do, [st, s5_dpick, s5_keep], [s5_dmsg, s5_mix, s5_gridh, s5_dhtml, s5_dpick])
     s5_dstop.click(lambda: F.STOP.set(), None, None, queue=False)
 
-    # ---- 6 Resize
+    # ---- 6 Watermarks and size
     def s6_refresh(s, ms):
         return s6_html(s["ds"], ms)
     s6_max.submit(s6_refresh, [st, s6_max], [s6_sum, s6_table, s6_go])
@@ -1815,7 +1864,7 @@ def build(app, show):
             yield s, line
     after_nav(s6_go.click(s6_go_fn, [st, s6_max], [st, s6_msg]))
 
-    # ---- 7 Tags: the first set with sdgui's caption writer settings, the others with dsflow
+    # ---- 7 Captions: the first set with sdgui's caption writer settings, the others with dsflow
     oc = UI["oc"]
 
     def write_all(s, url, model, trig, leave, length, detail, only_missing=False):
@@ -1890,16 +1939,24 @@ def build(app, show):
         return go(s, step=9)
     after_nav(s8_next.click(s8_done, st, st))
 
-    # ---- 9 Launch script
+    # ---- 9 Train
     def s9_pick(s, t):
         return go(s, tkey=t)
     fn, ins, outs = UI["cs_retype"]
     s9_type.input(s9_pick, [st, s9_type], st).then(sync_key, st, sync).then(s9_queue_vis, st, UI["cs_queue_btn"]) \
         .then(s9_dl_vis, st, [s9_dl_row, s9_dl_note]).then(lambda: "", None, s9_dl_md).then(s9_caps_vis, st, s9_caps)
     s9_caps.input(s9_caps_pick, [st, s9_caps, UI["cs_text"]], UI["cs_text"])
-    _mfn, _mins, _mouts = UI["cs_models"]
-    s9_dl_btn.click(s9_dl_fn, st, s9_dl_md, concurrency_id="hfdl", concurrency_limit=1) \
-        .then(s9_dl_vis, st, [s9_dl_row, s9_dl_note]).then(_mfn, _mins, _mouts)
+    s9_dl_btn.click(s9_dl_fn, st, s9_dl_md)
+
+    def dl_tick(prev):
+        """The background download's line, shown in steps 2 and 9."""
+        import hfdownload as HD
+        t = HD.bg_text()
+        if t == prev:
+            return gr.update(), gr.update(), prev
+        return t, t, t
+    dl_last = gr.State("")
+    ticker.timer(2.0, dl_tick, dl_last, [s2_dlmsg, s9_dl_md, dl_last], show_progress="hidden")
     s9_dl_stop.click(lambda: __import__("hfdownload").STOP.set(), None, None, queue=False)
     # one at a time, in the order they were asked for: a slower one for the type before must not land last
     UI["cs_text"].change(s9_calc_fn, [st, UI["cs_text"]], [s9_calc, s9_eff] + s9_vals, show_progress="hidden",
