@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.111126e"  # LoRA Studio version, see version.py
+__version__ = "1.111126f"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -296,8 +296,6 @@ def main():
                 ll.build_library_ui(app, detach_settings=True)
             with gr.Tab("Datasets", id="datasets") as t_ds:
                 import datasets_ui
-                with gr.Column(visible=False):
-                    show("prepare")             # shared controls of the steps and the full picture check (hidden)
                 DS = datasets_ui.build(app, show)
             with gr.Tab("Training", id="training"):
                 import training_ui

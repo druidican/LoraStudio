@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.111126e"  # LoRA Studio version, see version.py
+__version__ = "1.111126f"  # LoRA Studio version, see version.py
 import atexit
 import codecs
 import contextlib
@@ -153,14 +153,6 @@ CSS = ('#wm_tool {display:none !important;} '
        '#cc_html .cc-oddtxt {display: flex; flex-direction: column; gap: 3px; font-size: .82rem; min-width: 0;} '
        '#cc_html .cc-name {font-weight: 600; word-break: break-all;} '
        '#cc_view {position: sticky; top: 8px; align-self: flex-start;} '
-       '#dc_html .dctable {width: 100%; border-collapse: collapse;} '
-       '#dc_html .dctable td {vertical-align: top; padding: 6px;} '
-       '#dc_html .dctable tr {border-bottom: 1px solid var(--border-color-primary);} '
-       '#dc_html img {width: 120px; height: 120px; object-fit: cover; border-radius: 6px;} '
-       '#dc_html ul {margin: 4px 0 0 18px; padding: 0;} #dc_html li {font-size: .88rem;} '
-       '#dc_html li.dcbad {color: #f07c6a;} #dc_html li.dcwarn {color: #d9a23d;} '
-       '#dc_html .dctag {margin-left: 8px; padding: 1px 8px; border-radius: 10px; font-size: .75rem; color: #fff;} '
-       '#dc_html .dctag-bad {background: #b03a2e;} #dc_html .dctag-warn {background: #a07012;} '
        '#oc_ex .ocex {padding: 8px 12px; border-radius: 8px; background: rgba(128,128,128,.10);} '
        '#oc_ex .ochead {font-size: .82rem; opacity: .85; margin-bottom: 4px;} '
        '#oc_ex .octext {font-family: var(--font-mono, monospace); font-size: .9rem; line-height: 1.45;} '
@@ -1813,12 +1805,7 @@ from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other 
     cc_leave_out,
     cc_open,
     cc_render,
-    cc_state,
     cc_stop,
-    dc_back,
-    dc_run,
-    dc_set_aside,
-    dc_stop,
     oc_apply_recommendation,
     oc_example,
     oc_images,
@@ -1869,7 +1856,6 @@ from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other
     rp_name_update,
     rp_refresh,
     rp_rename,
-    scan_short,
     set_arg,
     settings_models,
     settings_path,
@@ -2004,7 +1990,6 @@ except Exception:                           # noqa: BLE001
     CC = None
 
 
-
 def script_saved_hook(ds) -> str:
     """After a new launch script: dsflow moves other repeat folders to _extra/ and ends 'look outside the repeat
     folder' (Datasets › 2). Returns its note ('' when there is nothing to say)."""
@@ -2077,51 +2062,6 @@ def _marks_counts(ds) -> tuple[int, int]:
         return 0, 0
     found = [e for e in marks.values() if e.get("marks")]
     return len(found), sum(1 for e in found if not e.get("choice"))
-
-
-def _row_state(label, state, text, ok):
-    chip = (f'<span class="pp-chip pp-ok">{state}</span>' if ok else f'<span class="pp-chip pp-todo">{state}</span>')
-    return f'<div class="pp-row"><span class="pp-name">{label}</span>{chip}<span class="pp-text">{html.escape(text)}</span></div>'
-
-
-def pp_status(ds, tkey):
-    """The four preparation steps of a dataset with their state (Datasets > Prepare)."""
-    if not ds:
-        return '<div class="pp-box"><p class="pp-empty">Pick a dataset above to see its five steps.</p></div>'
-    imgs = oc_images(ds)
-    n = len(imgs)
-    if not n:
-        return ('<div class="pp-box"><p class="pp-empty">No pictures in this dataset yet. Put them in its folder '
-                f'(<code>{html.escape(str(lora_path(ds)))}</code>), then pick it again.</p></div>')
-    checked = _checked_count(imgs)
-    found, pending = _marks_counts(ds)
-    caps = sum(1 for im in imgs if read_caption(im))
-    rows = folder_rows(ds)
-    try:
-        rec = recommended_repeats(ds, tkey, 0) if tkey else None
-    except Exception:                       # noqa: BLE001
-        rec = None
-    if len(rows) == 1:
-        f, r, _ = rows[0]
-        rep_txt = f"{f.name}" + (f" · recommended {rec}" if rec else "")
-        rep_ok = r is not None and (rec is None or r == rec)
-    else:
-        rep_txt, rep_ok = f"{len(rows)} repeat folders", True
-    out = [_row_state("1 Check pictures", "done" if checked >= n else ("partly" if checked else "to do"),
-                      f"{checked} of {n} checked", checked >= n),
-           _row_state("2 Watermarks", ("decide" if pending else ("done" if found else "none found")) if checked else "after the check",
-                      f"{found} with watermarks, {pending} undecided" if found else
-                      ("no watermarks or stamps found" if checked else "found by the content check"),
-                      checked > 0 and not pending),
-           _row_state("3 Repeats", "done" if rep_ok else "to do", rep_txt, rep_ok),
-           _row_state("4 Captions", "done" if caps >= n else "to do", f"{caps} of {n} have a caption", caps >= n)]
-    if CC is not None:
-        st, txt = cc_state(ds)
-        out.append(_row_state("5 Consistency", st or "-", txt or "", st == "done") if caps else
-                   _row_state("5 Consistency", "after captions", "checks the captions against each other", False))
-    nxt = ("Next: write the launch script" if (caps >= n and rep_ok and not pending) else "")
-    return ('<div class="pp-box">' + "".join(out)
-            + (f'<p class="pp-next">✓ Ready. {nxt} (Training › Launch script).</p>' if nxt else "") + "</div>")
 
 
 RUN_LOG_RE = re.compile(r"^(\d{8})_(\d{6})_(.+)\.log$")
@@ -2449,7 +2389,6 @@ def build_ui(parent):
                     cs_purpose = gr.Dropdown(choices=_purposes, value="character", label="Purpose", scale=2)
                     cs_priority = gr.Dropdown(choices=[("Balanced", "balanced"), ("Best quality", "quality"),
                                                        ("Fastest", "fast")], value="balanced", label="Priority", scale=2)
-                    cs_refresh = gr.Button("Scan library", scale=1, visible=False)
                 cs_status = gr.Markdown("")
             with sub("s9_opts"):
                 with gr.Row():
@@ -2507,35 +2446,7 @@ def build_ui(parent):
 
         # ================================================================ Datasets > Prepare
         # The Datasets flow (datasets_ui.py) places these parts in its steps: p_wm in 6 Resize, p_caption and
-        # p_cons in 7 Tags, p_repeat and the launch script page in 9 Launch script. "prepare" holds the shared
-        # controls and the full picture check; LoRA Studio keeps it hidden.
-        with page("prepare", "Prepare"):
-            with gr.Row():
-                pp_ds = gr.Dropdown(choices=list_lora_dirs(), value=None, label="Dataset", scale=3)
-                pp_type = gr.Dropdown(choices=_types, value=_types[0][1] if _types else None,
-                                      label="LoRA type", scale=3)
-                pp_purpose = gr.Dropdown(choices=_purposes, value="character", label="Purpose", scale=2)
-            pp_html = gr.HTML(pp_status(None, None), elem_id="pp_html")
-            with gr.Accordion("1 · Check pictures: quality, content and balance", open=True):
-                gr.Markdown("Finds pictures that are **not recommended** for training and says why. **Technical** "
-                            "(no AI, seconds): too small for the LoRA type, blurry, near-duplicates, extreme crops, heavy "
-                            "JPEG compression. **Content** (the Ollama model from Settings › AI helpers, a few seconds per "
-                            "picture, remembered): subject visible and in focus, number of people, face hidden, text / "
-                            "watermark, filters, collages and screenshots. **Balance**: framing, outfits and places that "
-                            "repeat too much. The rules follow the *Purpose* above.")
-                with gr.Row():
-                    dc_checks = gr.CheckboxGroup(choices=[("Technical", "technical"), ("Content (Ollama)", "content"),
-                                                          ("Balance (Ollama)", "balance")],
-                                                 value=["technical", "content", "balance"], label="Checks", scale=3)
-                    dc_btn = gr.Button("Check pictures", variant="primary", size="sm", scale=1, min_width=140)
-                    dc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=70)
-                dc_sum = gr.Markdown("")
-                dc_html = gr.HTML("", elem_id="dc_html")
-                dc_pick = gr.CheckboxGroup(choices=[], value=[], label="Pictures to set aside (not recommended ones are ticked)")
-                with gr.Row(elem_classes=["ls-bar"]):
-                    dc_aside_btn = gr.Button("Move ticked to _set_aside", variant="stop", size="sm", scale=1)
-                    dc_back_btn = gr.Button("Move all back", size="sm", scale=1)
-                dc_msg = gr.Markdown("")
+        # p_cons in 7 Tags, p_repeat and the launch script page in 9 Launch script.
         with page("p_wm", "Watermarks"):
             gr.Markdown("Pictures where the sort found marks **added on top** of the picture (watermarks, site "
                         "names, logo stamps, signatures, date stamps): remove them (picture tools), crop them off, set "
@@ -2813,9 +2724,6 @@ def build_ui(parent):
             hf_msg = gr.Markdown("")
 
         # ================================================================ events
-        def pp_after(ev):
-            return ev.then(pp_status, [cs_ds, cs_type], pp_html)
-
 
         def rn_save(wd, venv, trace, sd, mu):
             msg, raw = runner_save(wd, venv, trace, sd, mu)
@@ -2870,26 +2778,24 @@ def build_ui(parent):
             v = v if v in ch else None
             return gr.update(choices=ch, value=v), gr.update(choices=ch, value=v)
 
-        def ds_chain(ev):
-            """Everything that follows a new dataset (on either page)."""
-            ev = ev.then(cs_ds_change, [cs_ds, cs_type, cs_steps, cs_userep, cs_hfauto, cs_samples], cs_outs) \
-                   .then(rp_refresh, rp_in, rp_outs).then(wm_render, cs_ds, [wm_sum, wm_html]) \
-                   .then(cc_render, cs_ds, [cc_sum, cc_html]) \
-                   .then(lambda ds: gr.update(value=ds or ""), cs_ds, oc_trigger) \
-                   .then(lambda t: gr.update(value=t), cs_type, pp_type)
-            return pp_after(mvis(ev))
+        n_model, at_model = len(model_fields), 3 + len(cs_fields) - len(model_fields)   # where cs_outs holds them
 
-        def type_chain(ev):
-            ev = ev.then(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs) \
-                   .then(wm_render, cs_ds, [wm_sum, wm_html])
-            return pp_after(mvis(ev))
+        def ds_all(ds, tkey, steps, use_rep, hf_auto, samples):
+            """Everything that follows a new dataset, in ONE event (it was a chain of six, each costing the browser
+            about a second on a big page): the launch script page, the repeat folder, watermarks, consistency, and
+            which model file fields show."""
+            cs = list(cs_ds_change(ds, tkey, steps, use_rep, hf_auto, samples))
+            t = cs[1].get("value", tkey) if isinstance(cs[1], dict) else (cs[1] or tkey)
+            vals = [(v.get("value") if isinstance(v, dict) else v) for v in cs[at_model:at_model + n_model]]
+            for i, vis in enumerate(model_vis(t, *vals)):
+                v = cs[at_model + i]
+                cs[at_model + i] = {**v, "visible": vis["visible"]} if isinstance(v, dict) else gr.update(value=v, visible=vis["visible"])
+            return cs + list(rp_refresh(ds, tkey, steps)) + list(wm_render(ds)) + list(cc_render(ds))
 
-        ds_chain(cs_ds.input(lambda v: v, cs_ds, pp_ds))
-        ds_chain(pp_ds.input(lambda v: v, pp_ds, cs_ds))
-        type_chain(cs_type.input(lambda v: v, cs_type, pp_type))
-        type_chain(pp_type.input(lambda v: v, pp_type, cs_type))
-        UI.update(ds_chain=ds_chain, ds_both=ds_both, cs_ds=cs_ds, pp_ds=pp_ds, cs_type=cs_type,
-                  pp_type=pp_type, cs_purpose=cs_purpose, pp_purpose=pp_purpose, cs_retype=(cs_retype, cs_ret, cs_outs),
+        UI.update(ds_all=(ds_all, [cs_steps, cs_userep, cs_hfauto, cs_samples],
+                          cs_outs + rp_outs + [wm_sum, wm_html, cc_sum, cc_html]),
+                  ds_both=ds_both, cs_ds=cs_ds, cs_type=cs_type,
+                  cs_purpose=cs_purpose, cs_retype=(cs_retype, cs_ret, cs_outs),
                   rp_refresh=(rp_refresh, rp_in, rp_outs), wm=(wm_render, [wm_sum, wm_html]),
                   cc=(cc_render, [cc_sum, cc_html]), oc=dict(trigger=oc_trigger, leave=oc_leave, style=oc_style,
                   length=oc_length, detail=oc_detail, url=oc_url, model=oc_model, out=oc_out, run=oc_run_btn),
@@ -2901,20 +2807,17 @@ def build_ui(parent):
         mvis(cs_script.input(cs_script_change, cs_ctl, cs_outs))
         cs_steps.submit(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs)
 
-        def purpose_chain(ev):
-            return ev.then(set_choice, [cs_purpose, cs_priority], None).then(cs_retype, cs_ret, cs_outs) \
+        for _c in (cs_purpose, cs_priority):
+            _c.input(set_choice, [cs_purpose, cs_priority], None).then(cs_retype, cs_ret, cs_outs) \
                 .then(lambda: recs_status(), None, cs_recs_md).then(rp_refresh, rp_in, rp_outs)
-        purpose_chain(cs_purpose.input(lambda v: v, cs_purpose, pp_purpose))
-        purpose_chain(pp_purpose.input(lambda v: v, pp_purpose, cs_purpose))
-        purpose_chain(cs_priority.input(lambda: None, None, None))
         cs_export_btn.click(export_report, None, [cs_export_file, cs_status])
         cs_userep.input(cs_retype, cs_ret, cs_outs)
         cs_hfauto.input(cs_retype, cs_ret, cs_outs)
-        pp_after(rp_make_btn.click(rp_make, [cs_ds, cs_type, cs_text, cs_plan], rp_msg).then(rp_refresh, rp_in, rp_outs))
+        (rp_make_btn.click(rp_make, [cs_ds, cs_type, cs_text, cs_plan], rp_msg).then(rp_refresh, rp_in, rp_outs))
         cs_suggest_btn.click(cs_suggest, cs_ctl, cs_outs).then(rp_refresh, rp_in, rp_outs)
         rp_folder.input(rp_name_update, [cs_ds, rp_folder, rp_repeats], rp_newname)
         rp_repeats.input(rp_name_update, [cs_ds, rp_folder, rp_repeats], rp_newname)
-        pp_after(rp_btn.click(rp_rename, [cs_ds, rp_folder, rp_newname, rp_confirm], [rp_msg, cs_userep])
+        (rp_btn.click(rp_rename, [cs_ds, rp_folder, rp_newname, rp_confirm], [rp_msg, cs_userep])
                  .then(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs))
         ai_outs = [ai_html, ai_msg, oc_model, ai_rm]
         oc_find_btn.click(ai_test, oc_url, [oc_find_md] + ai_outs)
@@ -2940,15 +2843,13 @@ def build_ui(parent):
         cs_purpose.change(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
         oc_rec_btn.click(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
         demo.load(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
-        pp_after(oc_run_evt.then(cs_retype, cs_ret, cs_outs))              # the analysis re-reads the new captions
+        (oc_run_evt.then(cs_retype, cs_ret, cs_outs))              # the analysis re-reads the new captions
         oc_stop_btn.click(oc_stop, None, oc_out)
-        pp_after(dc_btn.click(dc_run, [cs_ds, cs_type, cs_purpose, dc_checks, oc_url, oc_model], [dc_sum, dc_html, dc_pick])
-                 .then(wm_render, cs_ds, [wm_sum, wm_html]))
         WM_JS = ("(ds, x) => { var o = {}; document.querySelectorAll('#wm_html .wm-row').forEach(function(r){ "
                  "var s = r.querySelector('.wm-opt.sel'); if (s) o[r.dataset.p] = s.dataset.c; }); return [ds, JSON.stringify(o)]; }")
-        pp_after(wm_apply_btn.click(wm_apply_live, [cs_ds, wm_box], wm_msg, js=WM_JS).then(wm_render, cs_ds, [wm_sum, wm_html])
+        (wm_apply_btn.click(wm_apply_live, [cs_ds, wm_box], wm_msg, js=WM_JS).then(wm_render, cs_ds, [wm_sum, wm_html])
                  .then(cs_retype, cs_ret, cs_outs))
-        pp_after(wm_reco_btn.click(lambda ds: (yield from wm_apply_live(ds, "", only_pending=True)), cs_ds, wm_msg)
+        (wm_reco_btn.click(lambda ds: (yield from wm_apply_live(ds, "", only_pending=True)), cs_ds, wm_msg)
                  .then(wm_render, cs_ds, [wm_sum, wm_html]).then(cs_retype, cs_ret, cs_outs))
         wm_p_outs = [wm_panel, wm_ptitle, wm_paint_col, wm_crop_col, wm_editor, wm_cimg, wm_l, wm_r, wm_t, wm_b,
                      wm_paint_go, wm_crop_go, wm_rel, wm_pmsg, wm_cres]
@@ -2958,30 +2859,25 @@ def build_ui(parent):
         for c_ in (wm_l, wm_r, wm_t, wm_b):
             c_.release(wm_crop_show, wm_cin, [wm_cimg, wm_cres], show_progress="hidden")
         wm_aspect.change(wm_crop_show, wm_cin, [wm_cimg, wm_cres], show_progress="hidden")
-        pp_after(wm_paint_go.click(lambda: "⏳ The picture tools fill in what you painted …", None, wm_pmsg)
+        (wm_paint_go.click(lambda: "⏳ The picture tools fill in what you painted …", None, wm_pmsg)
                  .then(wm_paint_apply, [cs_ds, wm_rel, wm_editor], [wm_msg, wm_panel])
                  .then(wm_render, cs_ds, [wm_sum, wm_html]))
-        pp_after(wm_crop_go.click(wm_crop_apply, wm_cin, [wm_msg, wm_panel])
+        (wm_crop_go.click(wm_crop_apply, wm_cin, [wm_msg, wm_panel])
                  .then(wm_render, cs_ds, [wm_sum, wm_html]))
-        dc_stop_btn.click(dc_stop, None, dc_msg)
-        pp_after(cc_btn.click(cc_find, [cs_ds, oc_url, oc_model, oc_trigger], [cc_sum, cc_html]))
+        (cc_btn.click(cc_find, [cs_ds, oc_url, oc_model, oc_trigger], [cc_sum, cc_html]))
         cc_stop_btn.click(cc_stop, None, cc_msg, queue=False)
-        pp_after(cc_apply_btn.click(cc_apply, [cs_ds, cc_box, oc_url, oc_model, oc_trigger, cc_confirm], [cc_msg, cc_confirm],
+        (cc_apply_btn.click(cc_apply, [cs_ds, cc_box, oc_url, oc_model, oc_trigger, cc_confirm], [cc_msg, cc_confirm],
                                     js=CC_JS)
                  .then(cc_render, cs_ds, [cc_sum, cc_html]).then(cc_leave_out, [cs_ds, oc_leave], oc_leave)
                  .then(cs_retype, cs_ret, cs_outs))
         cc_box.change(cc_open, cc_box, [cc_img, cc_cap])
-        pp_after(dc_aside_btn.click(dc_set_aside, [cs_ds, dc_pick], dc_msg).then(cs_retype, cs_ret, cs_outs)
-                 .then(wm_render, cs_ds, [wm_sum, wm_html]))
-        pp_after(dc_back_btn.click(dc_back, cs_ds, dc_msg).then(cs_retype, cs_ret, cs_outs)
-                 .then(wm_render, cs_ds, [wm_sum, wm_html]))
-        pp_after(oc_undo_btn.click(rv_undo, None, oc_out).then(cs_retype, cs_ret, cs_outs))
+        (oc_undo_btn.click(rv_undo, None, oc_out).then(cs_retype, cs_ret, cs_outs))
         rp_epochs_btn.click(cs_set_epochs, [cs_ds, cs_type, cs_script, cs_text, cs_plan, cs_steps], cs_outs)
         cs_hf_show.input(lambda show: gr.update(type="text" if show else "password"), cs_hf_show, cs_hf_tok)
         cs_hf_reload.click(lambda: (read_hf_token(), hf_status_text()), None, [cs_hf_tok, hf_md])
         hf_save_btn.click(save_hf_token, hf_new, [hf_msg, cs_hf_tok, hf_md]).then(lambda: "", None, hf_new)
         cs_hf_fill.click(cs_fill_hf, [cs_text, cs_plan], cs_outs)
-        # the form and the text follow each other, without buttons
+        # the form and the text follow each other, without buttons (.change: step 9 also writes the text)
         for fld, (fname, _) in zip(cs_fields, FORM_FIELDS):
             if fname not in STUDIO_TABLE:
                 fld.blur(cs_apply_quiet, [cs_ds, cs_type, cs_script, cs_text, cs_plan] + cs_fields, cs_outs,
@@ -2989,14 +2885,13 @@ def build_ui(parent):
         cs_text.change(cs_read, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs, show_progress="hidden")
         cs_models_btn.click(cs_use_settings, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs)
         cs_check_btn.click(cs_check, cs_text, cs_check_out)
-        pp_after(cs_save_over_btn.click(cs_save_over, [cs_ds, cs_script, cs_text, cs_type, cs_plan, cs_makedirs], cs_status)
+        (cs_save_over_btn.click(cs_save_over, [cs_ds, cs_script, cs_text, cs_type, cs_plan, cs_makedirs], cs_status)
                  .then(lambda s: s, cs_status, cs_save_msg).then(rp_refresh, rp_in, rp_outs))
-        pp_after(cs_save_new_btn.click(lambda *a: cs_save_new(*a)[:-1], [cs_ds, cs_newname, cs_text, cs_prompts_path,
+        (cs_save_new_btn.click(lambda *a: cs_save_new(*a)[:-1], [cs_ds, cs_newname, cs_text, cs_prompts_path,
                                                                         cs_prompts_text, cs_type, cs_script, cs_plan,
                                                                         cs_makedirs], cs_outs)
                  .then(lambda s: s, cs_status, cs_save_msg)
                  .then(rp_refresh, rp_in, rp_outs))
-        cs_refresh.click(scan_short, cs_ds, [cs_ds, cs_status]).then(lambda v: ds_both(v)[1], cs_ds, pp_ds)
         demo.load(model_vis, [cs_type] + model_fields, model_fields)
 
         # ---- model files settings
@@ -3026,12 +2921,10 @@ def build_ui(parent):
                 _ev(st_files_changed, st_dl_vis_in + sug_in, st_dl_vis_out + [st_sug_md, st_sug_picks],
                     show_progress="hidden")
         sub_outs = [sub_msg, st_type, cs_type, sub_rm, sub_md, st_raw_box]
-        pp_types = lambda ev: ev.then(lambda t: gr.update(choices=type_choices(), value=t), cs_type, pp_type)
-        pp_types(_stv(sub_add_btn.click(sub_add, [sub_name, sub_base, sub_tag], sub_outs)
-                      .then(st_load, [st_type, st_rec], st_outs)))
-        pp_types(_stv(sub_rm_btn.click(sub_remove, [sub_rm, sub_confirm, st_type, cs_type], sub_outs)
-                      .then(lambda: False, None, sub_confirm).then(st_load, [st_type, st_rec], st_outs)))
-        pp_types(_stv(st_reload.click(sub_reload, None, sub_outs).then(st_load, [st_type, st_rec], st_outs)))
+        _stv(sub_add_btn.click(sub_add, [sub_name, sub_base, sub_tag], sub_outs).then(st_load, [st_type, st_rec], st_outs))
+        _stv(sub_rm_btn.click(sub_remove, [sub_rm, sub_confirm, st_type, cs_type], sub_outs)
+             .then(lambda: False, None, sub_confirm).then(st_load, [st_type, st_rec], st_outs))
+        _stv(st_reload.click(sub_reload, None, sub_outs).then(st_load, [st_type, st_rec], st_outs))
         st_save_btn.click(st_save, [st_type, st_flags] + st_dirs + st_files, [st_msg, st_raw_box])
         st_type.input(lambda: "", None, st_online_md)
         st_sug_rescan.click(st_suggest, sug_in, [st_sug_md, st_sug_picks])

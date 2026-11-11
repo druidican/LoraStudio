@@ -5,10 +5,9 @@ and the GPU / GFX values.
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.111126e"  # LoRA Studio version, see version.py
+__version__ = "1.111126f"  # LoRA Studio version, see version.py
 
 import glob
-import json
 import math
 import os
 import re
@@ -52,7 +51,6 @@ def hf_status_text() -> str:
     if tok:
         return f"**HF token:** `{mask_token(tok)}` (from {HF_FILE})"
     return f"**HF token:** not set. Put it in `{hf_path()}`"
-
 
 
 def get_export(text: str, name: str):
@@ -100,83 +98,6 @@ def cs_fill_hf(text, plan):
     return S._cs_result(text=new, plan=plan,
                       status="`HF_TOKEN` set in the script text (not saved yet)." if changed
                       else "`HF_TOKEN` already matches huggingtoken.txt.")
-
-
-# --------------------------------------------------------------------------- library scan
-KNOWN_LIBS = S.CACHE_DIR / "known_libraries.json"
-
-
-def scan_library(cur_cs, cur_rv):
-    img = S.images_dir()
-    if not img.is_dir():
-        return gr.update(), gr.update(), f"`{img}` does not exist.", gr.update()
-    try:
-        known = set(json.loads(KNOWN_LIBS.read_text()))
-    except Exception:
-        known = None
-    names = S.list_lora_dirs()
-    rows, new = [], []
-    for name in names:
-        fr = S.repeat_folders(S.lora_path(name))
-        imgs = capt = 0
-        for f, _ in fr:
-            for im in S.list_images(f):
-                imgs += 1
-                capt += bool(S.read_caption(im))
-        reps = sorted({r for _, r in fr if r})
-        loose = [f for f, r in fr if r is None]
-        nscr = len(S.launch_scripts(name))
-        notes = []
-        if known is not None and name not in known:
-            new.append(name)
-            notes.append("**NEW**")
-        if not imgs:
-            notes.append("no images")
-        elif not reps:
-            notes.append("no `N_name` repeat folder: sd-scripts would ignore the images")
-        elif loose:
-            notes.append("some images are outside repeat folders")
-        if imgs and capt < imgs:
-            notes.append(f"{imgs - capt} without caption")
-        if imgs and not nscr:
-            notes.append("no launch script yet")
-        rows.append(f"| {name} | {imgs} | {capt} | {', '.join(str(r) for r in reps) or '-'} | {nscr} | {'; '.join(notes) or 'ready'} |")
-    gone = sorted(known - set(names)) if known else []
-    try:
-        S.CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        KNOWN_LIBS.write_text(json.dumps(names))
-    except OSError:
-        pass
-    if known is None:
-        head = f"**First scan:** {len(names)} image libraries in `{img}`. They are remembered, so the next scan can point out new ones."
-    elif new:
-        head = f"**{len(new)} new image librar{'y' if len(new) == 1 else 'ies'} since the last scan:** {', '.join(new)}. ({len(names)} in total.)"
-    else:
-        head = f"No new image libraries since the last scan. ({len(names)} in total.)"
-    if gone:
-        head += f" No longer present: {', '.join(gone)}."
-    table = ["", "| Library | Images | Captions | Repeats | Launch scripts | Notes |", "|---|---|---|---|---|---|"] + rows
-    ds_cs = gr.update(choices=names, value=cur_cs if cur_cs in names else None)
-    ds_rv = gr.update(choices=names, value=cur_rv if cur_rv in names else None)
-    return ds_cs, ds_rv, head + "\n".join(table), gr.update(open=True)
-
-
-def scan_short(cur):
-    """Scan library: re-read every dataset folder (and Personal Data's scan), refresh the list, one status line."""
-    _, _, md, _ = scan_library(cur, None)              # also remembers the names, to point out new ones
-    names = S.list_lora_dirs()
-    head = md.split("\n", 1)[0]
-    LL = S._library()
-    extra = ""
-    if LL is not None:
-        try:
-            LL.LIB.scan()
-            extra = f" Collection rescanned ({len(LL.LIB.loras)} LoRAs)."
-        except Exception as e:              # noqa: BLE001
-            extra = f" (Collection rescan failed: {e})"
-    no_script = [n for n in names if not S.launch_scripts(n)]
-    tail = f" {len(no_script)} without a launch script yet." if no_script else ""
-    return gr.update(choices=names, value=cur if cur in names else None), head + tail + extra
 
 
 # --------------------------------------------------------------------------- repeat folders (rename)

@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.101126"  # LoRA Studio version, see version.py
+__version__ = "1.111126f"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -784,7 +784,7 @@ def build(app, show):
                 e_list = gr.HTML(elem_id="ds_editlist")
             with gr.Column(scale=4):
                 e_head = gr.HTML()
-                with gr.Accordion("Add pictures from a folder", open=False) as e_add_acc:
+                with gr.Accordion("Add pictures from a folder", open=False):
                     gr.Markdown("Pictures that are good enough and not already in the dataset are copied into its repeat "
                                 "folder (and into _originals/). Then sort and select again.", elem_classes=["ls-note"])
                     with gr.Row():
@@ -1196,7 +1196,7 @@ def build(app, show):
         ch = S.list_lora_dirs()
         dsu = gr.update(choices=ch, value=ds if ds in ch else None)
         tu = gr.update(choices=S.type_choices(), value=t) if t else gr.update()   # also types added since the start
-        return dsu, dsu, tu, tu, gr.update(value=pu or "character"), gr.update(value=pu or "character")
+        return dsu, tu, gr.update(value=pu or "character")
 
     def after_nav(ev):
         """One round trip redraws the whole page for the state: the nav, the step that is open and its contents."""
@@ -1393,10 +1393,9 @@ def build(app, show):
         return (gr.update(visible=ch or worn),
                 gr.update(value=F.description(s["ds"]), label="Item description" if worn else "Character description",
                           placeholder="silver, leaf design, small green stones" if worn else
-                          "slim build, tall, blonde hair, blue eyes"), "",
+                          "round glasses, red scarf, silver earrings"), "",
                 "#### Item description, next to the trigger word" if worn else
                 "#### Character description, next to the trigger word")
-    navbox.change(desc_load, st, [s7_desc_card, s7_desc, s7_desc_msg, s7_desc_title], show_progress="hidden")
 
     def mv_view(s, trig, msg=""):
         """The tags of IMG.txt with their counts; ticked: the moved ones are gone, the frequent traits pre-ticked."""
@@ -1419,7 +1418,6 @@ def build(app, show):
                                                                         if moved else ""))
         return gr.update(visible=True), gr.update(choices=choices, value=tick), note
     MV_OUT = [s7_mv_card, s7_mv_tags, s7_mv_msg]
-    navbox.change(mv_view, [st, UI["oc"]["trigger"]], MV_OUT, show_progress="hidden")
 
     WORN_NOTE = ("For a worn item the WD tagger writes **every** tag, also the item's own look (metal, stones, pattern, "
                  "material ...). Tick the ones that are the item's look: **Move** takes them out of the captions (so "
@@ -1441,7 +1439,6 @@ def build(app, show):
                 "#### Item tags → trigger words" if worn else "#### Character tags → trigger words",
                 WORN_NOTE if worn else CHAR_NOTE)
     WORN_OUT = [s7_kind_card, s7_kinds, s7_places, s7_kind_msg, s7_mv_title, s7_mv_note]
-    navbox.change(worn_view, st, WORN_OUT, show_progress="hidden")
 
     def kind_suggest(s, kinds, places, trig):
         if not s.get("ds"):
@@ -1501,7 +1498,14 @@ def build(app, show):
                 words.append(w)
         return ", ".join(words), "Suggested from the tags: check it, add build or height yourself, then **Save**."
     s7_desc_sug.click(desc_suggest, [st, s7_desc], [s7_desc, s7_desc_msg])
-    navbox.change(refresh_all, [st, e_find, s8_show, UI["cs_text"], UI["oc"]["leave"]], all_outs, show_progress="hidden")
+
+    def nav_all(s, find, show8, text, leave, trig):
+        """A new page or step: everything in one event (four events used to follow every click, each costing the
+        browser about a second on a big page)."""
+        return refresh_all(s, find, show8, text, leave) + list(desc_load(s)) + list(mv_view(s, trig)) + list(worn_view(s))
+    navbox.change(nav_all, [st, e_find, s8_show, UI["cs_text"], UI["oc"]["leave"], UI["oc"]["trigger"]],
+                  all_outs + [s7_desc_card, s7_desc, s7_desc_msg, s7_desc_title] + MV_OUT + WORN_OUT,
+                  show_progress="hidden")
     for b, view in ((b_new, "new"), (b_edit, "edit"), (b_imp, "imp")):
         after_nav(b.click(lambda s, v=view: go(s, view=v, mode=v if v != "imp" else s.get("mode", "new")), st, st,
                           show_progress="hidden"))
@@ -1523,8 +1527,20 @@ def build(app, show):
     ticker.timer(2.0, batch_tick, i_last, [i_prog, i_last], show_progress="hidden")
 
     # sdgui's step parts follow the dataset and type of the open step
-    ds_ev = sync.change(set_cs, sync, [UI["cs_ds"], UI["pp_ds"], UI["cs_type"], UI["pp_type"], UI["cs_purpose"],
-                                       UI["pp_purpose"]], show_progress="hidden")
+    ds_fn, ds_in, ds_out = UI["ds_all"]
+
+    def sync_all(key, s, *vals):
+        """A new dataset, LoRA type or purpose: sdgui's parts follow, in one event."""
+        dsu, tu, pu = set_cs(key)
+        ds, t = (key.split("|") + ["", ""])[:2]
+        out = list(ds_fn(ds, t, *vals))
+        out[1] = {**tu, **out[1]} if isinstance(out[1], dict) else {**tu, "value": out[1]}    # cs_type
+        trig = F.meta(ds)["trigger"] if ds else gr.update()
+        return [dsu, pu] + out + [trig] + list(s9_calc_fn(s, out[2] if not isinstance(out[2], dict) else
+                                                           out[2].get("value", "")))
+    sync.change(sync_all, [sync, st] + ds_in,
+                [UI["cs_ds"], UI["cs_purpose"]] + ds_out + [UI["oc"]["trigger"], s9_calc, s9_eff] + s9_vals,
+                show_progress="hidden", concurrency_id="s9calc", concurrency_limit=1)
     def s9_calc_fn(s, text):
         ds = s.get("ds")
         if not ds or s.get("step") != 9:
@@ -1532,9 +1548,6 @@ def build(app, show):
         t = s.get("tkey") if s.get("tkey") in F.meta(ds)["types"] else (F.meta(ds)["types"] or [""])[0]
         a, b, vals = calc(ds, t, text)
         return [a, b] + list(vals)
-    UI["ds_chain"](ds_ev).then(lambda s: F.meta(s["ds"])["trigger"] if s.get("ds") else gr.update(), st,
-                               UI["oc"]["trigger"]).then(s9_calc_fn, [st, UI["cs_text"]], [s9_calc, s9_eff] + s9_vals,
-                                                          concurrency_id="s9calc", concurrency_limit=1)
 
     # ---- 1 Folder
     def pick_src(s):

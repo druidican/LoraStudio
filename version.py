@@ -14,18 +14,18 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.111126e"
-VERSION = "1.111126e"
+__version__ = "1.111126f"
+VERSION = "1.111126f"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.111126e",
-    "version.py": "1.111126e",
+    "lora_studio.py": "1.111126f",
+    "version.py": "1.111126f",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.111126e",
+    "program/Training/sdgui.py": "1.111126f",
     "program/Training/sd_script.py": "1.111126e",
-    "program/Data/sd_prepare.py": "1.111126e",
-    "program/Training/sd_settings.py": "1.111126e",
-    "program/Data/datasets_ui.py": "1.101126",
+    "program/Data/sd_prepare.py": "1.111126f",
+    "program/Training/sd_settings.py": "1.111126f",
+    "program/Data/datasets_ui.py": "1.111126f",
     "program/Data/dsflow.py": "1.091126b",
     "program/Training/training_ui.py": "1.111126e",
     "program/Settings/settings_ui.py": "1.111126d",
@@ -80,6 +80,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.111126f", "Clean-up 3 (Datasets): moving between steps and opening a dataset is much quicker. A new step was four events and opening a dataset about eight more; each is now one (on the 80-dataset test copy most step changes went from 4.5-9 s of a busy browser to 1.5-2.7 s). A hidden 'Prepare' page that recalculated after every change is gone, with its unused picture check code. The example text in the character description no longer suggests body traits."),
     ("1.111126e", "Clean-up 2 (Training): the old stand-alone sdgui.py program is gone (LoRA Studio is the only way in; it had no Run page any more), with its own header, GPU display, timers and the hidden 'Run all steps' preparation, which also ran three extra steps every time you picked a LoRA type in step 9. Leftovers of the old queue table removed. Training › Results no longer searches all dataset folders for every old log without a script line on each refresh. Nothing you use changes."),
     ("1.111126d", "Clean-up 1 (status strip, timer, start-up, Settings): the page is quicker to open. Fields that the start-up already filled no longer each send their own event afterwards (the model file fields made four, the Collection's base-model filter, the caption example and the speed test list one each), the shared timer no longer redraws parts that have nothing new, and the training venv status loads with the other start-up parts. On a test copy with 80 datasets and 200 LoRAs the browser was busy about 9 s instead of 22 s while opening the page. Leftovers removed. LS_LOAD_DEBUG=1 prints how long each start-up part takes."),
     ("1.111126c", "Runs stopped before their final LoRA count as not run: listed as stopped, ticked by 'Tick the ones not run', and can be queued again."),

@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.111126e"  # LoRA Studio version, see version.py
+__version__ = "1.111126f"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -274,8 +274,6 @@ def oc_run(ds, url, model, trigger, leave_out, hints, unload_after, style="sente
     yield "\n".join(L)
 
 
-# ---- Check dataset pictures (datacheck.py): technical checks, Ollama content pass, balance; set aside / back
-DC_STOP = {"flag": False}
 DC_CACHE_NAME = "datacheck_cache.json"
 
 
@@ -307,176 +305,6 @@ def _dc_min_side(tkey) -> int:
         except Exception:                   # noqa: BLE001
             side = 0
     return side
-
-
-def _dc_report(results, purpose, notes, elapsed, ran):
-    """(summary markdown, HTML table, checkbox update)."""
-    rows = []
-    for p, r in results.items():
-        sev = "bad" if any(s == S.DC.BAD for s, _ in r["issues"]) else ("warn" if r["issues"] else "ok")
-        rows.append((p, sev, r))
-    bad = [x for x in rows if x[1] == "bad"]
-    warn = [x for x in rows if x[1] == "warn"]
-    L = [f"**{len(rows)} pictures checked** ({', '.join(ran)}; {S.fmt(elapsed)}): **{len(bad)} not recommended**, "
-         f"{len(warn)} with a warning, {len(rows) - len(bad) - len(warn)} fine. Purpose: **{purpose}**."]
-    if notes:
-        L.append("\n**Dataset balance**")
-        L += [f"- {n}" for n in notes]
-    if bad:
-        L.append("\nThe *not recommended* pictures are ticked below. Check them, untick what you want to keep, "
-                 "and press **Move ticked to _set_aside** (captions move along; no trainer reads that folder).")
-    cells = []
-    for p, sev, r in sorted(rows, key=lambda x: (x[1] != "bad", x[1] != "warn", x[0].name)):
-        if sev == "ok":
-            continue
-        uri = S.DC.thumb_uri(p)
-        issues = "".join(f"<li class='dc{s}'>{html.escape(t)}</li>" for s, t in r["issues"])
-        cells.append(f"<tr class='dcrow-{sev}'><td><img src='{uri}' loading='lazy'></td>"
-                     f"<td><b>{html.escape(p.parent.name)}/{html.escape(p.name)}</b>"
-                     f"<span class='dctag dctag-{sev}'>{'not recommended' if sev == 'bad' else 'warning'}</span>"
-                     f"<ul>{issues}</ul></td></tr>")
-    table = ("<table class='dctable'>" + "".join(cells) + "</table>") if cells else "<p>No problems found.</p>"
-    choices = [(f"{p.parent.name}/{p.name} — {'; '.join(t for _, t in r['issues'])[:140]}", str(p))
-               for p, sev, r in sorted(rows, key=lambda x: (x[1] != "bad", x[0].name)) if sev != "ok"]
-    return "\n".join(L), table, gr.update(choices=choices, value=[str(p) for p, sev, _ in bad])
-
-
-def dc_run(ds, tkey, purpose, checks, url, model):
-    """Generator: (summary, table html, checkbox update)."""
-    none = gr.update()
-    if S.DC is None:
-        yield "datacheck.py is missing next to sdgui.py.", "", none
-        return
-    if not ds:
-        yield "Pick a LoRA folder first.", "", none
-        return
-    checks = checks or []
-    imgs = oc_images(ds)
-    if not imgs:
-        yield "No pictures in this dataset's repeat folders.", "", none
-        return
-    purpose = purpose or "character"
-    DC_STOP["flag"] = False
-    t0, ran = time.time(), []
-    results = {p: {"issues": [], "content": None} for p in imgs}
-    if "technical" in checks:
-        side = _dc_min_side(tkey)
-        yield f"⏳ Technical checks on {len(imgs)} pictures ...", "", none
-        tech = S.DC.technical(imgs, side)
-        for p, r in tech.items():
-            results[p]["issues"] += r["issues"]
-        ran.append("technical" + (f", {side} px" if side else ""))
-    use_ai = "content" in checks or "balance" in checks
-    if use_ai:
-        model = model or oc_settings()[1]
-        url = (url or "").strip() or oc_settings()[0]
-        if S.CAP is None or not model:
-            results_note = "Ollama pass skipped: pick a vision model in *Recaption with Ollama* above (Find models)."
-            yield results_note, "", none
-            use_ai = False
-        elif S.RUN.running():
-            yield "Ollama pass skipped: a training run is active (it would share the GPU).", "", none
-            use_ai = False
-    root = S.lora_path(ds)
-    marks = S.DC.reconcile(root, S.DC.marks_load(root)) if use_ai else {}
-    crop_min = _dc_min_side(tkey) or 512
-    n_marks = 0
-    if use_ai:
-        cache, done = _dc_cache_load(), 0
-        for i, p in enumerate(imgs, 1):
-            if DC_STOP["flag"]:
-                break
-            st = p.stat()
-            key = f"{p}|{st.st_size}|{int(st.st_mtime)}|{model}"
-            d = cache.get(key)
-            if d is None:
-                eta = f", about {S.fmt((time.time() - t0) / max(done, 1) * (len(imgs) - i + 1))} left" if done else ""
-                yield f"⏳ Ollama {i}/{len(imgs)}: {p.parent.name}/{p.name}{eta}", "", none
-                try:
-                    d = S.DC.content(url, model, p)
-                except Exception as e:      # noqa: BLE001
-                    _dc_cache_save(cache)
-                    if marks:
-                        S.DC.marks_save(root, marks)          # keep what was found so far
-                    yield f"❌ Ollama: {e}", "", none
-                    return
-                cache[key] = d
-                done += 1
-                if done % 5 == 0:
-                    _dc_cache_save(cache)
-            results[p]["content"] = d
-            if "content" in checks:
-                issues = S.DC.content_issues(d, purpose)
-                if S.DC._true(d.get("text_or_watermark")):
-                    rp = S.DC.rel(root, p)
-                    e = marks.get(rp)
-                    sig = f"{st.st_size}|{int(st.st_mtime)}"
-                    if not (e and e.get("choice")) and (not e or e.get("sig") != sig):
-                        yield f"⏳ Ollama {i}/{len(imgs)}: where are the watermarks in {p.parent.name}/{p.name}?", "", none
-                        try:
-                            f = S.DC.find_marks(url, model, p)
-                            e = {**f, "sig": sig, "choice": "",
-                                 "options": S.DC.crop_options(f["W"], f["H"], f["marks"], f["subject"], crop_min)}
-                            marks[rp] = e
-                        except Exception as ex:           # noqa: BLE001
-                            e = None
-                            print(f"[check] watermark search failed for {p.name}: {ex!r}")
-                    if e is not None:
-                        issues = [x for x in issues if "watermark" not in x[1]]
-                        if e.get("marks"):
-                            n_marks += 1
-                            kinds = ", ".join(sorted({m["kind"] for m in e["marks"]}))
-                            if e.get("options"):
-                                issues.append((S.DC.WARN, f"{kinds} on the picture: can be cropped off (see Watermarks below)"))
-                            else:
-                                issues.append((S.DC.BAD if purpose == "style" else S.DC.WARN,
-                                               f"{kinds} over the picture: no crop keeps the subject (see Watermarks below)"))
-                results[p]["issues"] += issues
-        _dc_cache_save(cache)
-        if marks:
-            S.DC.marks_save(root, marks)
-        ran.append(f"content with {model}" + (" (stopped)" if DC_STOP["flag"] else ""))
-        if n_marks:
-            ran.append(f"{n_marks} with watermarks or stamps")
-    notes = S.DC.balance(results, purpose) if "balance" in checks and use_ai else []
-    yield _dc_report(results, purpose, notes, time.time() - t0, ran or ["nothing"])
-
-
-def dc_stop():
-    DC_STOP["flag"] = True
-    return "Stopping after the current picture..."
-
-
-def dc_set_aside(ds, picked):
-    if S.DC is None or not ds:
-        return "Pick a LoRA folder first."
-    if not picked:
-        return "Nothing ticked."
-    moved, err = wm_set_aside(S.lora_path(ds), [Path(p) for p in picked])
-    left = len(S.DC.set_aside_list(S.lora_path(ds)))
-    return (f"✔ {moved} picture(s) and their captions moved to `{S.lora_path(ds) / S.DC.SET_ASIDE}` ({left} there now). "
-            "The step plan above is updated. **Move all back** restores them."
-            + ("\n\nCould not move: " + "; ".join(err[:5]) if err else ""))
-
-
-def wm_set_aside(root: Path, pics: list[Path]):
-    """Set aside; a picture with a watermark entry goes through it (its uncropped original is what is set aside)."""
-    marks = S.DC.reconcile(root, S.DC.marks_load(root))
-    plain, moved, err = [], 0, []
-    for p in pics:
-        rp = S.DC.rel(root, p)
-        if rp in marks:
-            e2 = S.DC.apply_choice(root, rp, marks[rp], "aside")
-            if e2:
-                err.append(e2)
-            else:
-                moved += 1
-        else:
-            plain.append(p)
-    if marks:
-        S.DC.marks_save(root, marks)
-    m2, e3 = S.DC.set_aside(root, plain)
-    return moved + m2, err + e3
 
 
 # ---- Watermarks, stamps and site names: review the crop options and choose per picture
@@ -758,16 +586,6 @@ def wm_apply_steps(ds, choices_json, only_pending=False, prefer="remove"):
             + ("\n\nProblems: " + "; ".join(errs[:5]) if errs else ""))
 
 
-def dc_back(ds):
-    if S.DC is None or not ds:
-        return "Pick a LoRA folder first."
-    n = len(S.DC.set_aside_list(S.lora_path(ds)))
-    if not n:
-        return "No set-aside pictures in this dataset."
-    moved, err = S.DC.move_back(S.lora_path(ds))
-    return f"✔ {moved} picture(s) moved back to their repeat folders." + ("\n\n" + "; ".join(err[:5]) if err else "")
-
-
 def oc_stop():
     OC_STOP["flag"] = True
     return "Stopping after the current image..."
@@ -791,7 +609,6 @@ def rv_undo():
     desc = S.LAST_CHANGE["desc"]
     S.LAST_CHANGE["files"] = {}
     return f"Undid '{desc}': restored {n} file(s)."
-
 
 
 CC_CORE = ("hair colour", "hair length", "eye colour", "skin tone", "build", "horns", "ears", "tail", "wings", "fur")
@@ -841,24 +658,6 @@ def _cc_explain(g, total, rec) -> tuple[str, dict]:
                  "sometimes in the words)."),
     }
     return why, means
-
-
-def cc_state(ds):
-    """(state, text) of step 5 for pp_status."""
-    if S.CC is None or not ds:
-        return "", ""
-    res = S.CC.load_result(ds)
-    if not res:
-        return "to do", "not checked yet"
-    imgs = oc_images(ds)
-    now = S.CC.captions_key({str(p): S.read_caption(p) for p in imgs if S.read_caption(p)})
-    if res.get("applied") == now:
-        return "done", f"applied {res.get('applied_at', '')}"
-    if res.get("captions") != now:
-        return "to do", "captions changed since the last check"
-    n = sum(1 for g in res["groups"] if g["kind"] == "contradiction")
-    return ("decide" if res["groups"] else "done"), (f"{n} contradiction{'s' if n != 1 else ''}, {len(res['groups'])} trait{'s' if len(res['groups']) != 1 else ''} to decide"
-                                                     if res["groups"] else "no character traits in the captions")
 
 
 def cc_render(ds):
