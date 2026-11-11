@@ -75,6 +75,9 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
   picture, coverage over the kept pictures, suggestions in step 5 (add / upscale / sharpen / crop into a new picture),
   done only when ticked. Upscales go through the owner's ComfyUI workflow (`Training/comfyupscale.py`: UI or API
   format, SeedVR2 size and noise set per picture), else the picture tools. Judges visibility, never identity.
+- **Speed test**: `Training/speedtest.py` (terminal, one launch script) and `Training/speedjobs.py` (Settings ›
+  Speed test, per LoRA type, invented dataset in `userdata/speedtest/`, results.json, use.json applied in
+  `sd_script.make_plan` via `_speed`). The launch script is run up to `accelerate` with a bash function recording it.
 - **Worn item** purpose (clothes / equipment / jewelry): kinds and places, *Make the words the same*, balance check.
 - **Quality words:** Pony trains with `score_9, score_8_up, score_7_up, source_anime` as `--caption_prefix`
   (keep_tokens raised to cover them), Illustrious with `masterpiece, best quality` as `--caption_suffix`; caption

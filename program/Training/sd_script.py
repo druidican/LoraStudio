@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.101126d"  # LoRA Studio version, see version.py
+__version__ = "1.111126b"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -585,6 +585,14 @@ def build_prompts(sc, stats, cfg):
     return path, sc.build_prompts_text(caps, lora.name.lower(), lora.name, cfg)[0], True
 
 
+def _speed(tkey, cfg) -> dict:
+    try:
+        import speedjobs
+        return speedjobs.apply(tkey, cfg)
+    except Exception:                                  # noqa: BLE001
+        return cfg
+
+
 def caption_ext_for(ds, tkey) -> str:
     """The caption set a new launch script of this type trains on (Datasets: step 3 and 9), else IMG.txt."""
     try:
@@ -796,6 +804,7 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
         samples = False                              # musubi types train without sample images
     stats = with_virtual_row(dataset_stats(ds))
     cfg = tuned_cfg(tkey, cfg, stats)
+    cfg = _speed(tkey, cfg)                           # Settings › Speed test: "use the faster settings" for this type
     cfg["caption_ext"] = caption_ext_for(ds, tkey)
     so = _num(steps_over)
     if so:

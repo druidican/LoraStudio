@@ -81,6 +81,26 @@ installed with `install.sh` and chose *use my own trainers*, these point at your
 - **Advanced: low-level trainer and GPU values**: environment values for the trainers (*Save environment*), and
   *Update all launch scripts* writes changed values into the scripts you already have.
 
+## Speed test
+
+Which settings make each LoRA type train fastest on **your** computer? The table lists every LoRA type: whether it
+can be tested (its model files and trainer are there), its last test (how fast it trains now, and the fastest that
+was found) and whether the faster settings are in use.
+
+- Tick the types to test, choose how thorough (*Quick*, *Full*, or *Only how fast it trains now*) and press *Start
+  the speed test*. Test a few types now and others later: every result is kept.
+- Each type trains a few steps on an invented test dataset (20 plain pictures; none of your datasets is used) with
+  one setting changed at a time: fewer swapped blocks, pinned memory for block swapping, no gradient checkpointing,
+  other attention (sage, flash, xformers), fp8, torch.compile, and the ROCm settings TunableOp, MIOpen fast search and
+  expandable memory. Only what your sd-scripts or musubi-tuner support is tried. A setting that runs out of memory or
+  gets a NaN loss is reported as such; then the faster ones are tried together.
+- **Results**: pick a type to read its report (each setting with seconds per step, the change against now and the
+  video memory). Tick **Use the faster settings for new launch scripts of this type** to make every new launch
+  script of that type use the fastest result; your existing scripts stay as they are (make a new version in step 9).
+  Untick to go back. A later test of the same type updates the settings in use.
+- Close ComfyUI before a test; Ollama is stopped by itself. The training queue does not start while a test runs,
+  and a test does not start during a training run. *Stop* ends it after the running step.
+
 ## AI helpers
 
 ![Settings › AI helpers: the Ollama models, which one is the default, start and stop](img/set_ai.jpg)

@@ -10,7 +10,7 @@ output of the one event).
 Standalone (sdgui.py on its own) nothing is registered and the parts keep their own timers.
 """
 from __future__ import annotations
-__version__ = "1.101126c"  # LoRA Studio version, see version.py
+__version__ = "1.111126b"  # LoRA Studio version, see version.py
 
 import gradio as gr
 
@@ -105,7 +105,8 @@ def build():
 
     def redrawer(p, n_out):
         def redraw(s):
-            return PENDING.pop(((s or ":").rsplit(":", 1)[0], p), None) or [gr.update()] * n_out
+            out = PENDING.pop(((s or ":").rsplit(":", 1)[0], p), None) or [gr.update()] * n_out
+            return out[0] if n_out == 1 else out          # Gradio wants a single value for one output
         return redraw
     t = gr.Timer(IDLE)
     t.tick(tick_all, ins + [sent], sigs + [sent, t], show_progress="hidden")

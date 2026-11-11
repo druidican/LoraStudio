@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.111126"  # LoRA Studio version, see version.py
+__version__ = "1.111126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -392,6 +392,28 @@ def _speedtest():
     need({"baseline", "swap6", "pinned", "no_checkpointing", "sage_attn", "fp8", "compile"} <= set(names), names)
     ch = ST.changes(args, ST.setopt(ST.drop(args, "sdpa"), "blocks_to_swap", 6) + ["--sage_attn"])
     need(("blocks_to_swap", "10", "6") in ch and any(k == "sdpa" and n is ST.MISSING for k, o, n in ch), ch)
+
+
+@check("the shared timer redraws a one-output part with a single value")
+def _tickone():
+    import gradio as gr
+    import ticker
+    old = (list(ticker.TICKS), dict(ticker.ACTIVE))
+    try:
+        ticker.TICKS.clear()
+        ticker.ACTIVE["on"] = True
+        with gr.Blocks() as app:
+            box = gr.Markdown()
+            ticker.timer(2.0, lambda: "hello", None, box)
+            ticker.build()
+        fns = {getattr(d.fn, "__name__", ""): d.fn for d in app.fns.values()}
+        tick, redraw = fns["tick_all"], fns["redraw"]
+        sig = tick({})[0]
+        need(isinstance(sig, str), f"no change signalled: {sig}")
+        need(redraw(sig) == "hello", f"one output must be one value, got {redraw(sig)!r}")
+    finally:
+        ticker.TICKS[:] = old[0]
+        ticker.ACTIVE.clear(); ticker.ACTIVE.update(old[1])
 
 
 @check("sentence captions of a character begin 'trigger, a class word, ...'")

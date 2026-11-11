@@ -21,7 +21,7 @@ reported as such. Close ComfyUI and stop Ollama first, so the video memory is fr
 is loaded again for every variant (about 1-3 minutes each, plus the steps).
 """
 from __future__ import annotations
-__version__ = "1.111126"  # LoRA Studio version, see version.py
+__version__ = "1.111126b"  # LoRA Studio version, see version.py
 
 import argparse
 import glob
@@ -263,7 +263,7 @@ OOM = re.compile(r"out of memory|OutOfMemoryError|HIP error: out of memory|CUBLA
 NAN = re.compile(r"avr_loss=nan|loss=nan|NaN detected", re.I)
 
 
-def run_variant(cap, var, steps, warm, out_dir, timeout, vram: VRAM, logdir: Path) -> dict:
+def run_variant(cap, var, steps, warm, out_dir, timeout, vram: VRAM, logdir: Path, say=print, stop=None) -> dict:
     args = list(var["args"])
     for d in DROP_ALWAYS:
         args = drop(args, d)
@@ -294,13 +294,16 @@ def run_variant(cap, var, steps, warm, out_dir, timeout, vram: VRAM, logdir: Pat
                     if n > last:
                         times.append((n, time.time()))
                         last = n
-                        print(f"\r[speedtest]   {var['name']}: step {n}/{steps}   ", end="", flush=True)
+                        say(f"  {var['name']}: step {n}/{steps}", True)
                 if OOM.search(text):
                     status = "out of memory"
                 if NAN.search(text) and status == "ok":
                     status = "NaN loss"
                 if time.time() - t0 > timeout:
                     status = "too slow (timeout)"
+                    break
+                if stop is not None and stop.is_set():
+                    status = "stopped"
                     break
         finally:
             if p.poll() is None:
@@ -314,7 +317,6 @@ def run_variant(cap, var, steps, warm, out_dir, timeout, vram: VRAM, logdir: Pat
                     os.killpg(p.pid, signal.SIGKILL)
             p.wait()
             peak = vram.stop()
-    print()
     if p.returncode not in (0, None) and status == "ok":
         status = "failed" + (": option not available" if re.search(r"unrecognized arguments|No module named",
                                                                     buf) else "")
@@ -368,12 +370,105 @@ def report(script: Path, cap, results, vram: VRAM, steps) -> Path:
     return out
 
 
+def _say(line: str, progress: bool = False):
+    print(("\r[speedtest] " + line + "   ") if progress else ("[speedtest] " + line), end="" if progress else "\n",
+          flush=True)
+
+
+def change_list(base_args, best_args) -> list[dict]:
+    out = []
+    for k, old, new in changes(base_args, best_args):
+        out.append({"opt": k, "op": "remove" if new is MISSING else "add" if old is MISSING else "change",
+                    "old": None if old is MISSING else old, "new": None if new is MISSING else new})
+    return out
+
+
+def test_script(script: Path, depth: str = "quick", steps: int = 15, warm: int = 4, timeout: int = 1200,
+                only: str = "", combo: bool = True, say=_say, stop=None, report_dir: Path | None = None) -> dict:
+    """The whole test of one launch script. depth: 'now' (only how fast it is now), 'quick' or 'full'.
+    Returns {'report', 'baseline', 'best', 'best_s', 'changes', 'env', 'results', 'status'}."""
+    script = Path(script).resolve()
+    work = Path(tempfile.mkdtemp(prefix="lsspeedtest_"))
+    say(f"preparing: running {script.name} up to its training command (no training) ...")
+    cap = capture(script, work)
+    opts = supported(cap) if depth != "now" else set()
+    vs = variants(cap["args"], opts, depth != "full")
+    if depth == "now":
+        vs = vs[:1]
+    if only:
+        keep = {x.strip() for x in only.split(",")} | {"baseline"}
+        vs = [v for v in vs if v["name"] in keep]
+    vram = VRAM()
+    if vram.used() > 2 * 2 ** 30:
+        say(f"note: {gb(vram.used())} of video memory is already in use (ComfyUI? Ollama?). "
+            "Results are better with it free.")
+    steps = max(steps, warm + 4)
+    results = []
+    out_dir = work / "out"
+
+    def one(v):
+        out_dir.mkdir(exist_ok=True)
+        r = run_variant(cap, v, steps, warm, out_dir, timeout, vram, work, say, stop)
+        shutil.rmtree(out_dir, ignore_errors=True)
+        say(f"  -> {r['s_per_step'] or '-'} s/step, peak {gb(r['vram'])}, {r['status']}")
+        results.append(r)
+        return r
+
+    try:
+        for n, v in enumerate(vs, 1):
+            if stop is not None and stop.is_set():
+                break
+            say(f"{n}/{len(vs)} {v['name']}: {v['why']}")
+            one(v)
+        base = next((r for r in results if r["name"] == "baseline" and r["s_per_step"]), None)
+        wins = [r for r in results if base and r["name"] != "baseline" and r["status"] == "ok" and r["s_per_step"]
+                and r["s_per_step"] < base["s_per_step"] * 0.97]
+        if len(wins) >= 2 and combo and not (stop is not None and stop.is_set()):
+            args, env, names = list(cap["args"]), {}, []
+            swaps = [r for r in wins if r["name"].startswith("swap")]
+            for r in sorted(wins, key=lambda r: r["s_per_step"]):
+                if r["name"].startswith("swap") and r is not min(swaps, key=lambda x: x["s_per_step"]):
+                    continue
+                if r["name"] in ATTN and any(n in ATTN for n in names):
+                    continue
+                if r["name"] == "pinned" and "swap0" in names:
+                    continue                            # nothing is swapped any more
+                args = apply_changes(args, changes(cap["args"], r["args"]))
+                env.update(r["env"])
+                names.append(r["name"])
+            say(f"together: {'+'.join(names)}")
+            r = one({"name": "+".join(names), "why": "the faster ones together", "args": args, "env": env})
+            if r["status"] == "out of memory" and "no_checkpointing" in names and len(names) > 2:
+                names2 = [x for x in names if x != "no_checkpointing"]
+                say(f"together without the memory-hungry one: {'+'.join(names2)}")
+                one({"name": "+".join(names2), "why": "the faster ones together, keeping gradient checkpointing",
+                     "args": setopt(args, "gradient_checkpointing"), "env": env})
+    except KeyboardInterrupt:
+        say("stopped; writing the report of what ran")
+    if not results:
+        return {"status": "nothing ran", "results": []}
+    out = report(script, cap, results, vram, steps)
+    if report_dir:
+        Path(report_dir).mkdir(parents=True, exist_ok=True)
+        out = Path(shutil.move(str(out), Path(report_dir) / out.name))
+    base = next((r for r in results if r["name"] == "baseline"), None)
+    good = [r for r in results if r["status"] == "ok" and r["s_per_step"]]
+    best = min(good, key=lambda r: r["s_per_step"]) if good else None
+    return {"status": "done" if not (stop is not None and stop.is_set()) else "stopped", "report": str(out),
+            "baseline": base and base["s_per_step"], "best": best and best["name"],
+            "best_s": best and best["s_per_step"], "vram_total": vram.total, "depth": depth,
+            "changes": change_list(base["args"], best["args"]) if base and best and best is not base else [],
+            "env": dict(best["env"]) if best and best is not base else {},
+            "results": [{k: r[k] for k in ("name", "why", "status", "s_per_step", "vram")} for r in results]}
+
+
 def main():
     ap = argparse.ArgumentParser(description="Speed test for a LoRA Studio launch script.")
     ap.add_argument("script", type=Path)
     ap.add_argument("--steps", type=int, default=15, help="training steps per variant (default 15)")
     ap.add_argument("--warmup", type=int, default=4, help="steps not measured at the start (default 4)")
     ap.add_argument("--quick", action="store_true", help="fewer variants")
+    ap.add_argument("--now", action="store_true", help="only measure how fast it is now")
     ap.add_argument("--only", default="", help="comma-separated variant names (see --list)")
     ap.add_argument("--list", action="store_true", help="show the variants and stop")
     ap.add_argument("--timeout", type=int, default=1200, help="seconds per variant before it is stopped")
@@ -382,73 +477,16 @@ def main():
     script = a.script.resolve()
     if not script.is_file():
         sys.exit(f"no such launch script: {script}")
-    work = Path(tempfile.mkdtemp(prefix="lsspeedtest_"))
-    cap = capture(script, work)
-    opts = supported(cap)
-    vs = variants(cap["args"], opts, a.quick)
-    if a.only:
-        keep = {x.strip() for x in a.only.split(",")} | {"baseline"}
-        vs = [v for v in vs if v["name"] in keep]
     if a.list:
-        for v in vs:
+        cap = capture(script, Path(tempfile.mkdtemp(prefix="lsspeedtest_")))
+        for v in variants(cap["args"], supported(cap), a.quick):
             print(f"  {v['name']:18s} {v['why']}")
         return
-    vram = VRAM()
-    if vram.used() > 2 * 2 ** 30:
-        print(f"[speedtest] note: {gb(vram.used())} of video memory is already in use (ComfyUI? Ollama?). "
-              "Results are better with it free.")
-    steps = max(a.steps, a.warmup + 4)
-    est = len(vs) * (90 + steps * 10)
-    print(f"[speedtest] {len(vs)} variants × {steps} steps; roughly {est // 60}-{est * 2 // 60} minutes. "
-          "Ctrl+C stops and still writes the report.")
-    results = []
-    try:
-        for n, v in enumerate(vs, 1):
-            print(f"[speedtest] {n}/{len(vs)} {v['name']}: {v['why']}")
-            out_dir = work / "out"
-            out_dir.mkdir(exist_ok=True)
-            r = run_variant(cap, v, steps, a.warmup, out_dir, a.timeout, vram, work)
-            shutil.rmtree(out_dir, ignore_errors=True)
-            print(f"[speedtest]   -> {r['s_per_step'] or '-'} s/step, peak {gb(r['vram'])}, {r['status']}")
-            results.append(r)
-        base = next((r for r in results if r["name"] == "baseline" and r["s_per_step"]), None)
-        wins = [r for r in results if base and r["name"] != "baseline" and r["status"] == "ok" and r["s_per_step"]
-                and r["s_per_step"] < base["s_per_step"] * 0.97]
-        if len(wins) >= 2 and not a.no_combo:
-            args, env, names = list(cap["args"]), {}, []
-            swaps = [r for r in wins if r["name"].startswith("swap")]
-            for r in sorted(wins, key=lambda r: r["s_per_step"]):
-                if r["name"].startswith("swap") and r is not min(swaps, key=lambda x: x["s_per_step"]):
-                    continue
-                if r["name"] in ATTN and any(n in ATTN for n in names):
-                    continue
-                args = apply_changes(args, changes(cap["args"], r["args"]))
-                env.update(r["env"])
-                names.append(r["name"])
-            v = {"name": "+".join(names), "why": "the faster ones together", "args": args, "env": env}
-            print(f"[speedtest] together: {v['name']}")
-            out_dir = work / "out"
-            out_dir.mkdir(exist_ok=True)
-            r = run_variant(cap, v, steps, a.warmup, out_dir, a.timeout, vram, work)
-            shutil.rmtree(out_dir, ignore_errors=True)
-            print(f"[speedtest]   -> {r['s_per_step'] or '-'} s/step, peak {gb(r['vram'])}, {r['status']}")
-            results.append(r)
-            if r["status"] == "out of memory" and "no_checkpointing" in names and len(names) > 2:
-                names2 = [x for x in names if x != "no_checkpointing"]
-                v = {"name": "+".join(names2), "why": "the faster ones together, keeping gradient checkpointing",
-                     "args": setopt(args, "gradient_checkpointing"), "env": env}
-                print(f"[speedtest] together without the memory-hungry one: {v['name']}")
-                out_dir.mkdir(exist_ok=True)
-                r = run_variant(cap, v, steps, a.warmup, out_dir, a.timeout, vram, work)
-                shutil.rmtree(out_dir, ignore_errors=True)
-                print(f"[speedtest]   -> {r['s_per_step'] or '-'} s/step, peak {gb(r['vram'])}, {r['status']}")
-                results.append(r)
-    except KeyboardInterrupt:
-        print("\n[speedtest] stopped; writing the report of what ran")
-    if results:
-        out = report(script, cap, results, vram, steps)
-        print(f"\n[speedtest] report: {out}\n")
-        print(out.read_text(encoding="utf-8"))
+    r = test_script(script, "now" if a.now else "quick" if a.quick else "full", a.steps, a.warmup, a.timeout,
+                    a.only, not a.no_combo)
+    if r.get("report"):
+        print(f"\n[speedtest] report: {r['report']}\n")
+        print(Path(r["report"]).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

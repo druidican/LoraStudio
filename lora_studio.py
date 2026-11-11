@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.101126c"  # LoRA Studio version, see version.py
+__version__ = "1.111126b"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -350,6 +350,7 @@ def main():
                                         "ai": lambda: (_ollama_note(), show("ai")), "look": _look, "backup": _backup,
                                         "updates": _updates, "batch": lambda: settings_ui.batch_panel(app),
                                         "comfy": lambda: settings_ui.comfy_panel(app),
+                                        "speed": lambda: settings_ui.speed_panel(app),
                                         "version": lambda: settings_ui.version_panel(app)})
 
         # the status strip, and moving between pages

@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.101126"  # LoRA Studio version, see version.py
+__version__ = "1.111126b"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -27,8 +27,8 @@ NAV = [
     ("", [("health", "Health check")]),
     ("PROGRAM", [("start", "Start and network")]),
     ("YOUR FILES", [("folders", "Folders"), ("models", "Model files")]),
-    ("TOOLS", [("trainers", "Trainers and GPU"), ("ai", "AI helpers"), ("batch", "Automatic improvement"),
-               ("comfy", "Test pictures (ComfyUI)")]),
+    ("TOOLS", [("trainers", "Trainers and GPU"), ("speed", "Speed test"), ("ai", "AI helpers"),
+               ("batch", "Automatic improvement"), ("comfy", "Test pictures (ComfyUI)")]),
     ("LIBRARY", [("look", "Look and base models")]),
     ("CARE", [("backup", "Backup"), ("updates", "Updates"), ("version", "Version")]),
 ]
@@ -832,6 +832,100 @@ def comfy_panel(app):
         return f"✔ ComfyUI answers at `{u}` ({len(names)} LoRAs in its list)."
     test.click(do_test, url, tmsg)
     upscale_card(app)
+
+
+def speed_panel(app):
+    """Settings › Speed test: which settings make each LoRA type train fastest on this computer (speedjobs.py)."""
+    import speedjobs as SJ
+    import ticker
+    gr.Markdown("Tick the LoRA types to test. Each one trains a few steps on an invented test dataset (20 plain "
+                "pictures; none of your datasets is used) with different settings: fewer swapped blocks, pinned "
+                "memory, no gradient checkpointing, other attention, fp8, torch.compile and ROCm speed settings. It "
+                "measures seconds per step and video memory. Test some types now and others later; the results stay. "
+                "When a type has faster settings, tick **Use the faster settings** below to make every new launch "
+                "script of that type use them. Close ComfyUI before a test; Ollama is stopped by itself.",
+                elem_classes=["ls-note"])
+    table = gr.HTML()
+    with gr.Column(elem_classes=["ls-card"]):
+        pick = gr.CheckboxGroup(choices=[], label="Test these LoRA types", elem_id="sp_pick")
+        depth = gr.Radio(SJ.DEPTHS, value="quick", label="How thorough")
+        with gr.Row(elem_classes=["ls-bar"]):
+            go = gr.Button("Start the speed test", variant="primary", size="sm", scale=0, min_width=190)
+            halt = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=90)
+        msg = gr.Markdown()
+        live = gr.Markdown(elem_id="sp_live")
+    with gr.Column(elem_classes=["ls-card"]):
+        gr.Markdown("**Results**")
+        which = gr.Dropdown(choices=[], label="LoRA type", interactive=True)
+        use = gr.Checkbox(label="Use the faster settings for new launch scripts of this type",
+                          info="Existing launch scripts stay as they are; make a new version in step 9. Untick to "
+                               "go back to the normal settings.")
+        use_msg = gr.Markdown()
+        rep_md = gr.Markdown(elem_id="sp_report")
+
+    def tbl():
+        rows = []
+        for t in SJ.types():
+            r = t["result"] or {}
+            if r.get("baseline"):
+                gain = (f" → <b>{r['best_s']}</b> ({(1 - r['best_s'] / r['baseline']) * 100:.0f}% faster)"
+                        if r.get("best_s") and r.get("best") not in (None, "baseline") else " (already the fastest)")
+                res = f"{r['date']} · {r.get('depth', '')} · {r['baseline']} s/step{gain}"
+            else:
+                res = "not tested"
+            state = "✔ in use" if t["use"] else ""
+            rows.append(f"<tr><td>{html.escape(t['label'])}</td><td>{'ready' if t['ready'] else html.escape(t['why'])}"
+                        f"</td><td>{res}</td><td>{state}</td></tr>")
+        return ('<table class="ls-table"><tr><th>LoRA type</th><th>Can be tested</th><th>Last test: now → fastest'
+                '</th><th>Faster settings</th></tr>' + "".join(rows) + "</table>")
+
+    def choices():
+        ts = SJ.types()
+        ready = [(t["label"], t["key"]) for t in ts if t["ready"]]
+        tested = [(t["label"], t["key"]) for t in ts if t["result"]]
+        return ready, tested
+
+    def load():
+        ready, tested = choices()
+        cur = tested[0][1] if tested else None
+        return (tbl(), gr.update(choices=ready), gr.update(choices=tested, value=cur)) + show(cur)
+
+    def show(k):
+        if not k:
+            return gr.update(value=False, interactive=False), "", ""
+        r = SJ.results().get(k) or {}
+        try:
+            text = Path(r.get("report", "")).read_text(encoding="utf-8")
+        except OSError:
+            text = "The report file is gone."
+        can = bool(r.get("changes") or r.get("env"))
+        return gr.update(value=SJ.use_on(k), interactive=can), "", text
+
+    def live_view():
+        if not SJ.JOB["running"] and not SJ.JOB["lines"]:
+            return gr.update()
+        lines = SJ.JOB["lines"][-14:] + ([f"⏳ {SJ.JOB['now']}"] if SJ.JOB["now"] else [])
+        return "```\n" + "\n".join(lines) + "\n```"
+
+    def started(ks, d):
+        return SJ.start(ks or [], d or "quick"), live_view()
+
+    app.load(load, None, [table, pick, which, use, use_msg, rep_md])
+    go.click(started, [pick, depth], [msg, live])
+    halt.click(lambda: SJ.stop(), None, msg)
+    which.change(show, which, [use, use_msg, rep_md])
+    use.input(lambda k, v: SJ.set_use(k, v) if k else "", [which, use], use_msg).then(tbl, None, table)
+    ticker.timer(2.0, live_view, None, live, show_progress="hidden")
+    def follow(cur):
+        """While a test runs and after it: the table, the list of tested types and the shown result follow it."""
+        if not (SJ.JOB["running"] or SJ.JOB["done"]):
+            return [gr.update()] * 5
+        _, tested = choices()
+        keys = [k for _, k in tested]
+        cur = cur if cur in keys else (SJ.JOB["done"][-1] if SJ.JOB["done"] else (keys[0] if keys else None))
+        return (tbl(), gr.update(choices=tested, value=cur)) + show(cur)
+    ticker.timer(2.0, follow, which, [table, which, use, use_msg, rep_md], show_progress="hidden")
+    ticker.BUSY.append(SJ.busy)
 
 
 def upscale_card(app):

@@ -33,7 +33,7 @@ Security: this runs shell text from a web page and edits files. By default it bi
 To reach it from other computers on your network use --host 0.0.0.0 and set a login with --auth user:password
 (only do this on a network you trust; never expose it to the internet).
 """
-__version__ = "1.101126c"  # LoRA Studio version, see version.py
+__version__ = "1.111126b"  # LoRA Studio version, see version.py
 import argparse
 import atexit
 import codecs
@@ -1331,6 +1331,14 @@ def queue_start(stop_on_fail):
     if RUN.running():
         gr.Warning("A run is in progress. Wait for it to finish (or press Stop now), then start the queue.")
         return _q_out()
+    try:
+        import speedjobs
+        if speedjobs.busy():
+            gr.Warning("A speed test is running (Settings › Speed test). Start the queue when it has finished, "
+                       "or stop it there.")
+            return _q_out()
+    except ImportError:
+        pass
     with QLOCK:
         if not any(i["state"] == "queued" for i in QUEUE["items"]):
             gr.Warning("No waiting items in the queue.")

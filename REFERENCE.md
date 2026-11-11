@@ -314,7 +314,9 @@ every action that takes 0.2 s or more.
 
 ### Training speed test (terminal)
 
-Which settings train fastest on your computer? `speedtest.py` tries them on one of your own launch scripts:
+The same test is in **Settings › Speed test** for every LoRA type (on an invented test dataset, results kept per
+type, and a switch to use the faster settings for new launch scripts). In a terminal, `speedtest.py` tries them on
+one of your own launch scripts:
 
 ```bash
 python3 ~/AI/LoraStudio/program/Training/speedtest.py ~/Datasets/pip/pipZITV1.sh            # all variants
