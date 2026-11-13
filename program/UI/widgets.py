@@ -47,6 +47,9 @@ def _pic(tok: str, w: int = 360):
 _ROOTS = {"t": 0.0, "roots": []}
 
 
+EXTRA_ROOTS: list[Path] = []             # --allow-path and the training cache (set at the start)
+
+
 def allowed_roots() -> list[Path]:
     """The folders whose files a page may link (lspaths.file_url): the program's own (thumbnails, manual, logo,
     reports), your datasets, LoRA folders, sd-scripts and LoRA Manager's example pictures."""
@@ -65,6 +68,7 @@ def allowed_roots() -> list[Path]:
         r += [Path(x) for x in LL.lm_example_roots(LL.LIB)]
     except Exception:                                    # noqa: BLE001
         pass
+    r += EXTRA_ROOTS
     _ROOTS["roots"] = [x.resolve() for x in r if str(x)]
     _ROOTS["t"] = time.time()
     return _ROOTS["roots"]

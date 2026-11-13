@@ -13,7 +13,6 @@ __version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import argparse
 import os
-import secrets
 import sys
 import threading
 from pathlib import Path
@@ -36,17 +35,56 @@ def apply_folders(s: dict):
     sdgui.DEFAULT_MODEL_DIR = os.path.expanduser(s.get("models_dir") or "")
 
 
-def storage_secret() -> str:
-    """The key that signs the browser's login cookie (made once, kept in userdata)."""
-    f = USER / ".session_key"
-    try:
-        return f.read_text().strip()
-    except OSError:
-        k = secrets.token_hex(32)
-        USER.mkdir(exist_ok=True)
-        f.write_text(k)
-        f.chmod(0o600)
-        return k
+def setup_page_first():
+    """First start (no settings yet) or --setup: the setup page instead of the program. It runs BEFORE lora_library
+    and sdgui are imported, because those make default settings files when there are none. When it finishes, it
+    starts this program again (same port) with the new settings."""
+    import firstrun
+    if "--setup" not in sys.argv and not firstrun.needs_setup():
+        return
+    import launchopts
+    lo = launchopts.load()
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("--port", type=int, default=lo["port"])
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--auth")
+    ap.add_argument("--no-browser", action="store_true")
+    a, _ = ap.parse_known_args()
+    auth = a.auth or os.environ.get("SDGUI_AUTH")
+    auth = tuple(auth.split(":", 1)) if auth and ":" in auth else None
+    firstrun.run(a.host, a.port, not a.no_browser, auth)
+    sys.exit(0)
+
+
+def start_tasks(lo: dict):
+    """The quiet jobs after the start: the Collection scan and thumbnails, the queue, old launch scripts, the
+    program's own folders, the training venv check and the trainers' update check."""
+    import lora_library as LL
+    import sdgui
+    threading.Thread(target=lambda: (LL.LIB.ensure_loaded(), LL.warm_thumbnails(LL.LIB)),
+                     daemon=True, name="library-load").start()
+    note = sdgui.queue_restore(start=lo["resume_queue"])
+    if note:
+        print(f"[Queue] {note}")
+    n_old = sdgui.archive_all_datasets()
+    if n_old:
+        print(f"[Scripts] {n_old} older launch script(s) moved to {sdgui.OLD_RUNS}/ (one script per LoRA type is shown)")
+    try:                                   # an update from before 1.251026d: bring the manual and the logo
+        import selfupdate
+        selfupdate.repair_dirs()
+    except Exception as e:                 # noqa: BLE001
+        print(f"[Updates] {e!r}")
+    try:                                   # PyTorch and its ROCm / CUDA parts in the training venv (no download)
+        import venvcheck
+        venvcheck.start_check()
+    except Exception as e:                 # noqa: BLE001
+        print(f"[Training venv] {e!r}")
+    if lo["check_updates"]:
+        try:                               # quiet check for sd-scripts / musubi-tuner updates (never installs)
+            import updater
+            updater.start_background_check()
+        except Exception as e:             # noqa: BLE001
+            print(f"[Updates] not available: {e!r}")
 
 
 def main():
@@ -57,7 +95,12 @@ def main():
     ap.add_argument("--host", default="0.0.0.0" if lo["network"] else "127.0.0.1")
     ap.add_argument("--auth", help="login as user:password; or set SDGUI_AUTH")
     ap.add_argument("--venv", help="venv for the trainer (default: <sd-scripts>/venv)")
+    ap.add_argument("--datatypes", "--scan-script", dest="scan_script",
+                    help="path to Lora_Datatypes.py, the file with all LoRA types (default: next to this file)")
+    ap.add_argument("--allow-path", action="append", default=[],
+                    help="extra folder the pages may show pictures from (repeatable)")
     ap.add_argument("--no-browser", action="store_true", default=not lo["browser"])
+    ap.add_argument("--setup", action="store_true", help="show the setup page again (folders, token, backup import)")
     args = ap.parse_args()
 
     import lora_library as LL
@@ -67,19 +110,31 @@ def main():
     LL.ON_SETTINGS_SAVED.append(apply_folders)
     sdgui.CONFIG_DIR, sdgui.SETTINGS_FILE = USER, "training_settings.txt"
     sdgui.DEFAULT_VENV = os.path.expanduser(args.venv) if args.venv else sdgui.detect_venv()
-    sdgui.SCAN_SCRIPT = sdgui.find_scan_script(None)
+    sdgui.SCAN_SCRIPT = sdgui.find_scan_script(args.scan_script)
     sdgui.apply_gfx_env()
     sdgui.BIND_HOST = args.host
+
+    def sd_dir_saved(path):                 # Settings › Trainers and GPU is the one place for the sd-scripts folder
+        v = LL.load_settings()
+        if os.path.expanduser(v.get("sd_scripts_dir") or "") != os.path.expanduser(path):
+            v["sd_scripts_dir"] = path
+            LL._write_values(v)
+            LL.LIB.settings["sd_scripts_dir"] = path
+    sdgui.ON_SD_DIR.append(sd_dir_saved)
 
     auth = args.auth or os.environ.get("SDGUI_AUTH") or (f"{lo['user']}:{lo['password']}"
                                                            if lo["user"] and lo["password"] else None)
     from nicegui import app, ui
+    import login
     import shell
-    import widgets  # noqa: F401  (the file routes)
+    import widgets  # the file routes
+    widgets.EXTRA_ROOTS[:] = [Path(os.path.expanduser(p)) for p in args.allow_path] + [Path(sdgui.CACHE_DIR)]
 
     if auth:
-        user, _, pw = auth.partition(":")
-        _login(app, ui, user, pw)
+        user, sep, pw = auth.partition(":")
+        if not sep or not user or not pw:
+            ap.error("--auth must look like user:password")
+        login.install(user, pw)
 
     @ui.page("/")
     def index():
@@ -87,38 +142,17 @@ def main():
             return ui.navigate.to("/login")
         shell.build_page()
 
-    threading.Thread(target=LL.LIB.ensure_loaded, daemon=True, name="library-load").start()
-    note = sdgui.queue_restore(start=lo["resume_queue"])
-    if note:
-        print(f"[Queue] {note}")
+    import version
+    print(version.banner())
+    start_tasks(lo)
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print(f"\n*** Listening on {args.host}:{args.port}: anyone on your network can open the program. "
               f"{'A login is required.' if auth else 'No login is set: use --auth user:password.'} ***\n")
     fav = PROG / "logo" / "favicon.png"
     ui.run(host=args.host, port=args.port, title="LoRA Studio", favicon=fav if fav.is_file() else None,
-           show=not args.no_browser, reload=False, storage_secret=storage_secret(), show_welcome_message=True)
-
-
-def _login(app, ui, user: str, pw: str):
-    """A login page; the browser keeps a signed cookie, so a reload does not ask again."""
-    import hmac
-
-    @ui.page("/login")
-    def login():
-        def check():
-            if hmac.compare_digest(u.value, user) and hmac.compare_digest(p.value, pw):
-                app.storage.user["ok"] = True
-                ui.navigate.to("/")
-            else:
-                msg.text = "Wrong user name or password."
-        ui.query("body").style("background:#1C1F24")
-        with ui.card().classes("absolute-center w-80 items-stretch"):
-            ui.label("LoRA Studio").classes("text-xl font-bold text-center")
-            u = ui.input("User name").props("outlined dense")
-            p = ui.input("Password", password=True).props("outlined dense").on("keydown.enter", check)
-            ui.button("Log in", on_click=check).props("unelevated no-caps color=primary")
-            msg = ui.label("").classes("text-red-600 text-sm")
+           show=not args.no_browser, reload=False, storage_secret=login.storage_secret(), show_welcome_message=True)
 
 
 if __name__ == "__main__":
+    setup_page_first()
     main()

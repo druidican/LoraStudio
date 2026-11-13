@@ -80,6 +80,7 @@ def _strip(shell: Shell):
 def build_page():
     """The whole program for one browser tab."""
     import lora_library as LL
+    import setup_page
     import studio_css
     ui.add_head_html(f"<style>{LL.CSS}</style>")          # the cards, tiles and tables drawn as HTML
     import sdgui
@@ -92,6 +93,7 @@ def build_page():
                      "attributeFilter:['class']});f();})();</script>")
     ui.add_head_html(BRIDGE_JS)
     shell = Shell()
+    setup_page.notice_gate()                              # shown once, before anything else
     ui.on("ls_nav", lambda e: shell.go("settings", group=e.args))
     ui.on("ls_lora", lambda e: shell.go("collection", lora=str(e.args)))
     import notify

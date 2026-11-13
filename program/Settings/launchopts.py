@@ -65,7 +65,8 @@ def restart(delay: float = 1.5, extra: list | None = None):
         args.append("--no-browser")                   # the open page reloads by itself
         args += list(extra or [])
         print("[LoRA Studio] restarting with the new launch options ...", flush=True)
-        os.execv(sys.executable, [sys.executable, str(_LP.ROOT / "lora_studio.py")] + args)
+        script = os.path.abspath(sys.argv[0]) if sys.argv[0].endswith(".py") else str(_LP.ROOT / "lora_studio.py")
+        os.execv(sys.executable, [sys.executable, script] + args)
     threading.Thread(target=go, daemon=True).start()
 
 

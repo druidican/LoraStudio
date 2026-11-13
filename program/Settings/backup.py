@@ -219,7 +219,7 @@ def restart_program(delay: float = 1.5):
         args = [a for a in sys.argv[1:] if a != "--setup"]
         if "--no-browser" not in args:
             args.append("--no-browser")
-        script = str(_LP.ROOT / "lora_studio.py")
+        script = os.path.abspath(sys.argv[0]) if sys.argv[0].endswith(".py") else str(_LP.ROOT / "lora_studio.py")
         print("[LoRA Studio] restarting with the new settings ...", flush=True)
         try:
             sys.stdout.flush()
