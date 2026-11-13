@@ -134,9 +134,9 @@ are gone. Keep it that way: build a step's controls when it is opened, redraw HT
 
 ## Open
 
-- **NiceGUI (owner decided 2026-11-13):** done as a complete redo; 1.131126c is the first beta (updater channel
-  *Betas too*). The Gradio version is kept on the branch `old`. Waiting for the owner's test on real hardware; then a
-  release when the owner says it is good. Plan and decisions: `docs/NICEGUI_PLAN.md`.
+- **NiceGUI (owner decided 2026-11-13):** done as a complete redo. 1.131126c tested by the owner on real hardware
+  (training, ComfyUI test pictures, amd-smi values, update and install all fine) and published as the normal
+  release. The Gradio version is kept on the branch `old`. Plan and decisions: `docs/NICEGUI_PLAN.md`.
 - **Redesign, bold part (owner approved 2026-11-11):** done (Home, the dataset page, Queue, Insights in the
   Collection, the ? manual with new pip pictures). Every release removes the code it replaces (owner: no leftovers,
   no loops). The plan and the task walk-throughs are in the owner's walkthrough document (Usability tab) and the

@@ -41,5 +41,5 @@ Owner's decisions (2026-11-13):
 - [x] Settings: every group (UI/pg_settings.py, UI/set_panels.py); the first-start setup page (UI/setup_page.py)
 - [x] Gradio removed (ticker, loadjoin, livepoll deleted; the old build functions gone); selftest; install/start scripts
 - [x] Manual text and new pip screenshots (`tools/make_test_world.py`: the pretend trainer now writes a loss log)
-- [x] Beta release 1.131126c
+- [x] Beta release 1.131126c; owner's test on real hardware passed (2026-11-13), made the normal release
 - [x] When complete (owner, 2026-11-13): the old `main` kept as branch `old`, `nicegui` became the new `main`.
