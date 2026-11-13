@@ -120,7 +120,7 @@ def build_page():
             ui.button("?", on_click=lambda: help_dialog(shell)).props("flat round color=white") \
                 .tooltip("The manual for this page")
         _strip(shell)
-    with ui.tab_panels(shell.tabs, value=app.storage.user.get("start", "home")) \
+    with ui.tab_panels(shell.tabs, value=_start_page()) \
             .props("animated=false keep-alive").classes("w-full bg-transparent"):
         for key, label in PAGES:
             with ui.tab_panel(key).classes("p-0"):
@@ -145,6 +145,12 @@ window.lsGoRun = function(log){ emitEvent('ls_go', 'run|' + log); };
 window.lsOpenLora = function(gid){ emitEvent('ls_lora', 'gid:' + gid); };
 </script>
 """
+
+
+def _start_page() -> str:
+    import launchopts
+    k = launchopts.load().get("start_page") or "home"
+    return k if k in dict(PAGES) else "home"
 
 
 def help_dialog(shell: Shell):

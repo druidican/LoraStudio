@@ -69,3 +69,5 @@ body { background:var(--ls-bg); color:var(--ls-text); font-family:Inter, system-
 .ls-row:hover { background:rgba(127,127,127,.12); }
 .ls-nav { color:var(--ls-muted) !important; border-radius:0 !important; border-bottom:2px solid transparent; font-weight:600; }
 .ls-nav.ls-nav-on { color:var(--ls-text) !important; border-bottom-color:var(--ls-accent); }
+.q-btn.ls-set-item { justify-content:flex-start; color:var(--ls-text) !important; border-radius:8px; font-weight:500; }
+.q-btn.ls-set-item.ls-set-on { background:var(--ls-accent-bg) !important; font-weight:650; }
