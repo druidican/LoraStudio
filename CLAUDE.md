@@ -127,6 +127,9 @@ Playwright long tasks; `LS_TICK_DEBUG=1` prints what each tick changes.
 
 ## Open
 
+- **Moving to NiceGUI (owner decided 2026-11-13): a complete redo, built all at once on the branch `nicegui`;**
+  `main` stays the Gradio version until it is complete, then betas. Plan, decisions and progress: `docs/NICEGUI_PLAN.md`
+  (on that branch). Work there; on `main` only fixes the owner asks for.
 - **Redesign, bold part (owner approved 2026-11-11):** moderate part 1.111126h-j; Home and the ? Manual 1.131126; the
   dataset page, the Queue tab and Insights in the Collection 1.131126b. Still to do: the manual's pictures retaken
   from a new pip demo world (the text is up to date; old screenshots still show Training › Run / Results), and a last
