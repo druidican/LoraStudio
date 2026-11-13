@@ -22,7 +22,7 @@ from widgets import CropPanel, PaintPanel, note, pic_url, stream
 
 
 def attach(page):
-    for n, fn in ((2, step2), (3, step3), (4, step4), (5, step5), (6, step6)):
+    for n, fn in ((2, step2), (3, step3), (4, step4), (5, step5), (6, step6), (7, step7), (8, step8)):
         page.steps[n] = (lambda fn=fn: fn(page))
 
 
@@ -498,4 +498,383 @@ def step6(page):
             .props("outline dense no-caps")
         go_b = ui.button("Resize →", on_click=resize).props("unelevated no-caps color=primary")
     wm_draw()
+    draw()
+
+
+# --------------------------------------------------------------------------- 7 Captions
+LEAVE_LABEL = {"character": "Never describe (always part of the person)",
+               "style": "Never describe (the style itself: the trigger word learns it)",
+               "object": "Never describe (the object itself: the trigger word learns it)",
+               "worn": "Never describe (the item's own look: the trigger word learns it)",
+               "action": "Never describe (the pose or action itself: the trigger word learns it)",
+               "concept": "Never describe (the effect itself: the trigger word learns it)"}
+
+CC_PAGE_JS = """
+<script>
+window.ccOpen = function(btn){
+  var d = btn.closest('.cc-odd'); if (!d) return;
+  document.querySelectorAll('#cc_html .cc-odd.cc-sel').forEach(function(e){ e.classList.remove('cc-sel'); });
+  d.classList.add('cc-sel');
+  emitEvent('cc_open', d.dataset.p);
+};
+</script>
+"""
+
+
+def leave_default(ds) -> str:
+    m = F.meta(ds)
+    if m.get("leave_out") is not None:
+        return m["leave_out"]
+    CAP = S.CAP
+    if CAP is None:
+        return ""
+    words = m.get("concept_words") or ""
+    if m["purpose"] in F.CONCEPT_KINDS and words:
+        return words
+    return CAP.STYLE_LEAVE_OUT if m["purpose"] == "style" else CAP.DEFAULT_LEAVE_OUT
+
+
+def step7(page):
+    import sd_prepare as SP
+    ds = page.s["ds"]
+    m = F.meta(ds)
+    purpose = m["purpose"]
+    if S.CAP is not None:
+        S.CAP.PURPOSE.update(value=purpose, words=m.get("concept_words") or "", **{"class": m.get("class_word", "person")})
+    tkey = page.s.get("tkey") if page.s.get("tkey") in m["types"] else (m["types"] or [""])[0]
+    url0, model0 = S.oc_settings()
+    head("Tag every picture",
+         "Tags (Illustrious, Pony, SDXL anime, Anima) are written by the WD tagger (run by sd-scripts; the first time it "
+         "downloads about 1.2 GB). Only general tags: no character names, so the trigger word stands for them; the Never "
+         "describe list and the consistency check apply as usual. Sentences (FLUX, Qwen-Image, Z-Image, …) are written by "
+         "Ollama.")
+    if not FT.have("ollama"):
+        note("Ollama is not installed: tag sets work, sentence captions do not. Write those yourself in 8 Review (click "
+             f"a picture), or put .txt files next to the pictures. Ollama: {FT.ollama_guide()}, then Settings › Start "
+             "and network.")
+    ui.html(V.s7_rec_html(purpose), sanitize=False).classes("w-full")
+    sets_html = ui.html(V.s7_sets_html(ds), sanitize=False).classes("w-full")
+    with ui.expansion("Caption settings: trigger word, never describe, length, detail, try on 3 pictures").classes("w-full ls-card"):
+        note("The Ollama model (Settings › AI helpers) looks at every picture and writes a caption that starts with the "
+             "trigger word. For a person, captions describe what changes (clothes, pose, place, light, framing) and leave "
+             "out what is always that person, so the trigger word learns it. Try on 3 pictures writes nothing.")
+        with ui.row().classes("w-full no-wrap gap-2"):
+            trig = ui.input("Trigger word (first word of every caption)", value=m["trigger"] or ds) \
+                .props("outlined dense").classes("w-64")
+            leave = ui.input(LEAVE_LABEL.get(purpose, LEAVE_LABEL["character"]), value=leave_default(ds)) \
+                .props("outlined dense").classes("grow")
+        rec_md, style0, length0, detail0 = SP.oc_recommend(tkey, purpose)
+        with ui.row().classes("w-full items-end gap-4"):
+            style = ui.toggle({"sentences": "Sentences", "tags": "Tags"}, value=style0).props("dense no-caps unelevated")
+            with ui.column().classes("gap-0 grow"):
+                ui.label("Length (1 very short … 5 very long)").classes("ls-note")
+                length = ui.slider(min=1, max=5, step=1, value=length0).props("label markers")
+            with ui.column().classes("gap-0 grow"):
+                ui.label("Detail (1 basic … 4 everything)").classes("ls-note")
+                detail = ui.slider(min=1, max=4, step=1, value=detail0).props("label markers")
+        rec = ui.markdown(rec_md)
+        ex = ui.html("", sanitize=False).classes("w-full")
+
+        def example():
+            ex.content = SP.oc_example(style.value, length.value, detail.value, trig.value, tkey)
+
+        def recommended():
+            md, s_, l_, d_ = SP.oc_recommend(tkey, purpose)
+            rec.content = md
+            style.value, length.value, detail.value = s_, l_, d_
+            example()
+        with ui.row().classes("items-center gap-2"):
+            hints = ui.checkbox("Give the old tags to the model as hints (they can be wrong)")
+            ui.button("Use recommended", on_click=recommended).props("flat dense no-caps")
+            prev_b = ui.button("Try on 3 pictures").props("outline dense no-caps")
+            ui.button("Undo last change", on_click=lambda: setattr(out, "content", SP.rv_undo())).props("flat dense no-caps")
+        for w in (style, length, detail, trig):
+            w.on_value_change(lambda: example())
+        example()
+    out = ui.markdown("")
+
+    def keep_leave():
+        mm = F.meta(ds)
+        mm["leave_out"] = leave.value
+        F.meta_save(ds, mm)
+
+    async def preview():
+        keep_leave()
+        await stream(SP.oc_preview(ds, url0, model0, trig.value, leave.value, hints.value, style.value, length.value,
+                                   detail.value), lambda line: setattr(out, "content", line))
+    prev_b.on_click(preview)
+
+    async def write(only_missing=False):
+        keep_leave()
+        sets = F.caption_sets(ds)
+        msg = ""
+
+        def lines():
+            nonlocal msg
+            for st_ in sets:
+                last = ""
+                for line in F.write_set(ds, url0, model0, trig.value or ds, leave.value, st_["style"], length.value,
+                                        detail.value, st_["ext"], only_missing=only_missing):
+                    last = line
+                    yield (msg + "\n\n" if msg else "") + line
+                msg += ("\n\n" if msg else "") + last
+            yield msg
+        await stream(lines(), lambda line: setattr(out, "content", line))
+        sets_html.content = V.s7_sets_html(ds)
+        if is_char or worn:
+            mv_draw()
+        if worn:
+            kind_msg.content = F.worn_balance(ds)
+    with ui.row().classes("items-center gap-2"):
+        ui.button("Write the captions", on_click=lambda: write(False)).props("unelevated dense no-caps color=primary")
+        ui.button("Only pictures without a caption", on_click=lambda: write(True)).props("outline dense no-caps")
+        ui.button("Stop", on_click=lambda: (F.STOP.set(), S.OC_STOP.update(flag=True))).props("flat dense no-caps color=negative")
+
+    worn = purpose == "worn"
+    is_char = DC.base_purpose(purpose) == "character"
+    # ---- worn item: kinds and places
+    with ui.card().props("flat bordered").classes("ls-card w-full gap-2") as kind_card:
+        ui.label("Kinds and where they are worn").classes("font-semibold")
+        note("One line per kind of item you want to ask for in a prompt, with the other words the tagger uses for it "
+             "after = (for example hair clip = hairclip, hair ornament), and the same for where they are worn (on index "
+             "finger, in hair). Make the words the same turns the other words into the kind's name in every caption and "
+             "puts the trigger word, the kinds and the places first. It also counts the pictures per kind.")
+        w = F.worn_setup(ds)
+        with ui.row().classes("w-full no-wrap gap-2"):
+            kinds = ui.textarea("Kinds (one per line: name = other words)", value=w["kinds"],
+                                placeholder="ring = rings\nhair clip = hairclip, hair ornament").props("outlined").classes("grow")
+            places = ui.textarea("Where they are worn (one per line: name = other words)", value=w["places"],
+                                 placeholder="on index finger\nin hair = hair clip in hair").props("outlined").classes("grow")
+        kind_msg = ui.markdown(F.worn_balance(ds) if worn else "")
+
+        def kind_suggest():
+            k, pl = F.suggest_worn(ds, ".txt", trig.value or ds)
+            if not (k or pl):
+                kind_msg.content = "No kinds found in the captions yet: write the tag captions first."
+                return
+            merge = lambda cur, new: "\n".join(dict.fromkeys([x for x in (cur or "").splitlines() if x.strip()]
+                                                             + [x for x in new.splitlines() if x.strip()]))
+            kinds.value, places.value = merge(kinds.value, k), merge(places.value, pl)
+            kind_msg.content = ("Found in the captions: check the lines, remove what you don't want to ask for, add the "
+                                "rest, then Make the words the same.")
+
+        def kind_save():
+            F.set_worn_setup(ds, kinds.value, places.value)
+            kind_msg.content = "✔ Saved. " + F.worn_balance(ds)
+
+        def kind_go():
+            F.set_worn_setup(ds, kinds.value, places.value)
+            kind_msg.content = F.same_words(ds, ".txt", trig.value or ds)
+            mv_draw()
+        with ui.row().classes("gap-2"):
+            ui.button("Suggest from the tags", on_click=kind_suggest).props("outline dense no-caps")
+            ui.button("Save", on_click=kind_save).props("flat dense no-caps")
+            ui.button("Make the words the same", on_click=kind_go).props("unelevated dense no-caps color=primary")
+    kind_card.set_visibility(worn)
+    # ---- tags -> trigger words
+    with ui.card().props("flat bordered").classes("ls-card w-full gap-2") as mv_card:
+        ui.label("Item tags → trigger words" if worn else "Character tags → trigger words").classes("font-semibold")
+        note(("For a worn item the WD tagger writes every tag, also the item's own look (metal, stones, pattern, "
+              "material …). Tick the ones that are the item's look: Move takes them out of the captions (so the trigger "
+              "word learns them) and puts them in the Item description below. A tag with a kind in it (gold ring) leaves "
+              "the kind (ring).") if worn else
+             ("For a character the WD tagger writes every tag, also the character's own (hair, eyes, freckles …). Tick "
+              "the ones that belong to the character: Move takes them out of the captions (so the trigger word learns "
+              "them) and puts them in the Character description below. Ticked already: the traits in most pictures. "
+              "The captions with all tags are kept, so Put them back undoes it."))
+        mv_tags = ui.select({}, multiple=True, label="Tags of the caption set (pictures that have them)") \
+            .props("outlined dense use-chips").classes("w-full")
+        mv_msg = ui.markdown("")
+
+        def mv_draw(msg=""):
+            rows, n = F.tag_counts(ds, ".txt", trig.value or ds)
+            if not n:
+                mv_tags.options, mv_tags.value = {}, []
+                mv_tags.update()
+                mv_msg.content = msg or "No captions yet: write the tag captions above first."
+                return
+            mm = F.meta(ds)
+            kk, pp = F.worn_names(ds)
+            mv_tags.options = {t: f"{t} ({c})" for t, c in rows[:120]}
+            mv_tags.value = F.default_ticks(rows, n, mm["purpose"], mm.get("worn_kind"), kk, pp)
+            mv_tags.update()
+            moved = F.moved_tags(ds)
+            mv_msg.content = msg or (f"{n} captions, {len(rows)} different tags."
+                                     + (f" Moved already: {', '.join(moved)}." if moved else ""))
+
+        def mv_go():
+            msg = F.move_tags(ds, mv_tags.value or [], ".txt", trig.value or ds)
+            mv_draw(msg)
+            desc.value = F.description(ds)
+
+        def mv_back():
+            msg = F.put_back(ds, ".txt")
+            mv_draw(msg)
+            desc.value = F.description(ds)
+        with ui.row().classes("gap-2"):
+            ui.button("Read the tags", on_click=lambda: mv_draw()).props("outline dense no-caps")
+            ui.button("Move the ticked tags", on_click=mv_go).props("unelevated dense no-caps color=primary")
+            ui.button("Put them back", on_click=mv_back).props("flat dense no-caps")
+    mv_card.set_visibility(is_char or worn)
+    # ---- description next to the trigger word
+    with ui.card().props("flat bordered").classes("ls-card w-full gap-2") as desc_card:
+        ui.label(("Item" if worn else "Character") + " description, next to the trigger word").classes("font-semibold")
+        note("The traits are not in the captions (moved above, or never written), so the trigger word learns them. Name "
+             "them here too: they are added to the LoRA's trigger words in its LoRA Manager data, so ComfyUI offers them "
+             "next to the trigger word. The captions do not change. Suggest takes the traits the WD tagger saw in most "
+             "pictures (never ethnicity, skin or age).")
+        desc = ui.input("Item description" if worn else "Character description", value=F.description(ds),
+                        placeholder="silver, leaf design, small green stones" if worn else
+                        "round glasses, red scarf, silver earrings").props("outlined dense").classes("w-full")
+        desc_msg = ui.markdown("")
+
+        def desc_save():
+            d = F.set_description(ds, desc.value)
+            desc.value = d
+            desc_msg.content = ((f"✔ Saved. The LoRAs of this dataset get {d} next to their trigger word when they are "
+                                 "scanned (Collection › Maintenance › Sync now passes it on to LoRA Manager).") if d
+                                else "✔ No description: only the trigger word.")
+
+        def desc_suggest():
+            sug = F.suggest_description(ds)
+            if not sug:
+                desc_msg.content = ("Nothing to suggest yet: write the tag captions with the WD tagger first (tags only; "
+                                    "for sentence captions type the description yourself).")
+                return
+            words = [w_.strip() for w_ in (desc.value or "").split(",") if w_.strip()]
+            for w_ in sug.split(", "):
+                if w_.lower() not in {x.lower() for x in words}:
+                    words.append(w_)
+            desc.value = ", ".join(words)
+            desc_msg.content = "Suggested from the tags: check it, add build or height yourself, then Save."
+        with ui.row().classes("gap-2"):
+            ui.button("Save", on_click=desc_save).props("unelevated dense no-caps color=primary")
+            ui.button("Suggest from the tags", on_click=desc_suggest).props("outline dense no-caps")
+    desc_card.set_visibility(is_char or worn)
+    # ---- consistency
+    with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
+        ui.label("Consistency, checked while tagging").classes("font-semibold")
+        note("The traits of the character itself that the captions mention (hair, eyes, build, skin, horns, tattoos, a "
+             "signature object): the same in most pictures is taken out of the captions so the trigger word learns it; "
+             "words that mean the same become one word; odd pictures that say something else are shown so you can look. "
+             "Clothes, places, poses, expressions and light stay in each caption.")
+        cc_sum = ui.markdown("")
+        with ui.row().classes("w-full no-wrap items-start gap-4"):
+            cc_html = ui.html("", sanitize=False).classes("grow basis-3/5 min-w-0").props('id="cc_html"')
+            with ui.column().classes("grow basis-2/5 gap-1"):
+                cc_img = ui.image("").classes("w-full rounded")
+                cc_img.set_visibility(False)
+                cc_cap = ui.markdown("Click a picture that says something else to look at it with its caption.")
+        cc_msg = ui.markdown("")
+        cc_ok = ui.checkbox("Replace the locked choices")
+        cc_ok.set_visibility(False)
+
+        def cc_draw():
+            cc_sum.content, cc_html.content = SP.cc_render(ds)
+
+        async def cc_check():
+            cc_msg.content = "Reading the captions …"
+            r = await run.io_bound(SP.cc_find, ds, url0, model0, trig.value, None)
+            cc_sum.content, cc_html.content = r
+            cc_msg.content = ""
+
+        async def cc_apply():
+            res = await ui.run_javascript("(" + SP.CC_JS + ")('', '', '', '', '', false)")
+            choices = res[1] if isinstance(res, list) and len(res) > 1 else "{}"
+            msg, upd = await run.io_bound(SP.cc_apply, ds, choices, url0, model0, trig.value, cc_ok.value, None)
+            cc_msg.content = msg
+            cc_ok.set_visibility(bool(isinstance(upd, dict) and upd.get("visible")))
+            cc_draw()
+            sets_html.content = V.s7_sets_html(ds)
+            lv = SP.cc_leave_out(ds, leave.value)
+            if isinstance(lv, dict) and lv.get("value"):
+                leave.value = lv["value"]
+                keep_leave()
+
+        def cc_open(path):
+            img, cap = SP.cc_open(path)
+            if isinstance(img, str):
+                cc_img.set_source(pic_url(img, 900))
+                cc_img.set_visibility(True)
+                cc_cap.content = cap
+
+        def mirror():
+            sets = F.caption_sets(ds)
+            if len(sets) < 2:
+                cc_msg.content = "There is only one caption set."
+                return
+            cc_msg.content = "\n\n".join(F.mirror_kept(ds, x["ext"], url0, model0, trig.value) for x in sets[1:])
+        page.on_cc_open = cc_open
+        with ui.row().classes("items-center gap-2"):
+            ui.button("Check the captions", on_click=cc_check).props("outline dense no-caps")
+            ui.button("Stop", on_click=SP.cc_stop).props("flat dense no-caps color=negative")
+            ui.button("Apply choices", on_click=cc_apply).props("unelevated dense no-caps color=primary")
+            if len(F.caption_sets(ds)) > 1:
+                ui.button("Apply to the other caption set too", on_click=mirror).props("outline dense no-caps")
+        cc_draw()
+    ui.button("Continue to Review →", on_click=lambda: page.go(step=8)).props("unelevated no-caps color=primary")
+    if is_char or worn:
+        mv_draw()
+
+
+# --------------------------------------------------------------------------- 8 Review
+def step8(page):
+    ds = page.s["ds"]
+    head("Review")
+    sets = F.caption_sets(ds)
+    with ui.row().classes("w-full no-wrap items-start gap-4"):
+        with ui.card().props("flat bordered").classes("ls-card w-72 flex-none gap-1"):
+            ui.label("The folder").classes("font-semibold")
+            tree = ui.html("", sanitize=False)
+            ui.label("Checks").classes("font-semibold")
+            checks = ui.html("", sanitize=False)
+        with ui.column().classes("grow min-w-0 gap-2"):
+            show = ui.toggle(["Problems first", "All"], value="Problems first").props("dense no-caps unelevated")
+            g = ui.html("", sanitize=False).classes("w-full")
+        with ui.card().props("flat bordered").classes("ls-card w-96 flex-none gap-2"):
+            img = ui.image("").classes("w-full rounded")
+            img.set_visibility(False)
+            name = ui.label("Click a picture to see and edit its caption.").classes("ls-note")
+            cap1 = ui.textarea("Caption").props("outlined autogrow").classes("w-full")
+            cap2 = ui.textarea(f"Caption IMG{sets[1]['ext']}" if len(sets) > 1 else "Second caption set") \
+                .props("outlined autogrow").classes("w-full")
+            cap2.set_visibility(len(sets) > 1)
+            msg = ui.markdown("")
+            cur = {"p": ""}
+
+            def save():
+                if not cur["p"]:
+                    msg.content = "Click a picture first."
+                    return
+                p = Path(cur["p"])
+                F.set_file(p, sets[0]["ext"]).write_text((cap1.value or "").strip() + "\n", encoding="utf-8")
+                if len(sets) > 1 and (cap2.value or "").strip():
+                    F.set_file(p, sets[1]["ext"]).write_text(cap2.value.strip() + "\n", encoding="utf-8")
+                msg.content = f"✔ Saved the caption of {p.name}."
+            ui.button("Save caption changes", on_click=save).props("outline dense no-caps")
+
+    def draw():
+        tree.content, checks.content, g.content = V.s8_render(ds, show.value)
+
+    def pick(path):
+        p = Path(path)
+        cur["p"] = str(p)
+        img.set_source(pic_url(p, 900))
+        img.set_visibility(True)
+        name.text = p.name
+        cap1.value = F.read_set(p, sets[0]["ext"]) or ""
+        cap2.value = (F.read_set(p, sets[1]["ext"]) or "") if len(sets) > 1 else ""
+        msg.content = ""
+
+    def fix(arg):
+        action, _, path = arg.partition("|")
+        msg.content = F.fix(ds, action, path)
+        draw()
+
+    def done():
+        F.mark_step(ds, "review")
+        page.go(step=9)
+    page.on_pick, page.on_fix = pick, fix
+    show.on_value_change(lambda: draw())
+    ui.button("Continue to Train →", on_click=done).props("unelevated no-caps color=primary")
     draw()

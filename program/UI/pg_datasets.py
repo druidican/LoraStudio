@@ -218,6 +218,10 @@ class Datasets:
         ds_steps.attach(self)
         ui.add_head_html("<script>" + V.GRID_JS + "</script>")
         ui.on("ls_ds_box", lambda e: self.route(str(e.args)))
+        import sd_prepare
+        import ds_steps as _DS
+        ui.add_head_html(_DS.CC_PAGE_JS + "<script>" + sd_prepare.CC_OPEN_JS + "</script>")
+        ui.on("cc_open", lambda e: getattr(self, "on_cc_open", lambda v: None)(str(e.args)))
         ui.on("ls_wm_tool", lambda e: getattr(self, "on_wm_tool", lambda v: None)(str(e.args)))
         self.draw()
 
