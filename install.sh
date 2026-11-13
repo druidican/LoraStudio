@@ -100,7 +100,7 @@ write_report() {   # write_report "result": reports/install_report_<time>.md (to
     {
         echo "# LoRA Studio install report · $(date '+%Y-%m-%d %H:%M')"
         echo ""
-        echo "Please look at this install of LoRA Studio (a Gradio app that trains LoRAs with sd-scripts / musubi-tuner)."
+        echo "Please look at this install of LoRA Studio (a NiceGUI app that trains LoRAs with sd-scripts / musubi-tuner)."
         echo ""
         echo "- Result: **$1**"
         echo "- LoRA Studio ${ver:-?} · install.sh run as: install.sh ${ARGS_GIVEN:-(no options)}"
@@ -666,7 +666,7 @@ ok "trainer library versions locked in constraints.txt"
 fi   # TRAINERS = install (steps 4 and 5)
 
 # ------------------------------------------------------------------ 6. GUI packages
-step "LoRA Studio packages (Gradio)"
+step "LoRA Studio packages (NiceGUI)"
 if [ "$TRAINERS" = install ]; then
     PIP install -q --upgrade -r "$TARGET/requirements.txt" -c "$CONS"
     echo "$GPU ${GFX:-cuda}" > "$VENV/.lorastudio-shared"
@@ -676,7 +676,7 @@ else
 fi
 sha256 "$TARGET/requirements.txt" > "$VENV/.requirements.sha256"
 (cd "$TARGET" && pwd -P) > "$VENV/.lorastudio-root"     # start.sh puts the paths right when the folder is moved
-ok "gradio $("$PY" -c 'import gradio; print(gradio.__version__)')"
+ok "nicegui $("$PY" -c 'import nicegui; print(nicegui.__version__)')"
 
 # ------------------------------------------------------------------ 7. test
 step "Testing"
@@ -689,7 +689,7 @@ if [ "$SD_MODE" = existing ]; then
     "$EX_VENV/bin/python" -c 'import torch; ok = torch.cuda.is_available(); print("   torch", torch.__version__, "GPU available:", ok, ("· " + torch.cuda.get_device_name(0)) if ok else "")' \
         || warn "PyTorch does not load in $EX_VENV"
 fi
-[ "$TRAINERS" = existing ] && ok "LoRA Studio itself: $("$PY" -c 'import gradio; print("gradio", gradio.__version__)')"
+[ "$TRAINERS" = existing ] && ok "LoRA Studio itself: $("$PY" -c 'import nicegui; print("nicegui", nicegui.__version__)')"
 if [ "$TRAINERS" = install ]; then
 if PIP check >/tmp/lorastudio-pipcheck.txt 2>&1; then ok "pip check: no broken requirements"
 else warn "pip check reports (usually harmless, see install.log):"; sed 's/^/     /' /tmp/lorastudio-pipcheck.txt | head -8; cat /tmp/lorastudio-pipcheck.txt >> "$LOG"; fi

@@ -2,7 +2,7 @@
 """Report for Claude: one file with everything needed to ask about a problem, instead of copy-pasting by hand.
 
 make(logname="") -> (path, text). With a run log: the run (result, time, what went wrong), its launch script and the
-end of its log. Always: the LoRA Studio version and parts, the machine (GPU, system, Python, Gradio) and the newest
+end of its log. Always: the LoRA Studio version and parts, the machine (GPU, system, Python, NiceGUI) and the newest
 machine check. Before it is written, the Hugging Face token and anything that looks like a token are removed and
 your home folder is shown as ~. Saved as reports/lorastudio_report_<time>.md in the program folder; the page also
 copies it, so it can be pasted or dropped into a chat.
@@ -114,7 +114,7 @@ def make(logname: str = "", note: str = "") -> tuple[Path, str]:
     parts = []
     parts.append(f"# LoRA Studio report · {time.strftime('%Y-%m-%d %H:%M')}")
     parts.append("")
-    parts.append("Please help me with this problem in LoRA Studio (a Gradio app that trains LoRAs with sd-scripts / "
+    parts.append("Please help me with this problem in LoRA Studio (a NiceGUI app that trains LoRAs with sd-scripts / "
                  "musubi-tuner). Everything below was collected by the program.")
     if note.strip():
         parts += ["", "## What I see", "", note.strip()]

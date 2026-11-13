@@ -28,7 +28,7 @@ function Write-Report($result, $linux = "") {
         $os = Get-CimInstance Win32_OperatingSystem
         $gpu = (Get-CimInstance Win32_VideoController | ForEach-Object { "$($_.Name) (driver $($_.DriverVersion))" }) -join " · "
         $lines = @("# LoRA Studio install report (Windows) · $(Get-Date -Format 'yyyy-MM-dd HH:mm')", "",
-            "Please look at this install of LoRA Studio on Windows (WSL2; a Gradio app that trains LoRAs).", "",
+            "Please look at this install of LoRA Studio on Windows (WSL2; a NiceGUI app that trains LoRAs).", "",
             "- Result: **$result**",
             "- Windows: $($os.Caption) $($os.Version) (build $($os.BuildNumber)) · WSL distro: $Distro",
             "- Graphics: $gpu") + $script:Rpt

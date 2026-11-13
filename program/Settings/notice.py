@@ -30,7 +30,7 @@ LoRA Studio only starts them, and the installer only downloads them from their o
 - sd-scripts: https://github.com/kohya-ss/sd-scripts
 - musubi-tuner: https://github.com/kohya-ss/musubi-tuner
 
-The same goes for PyTorch, ROCm, CUDA, Gradio, Ollama and ComfyUI, and for every model you train with or download:
+The same goes for PyTorch, ROCm, CUDA, NiceGUI, Ollama and ComfyUI, and for every model you train with or download:
 each keeps its own owner and licence, and you use them under their terms.
 
 The LoRAs you make, and the pictures you train them on, are yours and your responsibility."""

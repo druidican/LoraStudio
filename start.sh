@@ -146,7 +146,7 @@ fi
 # 2. Install / update the packages when requirements.txt is new or changed
 WANT="$(sha256 requirements.txt)"
 HAVE="$(cat "$STAMP" 2>/dev/null)"
-if [ "$WANT" != "$HAVE" ] || ! "$PY" -c "import gradio, pandas, PIL" >/dev/null 2>&1; then
+if [ "$WANT" != "$HAVE" ] || ! "$PY" -c "import nicegui, PIL" >/dev/null 2>&1; then
     echo "Installing packages from requirements.txt (only needed once) ..."
     if ! "$PY" -m pip install --upgrade -r requirements.txt "${CONS[@]}"; then
         echo
@@ -159,5 +159,5 @@ fi
 # 3. First start (no settings yet) or --setup: LoRA Studio opens its setup page in the browser
 #    (folders, token, Ollama, or import a backup). Without a browser: venv/bin/python program/Settings/setup.py asks in the terminal.
 
-echo "Starting LoRA Studio with $("$PY" -c 'import sys, gradio; print(f"Python {sys.version.split()[0]}, Gradio {gradio.__version__}")')"
+echo "Starting LoRA Studio with $("$PY" -c 'import sys, nicegui; print(f"Python {sys.version.split()[0]}, NiceGUI {nicegui.__version__}")')"
 exec "$PY" lora_studio.py "${ARGS[@]}"

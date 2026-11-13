@@ -113,6 +113,6 @@ License, version 3** ([LICENSE](LICENSE)). It comes with no warranty.
 Copyright © 2026 L. G. H. Druidican.
 
 LoRA Studio uses, but does not include (see [NOTICE](NOTICE), also shown once at the first start): [sd-scripts](https://github.com/kohya-ss/sd-scripts) and
-[musubi-tuner](https://github.com/kohya-ss/musubi-tuner) (Apache-2.0, by kohya-ss), [Gradio](https://gradio.app)
+[musubi-tuner](https://github.com/kohya-ss/musubi-tuner) (Apache-2.0, by kohya-ss), [NiceGUI](https://nicegui.io)
 (Apache-2.0), [PyTorch](https://pytorch.org) (BSD), [Ollama](https://ollama.com) (MIT) and
 [ComfyUI](https://github.com/comfyanonymous/ComfyUI) (GPL-3.0). The installer downloads them from their own sources.

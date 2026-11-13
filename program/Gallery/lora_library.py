@@ -2589,7 +2589,7 @@ def personal_sync(lib: Library, progress=None) -> str:
 # --------------------------------------------------------------------------- #
 
 CSS = """
-/* Normal (light) palette; the dark one below is used when Gradio runs in dark mode */
+/* Normal (light) palette; the dark one below is used in dark mode */
 :root { --ll-card:#FDFDFB; --ll-line:#C9CDD3; --ll-line2:#BCC2CA; --ll-text:#1C1F24; --ll-muted:#5A626C;
         --ll-dim:#7D858F; --ll-ok:#21857C; --ll-warn:#A86A0C; --ll-prob:#C0392B; --ll-chip:#EDEFF2;
         --ll-chip-text:#3A4048; --ll-imgbg:#E6E9ED; --ll-dash:#B5BBC3; --ll-warn-bg:#FBF1DF; --ll-warn-fg:#7A4E05;

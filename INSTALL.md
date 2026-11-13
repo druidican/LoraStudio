@@ -80,7 +80,7 @@ The installer explains each step as it goes. What it asks:
    is asked which one to train on.
 
 It then installs everything into **`~/LoraStudio`**: LoRA Studio, its own Python 3.12 (`.tools/`), one Python
-environment (`venv/`, always the newest Gradio and other program packages) with PyTorch for
+environment (`venv/`, always the newest NiceGUI and other program packages) with PyTorch for
 your card, and the trainers. This takes a while (PyTorch with ROCm or CUDA is several GB). Everything it prints is
 also in `~/LoraStudio/install.log`, and at the end it writes an **install report** to
 `~/LoraStudio/userdata/reports/` (without tokens, passwords or your home folder) that you can send when something

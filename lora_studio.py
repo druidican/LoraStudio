@@ -46,7 +46,7 @@ def setup_page_first():
     and sdgui are imported, because those make default settings files when there are none. When it finishes, it
     starts this program again (same port) with the new settings."""
     import firstrun
-    if "--setup" not in sys.argv and not firstrun.needs_setup():
+    if os.environ.get("LS_PAGE_CHECK") or ("--setup" not in sys.argv and not firstrun.needs_setup()):
         return
     import launchopts
     lo = launchopts.load()
@@ -137,7 +137,8 @@ def main():
             LL.LIB.settings["sd_scripts_dir"] = path
     sdgui.ON_SD_DIR.append(sd_dir_saved)
 
-    auth = args.auth or os.environ.get("SDGUI_AUTH") or (f"{lo['user']}:{lo['password']}"
+    check_only = bool(os.environ.get("LS_PAGE_CHECK"))   # selftest.py: build the page once, start nothing else
+    auth = None if check_only else args.auth or os.environ.get("SDGUI_AUTH") or (f"{lo['user']}:{lo['password']}"
                                                            if lo["user"] and lo["password"] else None)
     from nicegui import app, ui
     import login
@@ -159,7 +160,8 @@ def main():
 
     import version
     print(version.banner())
-    start_tasks(lo)
+    if not check_only:
+        start_tasks(lo)
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print(f"\n*** Listening on {args.host}:{args.port}: anyone on your network can open the program. "
               f"{'A login is required.' if auth else 'No login is set: use --auth user:password.'} ***\n")

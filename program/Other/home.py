@@ -114,5 +114,4 @@ def continue_items() -> list[dict]:
     return out
 
 
-# --------------------------------------------------------------------------- the parts (Gradio page, until it is removed)
 

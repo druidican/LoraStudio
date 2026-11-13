@@ -359,25 +359,8 @@ def _detailscan():
             F._save(DS, "sort.json", old_sort)
 
 
-@check("speed: start-up loaders join into one event; a launch script's type is remembered")
+@check("speed: a launch script's type is remembered")
 def _speed():
-    import gradio as gr
-    import loadjoin as LJ
-    calls = []
-    with gr.Blocks() as app:
-        LJ.catch(app)
-        a, b, c = gr.Textbox(), gr.Textbox(), gr.Textbox()
-        app.load(lambda: "x", None, a).then(lambda v: (calls.append(v), v + "y")[1], a, b)
-        app.load(lambda: gr.update(visible=False), None, c)
-        need(len(LJ.STEPS) == 3, f"steps: {len(LJ.STEPS)}")
-        real = app._ls_real_load
-        app._ls_real_load = lambda fn, i, o, **k: globals().__setitem__("_LJ_RUN", (fn, i, o))
-        LJ.build(app)
-        app._ls_real_load = real
-    fn, ins, outs = globals().pop("_LJ_RUN")
-    res = fn(*[None] * len(ins))
-    need(res[1] == "xy" and calls == ["x"], f"a later step must see an earlier one's value: {res}")
-    need(isinstance(res[2], dict) and res[2].get("visible") is False, res)
     G._TYPE_CACHE.clear()
     t = 'accelerate launch sdxl_train_network.py --output_name "pipILLV1"\n'
     need(G.script_type("x.sh", t) == "illustrious" and len(G._TYPE_CACHE) == 1, "type cache")
@@ -392,28 +375,6 @@ def _speedtest():
     need({"baseline", "swap6", "pinned", "no_checkpointing", "sage_attn", "fp8", "compile"} <= set(names), names)
     ch = ST.changes(args, ST.setopt(ST.drop(args, "sdpa"), "blocks_to_swap", 6) + ["--sage_attn"])
     need(("blocks_to_swap", "10", "6") in ch and any(k == "sdpa" and n is ST.MISSING for k, o, n in ch), ch)
-
-
-@check("the shared timer redraws a one-output part with a single value")
-def _tickone():
-    import gradio as gr
-    import ticker
-    old = (list(ticker.TICKS), dict(ticker.ACTIVE))
-    try:
-        ticker.TICKS.clear()
-        ticker.ACTIVE["on"] = True
-        with gr.Blocks() as app:
-            box = gr.Markdown()
-            ticker.timer(2.0, lambda: "hello", None, box)
-            ticker.build()
-        fns = {getattr(d.fn, "__name__", ""): d.fn for d in app.fns.values()}
-        tick, redraw = fns["tick_all"], fns["redraw"]
-        sig = tick({})[0]
-        need(isinstance(sig, str), f"no change signalled: {sig}")
-        need(redraw(sig) == "hello", f"one output must be one value, got {redraw(sig)!r}")
-    finally:
-        ticker.TICKS[:] = old[0]
-        ticker.ACTIVE.clear(); ticker.ACTIVE.update(old[1])
 
 
 @check("a run stopped before its final LoRA counts as not run")
@@ -963,14 +924,41 @@ def _sortkeep():
 
 
 # ---------------------------------------------------------------- the page
-@check("the training page builds")
+@check("the page builds (every tab)")
 def _page():
-    import gradio as gr
-    with gr.Blocks() as demo:
-        G.build_ui(demo)
-    n = len(demo.blocks)
-    need(n > 50, f"only {n} parts on the page")
-    return f"{n} components"
+    """Start the program on a free port with LS_PAGE_CHECK (no queue, no updates, no login), open the page once."""
+    import socket
+    import subprocess
+    import urllib.request
+    with socket.socket() as so:
+        so.bind(("127.0.0.1", 0))
+        port = so.getsockname()[1]
+    env = {**os.environ, "LS_PAGE_CHECK": "1"}
+    p = subprocess.Popen([sys.executable, str(HERE / "lora_studio.py"), "--no-browser", "--port", str(port)],
+                         cwd=HERE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        html, err = "", ""
+        for _ in range(120):
+            time.sleep(0.5)
+            if p.poll() is not None:
+                break
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=30) as r:
+                    html = r.read().decode("utf-8", "replace")
+                break
+            except OSError as e:
+                err = repr(e)
+        need(html, f"no page: {err or 'the program stopped'}")
+        need("Collection" in html and "Datasets" in html and "Settings" in html, "the tabs are missing")
+    finally:
+        p.terminate()
+        try:
+            out = p.communicate(timeout=15)[0]
+        except subprocess.TimeoutExpired:
+            p.kill()
+            out = p.communicate()[0]
+    need("Traceback" not in out, out[out.find("Traceback"):][:400])
+    return f"{len(html) // 1024} kB"
 
 
 # ---------------------------------------------------------------- done

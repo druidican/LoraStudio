@@ -449,7 +449,7 @@ cd ~/LoraStudio && ./start.sh
 ```
 ~/LoraStudio/
   start.sh, install.sh, *.py   LoRA Studio
-  venv/                        Python 3.12 + PyTorch (ROCm for AMD, CUDA for NVIDIA) + both trainers + Gradio
+  venv/                        Python 3.12 + PyTorch (ROCm for AMD, CUDA for NVIDIA) + both trainers + NiceGUI
   sd-scripts/                  git clone (its venv/ is a link to ../venv)
   musubi-tuner/                git clone (its venv/ is a link to ../venv)
   constraints.txt              PyTorch and trainer library versions that later installs must keep
@@ -471,7 +471,7 @@ What it does, step by step (every step says what it found; it asks before anythi
 5. Clones (or updates) **sd-scripts** and **musubi-tuner** and installs their packages, locked to the
    PyTorch above. Their shared libraries (transformers, diffusers, accelerate, huggingface-hub, ...) are
    then locked too, so a later `pip install -U` cannot break them (huggingface-hub 2.x did once).
-6. Installs LoRA Studio's own packages (Gradio) within those locks.
+6. Installs LoRA Studio's own packages (NiceGUI) within those locks.
 7. **Tests**: PyTorch sees the GPU and multiplies in bf16; `sdxl_train_network.py`,
    `flux_train_network.py` and musubi's `zimage_train_network.py` start.
 8. Points the **settings** at the new trainers (Settings › Folders and Settings › Trainers + GPU).
