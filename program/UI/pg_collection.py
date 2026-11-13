@@ -124,7 +124,7 @@ class Collection:
                 ui.button("Rescan folders", on_click=self.rescan).props("unelevated no-caps color=primary")
             with ui.column().classes("grow gap-2 min-w-0"):
                 with ui.row().classes("items-center gap-4 w-full"):
-                    ui.toggle(["Pictures", "Status"], value="Pictures",
+                    self.look = ui.toggle(["Pictures", "Status"], value="Pictures",
                               on_change=lambda e: self.set(look=e.value)).props("no-caps unelevated")
                     ui.checkbox("Select", on_change=lambda e: self.select_mode(e.value))
                     with ui.row().classes("items-center gap-2") as self.sel_tools:
@@ -168,6 +168,9 @@ class Collection:
             self.lora.show(key)
 
     def on_show(self, **kw):
+        if kw.get("look"):
+            self.tabs.value = "browse"
+            self.look.value = kw["look"]
         if kw.get("lora"):
             self.open_lora(kw["lora"])
 

@@ -26,13 +26,24 @@ class Shell:
         self.tabs = None
         self.pages: dict[str, object] = {}
         self.dark = None
+        self._going = False
 
     def go(self, key: str, **kw):
         """Open a page (and tell it what to show)."""
+        self._going = True
         self.tabs.value = key
+        self._going = False
         page = self.pages.get(key)
         if page is not None and hasattr(page, "on_show"):
             page.on_show(**kw)
+
+    def changed(self, e):
+        """A tab clicked: the page refreshes what it shows (pages opened with go() are told by go)."""
+        if self._going:
+            return
+        page = self.pages.get(e.value)
+        if page is not None and hasattr(page, "on_show"):
+            page.on_show()
 
 
 def _strip(shell: Shell):
@@ -59,12 +70,9 @@ def _strip(shell: Shell):
             machine.content = last["machine"] = m
 
     def click():
-        if last["log"]:
-            shell.go("datasets", run=last["log"])
-        else:
-            shell.go("queue")
+        shell.go("home" if last["log"] else "queue")
     run.on("click", click)
-    run.tooltip("Open the queue, or the run that just finished")
+    run.tooltip("Open the queue, or Home › Just trained after a run")
     tick()
     ui.timer(1.5, tick)
 
@@ -89,7 +97,7 @@ def build_page():
                 ui.image(lspaths.file_url(logo)).classes("ls-logo")
             ui.label("LoRA Studio").classes("ls-title")
             ui.label(version.VERSION).classes("ls-ver")
-            shell.tabs = ui.tabs().props("dense indicator-color=amber-6 active-color=amber-6 no-caps") \
+            shell.tabs = ui.tabs(on_change=shell.changed).props("dense indicator-color=amber-6 active-color=amber-6 no-caps") \
                 .classes("ml-4")
             with shell.tabs:
                 for key, label in PAGES:
@@ -103,7 +111,7 @@ def build_page():
             ui.button("?", on_click=lambda: help_dialog(shell)).props("flat round color=white") \
                 .tooltip("The manual for this page")
         _strip(shell)
-    with ui.tab_panels(shell.tabs, value=app.storage.user.get("start", "collection")) \
+    with ui.tab_panels(shell.tabs, value=app.storage.user.get("start", "home")) \
             .props("animated=false keep-alive").classes("w-full bg-transparent"):
         for key, label in PAGES:
             with ui.tab_panel(key).classes("p-0"):

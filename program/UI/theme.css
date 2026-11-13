@@ -65,3 +65,5 @@ body { background:var(--ls-bg); color:var(--ls-text); font-family:Inter, system-
 .ls-page h4, .q-dialog h4 { font-size:15px; line-height:1.4; font-weight:650; margin:12px 0 4px; letter-spacing:0; }
 .ls-page h5, .ls-page h6 { font-size:14px; font-weight:650; margin:10px 0 4px; }
 .ls-page .nicegui-markdown p { margin:4px 0; }
+.ls-row { display:flex; padding:5px 8px; border-radius:6px; text-decoration:none; color:inherit; font-size:14px; width:100%; }
+.ls-row:hover { background:rgba(127,127,127,.12); }

@@ -37,6 +37,8 @@ FAMILY_OF = {"illustrious": "sdxl", "sdxl": "sdxl", "pony": "sdxl", "noobai": "s
 DEFAULTS = {"url": "http://127.0.0.1:8188", "lora_dir": "", "prompts": 8, "auto": True, "around": 2,
             "fixed": {"sdxl": "", "anima": ""}, "families": {}}
 JOBS: dict = {}            # log name -> {"state", "text", "done", "total"}
+WHICH: dict = {}           # log name -> which save points the next pictures use (pick_epochs `which`)
+BATCH_FILE = APP_DIR / "last_batch.json"      # the runs of the last finished queue (Home › Just trained)
 PENDING: list = []         # log names waiting for ComfyUI (made when it answers)
 _LOCK = threading.Lock()
 
@@ -311,9 +313,16 @@ def _run_facts(logname: str):
     return {"script": script, "info": info, "final": final, "eps": eps, "best": a["best"] if a else None}
 
 
-def pick_epochs(eps: dict, final, best, around: int = 2) -> list[tuple[str, Path]]:
-    """[(label, file)]: the save point to try first and `around` on each side, plus the final file."""
+def pick_epochs(eps: dict, final, best, around: int = 2, which: str = "around") -> list[tuple[str, Path]]:
+    """[(label, file)]. which = "around": the save point to try first and `around` on each side, plus the final file;
+    "best+final": the save point to try first and the final file (one LoRA just trained); "final": the final file
+    only (several LoRAs just trained: one picture set each, side by side)."""
     keys = sorted(eps)
+    if which == "final":
+        return [("final", final)] if final else []
+    if which == "best+final":
+        out = [(f"epoch {best}", eps[best])] if best in eps else []
+        return out + ([("final", final)] if final else [])
     out = []
     if keys:
         b = best if best in eps else keys[len(keys) // 2]
@@ -397,7 +406,8 @@ def make(logname: str, say=None) -> str:
     if not roots:
         return "❌ No LoRA folder is set (Settings › Folders, or Settings › Test pictures)."
     root = roots[0]
-    eps = pick_epochs(facts["eps"], facts["final"], facts["best"], int(cfg.get("around") or 2))
+    eps = pick_epochs(facts["eps"], facts["final"], facts["best"], int(cfg.get("around") or 2),
+                      WHICH.pop(logname, "around"))
     if not eps:
         return "❌ This run has no LoRA files."
     prompts = prompts_for(info, int(cfg.get("prompts") or 8))
@@ -511,11 +521,18 @@ def share_prompts(lognames: list[str]) -> str:
 
 # --------------------------------------------------------------------------- after the queue
 def after_queue(lognames: list[str]):
-    """Called when the training queue has finished: test pictures for its successful runs (when switched on)."""
+    """Called when the training queue has finished: remember its runs (Home › Just trained) and make their test
+    pictures (when switched on): one LoRA trained: its best save point and its final file; several: the final file of
+    each, so they can be compared side by side."""
+    try:
+        BATCH_FILE.write_text(json.dumps({"logs": list(lognames), "at": time.time()}), encoding="utf-8")
+    except OSError:
+        pass
     if not settings().get("auto"):
         return
     with _LOCK:
         for ln in lognames:
+            WHICH[ln] = "best+final" if len(lognames) == 1 else "final"
             if ln not in PENDING:
                 PENDING.append(ln)
     _kick()
@@ -542,6 +559,33 @@ def _kick():
                 JOBS[ln] = {"state": "done", "text": msg, "done": 0, "total": 0}
     if not any(t.name == "comfy-pending" for t in threading.enumerate()):
         threading.Thread(target=work, daemon=True, name="comfy-pending").start()
+
+
+def last_batch() -> dict:
+    """{"logs": [...], "at": time} of the last finished queue, {} when none."""
+    try:
+        d = json.loads(BATCH_FILE.read_text(encoding="utf-8"))
+        return d if d.get("logs") else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def batch_view(logs: list[str]) -> list[dict]:
+    """What Home › Just trained shows per run: [{"log", "dataset", "type", "version", "state", "labels", "pics"}]."""
+    out = []
+    for ln in logs:
+        f = _run_facts(ln)
+        if not f:
+            continue
+        info = f["info"]
+        job = JOBS.get(ln) or {}
+        state = ("making" if job.get("state") == "running" else "waiting" if ln in PENDING else
+                 job.get("text", "") if job.get("text", "").startswith("❌") else "")
+        g = results(info) or {}
+        out.append({"log": ln, "dataset": info["dataset"], "type": info["type"], "version": info.get("version", ""),
+                    "state": state, "labels": g.get("labels") or [], "pics": g.get("pics") or {},
+                    "prompts": g.get("prompts") or [], "best": f["best"]})
+    return out
 
 
 # --------------------------------------------------------------------------- choosing one

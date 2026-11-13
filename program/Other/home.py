@@ -52,7 +52,69 @@ def recent() -> list[dict]:
         return []
 
 
-# --------------------------------------------------------------------------- the parts
+# --------------------------------------------------------------------------- the data of the Home cards
+def look_items() -> list[dict]:
+    """Needs a look: [{"level": bad|warn, "title", "detail", "go": (page, kw)}] from the health check, the
+    datasets' improvements and the Collection's warnings (each read from what those pages already know)."""
+    out = []
+    try:
+        import settings_ui
+        bad = [c for c in settings_ui.checks() if c["state"] in ("bad", "warn")]
+    except Exception:                                    # noqa: BLE001
+        bad = []
+    for c in bad:
+        out.append({"level": c["state"], "title": c["title"], "detail": c["detail"],
+                    "go": ("settings", {"group": c["fix"] or "health"})})
+    try:
+        import dsflow as F
+        import sdgui as S
+        imp = [(ds, F.improvements(ds)) for ds in S.list_lora_dirs()]
+    except Exception:                                    # noqa: BLE001
+        imp = []
+    for ds, it in imp:
+        if it:
+            out.append({"level": "warn", "title": ds, "detail": it[0][0], "go": ("datasets", {"ds": ds})})
+    try:
+        import lora_library as LL
+        st = [LL.group_status(m)[0] for m in LL.LIB.groups.values() if m and m[-1].dataset]
+        n_prob, n_warn = st.count("problem"), st.count("warning")
+    except Exception:                                    # noqa: BLE001
+        n_prob = n_warn = 0
+    if n_prob or n_warn:
+        out.append({"level": "bad" if n_prob else "warn", "title": "Collection",
+                    "detail": f"{n_prob} problems, {n_warn} warnings in your LoRA files",
+                    "go": ("collection", {"look": "Status"})})
+    return out
+
+
+def last_runs(n: int = 5) -> list[dict]:
+    try:
+        import training_ui as T
+        return [r for r in T.runs(30) if r["result"] != "running"][:n]
+    except Exception:                                    # noqa: BLE001
+        return []
+
+
+def continue_items() -> list[dict]:
+    """[{"ds", "step", "label"}] of the datasets opened last that still exist."""
+    try:
+        import dsflow as F
+        import sdgui as S
+        labels = {n: lab for n, _, lab in F.STEPS}
+        labels.update({10: "Results", 11: "LoRA"})
+        have = set(S.list_lora_dirs())
+    except Exception:                                    # noqa: BLE001
+        labels, have = {}, set()
+    out = []
+    for r in recent():
+        if r["ds"] in have:
+            step = r.get("step") or 0
+            out.append({"ds": r["ds"], "step": step,
+                        "label": ((str(step) + " ") if step <= 9 else "") + labels.get(step, "")})
+    return out
+
+
+# --------------------------------------------------------------------------- the parts (Gradio page, until it is removed)
 def _send(v: str) -> str:
     return f"lsSend('home_box', {json.dumps(v)})".replace('"', "&quot;")
 
