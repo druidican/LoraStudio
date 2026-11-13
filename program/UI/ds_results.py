@@ -3,7 +3,7 @@
 rating, report, TensorBoard) and comparing runs. The data and the HTML parts are training_ui's; clicks inside them
 come back as ls_rs_box events (open, copy, cmpuse, best)."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 from nicegui import ui
 
@@ -147,7 +147,7 @@ class Results:
             with ui.row().classes("w-full no-wrap items-start gap-4"):
                 with ui.card().props("flat bordered").classes("ls-card grow basis-3/7 gap-1"):
                     ui.label("Loss per epoch").classes("font-semibold")
-                    self.cmp_plot = ui.echart(dict(PLOT, legend={"show": True})).classes("w-full h-64")
+                    self.cmp_plot = ui.echart(dict(PLOT, legend={"show": True, "top": 0}, grid={**PLOT["grid"], "top": 36})).classes("w-full h-64")
                     note("Lower is not always better for image LoRAs; the shape matters more: a run that is still "
                          "falling could train longer, one that rises at the end trained too long.")
                 with ui.card().props("flat bordered").classes("ls-card grow basis-4/7 gap-1"):

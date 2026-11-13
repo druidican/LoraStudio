@@ -2,7 +2,7 @@
 """Collection › LoRA page: one LoRA (all its versions) in four parts: Overview, Pictures (made with it), Training and
 Edit. The data and the actions are in Gallery/lorapage.py; this file only draws them."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 

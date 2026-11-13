@@ -25,6 +25,9 @@ a few test pictures with it and the final file.
 - **TensorBoard** (folded): *Start TensorBoard* opens the run's logs in TensorBoard; *End of the run log* shows the
   last lines as the trainer wrote them.
 
+When a run or a queue has just ended, Home's **Just trained** card leads straight to these test pictures (see
+[Welcome](#welcome)).
+
 ## Comparing versions
 
 Tick two to four runs and press **Compare the ticked**.

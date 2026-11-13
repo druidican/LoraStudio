@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import html
 import os

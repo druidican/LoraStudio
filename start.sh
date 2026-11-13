@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.051126
+# LoRA Studio version 1.131126c
 # Start LoRA Studio (Training LoRA + Personal Data + Settings) and open it in the browser.
 #
 # Installed with ./install.sh (recommended): uses the shared ./venv (Python 3.12 + PyTorch + sd-scripts +

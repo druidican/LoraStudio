@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -406,6 +406,7 @@ def panel_updates(page):
                     tok.value = ""
                 ui.button("Save token", on_click=save_tok).props("outline dense no-caps")
                 ui.button("Test token", on_click=lambda: setattr(gmd, "content", GH.test_token())).props("flat dense no-caps")
+            ui.label("Updates from").classes("font-semibold")
             chan = ui.radio({k: v for k, v in GH.CHANNELS.items()}, value=GH.channel(),
                             on_change=lambda e: (GH.set_channel(GH.CHANNELS[e.value]), gh_inst.set_enabled(False))) \
                 .props("inline")

@@ -2,7 +2,7 @@
 """Datasets › Improvements: Fix the ticked datasets (dsflow.batch_start), its progress, Look at the fixed ones, and
 What Fix does (the batch settings, dsflow.batch_settings)."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import json
 

@@ -41,11 +41,34 @@ for e in range(1, epochs + 1):
     for s in range(4):
         n += 1
         time.sleep(0.4)
-        print(f"steps: {100 * n // steps}%| {n}/{steps} [00:0{n % 10}<00:01, 1.00it/s, avr_loss=0.{90 - n:02d}]", flush=True)
+        bar = "█" * (10 * n // steps) + " " * (10 - 10 * n // steps)
+        print(f"steps: {100 * n // steps:3d}%|{bar}| {n}/{steps} [00:{n:02d}<00:{steps - n:02d}, 1.00it/s, avr_loss={0.13 - 0.06 * n / steps + 0.004 * ((n * 7) % 5) / 5:.4f}]", flush=True)
     if e < epochs:
         open(os.path.join(out_dir, f"{name}-{e:06d}.safetensors"), "wb").write(b"pretend")
         print(f"saving checkpoint: {out_dir}/{name}-{e:06d}.safetensors", flush=True)
 open(os.path.join(out_dir, f"{name}.safetensors"), "wb").write(b"pretend")
+log_dir = os.path.expanduser(opt("logging_dir", ""))
+if log_dir:                                   # a TensorBoard log with loss/epoch: a curve that falls, then rises a little
+    import random, struct
+    def vint(n):
+        b = b""
+        while True:
+            c, n = n & 127, n >> 7
+            b += bytes([c | (128 if n else 0)])
+            if not n:
+                return b
+    def fld(no, wt, payload):
+        return vint(no << 3 | wt) + (vint(len(payload)) + payload if wt == 2 else payload)
+    rnd = random.Random(name + str(time.time()))
+    low = rnd.randint(max(2, epochs // 2), max(2, epochs - 1)) if epochs > 2 else epochs
+    d = os.path.join(log_dir, f"{name}_{time.strftime('%Y%m%d%H%M%S')}")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, f"events.out.tfevents.{int(time.time())}.pretend"), "wb") as f:
+        for e in range(1, epochs + 1):
+            v = 0.06 + 0.05 * abs(e - low) / max(1, epochs) + (0.04 if e < low else 0.005) * (low - e if e < low else 1) / max(1, low) + rnd.uniform(-0.003, 0.003)
+            val = fld(1, 2, b"loss/epoch") + fld(2, 5, struct.pack("<f", v))
+            ev = fld(2, 0, vint(e)) + fld(5, 2, fld(1, 2, val))
+            f.write(struct.pack("<Q", len(ev)) + b"\0" * 4 + ev + b"\0" * 4)
 print(f"model saved.", flush=True)
 '''
 

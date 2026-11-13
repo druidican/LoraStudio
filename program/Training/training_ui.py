@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import hashlib
 import html

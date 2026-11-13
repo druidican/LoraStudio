@@ -62,7 +62,7 @@ Click a tile for its **LoRA page**; the *Version* menu at the top switches betwe
 - **LoRA Manager's example pictures folder**: where LoRA Manager keeps the pictures you add to a LoRA's card; empty =
   read from LoRA Manager's own settings. They are linked, not copied.
 - **Scan all LoRAs**: reads every LoRA of your datasets once (launch script, the LoRA file's training data, repeat
-  folders, run log) into the Training tab's fields. A scanned version is read again only when its file changes; tick
+  folders, run log) into the fields of the LoRA page's Training tab. A scanned version is read again only when its file changes; tick
   *Read the scanned ones again too* to read them all.
 - **Free disk space**: *Leftovers of all finished LoRAs* (epoch files, saved states, `.tmp.safetensors`, latent caches,
   musubi-tuner's caches, only for LoRAs with a final file; *Find leftovers*, tick *Yes*, *Move to Trash*) and

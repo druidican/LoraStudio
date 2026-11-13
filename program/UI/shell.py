@@ -6,7 +6,7 @@ the page is opened with shell.go(key, **kw), e.g. shell.go("datasets", ds="pip",
 The status strip is redrawn by a timer only when its text changed.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import importlib
 from pathlib import Path

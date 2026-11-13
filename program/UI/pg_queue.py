@@ -6,7 +6,7 @@ ls_tr_box events (lsSend) that tr_action handles. Two timers keep the queue and 
 changes what changed.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import json
 

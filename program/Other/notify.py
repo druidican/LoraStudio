@@ -2,7 +2,7 @@
 """Short messages from the program's logic to whoever shows them (the page sets SHOW; without a page they are
 printed). kind: info | warning."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 SHOW = None
 

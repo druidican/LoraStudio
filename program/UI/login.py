@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """The login page (--auth user:password, or Settings › Start and network) and the key that signs its cookie."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import hmac
 import secrets

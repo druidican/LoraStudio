@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.111126j"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import json
 import os

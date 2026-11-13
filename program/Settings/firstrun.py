@@ -17,7 +17,7 @@ Folders are suggested from what is found on this computer (a ComfyUI install, it
 Ollama running, ...). Nothing is moved or deleted.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import os
 import re

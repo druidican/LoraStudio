@@ -8,7 +8,7 @@ your home folder is shown as ~. Saved as reports/lorastudio_report_<time>.md in 
 copies it, so it can be pasted or dropped into a chat.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import platform
 import re

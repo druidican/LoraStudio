@@ -3,7 +3,7 @@
 all LoRAs, and freeing disk space (training leftovers, orphaned LoRA Manager files). Everything removed goes to the
 desktop Trash."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path

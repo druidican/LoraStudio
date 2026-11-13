@@ -6,7 +6,7 @@ Just trained: the runs of the last finished queue. One LoRA: its test pictures w
 the final file; several LoRAs: the final file of each, side by side (comfytest.after_queue decides which are made).
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import time
 

@@ -2,7 +2,7 @@
 """The setup page (first start, or ./start.sh --setup) and the notice shown once before anything else.
 The questions and what is written are in firstrun.py; this file only draws them."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import time
 

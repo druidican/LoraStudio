@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-   LoRA Studio version 1.131126b
+   LoRA Studio version 1.131126c
    LoRA Studio's look for the NiceGUI pages: the same colours as before, light and dark (body--dark). */
 :root { --ls-bg:#F4F2EE; --ls-card:#FDFDFB; --ls-line:#D3D6DB; --ls-line2:#BCC2CA; --ls-text:#1C1F24; --ls-muted:#5A626C;
         --ls-dim:#7D858F; --ls-ok:#21857C; --ls-warn:#A86A0C; --ls-bad:#C0392B; --ls-chip:#EDEFF2; --ls-chip-text:#3A4048;

@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -84,6 +84,11 @@ def _versions():
 
 # ---------------------------------------------------------------- every part loads
 SKIP_IMPORT = {"pictools_worker.py", "lora_studio.py", "selftest.py"}   # runs in another venv / starts the program
+try:                                     # an update from the Gradio version tests the new files before start.sh has
+    import nicegui  # noqa: F401          # installed the new packages: the pages are checked at the next self-test
+    HAVE_NICEGUI = True
+except ImportError:
+    HAVE_NICEGUI = False
 
 
 @check("every part loads")
@@ -91,10 +96,10 @@ def _imports():
     import sdgui  # noqa: F401  (first: the parts need it)
     n = 0
     for name, _ in version.PARTS:
-        if name.endswith(".py") and Path(name).name not in SKIP_IMPORT:
+        if name.endswith(".py") and Path(name).name not in SKIP_IMPORT and (HAVE_NICEGUI or "/UI/" not in name):
             importlib.import_module(Path(name).stem)
             n += 1
-    return f"{n} modules"
+    return f"{n} modules" + ("" if HAVE_NICEGUI else " (the pages need NiceGUI: start.sh installs it at the next start)")
 
 
 import sdgui as G  # noqa: E402
@@ -927,6 +932,8 @@ def _sortkeep():
 @check("the page builds (every tab)")
 def _page():
     """Start the program on a free port with LS_PAGE_CHECK (no queue, no updates, no login), open the page once."""
+    if not HAVE_NICEGUI:
+        return "not yet: NiceGUI is installed by start.sh at the next start"
     import socket
     import subprocess
     import urllib.request

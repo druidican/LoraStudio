@@ -5,7 +5,7 @@ fields, Completed, accepting warnings, copying to the LoRA folder, reading the t
 (head, training card, versions, picture grid) come from lora_library.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import copy
 import json

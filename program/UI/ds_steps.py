@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import json
 import re

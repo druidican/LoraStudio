@@ -3,7 +3,7 @@
 saving and the queue. The script logic is sd_script.py (cs_* return what changed as a dict); the plan and the
 settings table are datasets_ui (calc, apply_settings, SETTINGS)."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 from pathlib import Path
 
@@ -148,7 +148,7 @@ class Train:
 
     def draw_caps(self):
         sets = F.train_sets(self.ds, self.tkey) if self.tkey else []
-        self.w_caps.set_visibility(len(sets) > 1)
+        self.w_caps_row.set_visibility(len(sets) > 1)
         if len(sets) > 1:
             self.w_caps.options = {x["style"]: f"{'Tags' if x['style'] == 'tags' else 'Sentences'} (IMG{x['ext']})"
                                    for x in sets}
@@ -238,7 +238,9 @@ class Train:
         labels = F.type_labels()
         ui.toggle({t: FT.label(labels.get(t, t), FT.trainer_for(t)) for t in self.types}, value=self.tkey,
                   on_change=lambda e: self.set_type(e.value)).props("no-caps unelevated")
-        self.w_caps = ui.radio({}, on_change=lambda e: self.pick_caps(e.value)).props("inline dense")
+        with ui.row().classes("items-center gap-3") as self.w_caps_row:
+            ui.label("Caption set for this launch script").classes("font-semibold")
+            self.w_caps = ui.radio({}, on_change=lambda e: self.pick_caps(e.value)).props("inline dense")
         with ui.card().props("flat bordered").classes("ls-card w-full") as self.w_dl:
             with ui.row().classes("w-full items-center gap-3"):
                 self.w_dl_note = ui.label("").classes("grow")

@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import html
 import os

@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.051126b
+# LoRA Studio version 1.131126c
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh

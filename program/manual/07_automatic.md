@@ -18,5 +18,5 @@ with what happens at the end. Your step 5 pins count here too. Everything it mov
 > **Do** look at the result of an automatic run once (step 5 and step 8) before training on it.
 > **Don't** let it run on a dataset you are editing by hand at the same time.
 
-**Check the next fixed dataset →** opens the datasets that were fixed one by one at step 5 (Select), so you can look
+**Look at the fixed ones** opens the datasets that were fixed one by one at step 5 (Select), so you can look
 them over before training.

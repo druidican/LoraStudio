@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.031126"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import lspaths
 import base64

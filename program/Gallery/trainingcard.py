@@ -18,7 +18,7 @@ model when empty and the clip skip (usage_tips; 1 when nothing says otherwise). 
 sync: LoRA Manager's when LoRA Studio has none, the dataset's trigger word when neither has any.
 """
 from __future__ import annotations
-__version__ = "1.111126g"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import copy
 import json

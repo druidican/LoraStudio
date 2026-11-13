@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import hashlib
 import html

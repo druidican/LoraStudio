@@ -13,7 +13,7 @@
 Nothing runs while a training run is active, and the training queue does not start while a speed test runs.
 """
 from __future__ import annotations
-__version__ = "1.111126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import json
 import shlex

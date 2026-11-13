@@ -41,7 +41,7 @@ command line still wins). The same page has **What is installed**: see [Installi
   the first one. Several folders: one per line.
 - **LoRA folders**: where ComfyUI reads LoRAs, together with LoRA Manager's files. Finished LoRAs are copied there
   from a dataset's Results, into the folder of their LoRA type.
-- **Extra launch script folders** (optional), the **Monitor sample folder** and the **Model folder** (where the
+- **Extra launch script folders** (optional) and the **Model folder** (where the
   model file lists start).
 - **ComfyUI picture folder**: where ComfyUI saves pictures, so the LoRA page can show the ones made with a LoRA.
 
@@ -52,7 +52,7 @@ command line still wins). The same page has **What is installed**: see [Installi
 ![Settings › Model files: the base model, VAE and text encoders per LoRA type](img/set_models.jpg)
 
 Pick the files once per LoRA type (Illustrious, SDXL, Anima, …): the base model, VAE and text encoders. New launch
-scripts use them. *Refresh file lists* reads the folders again; *Reload from file* takes what is in the settings file.
+scripts use them. *Refresh file lists* reads the folders again; *training_settings.txt as it is on disk* shows the file itself.
 
 - **Suggestions: which files fit**: every model file is read from its header (model family, text encoder or VAE
   kind, fp16 / fp8); the best match for each slot is marked ★. *Apply suggestions* fills the empty or unsuitable
@@ -123,7 +123,8 @@ by you, written into launch scripts that download models, and masked in the run 
 The ComfyUI address (*Test* checks it) and your LoRA folder as ComfyUI sees it. Import your own ComfyUI workflow per
 model family once (Workflow › Save in ComfyUI). LoRA Studio then makes test pictures with every save point of a run,
 with the same model, sampler and size as your workflow: how many prompts, and whether they are made by themselves
-when a run ends.
+when a run ends. After one LoRA they are made for its best save point and its final file; after a queue of several,
+for the final file of each (see *Just trained* on [Home](#welcome)).
 
 **Upscale workflow** (dataset pictures): your own ComfyUI workflow for the Detailed scan's upscales, sharpening and
 detail crops, for example **SeedVR2** (with a GGUF model if your video memory needs it). Save it in ComfyUI (*Workflow ›
@@ -147,7 +148,7 @@ How the Collection looks and how it tells which base model a LoRA was trained on
 - **Colour the Collection cards by purpose**: a border and a label in the colour of the purpose (character, art
   style, object, worn item, action / pose, concept). Pick the colours and press *Save colours*; *Default colours* goes back; off
   keeps every card white.
-- *Dark / Normal* at the top right of every page switches between dark and light.
+- The moon button at the top right of every page switches between dark and light.
 
 ## Backup, Updates and Version
 

@@ -6,14 +6,18 @@ code: the work is done by Claude, the owner tests on real hardware and reports b
 
 ## What it is
 
-A Gradio GUI (Python 3.12) for training LoRAs with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony,
-Anima, FLUX, SD3, Lumina, Chroma …) and **musubi-tuner** (Z-Image, Qwen-Image, FLUX.2), mainly on AMD ROCm under
-Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps a catalogue of the owner's LoRAs
+A NiceGUI program (Python 3.12; since 1.131126c, before that Gradio, kept on the branch `old`) for training LoRAs
+with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3, Lumina, Chroma …) and
+**musubi-tuner** (Z-Image, Qwen-Image, FLUX.2), mainly on AMD ROCm under Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps a catalogue of the owner's LoRAs
 (the Collection, with LoRA Manager data), runs a training queue and makes test pictures through ComfyUI.
 
-- `lora_studio.py`: entry point (the only one: the old stand-alone sdgui.py / lora_library.py modes were removed in 1.111126e/g). `start.sh` / `install.sh` (Linux, WSL, macOS without trainers),
+- `lora_studio.py`: entry point (NiceGUI: login, the setup page first when there are no settings, then the page).
+  `start.sh` / `install.sh` (Linux, WSL, macOS without trainers),
   `install-windows.ps1` + `Install LoRA Studio.cmd` (installs into WSL2).
-- `program/`: `Data/` (datasets, the nine steps: `dsflow.py`, `datasets_ui.py`, `captioner.py`, `wdtagger.py`,
+- `program/UI/`: the NiceGUI pages (`shell.py` header/tabs/strip/manual, `pg_home.py`, `pg_datasets.py` + `ds_steps.py`
+  `ds_train.py` `ds_results.py` `ds_batch.py`, `pg_queue.py`, `pg_collection.py` + `lora_page.py`, `pg_settings.py` +
+  `set_panels.py`, `setup_page.py`, `login.py`, `widgets.py`, `theme.css`). No logic in them.
+- `program/`: `Data/` (datasets, the nine steps: `dsflow.py`, `datasets_ui.py` (HTML renderers), `captioner.py`, `wdtagger.py`,
   `consistency.py`), `Training/` (`sdgui.py` runner/queue, `sd_script.py` launch scripts, `Lora_Datatypes.py`
   presets per LoRA type, `Training_Recommendations.py` numbers per type and purpose), `Gallery/` (Collection,
   `lora_library.py`), `Settings/` (`settings_ui.py`, `ghupdate.py` updater), `Other/` (`gpusmi.py`, `lspaths.py` …),
@@ -57,7 +61,8 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
 - **Python 3.12 via uv** in `.tools/python` (install.sh), because system Pythons broke installs on Windows/macOS.
   uv makes absolute symlinks, so `start.sh` repairs them, the venv, shebangs and settings paths when the folder
   was moved (`venv/.lorastudio-root` remembers the old place). The installer asks where to install.
-- **requirements.txt has no versions** (owner's wish: latest gradio, pandas, pillow, tensorboard).
+- **requirements.txt has no versions** (owner's wish: latest nicegui, pillow, numpy, tensorboard, markdown-it-py,
+  huggingface_hub).
 - **GPU status:** `gpusmi.py` uses amd-smi on ROCm ≥ 10 (rocm-smi is gone there), rocm-smi before; install.sh
   writes the choice to `features.json` `gpu_tool`. amd-smi's JSON differs between versions: keys matched loosely.
 - **Updater** (`ghupdate.py`): channel *Releases only* (default) or *Betas too*; the token is never sent along a
@@ -74,17 +79,21 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
   8 Review, 9 Train. Setup comes first because the scan judges sizes for the LoRA types; its card shows missing model
   files (downloaded in the background by `hfdownload.start_background`, also used by step 9) and Ollama's state.
   The redesign plan (moderate + bold) is in the walkthrough document's Usability tab; built release by release.
-- **Home and the Manual** (1.131126): `Other/home.py` is the start page (cards read the other pages' caches;
-  clicks go to the hidden `#home_box`, handled in lora_studio.py `home_go`; its Training card is refreshed via
-  livepoll `hm_live`). Datasets records the last five opened datasets (`home.remember`). The Manual tab's button is
-  hidden; the top **?** (`lsHelp`) opens the chapter of the current tab, *← Back* (`lsHelpBack`) returns.
-  `tools/make_test_world.py` makes an invented world with a pretend sd-scripts (runs end to end in seconds).
-- **The dataset page** (1.131126b): an open dataset has four parts in `datasets_ui.parts_html`: Prepare (steps 1-8,
-  reopens at `prep`), Train (step 9 + `queue_card`), Results (pseudo-step 10: `training_ui.build_results` lives there,
-  filled by `RS["show"]` in the same nav event; filters use `.input`) and LoRA (pseudo-step 11: `lora_html`, cards from
-  the Collection's groups → `lsOpenLora`). ds_box actions `part|`, `dspart|ds|n` (`lsDsPart`, Collection tiles) and
-  `run|log` (`lsGoRun`: the status strip, Home; `open_run` opens the run once). The Training tab is now **Queue**
-  (Run only); Insights is a Collection tab.
+- **NiceGUI pages** (1.131126c): each page is `UI/pg_<key>.py` with `build(shell)` returning an object with
+  `on_show(**kw)`; `shell.go(key, **kw)` switches tabs. The old HTML renderers (`datasets_ui`, `training_ui`,
+  `settings_ui`, `lora_library`, `home`) stay as plain functions; clicks inside their HTML call `lsSend(box, v)`,
+  which `shell.BRIDGE_JS` turns into the NiceGUI event `ls_<box>` (also `lsSetNav`, `lsGoQueue`, `lsGoRun`,
+  `lsOpenLora`, `lsManual`). Messages from logic: `Other/notify.py`. Live parts are `ui.timer`s that redraw only what
+  changed. Pictures are links (`widgets.pic_url`, `lspaths.file_url` inside `widgets.allowed_roots`), never data.
+- **Home** (`UI/pg_home.py`, data in `Other/home.py`): Just trained (the last queue, `comfytest.last_batch`: one LoRA →
+  test pictures of the best save point and the final file, several → the final file of each, `comfytest.WHICH`),
+  Training now, Continue (`home.remember`), Needs a look, Last results. The top **?** opens the manual (all chapters,
+  pictures) at the chapter of the current tab.
+- **The dataset page**: four parts (`datasets_ui.parts_html`): Prepare (steps 1-8, reopens at `prep`), Train (step 9,
+  `UI/ds_train.py`), Results (`UI/ds_results.py`) and LoRA (cards from the Collection's groups → `lsOpenLora`).
+  ds_box actions `part|`, `dspart|ds|n` (Collection tiles), `run|log` (status strip, Home). Insights is a Collection tab.
+- `tools/make_test_world.py` makes an invented world with a pretend sd-scripts (runs end to end in seconds, writes a
+  loss log, so Results and the manual pictures look real).
 - **Class word** (step 2, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).
 - **Detailed scan** (`Data/detailscan.py`, characters, on per dataset in step 4): an extra Ollama question per
   picture, coverage over the kept pictures, suggestions in step 5 (add / upscale / sharpen / crop into a new picture),
@@ -108,18 +117,16 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
 - Model choice matters as much as settings: the owner trains and generates Illustrious LoRAs on
   Illustrious-XL v0.1 by choice. Watermarks in training pictures are learned; step 6 removes them, but check.
 
-## Speed (1.101126c)
+## Speed
 
-Every Gradio event costs the browser ~0.3 s on this big page, whatever it outputs. So: the start-up loaders are
-joined into one event (`Other/loadjoin.py`, `LS_SEPARATE_LOADS=1` to compare); the status strip and the queue are
-fetched by the page itself from `/ls_live` (`Other/livepoll.py`, behind the login); the shared timer
-(`Other/ticker.py`) redraws only parts that changed and sleeps while nothing runs (the page wakes it).
-`script_type` is cached per file. A Datasets step change is one event (`nav_all`), a new dataset/type one more (`sync_all` with sdgui's `ds_all`); don't add `.change` chains that follow programmatic sets, chain or join instead. `LS_LOAD_DEBUG=1` prints the start-up steps' times. Measure with a test copy at the owner's size (80 datasets, 200 LoRAs) and
-Playwright long tasks; `LS_TICK_DEBUG=1` prints what each tick changes.
+NiceGUI updates only the elements that change, so the old Gradio tricks (joined loaders, livepoll, the shared timer)
+are gone. Keep it that way: build a step's controls when it is opened, redraw HTML parts only when their HTML changed
+(`set_html` in the pages), and run slow work with `run.io_bound` or `widgets.stream`. `script_type` is cached per file.
 
 ## Testing
 
-- `python selftest.py` (needs gradio etc.; use the program's venv).
+- `python selftest.py` (use the program's venv). It also starts the program once with `LS_PAGE_CHECK=1` (no login,
+  queue or updates) and opens the page.
 - `tools/run_test_app.sh <work folder> [port]`: a copy of the app with its own HOME and a pretend Ollama
   (`tools/fake_ollama.py`); `tools/fake_comfy.py` and `tools/fake_github.py` pretend ComfyUI and a GitHub release.
 - Browser checks with Playwright (chromium). Don't use `pkill -f` / `pgrep -f` with a pattern that also matches
@@ -127,14 +134,13 @@ Playwright long tasks; `LS_TICK_DEBUG=1` prints what each tick changes.
 
 ## Open
 
-- **Moving to NiceGUI (owner decided 2026-11-13): a complete redo, built all at once on the branch `nicegui`;**
-  `main` stays the Gradio version until it is complete, then betas. Plan, decisions and progress: `docs/NICEGUI_PLAN.md`
-  (on that branch). Work there; on `main` only fixes the owner asks for.
-- **Redesign, bold part (owner approved 2026-11-11):** moderate part 1.111126h-j; Home and the ? Manual 1.131126; the
-  dataset page, the Queue tab and Insights in the Collection 1.131126b. Still to do: the manual's pictures retaken
-  from a new pip demo world (the text is up to date; old screenshots still show Training › Run / Results), and a last
-  clean-up pass. Every release removes the code it replaces (owner: no leftovers, no loops). The plan and the task
-  walk-throughs are in the owner's walkthrough document (Usability tab) and the "LoRA Studio flow" whiteboard.
+- **NiceGUI (owner decided 2026-11-13):** done as a complete redo; 1.131126c is the first beta (updater channel
+  *Betas too*). The Gradio version is kept on the branch `old`. Waiting for the owner's test on real hardware; then a
+  release when the owner says it is good. Plan and decisions: `docs/NICEGUI_PLAN.md`.
+- **Redesign, bold part (owner approved 2026-11-11):** done (Home, the dataset page, Queue, Insights in the
+  Collection, the ? manual with new pip pictures). Every release removes the code it replaces (owner: no leftovers,
+  no loops). The plan and the task walk-throughs are in the owner's walkthrough document (Usability tab) and the
+  "LoRA Studio flow" whiteboard.
 
 - Worn items, later (owner deferred): sort and crop around the item; weight per kind.
 - amd-smi: values that stay empty on real hardware need the owner's `amd-smi metric --json` output.

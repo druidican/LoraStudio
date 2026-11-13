@@ -11,7 +11,7 @@
     5. Restart LoRA Studio (button) to use the new version. Roll back puts the files of before the last update back.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import ast
 import json
@@ -32,6 +32,24 @@ PREFIX = "lorastudio_"
 EXTRA_FILES = ("requirements.txt", "README.md", "INSTALL.md", "REFERENCE.md", "LICENSE", "NOTICE")       # copied too, not in the parts list
 DIRS = ("program/manual", "program/logo")             # folders that are copied as a whole (the manual, the logo)
 STATE = {"busy": False}
+
+
+OBSOLETE = ("program/Other/ticker.py", "program/Other/loadjoin.py", "program/Other/livepoll.py")   # Gradio parts (1.131126c)
+
+
+def remove_obsolete(say=print) -> int:
+    """Program files that an update replaced by other parts (an update only writes files): moved to update_backups/."""
+    n = 0
+    for name in OBSOLETE:
+        f = HERE / name
+        if f.is_file():
+            dest = BACKUPS / "obsolete" / name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(f), str(dest))
+            n += 1
+    if n:
+        say(f"[Updates] {n} old program file(s) that are no longer used moved to {(BACKUPS / 'obsolete').relative_to(HERE)}/")
+    return n
 
 
 def repair_dirs(say=print) -> str:

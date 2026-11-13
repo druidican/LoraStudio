@@ -14,7 +14,7 @@
     8. success -> constraints.txt is written again (PyTorch locked as before, trainer libraries at their new versions)
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import json
 import os

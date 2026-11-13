@@ -8,7 +8,7 @@ Pictures, grids and lists are drawn as HTML by datasets_ui's renderers; their cl
 (route). What each step does to the dataset folder is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path

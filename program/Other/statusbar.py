@@ -5,7 +5,7 @@ GPU: amd-smi or rocm-smi (AMD, see gpusmi.py) or nvidia-smi (NVIDIA); CPU and RA
 two seconds, so many open pages share one reading. A missing tool just leaves that part out.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import html
 import re

@@ -9,7 +9,7 @@ LoRA Studio: train LoRAs with sd-scripts and musubi-tuner, make the datasets, ke
 Run:  python lora_studio.py [--port 7860] [--host 127.0.0.1] [--auth user:password] [--no-browser]
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 import argparse
 import os
@@ -87,6 +87,7 @@ def start_tasks(lo: dict):
     try:                                   # an update from before 1.251026d: bring the manual and the logo
         import selfupdate
         selfupdate.repair_dirs()
+        selfupdate.remove_obsolete()
     except Exception as e:                 # noqa: BLE001
         print(f"[Updates] {e!r}")
     try:                                   # PyTorch and its ROCm / CUDA parts in the training venv (no download)
@@ -171,5 +172,10 @@ def main():
 
 
 if __name__ == "__main__":
+    import importlib.util
+    if importlib.util.find_spec("nicegui") is None:
+        print("LoRA Studio needs NiceGUI, which is not installed in this Python yet. Start it with ./start.sh: it "
+              "installs the program packages (requirements.txt) first.")
+        sys.exit(1)
     setup_page_first()
     main()

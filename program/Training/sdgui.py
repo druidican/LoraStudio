@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs

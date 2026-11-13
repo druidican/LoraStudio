@@ -3,7 +3,7 @@
 built when it is opened (set_panels.py), so the page starts quickly; the health check and the counts in the list
 come from settings_ui.checks()."""
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 from nicegui import ui
 

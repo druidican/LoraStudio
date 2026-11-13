@@ -7,7 +7,7 @@ that send an event back here (emitEvent): a tile opens its dataset page, a type 
 Select mode is kept in the browser (picked cards get the class ll-picked) and read when a button needs it.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.131126c"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 

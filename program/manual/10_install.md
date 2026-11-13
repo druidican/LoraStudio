@@ -20,7 +20,7 @@ The answers are remembered; `./install.sh --ask` asks again.
 The installer gives LoRA Studio its **own Python 3.12**, made with the small tool [uv](https://docs.astral.sh/uv/) in
 `~/LoraStudio/.tools`: no administrator rights, and the Python of your computer is not touched. It is the same
 Python 3.12 on every Linux, in WSL on Windows and on macOS. Only when it cannot be downloaded does the installer use
-the computer's own `python3.12`. LoRA Studio's own packages (Gradio and the rest) have no version numbers, so the
+the computer's own `python3.12`. LoRA Studio's own packages (NiceGUI and the rest) have no version numbers, so the
 newest are installed; the trainers keep the versions they need.
 
 ## Where it goes
