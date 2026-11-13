@@ -149,20 +149,6 @@ def run_html() -> tuple[str, str]:
     return ("○ Idle · " if state == "idle" else "") + " · ".join(bits), state
 
 
-def strip_html() -> str:
-    line, state = run_html()
-    done_id = str(int(DONE_EVENTS[-1]["t"])) if DONE_EVENTS else ""
-    done_txt = html.escape(DONE_EVENTS[-1]["name"] + (" finished" if DONE_EVENTS[-1]["ok"] else " failed")
-                           + (": " + DONE_EVENTS[-1]["advice"] if DONE_EVENTS[-1].get("advice") else "")) if DONE_EVENTS else ""
-    log = DONE_EVENTS[-1].get("log", "") if DONE_EVENTS and state in ("done", "fail") else ""
-    go = (f"window.lsGoRun && lsGoRun('{html.escape(log)}')" if log and re.fullmatch(r"[\w.\-]+", log)
-          else "window.lsGoQueue && lsGoQueue()")
-    where = "Open this run in its dataset's Results" if "lsGoRun" in go else "Open the Queue"
-    return (f'<div class="ls-strip ls-st-{state}" data-done="{done_id}" data-done-text="{done_txt}">'
-            f'<div class="ls-run" onclick="{go}" title="{where}">{line}</div>'
-            f'<div class="ls-machine">{machine_html()}{ollama_html()}</div></div>')
-
-
 def ollama_html() -> str:
     try:
         import ollamactl

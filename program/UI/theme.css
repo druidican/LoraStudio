@@ -78,3 +78,7 @@ body { background:var(--ls-bg); color:var(--ls-text); font-family:Inter, system-
 .ls-table th, .ls-table td { text-align: left; padding: 4px 10px; border-bottom: 1px solid var(--ls-line, #e2e2e2);
   vertical-align: top; }
 .ls-table th { font-weight: 600; }
+
+/* the colour names the older HTML parts use */
+:root { --border-color-primary: var(--ls-line); --block-background-fill: var(--ls-card);
+  --background-fill-secondary: var(--ls-bg); --color-accent: #E8A33D; }

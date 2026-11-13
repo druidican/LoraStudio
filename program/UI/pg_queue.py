@@ -112,10 +112,10 @@ class Queue:
                     self.head = ui.html("", sanitize=False).classes("grow")
                     ui.button("Stop after this run", on_click=sg.queue_stop_after_current).props("outline dense no-caps")
                     ui.button("Stop now", on_click=sg.stop_run).props("unelevated dense no-caps color=negative")
-                self.stage = ui.html("", sanitize=False).classes("w-full")
+                self.stage = ui.html("", sanitize=False).classes("w-full").props('id="stage_box"')
                 self.prog = ui.html("", sanitize=False).classes("w-full")
                 with ui.row().classes("w-full no-wrap items-start gap-4"):
-                    self.loss = ui.html("", sanitize=False).classes("grow basis-3/5 min-w-0")
+                    self.loss = ui.html("", sanitize=False).classes("grow basis-3/5 min-w-0").props('id="loss_box"')
                     self.sp = ui.html("", sanitize=False).classes("grow basis-2/5 min-w-0")
                 with ui.expansion("Run log").classes("w-full"):
                     self.log = ui.textarea().props("readonly outlined input-style='font-family:monospace;font-size:12px' "

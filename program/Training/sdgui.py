@@ -16,6 +16,7 @@ otherwise, with a login then (Settings › Start and network).
 """
 __version__ = "1.131126b"  # LoRA Studio version, see version.py
 import atexit
+import notify
 import codecs
 import contextlib
 import glob
@@ -38,7 +39,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import gradio as gr
 
 import lspaths as _LP  # noqa: E402
 
@@ -91,9 +91,8 @@ REPEAT_RE = re.compile(r"^(\d+)_")
 IGNORE_DIRS = {"model", "models", "output", "outputs", "samples", "sample", "log", "logs",
                "loramanager", "_set_aside", "_reserve", "_originals", ".lsflow", "_old_runs", "_extra"}   # never dataset folders (LoraManager = Personal sync: previews and examples)
 ARCHIVE_RENAMED_RE = re.compile(r"^\d+_loramanager$", re.I)   # a LoraManager folder renamed into a repeat folder
-CSS = ('#wm_tool {display:none !important;} '
-       '.ls-bar {gap: 8px !important; align-items: center !important; flex-wrap: wrap;} '
-       '.ls-bar > * {flex-grow: 0;} .ls-bar .block {padding: 4px 8px !important;} '
+CSS = ('.ls-bar {gap: 8px !important; align-items: center !important; flex-wrap: wrap;} '
+       '.ls-bar > * {flex-grow: 0;} '
        '.ls-prog {position: relative; height: 32px; border-radius: 8px; overflow: hidden; background: var(--block-background-fill); border: 1px solid var(--border-color-primary);} '
        '.ls-prog-fill {position: absolute; left: 0; top: 0; bottom: 0; transition: width .9s ease; background: linear-gradient(90deg, #a85a08, #e8a33d);} '
        '.ls-prog-ok .ls-prog-fill {background: linear-gradient(90deg, #1f7a72, #4fb3a9);} '
@@ -105,7 +104,6 @@ CSS = ('#wm_tool {display:none !important;} '
        '#loss_box .losscell {padding: 6px 10px; background: rgba(128,128,128,.12); border-radius: 6px;} '
        '@media (max-width: 700px) {#loss_box .losscells {grid-template-columns: 1fr;}} '
        '#loss_box .losschart {display:block; background: rgba(128,128,128,.08); border-radius: 6px;} '
-       '#progress_line textarea, #progress_line input {font-family: monospace; font-size: 0.95em;} '
        '#stage_box .lsstage {padding: 8px 10px; border-radius: 8px; background: rgba(128,128,128,.10);} '
        '#stage_box .lschips {display: flex; flex-wrap: wrap; gap: 6px;} '
        '#stage_box .lschip {padding: 3px 10px; border-radius: 14px; font-size: .85rem; border: 1px solid var(--border-color-primary); background: rgba(128,128,128,.12); opacity: .75;} '
@@ -127,7 +125,6 @@ CSS = ('#wm_tool {display:none !important;} '
        '#wm_html .wm-opt .wm-big {height: 120px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; opacity: .6;} '
        '#wm_html .wm-opt.sel {border-color: #e8a33d; background: rgba(232,163,61,.12);} '
        '#wm_html .wm-opt b {font-size: .85rem;} #wm_html .wm-now {color: #4fb3a9; font-weight: 600;} '
-       '#cc_box {display: none !important;} '
        '#cc_html input[type=radio] {appearance: auto; -webkit-appearance: radio; accent-color: #E8A33D; width: 14px; height: 14px; margin: 0 4px 0 0; vertical-align: -2px; opacity: 1;} '
        '#cc_html label {cursor: pointer;} '
        '#cc_html .cc-group {border: 1px solid var(--border-color-primary); border-radius: 10px; padding: 10px 12px; margin: 0 0 10px;} '
@@ -864,14 +861,11 @@ def runner_save(wd, venv, trace, sd_path="", mu_path=""):
     sd_path, mu_path = (sd_path or "").strip(), (mu_path or "").strip()
     for n, v in (("Working directory", wd), ("Venv", venv), ("sd-scripts path", sd_path), ("musubi-tuner path", mu_path)):
         if "\n" in v:
-            gr.Warning(f"{n}: no line breaks please.")
             return f"{n}: no line breaks please.", st_raw()
     if wd and not Path(os.path.expanduser(wd)).is_dir():
-        gr.Warning(f"Working directory does not exist: {wd}")
         return f"Working directory does not exist: `{wd}`. Nothing was saved.", st_raw()
     for n, v in (("sd-scripts path", sd_path), ("musubi-tuner path", mu_path)):
         if v and not Path(os.path.expanduser(v)).is_dir():
-            gr.Warning(f"{n} does not exist: {v}")
             return f"{n} does not exist: `{v}`. Nothing was saved.", st_raw()
     data = read_settings()
     sec = data.setdefault("general", {})
@@ -884,7 +878,7 @@ def runner_save(wd, venv, trace, sd_path="", mu_path=""):
         write_settings(data)
     except OSError as e:
         return f"Could not write `{settings_path()}`: {e}", st_raw()
-    gr.Info(f"Saved {Path(settings_path()).name}")
+    notify.info(f"Saved {Path(settings_path()).name}")
     return (f"Saved to `{settings_path()}` (`[general]`): working directory `{sec['SDGUI_WORKDIR']}`, venv "
             f"`{venv or 'none'}`, trace {'on' if trace else 'off'}; sd-scripts `{sd_root()}`, musubi-tuner `{musubi_root()}`. "
             "Used by the next Start or queued script, and by new launch scripts."), st_raw()
@@ -1226,35 +1220,35 @@ def run_failure(run, code) -> str:
 
 def queue_start(stop_on_fail):
     if QUEUE["running"]:
-        gr.Warning("The queue is already running.")
+        notify.warning("The queue is already running.")
         return
     if RUN.running():
-        gr.Warning("A run is in progress. Wait for it to finish (or press Stop now), then start the queue.")
+        notify.warning("A run is in progress. Wait for it to finish (or press Stop now), then start the queue.")
         return
     try:
         import speedjobs
         if speedjobs.busy():
-            gr.Warning("A speed test is running (Settings › Speed test). Start the queue when it has finished, "
+            notify.warning("A speed test is running (Settings › Speed test). Start the queue when it has finished, "
                        "or stop it there.")
             return
     except ImportError:
         pass
     with QLOCK:
         if not any(i["state"] == "queued" for i in QUEUE["items"]):
-            gr.Warning("No waiting items in the queue.")
+            notify.warning("No waiting items in the queue.")
             return
         QUEUE["running"], QUEUE["stop_flag"], QUEUE["stop_on_fail"] = True, False, bool(stop_on_fail)
         QUEUE["killed"] = False
     threading.Thread(target=_queue_worker, daemon=True).start()
-    gr.Info("Queue started.")
+    notify.info("Queue started.")
 
 
 def queue_stop_after_current():
     if not QUEUE["running"]:
-        gr.Info("The queue is not running.")
+        notify.info("The queue is not running.")
         return
     QUEUE["stop_flag"] = True
-    gr.Info("The queue will stop after the current script finishes.")
+    notify.info("The queue will stop after the current script finishes.")
 
 
 def _signal(proc, sig):
@@ -1280,11 +1274,11 @@ def stop_run():
         QUEUE["stop_flag"] = True
         QUEUE["killed"] = True
     if not RUN.running():
-        gr.Info("Nothing is running.")
+        notify.info("Nothing is running.")
         return
     _signal(RUN.proc, signal.SIGINT)
     threading.Thread(target=_escalate, args=(RUN.proc,), daemon=True).start()
-    gr.Info("Sent Ctrl+C. Escalates to SIGTERM after 20s and SIGKILL after 10s more if it hangs.")
+    notify.info("Sent Ctrl+C. Escalates to SIGTERM after 20s and SIGKILL after 10s more if it hangs.")
 
 
 # --------------------------------------------------------------------------- loss indicator
@@ -1498,8 +1492,7 @@ def tb_start(logdir, port):
     tb_stop()
     logdir = os.path.expanduser(logdir or "")
     if not Path(logdir).is_dir():
-        gr.Warning(f"Log dir not found: {logdir}")
-        return "TensorBoard: not running"
+        return f"TensorBoard: not running (log folder not found: {logdir})"
     port = int(port)
     TB["proc"] = subprocess.Popen(
         [sys.executable, "-m", "tensorboard.main", "--logdir", logdir, "--host", BIND_HOST, "--port", str(port)],
@@ -1807,7 +1800,6 @@ from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other 
     cc_open,
     cc_render,
     cc_stop,
-    oc_apply_recommendation,
     oc_example,
     oc_images,
     oc_preview,
@@ -1822,9 +1814,7 @@ from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other 
     wm_apply_live,
     wm_crop_apply,
     wm_crop_show,
-    wm_paint_apply,
     wm_render,
-    wm_tool_open,
 )
 from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
     ENV_EXTRA,
@@ -1847,7 +1837,6 @@ from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other
     get_export,
     get_gfx,
     gfx_load,
-    gfx_pick,
     hf_path,
     hf_status_text,
     mask_token,
@@ -1861,23 +1850,14 @@ from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other
     settings_models,
     settings_path,
     slot_label,
-    st_apply_suggestions,
-    st_load,
     st_online,
-    st_dl_visible,
-    st_download,
-    st_download_all,
-    st_download_link,
     st_download_stop,
     st_raw,
-    st_refresh,
-    st_refresh_all,
     st_save,
     st_suggest,
     sub_add,
     sub_choices,
     sub_list_md,
-    sub_reload,
     sub_remove,
     type_slots,
     vae_optional,
@@ -2166,9 +2146,9 @@ def queue_restore(start: bool = False) -> str:
 def save_hf_token(tok):
     tok = (tok or "").strip()
     if not tok:
-        return "Paste a token first.", gr.update(), hf_status_text()
+        return "Paste a token first.", None, hf_status_text()
     if " " in tok or "\n" in tok:
-        return "That does not look like a token (no spaces).", gr.update(), hf_status_text()
+        return "That does not look like a token (no spaces).", None, hf_status_text()
     p = hf_path()
     p.write_text("# Put your Hugging Face token (hf_...) on its own line below. Lines starting with # are ignored.\n"
                  + tok + "\n", encoding="utf-8")
@@ -2216,72 +2196,6 @@ def ai_models_html(url) -> str:
     return (f'<div class="ai-head"><b>Installed Ollama models · {len(ms)}</b><span>In memory now: {used:.1f} GB</span></div>'
             '<div class="ai-wrap"><table class="ai-table"><thead><tr><th>Default</th><th>Model</th><th>Size</th>'
             '<th>Reads pictures</th><th>State</th><th></th></tr></thead><tbody>' + "".join(rows) + "</tbody></table></div>")
-
-
-def ai_refresh(url, msg=""):
-    url = (url or "").strip() or ollama_ctl().DEFAULT_URL
-    try:
-        ms = ollama_ctl().installed(url)
-    except Exception:                           # noqa: BLE001
-        ms = []
-    names = [m["name"] for m in ms]
-    vision = [m["name"] for m in ms if m.get("vision")]
-    _, use = oc_settings()
-    choices = vision + ([use] if use and use not in vision else [])
-    return (ai_models_html(url), msg, gr.update(choices=choices, value=use or None),
-            gr.update(choices=names, value=None))
-
-
-def ai_default(name, url):
-    """The default model picked in the dropdown at the top of AI helpers."""
-    if not name:
-        return ai_refresh(url)
-    oc_save_settings((url or "").strip() or ollama_ctl().DEFAULT_URL, name)
-    return ai_refresh(url, f"✔ **{name}** is now the default: used for captions, sorting and picture checks.")
-
-
-def ai_test(url):
-    url = (url or "").strip()
-    if not url:
-        return ("Enter the Ollama address.",) + ai_refresh(url)
-    _, model = oc_settings()
-    oc_save_settings(url, model)
-    oc = ollama_ctl()
-    ok = oc.running(url, fresh=True) is not None
-    return (("✔ Ollama answers at " if ok else "❌ Ollama does not answer at ") + f"`{url}`.",) + ai_refresh(url)
-
-
-def ai_action(v, url):
-    """A click in the models table: use|name, start|name or stop|name."""
-    act, _, name = (v or "").partition("|")
-    name = name.rsplit("|", 1)[0] if name.count("|") else name
-    oc = ollama_ctl()
-    if not name:
-        return ai_refresh(url)
-    if act == "use":
-        oc_save_settings((url or "").strip() or oc.DEFAULT_URL, name)
-        return ai_refresh(url, f"✔ **{name}** is used for captions, sorting and picture checks.")
-    if act == "start":
-        return ai_refresh(url, oc.start(name, url))
-    if act == "stop":
-        return ai_refresh(url, oc.stop(name, url))
-    return ai_refresh(url)
-
-
-def ai_remove(name, ok, url):
-    if not name:
-        return ai_refresh(url, "Pick a model to remove.")
-    if not ok:
-        return ai_refresh(url, "Tick the confirmation first.")
-    return ai_refresh(url, ollama_ctl().delete(name, url))
-
-
-def ai_pull_tick(cur, url):
-    oc = ollama_ctl()
-    txt = oc.pull_text()
-    if txt == (cur or ""):
-        return gr.update(), gr.update()
-    return txt, (ai_models_html(url) if oc.PULL["done"] else gr.update())
 
 
 def trainer_facts_html() -> str:
@@ -2337,643 +2251,7 @@ def trainer_facts_html() -> str:
             + "".join(f'<div class="tf-fact"><span>{a}</span>{b}</div>' for a, b in facts) + "</div>")
 
 
-def model_vis(tkey, *vals):
-    """Show only the model-file fields the LoRA type uses (plus any that hold a value in the script)."""
-    try:
-        used = {k for k, _ in type_slots(tkey)} if tkey else set()
-    except Exception:                       # noqa: BLE001
-        used = set()
-    names = [n for n, _ in FORM_GROUPS[3][1]]
-    return [gr.update(visible=(not used) or n in used or bool((v or "").strip())) for n, v in zip(names, vals)]
-
-
 _FIN_MEMO: dict = {}
-
-
-def build_ui(parent):
-    """The training parts of LoRA Studio, built into the open gr.Blocks `parent`: every page hidden in BLOCKS (a
-    gr.Column made with render=False) for lora_studio.py / datasets_ui.py to place with .render(); the components
-    other pages wire to are in UI."""
-    global ST_N
-    BLOCKS.clear()
-    UI.clear()
-    try:
-        ST_N = max(4, max(len(v.get("model_args", [])) for v in merged_presets()[1].values()))
-    except Exception:
-        ST_N = 4
-    sname = Path(settings_path()).name
-
-    def page(key, title=""):
-        BLOCKS[key] = gr.Column(render=False)
-        return BLOCKS[key]
-    sub = page                                  # a part of a page, placed by datasets_ui
-
-    with contextlib.nullcontext(parent) as demo:
-        hf_md = gr.Markdown(visible=False)      # the token status (shown in Settings › Model files)
-        _types = type_choices()
-        _purposes = [("Character / person", "character"), ("Art style", "style"), ("Object / item", "object"),
-                     ("Worn item (clothes, equipment, jewelry)", "worn"),
-                     ("Action / pose", "action"), ("Concept / effect", "concept")]
-        _oc_url, _oc_model = oc_settings()
-
-        # ================================================================ Training > Launch script
-        with page("script", "Launch script"):
-            # LoRA Studio places the parts in Datasets › 9 in its own order (sub-pages)
-            with sub("s9_head"):
-                with gr.Row():
-                    cs_ds = gr.Dropdown(choices=list_lora_dirs(), value=None, label="Dataset", scale=3,
-                                        visible=False)
-                    cs_script = gr.Dropdown(choices=[("+ New launch script", NEW)], value=NEW,
-                                            label="Launch script", scale=4)
-                    cs_type = gr.Dropdown(choices=_types, value=_types[0][1] if _types else None,
-                                          label="LoRA type (model architecture)", scale=3, visible=False)
-                    cs_purpose = gr.Dropdown(choices=_purposes, value="character", label="Purpose", scale=2)
-                    cs_priority = gr.Dropdown(choices=[("Balanced", "balanced"), ("Best quality", "quality"),
-                                                       ("Fastest", "fast")], value="balanced", label="Priority", scale=2)
-                cs_status = gr.Markdown("")
-            with sub("s9_opts"):
-                with gr.Row():
-                    cs_steps = gr.Number(label="Target total steps (0 = recommended for the type, press Enter)",
-                                         value=0, precision=0, scale=2)
-                    cs_userep = gr.Checkbox(label=("Plan with the recommended repeat count (the repeat folder is "
-                                                   "renamed by Fill with recommended)"), value=True, scale=3)
-                    cs_hfauto = gr.Checkbox(label="Fill HF_TOKEN from the token file", value=True, scale=2)
-                    cs_samples = gr.State(False)   # sample images are not made (removed as an option)
-                with gr.Row():
-                    with gr.Column(scale=3):
-                        cs_recs_md = gr.Markdown(recs_status())
-                    cs_export_btn = gr.Button("Export report for Claude", scale=1, size="sm")
-                    cs_export_file = gr.File(label="Report", visible=False, scale=2)
-            with sub("s9_why"):
-                cs_explain = gr.Markdown("")
-            with sub("s9_fields"):
-                cs_fields = []
-                for gname, flds in FORM_GROUPS:
-                    with gr.Accordion(gname + (" (only the files this LoRA type uses)" if gname == "Model files" else ""),
-                                      open=False):
-                        per = 2 if gname == "Model files" else 4
-                        for i in range(0, len(flds), per):
-                            with gr.Row():
-                                for name, label in flds[i:i + per]:
-                                    cs_fields.append(gr.Textbox(label=label, info=f"--{name}",
-                                                                visible=name not in STUDIO_TABLE))
-                model_fields = cs_fields[-len(FORM_GROUPS[3][1]):]
-                with gr.Row():
-                    cs_models_btn = gr.Button("Use model files from Settings", size="sm")
-                    cs_hf_fill = gr.Button("Fill HF_TOKEN in the script text", size="sm")
-                cs_makedirs = gr.Checkbox(
-                    label="Create missing folders when saving: the repeat folder (<N>_<name>), model and log. "
-                          "Images lying directly in the dataset folder are moved into a newly created repeat folder.",
-                    value=True)
-            with sub("s9_text"):
-                cs_text = gr.Code(language="shell", label=("The script text (edit by hand; the settings above follow "
-                                                           "it, and it follows them)"),
-                                  lines=26, interactive=True, elem_id="cs_text")
-                cs_prompts_path = gr.State("")       # no sample prompts file (sample images were removed)
-                cs_prompts_text = gr.State("")
-            with sub("s9_save"):
-                with gr.Row(elem_classes=["ls-bar"], elem_id="s9_bar"):
-                    cs_suggest_btn = gr.Button("Fill with recommended settings", size="sm", scale=0, min_width=230)
-                    cs_check_btn = gr.Button("Check flags against my trainer", size="sm", scale=0, min_width=240)
-                    cs_save_over_btn = gr.Button("Save", variant="primary", visible=False, size="sm", scale=0,
-                                                 min_width=110)
-                    cs_newname = gr.Textbox(label="Save as", scale=0, min_width=220)
-                    cs_save_new_btn = gr.Button("Save as new version", variant="primary", scale=0, size="sm",
-                                                min_width=200)
-                    cs_queue_btn = gr.Button("Save and add to the queue →", variant="primary", size="sm", scale=0,
-                                             min_width=250)
-                    import launchopts as _LO
-                    cs_autostart = gr.Checkbox(label="Start the queue when nothing is training",
-                                               value=_LO.load()["queue_autostart"], scale=0, min_width=300)
-                cs_check_out = gr.Markdown("")
-                cs_save_msg = gr.Markdown("")
-            cs_plan = gr.State({})
-
-        # ================================================================ Datasets > Prepare
-        # The Datasets flow (datasets_ui.py) places these parts in its steps: p_wm in 6 Watermarks and size, p_caption and
-        # p_cons in 7 Captions, p_repeat and the launch script page in 9 Train.
-        with page("p_wm", "Watermarks"):
-            gr.Markdown("Pictures where the sort found marks **added on top** of the picture (watermarks, site "
-                        "names, logo stamps, signatures, date stamps): remove them (picture tools), crop them off, set "
-                        "the picture aside, or keep it (it may be learned). Text that belongs to the scene (signs, shirts) is left alone.",
-                        elem_classes=["ls-note"])
-            wm_sum = gr.Markdown("")
-            wm_html = gr.HTML("", elem_id="wm_html")
-            wm_box = gr.Textbox(visible=False)
-            with gr.Row(elem_classes=["ls-bar"], elem_id="wm_btnrow"):
-                wm_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=1,
-                                         elem_id="wm_apply_btn")
-                wm_reco_btn = gr.Button("Use the recommended option for the undecided ones", size="sm", scale=2,
-                                        elem_id="wm_reco_btn")
-            wm_msg = gr.Markdown("")
-            wm_tool = gr.Textbox(elem_id="wm_tool", show_label=False, container=False)
-            with gr.Column(visible=False, elem_classes=["ls-card"], elem_id="wm_panel") as wm_panel:
-                wm_ptitle = gr.Markdown()
-                with gr.Column(visible=True) as wm_paint_col:
-                    gr.Markdown("Paint over the mark with the brush (a little over its edges is fine). The "
-                                "picture tools fill in what is under it; the rest of the picture stays as it is.",
-                                elem_classes=["ls-note"])
-                    wm_editor = gr.ImageEditor(type="pil", image_mode="RGBA", sources=(), transforms=(),
-                                               layers=False, height=560, show_label=False,
-                                               brush=gr.Brush(colors=["#ff3b30"], default_color="#ff3b30",
-                                                              default_size=28, color_mode="fixed"),
-                                               buttons=[], elem_id="wm_editor")
-                with gr.Column(visible=False) as wm_crop_col:
-                    gr.Markdown("Move the edges until the mark is outside; the shaded part is cut off.",
-                                elem_classes=["ls-note"])
-                    wm_cimg = gr.Image(type="pil", interactive=False, height=420, show_label=False)
-                    wm_aspect = gr.Radio(["free", "3:4", "1:1", "4:3"], value="free", label="Shape")
-                    with gr.Row():
-                        wm_l = gr.Slider(0, 100, value=0, step=1, label="Left %")
-                        wm_r = gr.Slider(0, 100, value=100, step=1, label="Right %")
-                    with gr.Row():
-                        wm_t = gr.Slider(0, 100, value=0, step=1, label="Top %")
-                        wm_b = gr.Slider(0, 100, value=100, step=1, label="Bottom %")
-                    wm_cres = gr.Markdown()
-                with gr.Row(elem_classes=["ls-bar"]):
-                    wm_paint_go = gr.Button("Remove what I painted", variant="primary", size="sm", scale=0,
-                                            min_width=200)
-                    wm_crop_go = gr.Button("Use this crop", variant="primary", size="sm", scale=0,
-                                           min_width=160, visible=False)
-                    wm_close = gr.Button("Close", size="sm", scale=0, min_width=100)
-                wm_pmsg = gr.Markdown()
-                wm_rel = gr.State("")
-        with page("p_repeat", "Repeat folder"):
-            rp_info = gr.Markdown("")
-            with gr.Row():
-                rp_folder = gr.Dropdown(choices=[], label="Image folder", scale=4)
-                rp_repeats = gr.Number(label="Repeats", value=0, precision=0, scale=1)
-                rp_newname = gr.Textbox(label="New folder name", scale=3)
-            with gr.Row():
-                rp_confirm = gr.Checkbox(label="Allow moving images that sit directly in the dataset folder into a new repeat folder",
-                                         value=False, scale=3)
-                rp_btn = gr.Button("Rename / create repeat folder", variant="primary", scale=2)
-                rp_epochs_btn = gr.Button("Set epochs to hit the target steps", scale=2)
-                rp_make_btn = gr.Button("Create missing folders now (repeat folder, model, log)", scale=2)
-            rp_msg = gr.Markdown("")
-        with page("p_caption", "Captions"):
-            gr.Markdown(
-                "The Ollama model (Settings › AI helpers) looks at every picture and writes a caption that starts "
-                "with the trigger word. For a person, captions describe what changes (clothes, pose, place, light, "
-                "framing) and leave out what is always that person, so the trigger word learns it. **Try on 3 "
-                "pictures** writes nothing; **Write captions** replaces the `.txt` captions (Undo restores them).",
-                elem_classes=["ls-note"])
-            with gr.Row():
-                oc_trigger = gr.Textbox(label="Trigger word (first word of every caption)", scale=1)
-                oc_leave = gr.Textbox(label="Never describe (always part of the person)",
-                                      value=CAP.DEFAULT_LEAVE_OUT if CAP else "", scale=3)
-            with gr.Row():
-                oc_style = gr.Radio(choices=[("Sentences", "sentences"), ("Tags", "tags")], value="sentences",
-                                    label="Caption format", scale=1)
-                oc_length = gr.Slider(1, 5, value=3, step=1, label="Length (1 very short ... 5 very long)", scale=2)
-                oc_detail = gr.Slider(1, 4, value=3, step=1, label="Detail (1 basic ... 4 everything)", scale=2)
-                oc_rec_btn = gr.Button("Use recommended", size="sm", scale=0, min_width=140)
-            oc_rec = gr.Markdown("", elem_id="oc_rec")
-            oc_ex = gr.HTML("", elem_id="oc_ex")
-            with gr.Row(elem_classes=["ls-bar"]):
-                oc_hints = gr.Checkbox(label="Give the old tags to the model as hints (they can be wrong)", value=False, scale=3)
-                oc_unload = gr.Checkbox(label="Free the VRAM when done", value=True, scale=2)
-                oc_prev_btn = gr.Button("Try on 3 pictures", size="sm", scale=1, min_width=120)
-                oc_run_btn = gr.Button("Write captions", variant="primary", size="sm", scale=1, min_width=150)
-                oc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=1, min_width=70)
-                oc_undo_btn = gr.Button("Undo last change", size="sm", scale=1, min_width=130)
-            oc_out = gr.Markdown("")
-        with page("p_cons", "Consistency"):
-            gr.Markdown("The traits of the character itself that the captions mention (hair, eyes, build, skin, "
-                        "horns, tattoos, a signature object): the same in most pictures is **taken out of the "
-                        "captions** so the trigger word learns it; words that mean the same (athletic, fit, toned) "
-                        "become one word; **odd pictures** that say something else are shown so you can look. "
-                        "Clothes, places, poses, expressions and light stay in each caption.",
-                        elem_classes=["ls-note"])
-            with gr.Row(elem_classes=["ls-bar"]):
-                cc_btn = gr.Button("Check the captions", size="sm", scale=0, min_width=170)
-                cc_stop_btn = gr.Button("Stop", variant="stop", size="sm", scale=0, min_width=70)
-                cc_apply_btn = gr.Button("Apply choices", variant="primary", size="sm", scale=0, min_width=150)
-            cc_sum = gr.Markdown("")
-            cc_box = gr.Textbox(elem_id="cc_box", show_label=False, container=False)
-            with gr.Row(equal_height=False):
-                with gr.Column(scale=3):
-                    cc_html = gr.HTML("", elem_id="cc_html", **({"js_on_load": CC_OPEN_JS} if "js_on_load" in
-                                      inspect.signature(gr.HTML.__init__).parameters else {}))
-                with gr.Column(scale=2, elem_id="cc_view"):
-                    cc_img = gr.Image(label="Picture", type="filepath", interactive=False, height=420)
-                    cc_cap = gr.Markdown("*Click a picture that says something else to look at it with its caption.*")
-            cc_msg = gr.Markdown("")
-            cc_confirm = gr.Checkbox(label="Confirm", value=False, visible=False)
-
-        # ================================================================ Settings > Trainers and GPU
-        with page("trainers", "Trainers + GPU"):
-            gr.Markdown("The two trainers and the GPU they run on. Saved in "
-                        f"`{sname}` under `[general]`.")
-            with gr.Row(equal_height=False):
-                rn_sd = gr.Textbox(label="sd-scripts folder", scale=1,
-                                   info="Illustrious, SDXL, Pony, Anima, FLUX.1, SD 1.5 ...")
-                rn_mu = gr.Textbox(label="musubi-tuner folder", scale=1,
-                                   info="Z-Image Turbo, Qwen-Image, FLUX.2 klein (with its own venv/). Empty = ~/musubi-tuner.")
-            tr_facts = gr.HTML("", elem_id="tr_facts")
-            with gr.Column(elem_classes=["ls-card"]):
-                gr.Markdown("**Picture tools** · quality rating, look-alikes, crops around the person, watermark "
-                            "removal (LaMa) and gentle upscaling (Real-ESRGAN). They run in the sd-scripts venv on "
-                            "your GPU, never during a training run, and stop after 5 idle minutes.")
-                pt_status = gr.HTML("")
-                with gr.Row():
-                    pt_install = gr.Button("Install the picture tools", size="sm", scale=0, min_width=220)
-                    pt_check = gr.Button("Check again", size="sm", scale=0, min_width=130)
-                pt_msg = gr.Markdown()
-            with gr.Accordion("Advanced: low-level trainer and GPU values", open=False):
-                with gr.Row():
-                    rn_workdir = gr.Textbox(label="Working folder", scale=1,
-                                            info="Scripts run from here, so relative paths like venv/bin/activate work.")
-                    rn_venv = gr.Textbox(label="Venv to activate first (optional)", scale=1,
-                                         info="Folder or .../bin/activate. Your script's own activate line still runs after it.")
-                rn_trace = gr.Checkbox(label="Write a full trace to the log (set -x; for bug reports)")
-                _nv = S_NVIDIA()
-                gr.Markdown(("**GPU and CUDA environment (NVIDIA).** Used by the program, put into every new launch "
-                             "script, and written into existing scripts with the button below. The AMD ROCm values "
-                             "(GFX version, AOTriton, ROCm allocator) are not needed on NVIDIA and are left out.")
-                            if _nv else
-                            "**GPU and ROCm environment.** Change the GFX version when you change GPU. Used by the "
-                            "program, put into every new launch script, and written into existing scripts with the "
-                            "button below.")
-                with gr.Row(visible=not _nv):
-                    gx_pick = gr.Dropdown(choices=[(f"{lab}: {val}", val) for lab, val in KNOWN_GFX], label="Known GPUs",
-                                          scale=3)
-                    gx_val = gr.Textbox(label="GFX version override", placeholder="e.g. 12.0.1", scale=1, min_width=110)
-                gx_extra = [gr.Textbox(label=lab, placeholder=f"empty = preset default ({d})")
-                            for _, lab, d in ENV_EXTRA]
-                with gr.Row(elem_classes=["ls-bar"]):
-                    gx_detect = gr.Button("Detect GPU", size="sm", scale=1, visible=not _nv)
-                    gx_save_btn = gr.Button("Save environment", size="sm", scale=1)
-                with gr.Row():
-                    gx_confirm = gr.Checkbox(label="Yes, rewrite the export line in all my launch scripts (a .bak is kept)", value=False, scale=3)
-                    gx_upd_btn = gr.Button("Update all launch scripts", scale=1)
-                gx_msg = gr.Markdown("")
-            with gr.Row(elem_classes=["ls-bar"]):
-                rn_save_btn = gr.Button("Save", variant="primary", size="sm", scale=0, min_width=120)
-            rn_msg = gr.Markdown("")
-
-        # ================================================================ Settings > Model files
-        with page("models", "Model files"):
-            gr.Markdown(f"Model, VAE and text-encoder files for each LoRA type, saved in `{sname}`. Pick the type, then "
-                        "for every file type or paste a folder (press Enter) and pick a file. New launch scripts use "
-                        "these files instead of the preset defaults.")
-            _st_types = type_choices()
-            with gr.Row(elem_classes=["ls-bar"]):
-                st_type = gr.Dropdown(choices=_st_types, value=_st_types[0][1] if _st_types else None,
-                                      label="LoRA type", scale=3)
-                st_rec = gr.Checkbox(label="Also list files in subfolders (2 levels)", value=True, scale=2)
-                st_reload = gr.Button("Reload from file", size="sm", scale=1)
-                st_refresh_btn = gr.Button("Refresh file lists", size="sm", scale=1)
-            st_info = gr.Markdown("")
-            st_flags = gr.State([""] * ST_N)
-            st_rows, st_dirs, st_files, st_dl_btns = [], [], [], []
-            for i in range(ST_N):
-                with gr.Row(visible=False, equal_height=True) as _row:
-                    _d = gr.Textbox(label="Folder", scale=2)
-                    _f = gr.Dropdown(choices=[], label="File", allow_custom_value=True, scale=3)
-                    _b = gr.Button("⬇ From Hugging Face", size="sm", visible=False, scale=0, min_width=170)
-                st_rows.append(_row)
-                st_dirs.append(_d)
-                st_files.append(_f)
-                st_dl_btns.append(_b)
-            with gr.Row():
-                st_save_btn = gr.Button(f"Save to {sname}", variant="primary")
-                st_dl_all = gr.Button("⬇ Download all missing files", visible=False)
-                st_dl_stop = gr.Button("Stop download", variant="stop", size="sm", scale=0, min_width=140)
-            st_dl_md = gr.Markdown("")
-            with gr.Accordion("Download any file from Hugging Face (paste its link)", open=False):
-                gr.Markdown("For a file that is not in the built-in list, or another version of it: open the file on "
-                            "huggingface.co and copy the link from the address bar (…/blob/main/…) or from its download "
-                            "button (…/resolve/main/…). Your Hugging Face token is used, so gated repos work once you "
-                            "have accepted their licence there. The file goes into your models folder (or the slot's "
-                            "folder) and the slot is saved. A file in several parts (…-00001-of-00003) is fetched whole.")
-                with gr.Row():
-                    st_dl_slot = gr.Dropdown(choices=[], label="For the slot", scale=2)
-                    st_dl_link = gr.Textbox(label="Hugging Face file link", scale=5,
-                                            placeholder="https://huggingface.co/<owner>/<repo>/blob/main/<file>.safetensors")
-                    st_dl_go = gr.Button("⬇ Download", variant="primary", scale=1)
-            st_msg = gr.Markdown("")
-            with gr.Accordion("Suggestions: which files fit this LoRA type and base model", open=True):
-                gr.Markdown("Every model file in the slot folders (and the `models` folder above them) is identified from "
-                            "its header: model family, text encoder / VAE kind, fp16 / fp8 / ComfyUI fp8_scaled. The best "
-                            "match for each slot is marked ★. **Apply suggestions** fills the empty or unsuitable slots "
-                            "(the base model only with a file of the same family); nothing is saved until you press Save.")
-                st_sug_md = gr.Markdown("")
-                st_sug_picks = gr.State({})
-                with gr.Row():
-                    st_sug_apply = gr.Button("Apply suggestions", variant="secondary", scale=1)
-                    st_sug_all = gr.Checkbox(label="Also replace files that already fit", value=False, scale=1)
-                    st_sug_rescan = gr.Button("Check again", scale=1)
-                    st_online_btn = gr.Button("Look up online (Hugging Face, Civitai)", scale=1)
-                st_online_md = gr.Markdown("")
-            with gr.Accordion("LoRA subtypes (for example Pony: its own model files and file tag)", open=False):
-                gr.Markdown("A subtype trains exactly like its base type (same trainer, flags and recommended settings) "
-                            "but has its own model files and file tag, so launch scripts are named `<folder><TAG>_lora.sh` "
-                            f"and the LoRA `<folder><TAG>V1`. Saved in `{sname}` as a section such as `[pony]` with "
-                            "`base = sdxl`, `label` and `tag`, plus the model files. After adding one, pick it as "
-                            "**LoRA type** above and choose its files.")
-                sub_md = gr.Markdown(sub_list_md())
-                with gr.Row():
-                    sub_name = gr.Textbox(label="Name", info="e.g. Pony", scale=2)
-                    sub_base = gr.Dropdown(choices=[("SDXL", "sdxl"), ("Anima", "anima")], value="sdxl", label="Based on", scale=1)
-                    sub_tag = gr.Textbox(label="File tag", info="empty = the name in capitals (PONY)", scale=2)
-                    sub_add_btn = gr.Button("Add subtype", variant="primary", scale=1)
-                with gr.Row():
-                    sub_rm = gr.Dropdown(choices=sub_choices(), label="Subtype to remove", scale=3)
-                    sub_confirm = gr.Checkbox(label=f"Yes, remove its section from {sname}", value=False, scale=3)
-                    sub_rm_btn = gr.Button("Remove subtype", variant="stop", scale=1)
-                sub_msg = gr.Markdown("")
-            with gr.Accordion(f"{sname} as it is on disk", open=False):
-                st_raw_box = gr.Textbox(value=st_raw(), lines=14, interactive=False, show_label=False)
-
-        # ================================================================ Settings > AI helpers
-        with page("ai", "AI helpers"):
-            gr.Markdown("#### Ollama: reads pictures and writes captions")
-            with gr.Row(equal_height=True):
-                oc_url = gr.Textbox(label="Ollama address", value=_oc_url, scale=3)
-                oc_find_btn = gr.Button("Test", size="sm", scale=0, min_width=90)
-                ai_stopall = gr.Button("Stop Ollama", variant="stop", size="sm", scale=0, min_width=130)
-            oc_model = gr.Dropdown(choices=[_oc_model] if _oc_model else [], value=_oc_model or None,
-                                   label="Default model (captions, sorting and picture checks)",
-                                   info="Only models that can read pictures are listed. It is started when a step "
-                                        "needs it; the Start buttons below only load it ahead of time.",
-                                   allow_custom_value=True, elem_id="ai_default")
-            oc_find_md = gr.Markdown("")
-            ai_box = gr.Textbox(elem_id="ai_box", show_label=False, container=False)
-            ai_html = gr.HTML("", elem_id="ai_models")
-            ai_msg = gr.Markdown("")
-            with gr.Accordion("Get another model", open=False):
-                with gr.Row(equal_height=True):
-                    ai_pull_name = gr.Textbox(label="Model name", placeholder="e.g. minicpm-v:8b", scale=3)
-                    ai_pull_btn = gr.Button("Download", size="sm", scale=0, min_width=110)
-                ai_pull_md = gr.Markdown("")
-                with gr.Row(equal_height=True):
-                    ai_rm = gr.Dropdown(choices=[], label="Model to remove", scale=3)
-                    ai_rm_ok = gr.Checkbox(label="Yes, remove it from Ollama", value=False, scale=2)
-                    ai_rm_btn = gr.Button("Remove", variant="stop", size="sm", scale=0, min_width=100)
-            gr.Markdown("Only one model runs at a time: **Start** on another model stops the running one first. "
-                        "The **default model** (at the top, or the round button in the table) is used for captions, "
-                        "sorting and picture checks; models that cannot read pictures cannot be picked. Starting a training run stops Ollama to free video memory; it is "
-                        "not started again by itself. The top bar always shows which model is running.",
-                        elem_classes=["ls-note"])
-            gr.Markdown("#### Hugging Face token")
-            gr.Markdown(f"Kept in `{hf_path()}` (readable only by you) and written into `export HF_TOKEN=\"...\"` of "
-                        "launch scripts that download models. The token is masked in the run log.")
-            with gr.Row():
-                cs_hf_tok = gr.Textbox(label="Current token", value=read_hf_token(), type="password", interactive=False, scale=4)
-                cs_hf_show = gr.Checkbox(label="Show", value=False, scale=1)
-                cs_hf_reload = gr.Button("Reload token file", scale=1)
-            with gr.Row():
-                hf_new = gr.Textbox(label="Paste a new token", type="password", placeholder="hf_...", scale=4)
-                hf_save_btn = gr.Button("Save token", variant="primary", scale=1)
-            hf_msg = gr.Markdown("")
-
-        # ================================================================ events
-
-        def rn_save(wd, venv, trace, sd, mu):
-            msg, raw = runner_save(wd, venv, trace, sd, mu)
-            sd = (sd or "").strip()
-            if sd and msg.startswith("Saved to") and Path(os.path.expanduser(sd)).is_dir():
-                for cb in ON_SD_DIR:
-                    try:
-                        cb(sd)
-                    except Exception as e:          # noqa: BLE001
-                        msg += f" (could not update the folder list: {e})"
-            return msg, raw
-
-        def rn_load():
-            wd, venv, trace, sd, mu = runner_load()
-            return wd, venv, trace, sd or str(ROOT), mu
-        rn_save_btn.click(rn_save, [rn_workdir, rn_venv, rn_trace, rn_sd, rn_mu], [rn_msg, st_raw_box]) \
-            .then(trainer_facts_html, None, tr_facts)
-        demo.load(rn_load, None, [rn_workdir, rn_venv, rn_trace, rn_sd, rn_mu]).then(trainer_facts_html, None, tr_facts)
-
-        def pt_html(fresh=False):
-            try:
-                import pictools
-                st = pictools.status(fresh)
-            except Exception as e:                       # noqa: BLE001
-                return f'<div class="ls-note">✕ {html.escape(str(e))}</div>', gr.update()
-            have = sorted(p.name for p in pictools.MODELS_DIR.glob("*") if p.suffix in (".pt", ".pth"))
-            models = (f" · model files here: {html.escape(', '.join(have))}" if have else
-                      " · the model files (about 2.5 GB) download the first time a tool is used")
-            line = ("● ready" + models if st["ok"] else "○ " + html.escape(st["text"]))
-            return (f'<div class="ls-note">{line}<br><span class="rs-mono">{html.escape(st["python"] or "")}</span></div>',
-                    gr.update(visible=not st["ok"]))
-        pt_check.click(lambda: pt_html(True), None, [pt_status, pt_install])
-        demo.load(lambda: pt_html(False), None, [pt_status, pt_install])
-
-        def pt_do():
-            import pictools
-            yield "Installing spandrel into the sd-scripts venv (PyTorch is left as it is) …"
-            yield pictools.install()
-        pt_install.click(pt_do, None, pt_msg).then(lambda: pt_html(True), None, [pt_status, pt_install])
-
-        # ---- launch script + prepare (the dataset, type and purpose are the same on both pages)
-        cs_outs = [cs_script, cs_type, cs_text] + cs_fields + [cs_explain, cs_prompts_path, cs_prompts_text,
-                                                                cs_newname, cs_save_over_btn, cs_status, cs_plan, cs_samples]
-        cs_ctl = [cs_ds, cs_script, cs_type, cs_steps, cs_userep, cs_hfauto, cs_samples]
-        cs_ret = [cs_ds, cs_script, cs_type, cs_text, cs_steps, cs_userep, cs_hfauto, cs_samples]
-        rp_outs = [rp_folder, rp_repeats, rp_newname, rp_info]
-        rp_in = [cs_ds, cs_type, cs_steps]
-        mvis = lambda ev: ev.then(model_vis, [cs_type] + model_fields, model_fields)
-
-        def ds_both(v):
-            ch = list_lora_dirs()
-            v = v if v in ch else None
-            return gr.update(choices=ch, value=v), gr.update(choices=ch, value=v)
-
-        n_model, at_model = len(model_fields), 3 + len(cs_fields) - len(model_fields)   # where cs_outs holds them
-
-        def ds_all(ds, tkey, steps, use_rep, hf_auto, samples):
-            """Everything that follows a new dataset, in ONE event (it was a chain of six, each costing the browser
-            about a second on a big page): the launch script page, the repeat folder, watermarks, consistency, and
-            which model file fields show."""
-            cs = list(cs_ds_change(ds, tkey, steps, use_rep, hf_auto, samples))
-            t = cs[1].get("value", tkey) if isinstance(cs[1], dict) else (cs[1] or tkey)
-            vals = [(v.get("value") if isinstance(v, dict) else v) for v in cs[at_model:at_model + n_model]]
-            for i, vis in enumerate(model_vis(t, *vals)):
-                v = cs[at_model + i]
-                cs[at_model + i] = {**v, "visible": vis["visible"]} if isinstance(v, dict) else gr.update(value=v, visible=vis["visible"])
-            return cs + list(rp_refresh(ds, tkey, steps)) + list(wm_render(ds)) + list(cc_render(ds))
-
-        UI.update(ds_all=(ds_all, [cs_steps, cs_userep, cs_hfauto, cs_samples],
-                          cs_outs + rp_outs + [wm_sum, wm_html, cc_sum, cc_html]),
-                  ds_both=ds_both, cs_ds=cs_ds, cs_type=cs_type,
-                  cs_purpose=cs_purpose, cs_retype=(cs_retype, cs_ret, cs_outs),
-                  rp_refresh=(rp_refresh, rp_in, rp_outs), wm=(wm_render, [wm_sum, wm_html]),
-                  cc=(cc_render, [cc_sum, cc_html]), oc=dict(trigger=oc_trigger, leave=oc_leave, style=oc_style,
-                  length=oc_length, detail=oc_detail, url=oc_url, model=oc_model, out=oc_out, run=oc_run_btn),
-                  cs_text=cs_text, cs_plan=cs_plan, cs_script=cs_script, cs_steps=cs_steps, cs_fields=cs_fields,
-                  cs_save_new_btn=cs_save_new_btn, cs_save_over_btn=cs_save_over_btn, cs_status=cs_status,
-                  cs_newname=cs_newname, cs_apply=(cs_apply, [cs_ds, cs_type, cs_script, cs_text, cs_plan] + cs_fields, cs_outs),
-                  cs_models=(cs_use_settings, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs),
-                  cc_apply_btn=cc_apply_btn, cs_queue_btn=cs_queue_btn, cs_save_msg=cs_save_msg)
-        mvis(cs_script.input(cs_script_change, cs_ctl, cs_outs))
-        cs_steps.submit(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs)
-
-        for _c in (cs_purpose, cs_priority):
-            _c.input(set_choice, [cs_purpose, cs_priority], None).then(cs_retype, cs_ret, cs_outs) \
-                .then(lambda: recs_status(), None, cs_recs_md).then(rp_refresh, rp_in, rp_outs)
-        cs_export_btn.click(export_report, None, [cs_export_file, cs_status])
-        cs_userep.input(cs_retype, cs_ret, cs_outs)
-        cs_hfauto.input(cs_retype, cs_ret, cs_outs)
-        (rp_make_btn.click(rp_make, [cs_ds, cs_type, cs_text, cs_plan], rp_msg).then(rp_refresh, rp_in, rp_outs))
-        cs_suggest_btn.click(cs_suggest, cs_ctl, cs_outs).then(rp_refresh, rp_in, rp_outs)
-        rp_folder.input(rp_name_update, [cs_ds, rp_folder, rp_repeats], rp_newname)
-        rp_repeats.input(rp_name_update, [cs_ds, rp_folder, rp_repeats], rp_newname)
-        (rp_btn.click(rp_rename, [cs_ds, rp_folder, rp_newname, rp_confirm], [rp_msg, cs_userep])
-                 .then(cs_retype, cs_ret, cs_outs).then(rp_refresh, rp_in, rp_outs))
-        ai_outs = [ai_html, ai_msg, oc_model, ai_rm]
-        oc_find_btn.click(ai_test, oc_url, [oc_find_md] + ai_outs)
-        oc_url.submit(ai_test, oc_url, [oc_find_md] + ai_outs)
-        ai_box.change(ai_action, [ai_box, oc_url], ai_outs)
-        oc_model.input(ai_default, [oc_model, oc_url], ai_outs)
-        ai_stopall.click(lambda u: ai_refresh(u, ollama_ctl().stop_all(u)), oc_url, ai_outs)
-        demo.load(lambda u: ai_refresh(u, ""), oc_url, ai_outs)
-        ai_pull_btn.click(lambda n, u: ollama_ctl().pull(n, u), [ai_pull_name, oc_url], ai_pull_md)
-        ai_rm_btn.click(ai_remove, [ai_rm, ai_rm_ok, oc_url], ai_outs).then(lambda: False, None, ai_rm_ok)
-        import ticker
-        ticker.timer(3.0, ai_pull_tick, [ai_pull_md, oc_url], [ai_pull_md, ai_html], show_progress="hidden")
-        oc_prev_btn.click(oc_preview, [cs_ds, oc_url, oc_model, oc_trigger, oc_leave, oc_hints,
-                                       oc_style, oc_length, oc_detail], oc_out)
-        oc_run_evt = oc_run_btn.click(oc_run, [cs_ds, oc_url, oc_model, oc_trigger, oc_leave, oc_hints, oc_unload,
-                                               oc_style, oc_length, oc_detail], oc_out)
-        oc_ex_in = [oc_style, oc_length, oc_detail, oc_trigger, cs_type]
-        for comp in (oc_style, oc_length, oc_detail):     # set by you, or by the recommendation (which redraws it)
-            comp.input(oc_example, oc_ex_in, oc_ex)
-        oc_trigger.change(oc_example, oc_ex_in, oc_ex)
-        oc_rec_outs = [oc_rec, oc_style, oc_length, oc_detail]
-        cs_type.change(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
-        cs_purpose.change(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
-        oc_rec_btn.click(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
-        demo.load(oc_apply_recommendation, [cs_type, cs_purpose], oc_rec_outs).then(oc_example, oc_ex_in, oc_ex)
-        (oc_run_evt.then(cs_retype, cs_ret, cs_outs))              # the analysis re-reads the new captions
-        oc_stop_btn.click(oc_stop, None, oc_out)
-        WM_JS = ("(ds, x) => { var o = {}; document.querySelectorAll('#wm_html .wm-row').forEach(function(r){ "
-                 "var s = r.querySelector('.wm-opt.sel'); if (s) o[r.dataset.p] = s.dataset.c; }); return [ds, JSON.stringify(o)]; }")
-        (wm_apply_btn.click(wm_apply_live, [cs_ds, wm_box], wm_msg, js=WM_JS).then(wm_render, cs_ds, [wm_sum, wm_html])
-                 .then(cs_retype, cs_ret, cs_outs))
-        (wm_reco_btn.click(lambda ds: (yield from wm_apply_live(ds, "", only_pending=True)), cs_ds, wm_msg)
-                 .then(wm_render, cs_ds, [wm_sum, wm_html]).then(cs_retype, cs_ret, cs_outs))
-        wm_p_outs = [wm_panel, wm_ptitle, wm_paint_col, wm_crop_col, wm_editor, wm_cimg, wm_l, wm_r, wm_t, wm_b,
-                     wm_paint_go, wm_crop_go, wm_rel, wm_pmsg, wm_cres]
-        wm_tool.change(wm_tool_open, [cs_ds, wm_tool], wm_p_outs, show_progress="hidden")
-        wm_close.click(lambda: gr.update(visible=False), None, wm_panel)
-        wm_cin = [cs_ds, wm_rel, wm_l, wm_r, wm_t, wm_b, wm_aspect]
-        for c_ in (wm_l, wm_r, wm_t, wm_b):
-            c_.release(wm_crop_show, wm_cin, [wm_cimg, wm_cres], show_progress="hidden")
-        wm_aspect.change(wm_crop_show, wm_cin, [wm_cimg, wm_cres], show_progress="hidden")
-        (wm_paint_go.click(lambda: "⏳ The picture tools fill in what you painted …", None, wm_pmsg)
-                 .then(wm_paint_apply, [cs_ds, wm_rel, wm_editor], [wm_msg, wm_panel])
-                 .then(wm_render, cs_ds, [wm_sum, wm_html]))
-        (wm_crop_go.click(wm_crop_apply, wm_cin, [wm_msg, wm_panel])
-                 .then(wm_render, cs_ds, [wm_sum, wm_html]))
-        (cc_btn.click(cc_find, [cs_ds, oc_url, oc_model, oc_trigger], [cc_sum, cc_html]))
-        cc_stop_btn.click(cc_stop, None, cc_msg, queue=False)
-        (cc_apply_btn.click(cc_apply, [cs_ds, cc_box, oc_url, oc_model, oc_trigger, cc_confirm], [cc_msg, cc_confirm],
-                                    js=CC_JS)
-                 .then(cc_render, cs_ds, [cc_sum, cc_html]).then(cc_leave_out, [cs_ds, oc_leave], oc_leave)
-                 .then(cs_retype, cs_ret, cs_outs))
-        cc_box.change(cc_open, cc_box, [cc_img, cc_cap])
-        (oc_undo_btn.click(rv_undo, None, oc_out).then(cs_retype, cs_ret, cs_outs))
-        rp_epochs_btn.click(cs_set_epochs, [cs_ds, cs_type, cs_script, cs_text, cs_plan, cs_steps], cs_outs)
-        cs_hf_show.input(lambda show: gr.update(type="text" if show else "password"), cs_hf_show, cs_hf_tok)
-        cs_hf_reload.click(lambda: (read_hf_token(), hf_status_text()), None, [cs_hf_tok, hf_md])
-        hf_save_btn.click(save_hf_token, hf_new, [hf_msg, cs_hf_tok, hf_md]).then(lambda: "", None, hf_new)
-        cs_hf_fill.click(cs_fill_hf, [cs_text, cs_plan], cs_outs)
-        # the form and the text follow each other, without buttons (.change: step 9 also writes the text)
-        for fld, (fname, _) in zip(cs_fields, FORM_FIELDS):
-            if fname not in STUDIO_TABLE:
-                fld.blur(cs_apply_quiet, [cs_ds, cs_type, cs_script, cs_text, cs_plan] + cs_fields, cs_outs,
-                         show_progress="hidden")
-        cs_text.change(cs_read, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs, show_progress="hidden")
-        cs_models_btn.click(cs_use_settings, [cs_ds, cs_type, cs_script, cs_text, cs_plan], cs_outs)
-        cs_check_btn.click(cs_check, cs_text, cs_check_out)
-        (cs_save_over_btn.click(cs_save_over, [cs_ds, cs_script, cs_text, cs_type, cs_plan, cs_makedirs], cs_status)
-                 .then(lambda s: s, cs_status, cs_save_msg).then(rp_refresh, rp_in, rp_outs))
-        (cs_save_new_btn.click(lambda *a: cs_save_new(*a)[:-1], [cs_ds, cs_newname, cs_text, cs_prompts_path,
-                                                                        cs_prompts_text, cs_type, cs_script, cs_plan,
-                                                                        cs_makedirs], cs_outs)
-                 .then(lambda s: s, cs_status, cs_save_msg)
-                 .then(rp_refresh, rp_in, rp_outs))
-        demo.load(model_vis, [cs_type] + model_fields, model_fields)
-
-        at_status = cs_outs.index(cs_status)
-
-        def cs_save_for_queue(ds, script, text, tkey, plan, makedirs, newname, prompts_path, prompts_text):
-            """Save and add to the queue: over the open launch script, or as its new version when none is open."""
-            if script not in (None, "", NEW) and Path(script).is_file():
-                msg = cs_save_over(ds, script, text, tkey, plan, makedirs)
-                out = [gr.update()] * len(cs_outs)
-                out[at_status] = msg
-                return out + [msg]
-            out = list(cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, plan, makedirs)[:-1])
-            return out + [out[at_status]]
-        save_queue_ev = cs_queue_btn.click(
-            cs_save_for_queue, [cs_ds, cs_script, cs_text, cs_type, cs_plan, cs_makedirs, cs_newname, cs_prompts_path,
-                                cs_prompts_text], cs_outs + [cs_save_msg]).then(rp_refresh, rp_in, rp_outs)
-
-        def autostart_save(v):
-            lo = _LO.load()
-            lo["queue_autostart"] = bool(v)
-            _LO.save(lo)
-        cs_autostart.input(autostart_save, cs_autostart, None)
-        UI.update(save_queue_ev=save_queue_ev, cs_autostart=cs_autostart)
-
-        # ---- model files settings
-        st_slot_outs = []
-        for _r, _d, _f in zip(st_rows, st_dirs, st_files):
-            st_slot_outs += [_r, _d, _f]
-        st_outs = st_slot_outs + [st_flags, st_info]
-        sug_in = [st_type, st_flags] + st_dirs + st_files
-        st_dl_vis_in = [st_type, st_flags] + st_files
-        st_dl_vis_out = st_dl_btns + [st_dl_all, st_dl_slot]
-
-        def st_files_changed(*vals):
-            n = len(st_dl_vis_in)
-            return list(st_dl_visible(*vals[:n])) + list(st_suggest(*vals[n:]))
-        # after anything that changes the model file fields: the download buttons and the suggestions follow, in one
-        # event (a .change per field cost four events, also when the page opened)
-        _stv = lambda ev: ev.then(st_files_changed, st_dl_vis_in + sug_in, st_dl_vis_out + [st_sug_md, st_sug_picks],
-                                  show_progress="hidden")
-        _stv(st_type.input(st_load, [st_type, st_rec], st_outs))
-        _stv(demo.load(st_load, [st_type, st_rec], st_outs))
-        _stv(st_rec.input(st_refresh_all, [st_rec] + st_dirs + st_files, st_files))
-        _stv(st_refresh_btn.click(st_refresh_all, [st_rec] + st_dirs + st_files, st_files))
-        for _d, _f in zip(st_dirs, st_files):
-            _stv(_d.submit(st_refresh, [_d, st_rec, _f], _f))
-            _stv(_d.blur(st_refresh, [_d, st_rec, _f], _f))
-            for _ev in (_f.input,):                            # a file picked or typed by you
-                _ev(st_files_changed, st_dl_vis_in + sug_in, st_dl_vis_out + [st_sug_md, st_sug_picks],
-                    show_progress="hidden")
-        sub_outs = [sub_msg, st_type, cs_type, sub_rm, sub_md, st_raw_box]
-        _stv(sub_add_btn.click(sub_add, [sub_name, sub_base, sub_tag], sub_outs).then(st_load, [st_type, st_rec], st_outs))
-        _stv(sub_rm_btn.click(sub_remove, [sub_rm, sub_confirm, st_type, cs_type], sub_outs)
-             .then(lambda: False, None, sub_confirm).then(st_load, [st_type, st_rec], st_outs))
-        _stv(st_reload.click(sub_reload, None, sub_outs).then(st_load, [st_type, st_rec], st_outs))
-        st_save_btn.click(st_save, [st_type, st_flags] + st_dirs + st_files, [st_msg, st_raw_box])
-        st_type.input(lambda: "", None, st_online_md)
-        st_sug_rescan.click(st_suggest, sug_in, [st_sug_md, st_sug_picks])
-        _stv(st_sug_apply.click(st_apply_suggestions, [st_type, st_flags, st_sug_picks, st_sug_all, st_rec] + st_dirs
-                                + st_files, st_dirs + st_files))
-        st_online_btn.click(st_online, [st_type, st_files[0]], st_online_md)
-        # Hugging Face downloads (Settings > Hugging Face token is used)
-        for _i, (_d, _f, _b) in enumerate(zip(st_dirs, st_files, st_dl_btns)):
-            _stv(_b.click(lambda t, fl, d, f, i=_i: (yield from st_download(t, fl, i, d, f)), [st_type, st_flags, _d, _f],
-                          [st_dl_md, _d, _f], concurrency_id="hfdl", concurrency_limit=1))
-        _stv(st_dl_all.click(st_download_all, [st_type, st_flags, st_rec] + st_dirs + st_files,
-                             [st_dl_md] + st_dirs + st_files, concurrency_id="hfdl", concurrency_limit=1))
-        _stv(st_dl_go.click(st_download_link, [st_type, st_flags, st_dl_slot, st_dl_link, st_rec] + st_dirs + st_files,
-                            [st_dl_md] + st_dirs + st_files, concurrency_id="hfdl", concurrency_limit=1))
-        st_dl_stop.click(st_download_stop, None, None, queue=False)
-        st_type.input(lambda: "", None, st_dl_md)
-        gx_pick.input(gfx_pick, gx_pick, gx_val)
-        gx_detect.click(detect_gfx, None, [gx_val, gx_msg])
-        gx_save_btn.click(env_save, [gx_val] + gx_extra, [gx_msg, st_raw_box])
-        gx_upd_btn.click(env_update_scripts, gx_confirm, gx_msg).then(lambda: False, None, gx_confirm)
-        demo.load(gfx_load, None, [gx_val, gx_pick, gx_msg] + gx_extra)
-    return demo
 
 
 def detect_venv() -> str:

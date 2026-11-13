@@ -620,7 +620,7 @@ def panel_ai(page):
         note("Only models that can read pictures are listed. It is started when a step needs it; Start below only "
              "loads it ahead of time.")
         tmsg = ui.markdown("")
-        table = ui.html("", sanitize=False).classes("w-full")
+        table = ui.html("", sanitize=False).classes("w-full").props('id="ai_models"')
         msg = ui.markdown("")
         with ui.expansion("Get another model").classes("w-full"):
             with ui.row().classes("w-full items-end gap-2"):
@@ -718,7 +718,7 @@ def panel_trainers(page):
                              value=sd or str(S.ROOT)).props("outlined dense").classes("grow")
             rn_mu = ui.input("musubi-tuner folder (Z-Image, Qwen-Image, FLUX.2 klein; empty = ~/musubi-tuner)",
                              value=mu).props("outlined dense").classes("grow")
-        facts = ui.html(S.trainer_facts_html(), sanitize=False).classes("w-full")
+        facts = ui.html(S.trainer_facts_html(), sanitize=False).classes("w-full").props('id="tr_facts"')
     with card():
         ui.label("Picture tools").classes("font-semibold")
         note("Quality rating, look-alikes, crops around the person, watermark removal (LaMa) and gentle upscaling "
@@ -996,7 +996,7 @@ def panel_models(page):
 
             def add():
                 r = SSET.sub_add(sname.value, sbase.value, stag.value)
-                smsg.content, sub_md.content = r[0], SSET.sub_list_md()
+                smsg.content, sub_md.content = r, SSET.sub_list_md()
                 after_subs()
             ui.button("Add subtype", on_click=add).props("unelevated dense no-caps color=primary")
         with ui.row().classes("w-full items-end gap-2"):
@@ -1005,7 +1005,7 @@ def panel_models(page):
 
             async def remove():
                 if srm.value and await confirm(f"Remove the subtype {srm.value} from settings.txt?", "Remove"):
-                    smsg.content = SSET.sub_remove(srm.value, True, st["tkey"], "")[0]
+                    smsg.content = SSET.sub_remove(srm.value, True)
                     sub_md.content = SSET.sub_list_md()
                     after_subs()
             ui.button("Remove subtype", on_click=remove).props("flat dense no-caps color=negative")

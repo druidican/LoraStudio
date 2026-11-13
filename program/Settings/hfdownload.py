@@ -467,6 +467,3 @@ def start_background(tkeys) -> str:
     threading.Thread(target=work, daemon=True, name="hf-background").start()
     return "⏳ Downloading in the background: you can go on with the next steps."
 
-
-def bg_text() -> str:
-    return BG["line"] if (BG["running"] or BG["line"]) else ""

@@ -11,7 +11,6 @@ __version__ = "1.131126"  # LoRA Studio version, see version.py
 import html
 import re
 
-import gradio as gr
 
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 HERE = _LP.PROG
@@ -36,8 +35,7 @@ def _render(text: str) -> str:
     from markdown_it import MarkdownIt
     md = MarkdownIt("commonmark", {"html": False}).enable("table")
     out = md.render(text)
-    base = "/gradio_api/file=" + html.escape(str(DIR).replace("\\", "/"))
-    out = re.sub(r'src="(img/[^"]+)"', lambda m: f'src="{base}/{m.group(1)}" loading="lazy"', out)
+    out = re.sub(r'src="(img/[^"]+)"', lambda m: f'src="{_LP.file_url(DIR / m.group(1))}" loading="lazy"', out)
     out = re.sub(r'<a href="#([\w-]+)">', lambda m: f'<a href="#" onclick="lsManual(\'{m.group(1)}\'); return false;">', out)
     out = re.sub(r'<a href="(https?://[^"]+)">', r'<a href="\1" target="_blank" rel="noopener">', out)
     return out
@@ -58,28 +56,3 @@ def page(key: str) -> tuple[str, str]:
     foot = ('<div class="mn-foot">' + (btn(ch[i - 1], "← " + ch[i - 1]["title"]) if i > 0 else "<span></span>")
             + (btn(ch[i + 1], ch[i + 1]["title"] + " →") if i + 1 < len(ch) else "") + "</div>")
     return f'<div class="mn-body">{body}{foot}</div>', f'<div class="mn-nav">{nav}</div>'
-
-
-JS = """
-window.lsManual = function(key){
-  var el = document.querySelector('#mn_box textarea, #mn_box input'); if (!el) return;
-  var setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set;
-  setter.call(el, key + '|' + Date.now()); el.dispatchEvent(new Event('input', {bubbles:true}));
-  var top = document.getElementById('mn_body'); if (top) top.scrollIntoView({behavior:'smooth', block:'start'});
-};
-"""
-
-
-def build(app):
-    gr.HTML('<div class="ls-bar"><button class="tr-btn" onclick="window.lsHelpBack && lsHelpBack()">← Back</button></div>')
-    with gr.Row(equal_height=False, elem_id="mn_wrap"):
-        with gr.Column(scale=1, min_width=230):
-            nav = gr.HTML(elem_id="mn_navbox")
-        with gr.Column(scale=4, elem_id="mn_body"):
-            body = gr.HTML()
-    box = gr.Textbox(elem_id="mn_box", show_label=False, container=False, elem_classes=["ls-hidden"])
-
-    def show(v):
-        return page((v or "").split("|")[0])
-    box.change(show, box, [body, nav], show_progress="hidden")
-    return {"load": (lambda: page(""), None, [body, nav])}     # loaded when the tab is opened, not with the page

@@ -166,15 +166,14 @@ class Train:
     def draw_download(self):
         try:
             import hfdownload as HD
-            import sd_settings as SS
             miss = HD.missing(self.tkey) if self.tkey else []
         except Exception:                                # noqa: BLE001
             miss = []
         self.w_dl.set_visibility(bool(miss))
         if miss:
             k = HD.known(self.tkey)
-            rows = ", ".join(f"{SS.slot_label(f)} ({Path(k[f][1]).name})" for f in miss)
-            tok = "" if SS.read_hf_token() else " A Hugging Face token (Settings › Hugging Face token) is needed for gated models."
+            rows = ", ".join(f"{SSET.slot_label(f)} ({Path(k[f][1]).name})" for f in miss)
+            tok = "" if SSET.read_hf_token() else " A Hugging Face token (Settings › Hugging Face token) is needed for gated models."
             self.w_dl_note.text = (f"Missing on this computer: {rows}. They can be downloaded from Hugging Face into "
                                    f"your models folder.{tok}")
 

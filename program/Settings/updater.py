@@ -487,34 +487,3 @@ def _with_out(gen, out):
 # UI (Settings > Updates)
 # --------------------------------------------------------------------------- #
 
-def build_ui(app):
-    import gradio as gr
-    gr.Markdown("Updates for **sd-scripts** and **musubi-tuner** from GitHub (the branch each one is on). Checked "
-                "quietly when the program starts; nothing is installed until you press **Update now**. PyTorch / ROCm "
-                "are never changed, and if a test fails after the update, the code and the venv go back to how they "
-                "were (a snapshot is kept in `update_backups/`).")
-    status = gr.Markdown(status_md())
-    with gr.Row(elem_classes=["ls-bar"]):
-        chk = gr.Button("Check for updates", size="sm", scale=0, min_width=170)
-        upd = gr.Button("Update now", variant="primary", size="sm", scale=0, min_width=150)
-    log = gr.Textbox(label="Update log", lines=18, max_lines=30, interactive=False, autoscroll=True)
-
-    def on_load():
-        yield status_md()
-        t = _BG
-        for _ in range(120):
-            if t is None or not t.is_alive():
-                break
-            time.sleep(1)
-        yield status_md()
-
-    def on_check():
-        if STATUS["running"] or LOCK.locked():
-            return status_md() + "\n\n(a check or update is already running)"
-        check()
-        return status_md()
-
-    app.load(on_load, None, status)
-    chk.click(lambda: "Checking for updates ...", None, status).then(on_check, None, status)
-    upd.click(update, None, [log, status])
-    return status

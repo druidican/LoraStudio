@@ -95,6 +95,7 @@ def build_page():
     shell = Shell()
     setup_page.notice_gate()                              # shown once, before anything else
     ui.on("ls_nav", lambda e: shell.go("settings", group=e.args))
+    ui.on("ls_manual", lambda e: getattr(shell, "manual_show", lambda k: None)(str(e.args)))
     ui.on("ls_lora", lambda e: shell.go("collection", lora=str(e.args)))
     import notify
     notify.SHOW = lambda msg, kind: ui.notify(msg, type="warning" if kind == "warning" else "info")
@@ -140,6 +141,7 @@ BRIDGE_JS = """
 <script>
 // Links inside the HTML parts the program draws (cards, tables, lists) send events to the page's Python side:
 // lsSend('<box>', value) -> event ls_<box>; lsSetNav('<settings group>'); lsGoQueue(); lsGoRun('<log>').
+window.lsManual = function(k){ emitEvent('ls_manual', k); };
 window.lsSend = function(box, v){ emitEvent('ls_' + box, v); };
 window.lsSetNav = function(k){ emitEvent('ls_nav', k); };
 window.lsGoQueue = function(){ emitEvent('ls_go', 'queue'); };
@@ -156,14 +158,25 @@ def _start_page() -> str:
 
 
 def help_dialog(shell: Shell):
-    """The manual chapter of the current page (the full Manual page comes later)."""
-    import re
-    chap = {"home": "01_welcome", "datasets": "03_datasets", "queue": "04_training", "collection": "06_collection",
-            "settings": "02_settings"}.get(shell.tabs.value, "01_welcome")
-    f = next((lspaths.PROG / "manual").glob(chap + "*.md"), None)
-    text = f.read_text(encoding="utf-8") if f else "No manual chapter found."
-    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)          # pictures come with the new manual
-    with ui.dialog() as d, ui.card().classes("w-[900px] max-w-[95vw]"):
-        ui.markdown(text).classes("w-full")
-        ui.button("Close", on_click=d.close).props("flat no-caps")
+    """The manual, opened at the chapter of the current page; chapters on the left, pictures from manual/img/."""
+    import manual
+    key = {"home": "welcome", "datasets": "datasets", "queue": "training", "collection": "collection",
+           "settings": "settings"}.get(shell.tabs.value, "welcome")
+    with ui.dialog().props("maximized") as d, ui.card().classes("w-full ls-page"):
+        with ui.row().classes("w-full items-center"):
+            ui.label("Manual").classes("text-xl font-bold grow")
+            ui.button("Close", on_click=d.close).props("flat no-caps")
+        with ui.row().classes("w-full no-wrap items-start gap-6"):
+            nav = ui.html("", sanitize=False).classes("w-64 flex-none")
+            body = ui.scroll_area().classes("grow h-[calc(100vh-110px)]")
+            with body:
+                text = ui.html("", sanitize=False).classes("w-full")
+
+    def show(k):
+        b, n = manual.page(k)
+        text.content, nav.content = b, n
+        body.scroll_to(percent=0)
+    shell.manual_show = show                             # chapter links: the ls_manual event (build_page)
+    show(key)
     d.open()
+

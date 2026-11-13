@@ -5,7 +5,7 @@
    it is loaded after this one, and an update never replaces it. Reload the page after a change
    (restart LoRA Studio for changes to this file). */
 /* ---- shared ---- */
-.ls-hidden, #ai_box, #ds_box, #tr_box, #rs_box { display:none !important; }
+.ls-hidden { display:none !important; }
 .ls-note, .ls-note p { color:var(--ll-muted); font-size:13px; }
 .ls-bar > .ls-note, .ls-bar .ls-note { flex:1 1 240px !important; min-width:200px !important; }
 .ls-card { background:var(--ll-card); border:1px solid var(--ll-line); border-radius:12px; padding:14px 16px; }
@@ -14,16 +14,7 @@
 .ls-chip.ok { background:#21857C; color:#fff; } .ls-chip.warn { background:#E8A33D; color:#1C1F24; }
 .ls-chip.bad { background:#8E2A1F; color:#fff; } .ls-chip.dark { background:#262A31; color:#F6F5F1; }
 
-/* ---- Settings: left list ---- */
-#set_nav { gap:2px !important; border-right:1px solid var(--ll-line); padding-right:10px; }
-#set_nav .set-grp { font-size:12px; font-weight:700; letter-spacing:1px; color:var(--ll-muted); padding:12px 12px 4px; }
-#set_nav button.set-item { justify-content:flex-start !important; text-align:left; background:transparent !important;
-                            border:0 !important; box-shadow:none !important; font-size:15px !important; font-weight:500;
-                            padding:8px 12px !important; border-radius:8px !important; color:var(--ll-text) !important; }
-#set_nav button.set-item:hover { background:var(--ll-chip, #ECEEF1) !important; }
-#set_nav button.set-on { background:#FBE9C8 !important; font-weight:700 !important; color:#1C1F24 !important; }
-#set_nav button.set-on:hover, #set_nav button.set-on:focus, .dark #set_nav button.set-on,
-.dark #set_nav button.set-on:hover, .dark #set_nav button.set-on:focus { background:#FBE9C8 !important; color:#1C1F24 !important; }
+/* ---- Settings: health check ---- */
 .hc { display:flex; flex-direction:column; gap:14px; }
 .hc-when { color:var(--ll-muted); font-size:13px; }
 .hc-tiles { display:flex; gap:12px; flex-wrap:wrap; }
@@ -89,29 +80,11 @@ table.rs-table { border:0 !important; width:100%; border-collapse:collapse; font
 .rs-head { margin:6px 0 10px; } .rs-this { font-size:14px; }
 
 /* ---- Collection ---- */
-#col_look { margin-bottom:6px; }
-#col_look .wrap { gap:0 !important; }
-#col_look label { border:1px solid var(--ll-line) !important; border-radius:0 !important; padding:6px 16px !important;
-                  margin:0 !important; background:var(--ll-card) !important; }
-#col_look label:first-child { border-radius:8px 0 0 8px !important; } #col_look label:last-child { border-radius:0 8px 8px 0 !important; }
-#col_look label.selected { background:#262A31 !important; color:#F6F5F1 !important; }
-#col_look input { display:none; }
-#lp_head { align-items:center !important; }
-#lp_title .lp-title { display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
-#lp_title .lp-title b { font-size:26px; } #lp_title .lp-title span { font-size:13px; }
-#lp_types .wrap { gap:6px !important; }
-#lp_types label { border:1px solid var(--ll-line) !important; border-radius:99px !important; padding:4px 12px !important;
-                  font-weight:600; font-size:13px; background:transparent !important; }
-#lp_types label.selected { background:#262A31 !important; color:#F6F5F1 !important; border-color:#262A31 !important; }
-#lp_types input { display:none; }
+
 .rs-label { font-size:12px; font-weight:700; letter-spacing:1px; color:var(--ll-muted); }
 
 /* ---- Datasets ---- */
-#ds_navrow { gap:4px !important; border-bottom:1px solid var(--ll-line); margin-bottom:10px; }
-#ds_navrow button.ds-nav { background:transparent !important; border:0 !important; box-shadow:none !important; border-radius:0 !important;
-                           border-bottom:3px solid transparent !important; font-size:15px !important; font-weight:500 !important;
-                           color:var(--ll-muted) !important; padding:10px 16px !important; }
-#ds_navrow button.ds-nav-on { color:var(--ll-text) !important; border-bottom-color:#E8A33D !important; font-weight:700 !important; }
+
 .ds-stepper { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 12px; }
 .ds-step { display:inline-flex; gap:8px; align-items:center; cursor:pointer; padding:6px 12px 6px 6px; border-radius:99px;
            border:1px solid var(--ll-line); background:var(--ll-card); color:var(--ll-text); font-size:13px; font-weight:600; }
@@ -192,19 +165,16 @@ table.ds-calc { border-collapse:collapse; font-size:14px; } .ds-calc td { paddin
 .ds-effrow span:first-child { min-width:220px; color:var(--ll-muted); }
 .ds-impcard { margin-bottom:10px; } .ds-imph { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:6px; }
 .ds-improw { display:flex; gap:10px; align-items:baseline; padding:4px 0; font-size:14px; }
-.ds-seg .wrap { gap:0 !important; }
 .ds-seg label { border:1px solid var(--ll-line) !important; border-radius:0 !important; padding:4px 12px !important; margin:0 !important; }
 .ds-seg label.selected { background:#262A31 !important; color:#F6F5F1 !important; }
 .ds-seg input { display:none; }
 .ds-sug .rs-big { font-size:22px; }
-.ds-frow-on *, .ds-st-now *, #set_nav button.set-on * { color:#1C1F24 !important; }
+.ds-frow-on *, .ds-st-now * { color:#1C1F24 !important; }
 .ds-frow-on .ls-note { color:#4A5160 !important; }
 .ds-imptick { gap:8px; } .ds-imptick b { font-size:15px; }
 .ds-batch { display:flex; flex-direction:column; gap:8px; margin-top:6px; }
 .ds-bline { font-size:14px; } .ds-bres { border-top:1px solid var(--ll-line); padding-top:6px; font-size:14px; }
-#ds_s6 #wm_btnrow { display:none !important; }   /* step 6 has these buttons in its bottom bar */
 .tr-tick { width:17px; height:17px; accent-color:#E8A33D; flex:0 0 auto; cursor:pointer; }
-#wm_tool { display:none !important; }
 .wm-tools { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
 .wm-tool { cursor:pointer; padding:3px 9px; border-radius:7px; border:1px solid var(--ll-line); background:var(--ll-card);
   color:var(--ll-ink); font-size:12px; } .wm-tool:hover { border-color:#E8A33D; }
@@ -240,44 +210,23 @@ table.ds-calc { border-collapse:collapse; font-size:14px; } .ds-calc td { paddin
 .rs-ctable tr.rs-diff td:first-child { color:inherit; font-weight:600; }
 .ll-best { background:#E9B04F !important; color:#2A1C05 !important; }
 
-/* ==== Layout pass (1.241026b): one look for buttons, bars, cards, tables and folds on every page ==== */
+/* ==== one look for buttons, bars, cards and tables on every page ==== */
 :root { --ls-accent:#E8A33D; --ls-accent-soft:#FBE9C8; --ls-ink-on-accent:#1C1F24; --ls-radius:10px; --ls-gap:10px; }
 
-/* buttons: Gradio's small buttons look like the buttons inside lists (bordered, same height and weight) */
-.gradio-container button.sm.secondary, .gradio-container button.sm.stop, .gradio-container button.sm.primary,
+/* buttons drawn in HTML (lists, tables) */
 .tr-btn, .ai-btn, #ai_models .ai-btn {
   min-height:32px; padding:5px 14px !important; border-radius:8px !important; font-size:13px !important;
   font-weight:600 !important; line-height:1.25; box-shadow:none !important; }
-.gradio-container button.sm.secondary { border:1px solid var(--ll-line) !important; background:var(--ll-card) !important;
-  color:var(--ll-text) !important; }
-.gradio-container button.sm.secondary:hover, .tr-btn:hover { border-color:var(--ls-accent) !important; }
-.gradio-container button.sm.primary { border:1px solid var(--ls-accent) !important; background:var(--ls-accent) !important;
-  color:var(--ls-ink-on-accent) !important; }
-.gradio-container button.sm.primary:hover { filter:brightness(1.05); }
-.gradio-container button.sm.stop { border:1px solid #B5402F !important; background:transparent !important; color:#B5402F !important; }
+.tr-btn:hover { border-color:var(--ls-accent) !important; }
 .tr-btn.tr-small { min-height:26px; padding:2px 10px !important; font-size:12px !important; }
-.gradio-container button.sm:disabled { opacity:.5; cursor:default; }
-/* keep the special buttons as they were (side lists, tabs of the Datasets page) */
-#set_nav button.set-item, #ds_navrow button.ds-nav { min-height:0; }
 
-/* bars of buttons: one row, centred, the same gap; a checkbox in a bar has no box around it */
+/* bars of buttons: one row, centred, the same gap */
 .ls-bar { gap:var(--ls-gap) !important; align-items:center !important; flex-wrap:wrap !important; }
-.ls-bar > .form:has(input[type=checkbox]), .ls-bar > .form:has(input[type=checkbox]) > .block {
-  border:0 !important; background:transparent !important; box-shadow:none !important; }
-.ls-bar > .form:has(input[type=checkbox]) > .block { padding:4px 2px !important; }
 
-/* cards and folds: the same corner, border and inside space */
+/* cards: the same corner, border and inside space */
 .ls-card { border-radius:var(--ls-radius) !important; padding:14px 16px !important; gap:10px !important; }
-.gradio-container .block.ls-card { border:1px solid var(--ll-line) !important; }
-.gradio-container .accordion { border:1px solid var(--ll-line) !important;
-  border-radius:var(--ls-radius) !important; background:var(--ll-card) !important; padding:4px 14px !important; }
-.gradio-container .accordion > .label-wrap, .gradio-container .accordion > button.label-wrap { font-weight:600; font-size:14px; }
-.gradio-container h3 { margin:6px 0 8px !important; font-size:18px !important; }
-.gradio-container h4 { margin:2px 0 6px !important; font-size:15px !important; }
 
-/* tables: no dark grid lines (Gradio draws them on every row); a light line between rows, in a rounded frame */
-.gradio-container .prose table tr, .gradio-container .prose table th, .gradio-container .prose table td {
-  border-color:var(--ll-line) !important; }
+/* tables: a light line between rows, in a rounded frame */
 table.rs-table tr, table.ai-table tr, table.ls-ver-t tr, table.rs-cgrid tr, table.ds-calc tr { border:0 !important; }
 .rs-wrap, #ai_models .ai-wrap { border:1px solid var(--ll-line); border-radius:var(--ls-radius); background:var(--ll-card); }
 .rs-wrap table.rs-table th:first-child, .rs-wrap table.rs-table td:first-child { padding-left:14px; }
@@ -290,18 +239,12 @@ details.ds-fold { margin-top:8px; }
 details.ds-fold > summary { cursor:pointer; color:var(--ll-muted); font-size:13px; padding:6px 2px; }
 details.ds-fold[open] > summary { margin-bottom:6px; }
 
-/* the step pages: the same top space, and the bottom bar of each step sits apart from the content */
-#ds_s2, #ds_s3, #ds_s4, #ds_s5, #ds_s6, #ds_s7, #ds_s8, #ds_s9 { gap:12px !important; }
-#s6_bottom { border-top:1px solid var(--ll-line); padding-top:12px !important; margin-top:4px; }
+/* the bottom bar of a step sits apart from the content */
 .ds-bottom { border-top:1px solid var(--ll-line); padding-top:12px !important; margin-top:4px; }
-#ds_s2 .ds-bottom { border-top:0; padding-top:0 !important; }
-/* the consistency picture only takes room when there is a picture to look at */
-#cc_view:not(:has(img)) { display:none !important; }
 .ls-ver-t td { border:0 !important; border-top:1px solid var(--ll-line) !important; padding:5px 8px !important; }
 .ls-ver-bad { color:#8F560B; font-weight:600; }
 .ls-ver-hist { margin:8px 0 4px; display:flex; flex-direction:column; gap:3px; font-size:13px; }
 .ls-ver-h b { font-family:'JetBrains Mono',monospace; margin-right:6px; }
-.gradio-container .prose table { border-color:var(--ll-line) !important; }
 table.ds-calc, table.ds-calc td, table.ds-calc th { border:0 !important; }
 table.ds-calc td { border-top:1px solid var(--ll-line) !important; padding:5px 18px 5px 0 !important; }
 table.ds-calc tr:first-child td { border-top:0 !important; }
@@ -342,7 +285,6 @@ table.ds-calc tr:first-child td { border-top:0 !important; }
 /* a part that is not installed: its places stay, greyed, with "(… missing)" */
 .hc-off { background:var(--ll-chip, #ECEEF1); color:var(--ll-muted); }
 .hc-offcard .hc-t { color:var(--ll-muted); }
-#set_nav button.set-missing, #set_nav button.set-missing * { color:var(--ll-muted) !important; font-weight:400 !important; }
 .ds-step.ds-missing { opacity:.55; } .ds-step.ds-missing span:last-child { font-weight:400; }
 .ds-srow.ds-missing b { color:var(--ll-muted); font-weight:500; }
 .ls-missing, .ls-missing * { color:var(--ll-muted) !important; }

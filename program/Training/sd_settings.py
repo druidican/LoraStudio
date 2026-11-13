@@ -14,7 +14,6 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-import gradio as gr
 
 import notify
 import sdgui as S
@@ -368,39 +367,6 @@ def _slot_dir(path, saved_dir):
     return S.DEFAULT_MODEL_DIR or ""
 
 
-def st_load(tkey, recursive):
-    if not tkey:
-        return [gr.update()] * (3 * S.ST_N) + [[""] * S.ST_N, "Pick a LoRA type."]
-    slots, saved = type_slots(tkey), read_settings().get(tkey, {})
-    out, flags = [], []
-    for i in range(S.ST_N):
-        if i < len(slots):
-            key, default = slots[i]
-            path = saved.get(key) or default
-            d = _slot_dir(path, saved.get(key + ".dir"))
-            lab = slot_label(key)
-            flags.append(key)
-            out += [gr.update(visible=True), gr.update(label=f"{lab}: folder", value=d),
-                    gr.update(label=f"{lab}: file (--{key})", choices=list_model_files(d, recursive), value=path or None)]
-        else:
-            flags.append("")
-            out += [gr.update(visible=False), gr.update(value=""), gr.update(choices=[], value=None)]
-    have = settings_path().is_file()
-    info = (f"Settings for this type are read from `{settings_path()}`." if saved else
-            (f"No saved settings for this type yet: showing the defaults from your preset. **Save** writes them to `{settings_path()}`."
-             if have else f"`{settings_path()}` does not exist yet: showing the defaults from your preset. **Save** creates it."))
-    return out + [flags, info]
-
-
-def st_refresh(folder, recursive, current):
-    return gr.update(choices=list_model_files(folder, recursive), value=current)
-
-
-def st_refresh_all(recursive, *args):
-    dirs, cur = args[:S.ST_N], args[S.ST_N:2 * S.ST_N]
-    return [st_refresh(d, recursive, c) for d, c in zip(dirs, cur)]
-
-
 def _type_base(tkey):
     _, presets = S.merged_presets()
     return (presets.get(tkey) or {}).get("base", "")
@@ -422,41 +388,12 @@ def st_suggest(tkey, flags, *args):
     return r["md"], r["picks"]
 
 
-def st_apply_suggestions(tkey, flags, picks, replace_fitting, recursive, *args):
-    """Put the suggested files into the slots: empty, missing or unsuitable ones (all of them when ticked).
-    The base model is only replaced by another file of the same model family when the chosen one is unusable."""
-    files = list(args[S.ST_N:2 * S.ST_N])
-    req = S.GUIDE.requirements_for(tkey, _type_base(tkey)) if S.GUIDE else {}
-    out_d, out_f, changed = [], [], []
-    for i in range(S.ST_N):
-        flag = flags[i] if i < len(flags) else ""
-        cur = os.path.expanduser((files[i] or "").strip())
-        new = (picks or {}).get(flag)
-        fits = bool(cur) and "/PATH/TO" not in cur and Path(cur).is_file() and S.GUIDE is not None \
-            and not S.GUIDE.problems(S.GUIDE.identify(cur), flag, req.get(flag, []))
-        if new and (replace_fitting or not fits) and new != cur:
-            d = str(Path(new).parent)
-            out_d.append(gr.update(value=d))
-            out_f.append(gr.update(choices=list_model_files(d, recursive), value=new))
-            changed.append(f"{slot_label(flag)}: {Path(new).name}")
-        else:
-            out_d.append(gr.update())
-            out_f.append(gr.update())
-    if changed:
-        notify.info("Filled " + "; ".join(changed) + ". Press Save to keep them.")
-    else:
-        notify.info("Nothing to change: the slots already hold fitting files (tick 'Also replace files that already fit' "
-                "to use the ★ ones).")
-    return out_d + out_f
-
-
-def st_online(tkey, base_file, progress=gr.Progress()):
+def st_online(tkey, base_file, progress=None):
     if S.GUIDE is None:
         return "model_guide.py is missing next to sdgui.py."
     base = (base_file or "").strip()
     if not base or "/PATH/TO" in base:
         return "Choose the base model file first."
-    progress(0.2, desc="Asking Hugging Face and Civitai ...")
     try:
         return S.GUIDE.lookup_online(tkey, os.path.expanduser(base), read_hf_token() or "")
     except Exception as e:                          # noqa: BLE001
@@ -467,99 +404,6 @@ def st_online(tkey, base_file, progress=gr.Progress()):
 def _hd():
     import hfdownload
     return hfdownload
-
-
-def st_dl_visible(tkey, flags, *files):
-    """A download button on every slot whose file is missing and that has a built-in file; 'Download all' when
-    there are two or more; the slot list for the paste-a-link field."""
-    HD = _hd()
-    kn = HD.known(tkey) if tkey else {}
-    btns, n = [], 0
-    for i in range(S.ST_N):
-        flag = flags[i] if i < len(flags) else ""
-        f = files[i] if i < len(files) else ""
-        vis = bool(flag) and flag in kn and HD.is_missing(f or "")
-        n += vis
-        btns.append(gr.update(visible=vis))
-    slots = [(slot_label(f), f) for f in flags if f]
-    return btns + [gr.update(visible=n >= 2), gr.update(choices=slots, value=slots[0][1] if slots else None)]
-
-
-def _slot_after(path, recursive=True):
-    """(folder update, file update) for a slot after a download."""
-    if path is None:
-        return gr.update(), gr.update()
-    d = str(path.parent.parent if _hd().GENERIC.match(path.name) else path.parent)
-    return gr.update(value=d), gr.update(choices=list_model_files(d, recursive), value=str(path))
-
-
-def st_download(tkey, flags, i, d, f):
-    flag = flags[i] if i < len(flags) else ""
-    if not tkey or not flag:
-        yield "Pick a LoRA type first.", gr.update(), gr.update()
-        return
-    gen, res = _hd().fetch(tkey, flag, slot_dir=d or ""), None
-    try:
-        while True:
-            yield next(gen), gr.update(), gr.update()
-    except StopIteration as e:
-        res = e.value
-    yield (gr.update(), *_slot_after(res))
-
-
-def _all_slots(flags, results, recursive, n):
-    out_d, out_f = [], []
-    for i in range(n):
-        flag = flags[i] if i < len(flags) else ""
-        a, b = _slot_after(results.get(flag), recursive) if flag in results else (gr.update(), gr.update())
-        out_d.append(a)
-        out_f.append(b)
-    return out_d + out_f
-
-
-def st_download_all(tkey, flags, recursive, *args):
-    dirs = list(args[:S.ST_N])
-    HD = _hd()
-    todo = HD.missing(tkey)
-    keep = [gr.update()] * (2 * S.ST_N)
-    if not todo:
-        yield ["✔ Every model file of this LoRA type is on this computer."] + keep
-        return
-    results, log = {}, []
-    for flag in todo:
-        i = flags.index(flag) if flag in flags else -1
-        gen, last = HD.fetch(tkey, flag, slot_dir=dirs[i] if i >= 0 else ""), ""
-        try:
-            while True:
-                last = next(gen)
-                yield ["\n\n".join(log + [last])] + keep
-        except StopIteration as e:
-            if e.value is not None:
-                results[flag] = e.value
-        log.append(last)
-        if HD.STOP.is_set():
-            break
-    yield ["\n\n".join(log + [f"**{len(results)} of {len(todo)} files downloaded.**"])] + _all_slots(
-        flags, results, recursive, S.ST_N)
-
-
-def st_download_link(tkey, flags, slot, link, recursive, *args):
-    dirs = list(args[:S.ST_N])
-    keep = [gr.update()] * (2 * S.ST_N)
-    if not tkey or not slot:
-        yield ["Pick a LoRA type and the slot first."] + keep
-        return
-    if not (link or "").strip():
-        yield ["Paste the link of the file on huggingface.co first."] + keep
-        return
-    i = flags.index(slot) if slot in flags else -1
-    gen, res = _hd().fetch(tkey, slot, slot_dir=dirs[i] if i >= 0 else "", link=link), None
-    try:
-        while True:
-            yield [next(gen)] + keep
-    except StopIteration as e:
-        res = e.value
-    yield [gr.update()] + _all_slots(flags, {slot: res} if res else {}, recursive, S.ST_N)
 
 
 def st_download_stop():
@@ -629,29 +473,22 @@ def sub_choices():
     return [(f"{c['label']} ({S.SUBTYPE_BASES[c['base']]})", k) for k, c in S.custom_subtypes().items()]
 
 
-def _sub_outs(msg, st_val=None, cs_val=None):
-    ch = S.type_choices()
-    return (msg, gr.update(choices=ch, value=st_val) if st_val else gr.update(choices=ch),
-            gr.update(choices=ch, value=cs_val) if cs_val else gr.update(choices=ch),
-            gr.update(choices=sub_choices(), value=None), sub_list_md(), st_raw())
-
-
 def sub_add(name, base, tag):
     name = (name or "").strip()
     key = re.sub(r"[^a-z0-9]+", "", name.lower())
     if not key:
         notify.warning("Give the subtype a name, for example Pony.")
-        return _sub_outs("Give the subtype a name, for example **Pony**.")
+        return "Give the subtype a name, for example **Pony**."
     _, builtin = S.builtin_presets()
     if key in S.RESERVED_TYPES or key in builtin:
         notify.warning(f"'{name}' is already a built-in type.")
-        return _sub_outs(f"`{key}` is already a built-in type, so it cannot be added again. Pick it in the LoRA type list below.")
+        return f"`{key}` is already a built-in type, so it cannot be added again. Pick it in the LoRA type list below."
     if key in S.custom_subtypes():
         notify.warning(f"The subtype '{name}' already exists.")
-        return _sub_outs(f"The subtype `{key}` already exists. Pick it in the LoRA type list below.", st_val=key)
+        return f"The subtype `{key}` already exists. Pick it in the LoRA type list below."
     if base not in S.SUBTYPE_BASES:
         notify.warning("Pick SDXL or Anima as the base.")
-        return _sub_outs("Pick SDXL or Anima as the base.")
+        return "Pick SDXL or Anima as the base."
     tag = re.sub(r"[^A-Za-z0-9]", "", tag or "") or re.sub(r"[^A-Za-z0-9]", "", name).upper()
     data = read_settings()
     data[key] = {"base": base, "label": name, "tag": tag}
@@ -659,35 +496,30 @@ def sub_add(name, base, tag):
     try:
         write_settings(data)
     except OSError as e:
-        return _sub_outs(f"Could not write `{settings_path()}`: {e}")
+        return f"Could not write `{settings_path()}`: {e}"
     notify.info(f"Subtype {name} added")
-    return _sub_outs(f"Added **{name}** (based on {S.SUBTYPE_BASES[base]}, file tag `{tag}`). It is now in the LoRA type lists. "
-                     f"Choose its model files below and press **Save to settings.txt**.", st_val=key)
+    return (f"Added **{name}** (based on {S.SUBTYPE_BASES[base]}, file tag `{tag}`). It is now in the LoRA type "
+            f"lists. Choose its model files below and press **Save to settings.txt**.")
 
 
-def sub_remove(key, confirm, st_cur, cs_cur):
+def sub_remove(key, confirm):
     if not key:
         notify.warning("Pick a subtype to remove.")
-        return _sub_outs("Pick a subtype to remove.")
+        return "Pick a subtype to remove."
     if not confirm:
         notify.warning("Tick the confirmation box first.")
-        return _sub_outs("Tick the confirmation box first.")
+        return "Tick the confirmation box first."
     data = read_settings()
     if key not in S.custom_subtypes() or key not in data:
-        return _sub_outs("That subtype does not exist any more.")
+        return "That subtype does not exist any more."
     del data[key]
     try:
         write_settings(data)
     except OSError as e:
-        return _sub_outs(f"Could not write `{settings_path()}`: {e}")
+        return f"Could not write `{settings_path()}`: {e}"
     notify.info("Subtype removed")
-    return _sub_outs(f"Removed `{key}` from `{settings_path()}` (a `.bak` copy of the previous file was kept). Launch scripts that were "
-                     "made with it are not changed.",
-                     st_val="sdxl" if st_cur == key else None, cs_val="sdxl" if cs_cur == key else None)
-
-
-def sub_reload():
-    return _sub_outs("Subtypes re-read from settings.txt.")
+    return (f"Removed `{key}` from `{settings_path()}` (a `.bak` copy of the previous file was kept). Launch scripts "
+            "that were made with it are not changed.")
 
 
 # ---- GPU / GFX (HSA_OVERRIDE_GFX_VERSION), stored in settings.txt under [general]
@@ -792,14 +624,10 @@ def detect_gfx():
             pass
     names = [n for n in names if n != "gfx000"]
     if not names:
-        return gr.update(), "Could not detect the GPU (rocminfo / amd-smi / rocm-smi gave no gfx name). Pick it from the list instead."
+        return "", "Could not detect the GPU (rocminfo / amd-smi / rocm-smi gave no gfx name). Pick it from the list instead."
     n = names[0]
     v = gfx_name_to_version(n)
     return v, f"Detected **{n}**, which is `{v}`. If the card is not officially supported by your ROCm, pick the nearest supported entry from the list instead."
-
-
-def gfx_pick(choice):
-    return choice or gr.update()
 
 
 def gfx_load():

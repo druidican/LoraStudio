@@ -53,42 +53,6 @@ def plain() -> str:
     return TITLE + "\n\n" + TEXT.replace("**", "")
 
 
-CSS = """
-#ls_notice { position:fixed; inset:0; z-index:1000; overflow:auto; padding:32px 16px;
-  background:var(--body-background-fill, #f6f4f0); }
-#ls_notice > * { max-width:760px; margin-left:auto !important; margin-right:auto !important; }
-#ls_notice .ls-notice-card { border:1px solid var(--border-color-primary, #ddd); border-radius:14px; padding:20px 24px;
-  background:var(--block-background-fill, #fff); }
-#ls_notice img.ls-notice-logo { display:block; width:min(420px, 100%); margin:0 auto 18px; border-radius:10px; }
-"""
-
-
-def build_gate(app, logo_url: str = ""):
-    """The notice as a page over everything else, inside a gr.Blocks. Hidden when it was confirmed already.
-    Returns the gate column (None when already confirmed)."""
-    import gradio as gr
-    if accepted():
-        return None
-    with gr.Column(elem_id="ls_notice") as gate:
-        gr.HTML(f"<style>{CSS}</style>" + (f'<img class="ls-notice-logo" alt="" src="{logo_url}">' if logo_url else ""))
-        with gr.Column(elem_classes=["ls-notice-card"]):
-            gr.Markdown(f"## {TITLE}\n\n{TEXT}\n\nThis page is shown once. You can read it again in Settings › Version › "
-                        "Licences and credits, and in the NOTICE file in the program folder.")
-            ok = gr.Checkbox(label="I have read this and agree", value=False)
-            go = gr.Button("Continue to LoRA Studio", variant="primary", interactive=False)
-    ok.change(lambda v: gr.update(interactive=bool(v)), ok, go)
-
-    def confirm(v):
-        if not v:
-            return gr.update()
-        accept("page")
-        return gr.update(visible=False)
-    go.click(confirm, ok, gate)
-    # the page is built once at start: a later visit (or another browser) after the confirmation hides it at load
-    app.load(lambda: gr.update(visible=not accepted()), None, gate, show_progress="hidden")
-    return gate
-
-
 def logo_data_url() -> str:
     import base64
     f = _LP.PROG / "logo" / "lorastudio_login.jpg"

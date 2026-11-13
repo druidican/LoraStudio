@@ -15,7 +15,6 @@ import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-import gradio as gr
 
 import sdgui as S
 
@@ -104,11 +103,6 @@ def oc_recommend(tkey, purpose):
           f"{S.CAP.LENGTH_LABELS[length] if S.CAP else length}, detail {S.CAP.DETAIL_LABELS[detail] if S.CAP else detail}. "
           f"It reads captions through **{enc}**: {why}.{note}")
     return md, style, length, detail
-
-
-def oc_apply_recommendation(tkey, purpose):
-    md, style, length, detail = oc_recommend(tkey, purpose)
-    return md, gr.update(value=style), gr.update(value=length), gr.update(value=detail)
 
 
 def oc_example(style, length, detail, trigger, tkey):
@@ -409,40 +403,6 @@ def _wm_source(root, rp, e):
     return root / rp
 
 
-def wm_tool_open(ds, v):
-    """Open the paint or crop panel for one picture (lsSend('wm_tool', 'paint|rp') from the review)."""
-    keep = gr.update()
-    act, _, rest = (v or "").partition("|")
-    rp = rest.rsplit("|", 1)[0] if "|" in rest else rest
-    if not ds or act not in ("paint", "crop") or not rp:
-        return [keep] * 15
-    root = S.lora_path(ds)
-    marks = S.DC.marks_load(root)
-    e = marks.get(rp) or {}
-    src = _wm_source(root, rp, e)
-    from PIL import Image, ImageOps
-    try:
-        with Image.open(src) as im:
-            im = ImageOps.exif_transpose(im).convert("RGB")
-            im.thumbnail((1600, 1600))
-            im.load()
-    except Exception as ex:                     # noqa: BLE001
-        return [keep] * 13 + [f"Could not open the picture: {ex}", keep]
-    title = f"**{'Paint over the mark' if act == 'paint' else 'Crop it yourself'}:** `{rp}`"
-    if act == "paint":
-        return [gr.update(visible=True), title, gr.update(visible=True), gr.update(visible=False),
-                {"background": im, "layers": [], "composite": im}, keep, keep, keep, keep, keep,
-                gr.update(visible=True), gr.update(visible=False), rp, "", ""]
-    with Image.open(src) as o:
-        W, H = ImageOps.exif_transpose(o).size
-    box = e.get("custom_box") or next((o["box"] for o in e.get("options") or []), None) or [0, 0, W, H]
-    fr = [box[0] / W, box[1] / H, box[2] / W, box[3] / H]
-    import dsflow as F
-    return [gr.update(visible=True), title, gr.update(visible=False), gr.update(visible=True), keep,
-            F.crop_preview(str(src), fr), round(fr[0] * 100), round(fr[2] * 100), round(fr[1] * 100), round(fr[3] * 100),
-            gr.update(visible=False), gr.update(visible=True), rp, "", ""]
-
-
 def _wm_box(ds, rp, l, r, t, b, aspect):
     root = S.lora_path(ds)
     e = S.DC.marks_load(root).get(rp) or {}
@@ -457,7 +417,7 @@ def _wm_box(ds, rp, l, r, t, b, aspect):
 
 def wm_crop_show(ds, rp, l, r, t, b, aspect):
     if not ds or not rp:
-        return gr.update(), ""
+        return None, ""
     import dsflow as F
     src, W, H, fr, px = _wm_box(ds, rp, l, r, t, b, aspect)
     e = S.DC.marks_load(S.lora_path(ds)).get(rp) or {}
@@ -468,40 +428,22 @@ def wm_crop_show(ds, rp, l, r, t, b, aspect):
 
 
 def wm_crop_apply(ds, rp, l, r, t, b, aspect):
+    """(message, done)."""
     if not ds or not rp:
-        return "Pick a picture first.", gr.update()
+        return "Pick a picture first.", False
     root = S.lora_path(ds)
     marks = S.DC.marks_load(root)
     e = marks.get(rp)
     if e is None:
-        return "This picture is no longer in the watermark list.", gr.update()
+        return "This picture is no longer in the watermark list.", False
     _, W, H, fr, px = _wm_box(ds, rp, l, r, t, b, aspect)
     if (px[2] - px[0]) < 64 or (px[3] - px[1]) < 64:
-        return "That crop is too small.", gr.update()
+        return "That crop is too small.", False
     err = S.DC._back_to_original(root, rp, e) or S.DC.apply_choice(root, rp, e, "C", box=px)
     S.DC.marks_save(root, marks)
     if err:
-        return f"❌ {err}", gr.update()
-    return f"✔ `{rp}` cropped to {px[2] - px[0]}×{px[3] - px[1]}. The original is in `_set_aside/originals/`.", gr.update(visible=False)
-
-
-def wm_paint_apply(ds, rp, ed):
-    if not ds or not rp:
-        return "Pick a picture first.", gr.update()
-    if S.RUN.running():
-        return "A training run is using the GPU: paint over it when the run has finished.", gr.update()
-    layers = (ed or {}).get("layers") or []
-    if not layers:
-        return "Paint over the mark first.", gr.update()
-    from PIL import ImageChops
-    a = None
-    for lay in layers:
-        if lay is None:
-            continue
-        al = lay.convert("RGBA").getchannel("A")
-        a = al if a is None else ImageChops.lighter(a, al)
-    msg = wm_paint_mask(ds, rp, a)
-    return msg, (gr.update(visible=False) if msg.startswith("✔") else gr.update())
+        return f"❌ {err}", False
+    return f"✔ `{rp}` cropped to {px[2] - px[0]}×{px[3] - px[1]}. The original is in `_set_aside/originals/`.", True
 
 
 def wm_tool_info(ds, rp) -> tuple:
@@ -614,7 +556,6 @@ def oc_stop():
 def rv_undo():
     files = S.LAST_CHANGE["files"]
     if not files:
-        gr.Info("Nothing to undo.")
         return "Nothing to undo."
     n = 0
     for p, old in files.items():
@@ -809,21 +750,10 @@ if (!window.ccMode) {
     var h = g.querySelector('.cc-oddhead'); if (h) h.style.display = k !== null ? '' : 'none';
   };
 }
-if (!window.ccOpen) {
-  window.ccOpen = function(btn){
-    var d = btn.closest('.cc-odd'); if (!d) return;
-    document.querySelectorAll('#cc_html .cc-odd.cc-sel').forEach(function(e){ e.classList.remove('cc-sel'); });
-    d.classList.add('cc-sel');
-    var el = document.querySelector('#cc_box textarea, #cc_box input'); if (!el) return;
-    var setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set;
-    setter.call(el, d.dataset.p + '|' + Date.now());
-    el.dispatchEvent(new Event('input', {bubbles:true}));
-  };
-}
 """
 
 
-def cc_find(ds, url, model, trigger, progress=gr.Progress()):
+def cc_find(ds, url, model, trigger, progress=None):
     if S.CC is None:
         return "The consistency check is not available (consistency.py is missing).", ""
     if not ds:
@@ -837,10 +767,10 @@ def cc_find(ds, url, model, trigger, progress=gr.Progress()):
     return cc_render(ds)
 
 
-def cc_apply(ds, choices_json, url, model, trigger, confirm=False, progress=gr.Progress()):
-    """(message, confirm checkbox update). The choices are locked in <dataset>/traits.txt first; a choice that clashes
+def cc_apply(ds, choices_json, url, model, trigger, confirm=False, progress=None):
+    """(message, show the confirmation). The choices are locked in <dataset>/traits.txt first; a choice that clashes
     with a lock is only written after the confirmation is ticked."""
-    hide = gr.update(visible=False, value=False)
+    hide = False
     if S.CC is None or not ds:
         return "Pick a dataset first.", hide
     res = S.CC.load_result(ds)
@@ -858,7 +788,7 @@ def cc_apply(ds, choices_json, url, model, trigger, confirm=False, progress=gr.P
         return ("**These choices clash with locked traits** in `" + S.CC.LOCK_NAME + "`:\n\n"
                 + "\n".join(f"- {c}" for c in clashes)
                 + "\n\nTick **Replace the locked choices** below and press **Apply choices** again, or change the "
-                  "choices back."), gr.update(visible=True, value=False)
+                  "choices back."), True
     if not (url and model):
         url, model = oc_settings()
     try:
@@ -889,20 +819,21 @@ def cc_apply(ds, choices_json, url, model, trigger, confirm=False, progress=gr.P
 
 
 def cc_leave_out(ds, leave):
-    """Kept-in-LoRA traits are added to the 'Never describe' list of the captioner, so new captions skip them too."""
+    """Kept-in-LoRA traits are added to the 'Never describe' list of the captioner, so new captions skip them too.
+    The new list, or None when nothing changes."""
     res = S.CC.load_result(ds) if (S.CC and ds) else None
     if not res or not res.get("applied"):
-        return gr.update()
+        return None
     kept = res.get("kept") or []
     have = [t.strip().lower() for t in (leave or "").split(",") if t.strip()]
     add = [t for t in kept if t.lower() not in have]
-    return gr.update(value=(leave + ", " if leave else "") + ", ".join(add)) if add else gr.update()
+    return ((leave + ", " if leave else "") + ", ".join(add)) if add else None
 
 
 def cc_open(v):
     p = (v or "").rsplit("|", 1)[0]
     if not p or not Path(p).is_file():
-        return gr.update(), ""
+        return None, ""
     cap = S.read_caption(Path(p)) or ""
     return p, f"**{Path(p).name}**  \n{html.escape(cap)}"
 

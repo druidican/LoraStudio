@@ -576,7 +576,7 @@ def step7(page):
                 ui.label("Detail (1 basic … 4 everything)").classes("ls-note")
                 detail = ui.slider(min=1, max=4, step=1, value=detail0).props("label markers")
         rec = ui.markdown(rec_md)
-        ex = ui.html("", sanitize=False).classes("w-full")
+        ex = ui.html("", sanitize=False).classes("w-full").props('id="oc_ex"')
 
         def example():
             ex.content = SP.oc_example(style.value, length.value, detail.value, trig.value, tkey)
@@ -786,12 +786,14 @@ def step7(page):
             choices = res[1] if isinstance(res, list) and len(res) > 1 else "{}"
             msg, upd = await run.io_bound(SP.cc_apply, ds, choices, url0, model0, trig.value, cc_ok.value, None)
             cc_msg.content = msg
-            cc_ok.set_visibility(bool(isinstance(upd, dict) and upd.get("visible")))
+            cc_ok.set_visibility(bool(upd))
+            if not upd:
+                cc_ok.value = False
             cc_draw()
             sets_html.content = V.s7_sets_html(ds)
             lv = SP.cc_leave_out(ds, leave.value)
-            if isinstance(lv, dict) and lv.get("value"):
-                leave.value = lv["value"]
+            if lv:
+                leave.value = lv
                 keep_leave()
 
         def cc_open(path):
