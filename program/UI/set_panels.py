@@ -596,3 +596,110 @@ def _wf_summary(CT, fam) -> str:
     model = wf["ckpt"] or wf["unet"]
     return (f"Model {model} · {wf['sampler']} / {wf['scheduler']} · {wf['steps']} steps · CFG {wf['cfg']} · "
             f"{wf['width']}×{wf['height']}" + (f" · CLIP skip {abs(wf['clip_skip'])}" if wf.get("clip_skip") else ""))
+
+
+# --------------------------------------------------------------------------- AI helpers (Ollama, Hugging Face token)
+def panel_ai(page):
+    import asyncio
+    import features as FT
+    import sdgui as S
+    oc = S.ollama_ctl()
+    if not FT.have("ollama"):
+        note("Ollama is not installed (Settings › Start and network › What is installed): the detailed sort, writing "
+             f"captions and the consistency check by Ollama are hidden. Get it from {FT.ollama_guide()}, tick it there, "
+             "restart.")
+    url0, use0 = S.oc_settings()
+    with card():
+        ui.label("Ollama: reads pictures and writes captions").classes("font-semibold")
+        with ui.row().classes("w-full items-end gap-2"):
+            url = ui.input("Ollama address", value=url0).props("outlined dense").classes("grow")
+            ui.button("Test", on_click=lambda: test()).props("outline dense no-caps")
+            ui.button("Stop Ollama", on_click=lambda: refresh(oc.stop_all(u()))).props("flat dense no-caps color=negative")
+        model = ui.select([], value=None, label="Default model (captions, sorting and picture checks)",
+                          on_change=lambda e: set_default(e.value)).props("outlined dense").classes("w-full")
+        note("Only models that can read pictures are listed. It is started when a step needs it; Start below only "
+             "loads it ahead of time.")
+        tmsg = ui.markdown("")
+        table = ui.html("", sanitize=False).classes("w-full")
+        msg = ui.markdown("")
+        with ui.expansion("Get another model").classes("w-full"):
+            with ui.row().classes("w-full items-end gap-2"):
+                pname = ui.input("Model name", placeholder="e.g. minicpm-v:8b").props("outlined dense").classes("grow")
+                pmd = ui.markdown("")
+
+                async def pull():
+                    pmd.content = oc.pull(pname.value, u())
+                    while not oc.PULL.get("done"):
+                        await asyncio.sleep(2)
+                        pmd.content = oc.pull_text()
+                    pmd.content = oc.pull_text()
+                    refresh()
+                ui.button("Download", on_click=pull).props("outline dense no-caps")
+            with ui.row().classes("w-full items-end gap-2"):
+                rm = ui.select([], label="Model to remove").props("outlined dense").classes("grow")
+
+                async def remove():
+                    if rm.value and await confirm(f"Remove {rm.value} from Ollama?", "Remove"):
+                        refresh(oc.delete(rm.value, u()))
+                ui.button("Remove", on_click=remove).props("flat dense no-caps color=negative")
+        note("Only one model runs at a time: Start on another model stops the running one first. Starting a training "
+             "run stops Ollama to free video memory; it is not started again by itself.")
+
+    def u():
+        return (url.value or "").strip() or oc.DEFAULT_URL
+
+    def refresh(text=""):
+        try:
+            ms = oc.installed(u())
+        except Exception:                                # noqa: BLE001
+            ms = []
+        _, use = S.oc_settings()
+        vision = [m["name"] for m in ms if m.get("vision")]
+        table.content = S.ai_models_html(u())
+        msg.content = text or ""
+        model.options = vision + ([use] if use and use not in vision else [])
+        model.set_value(use or None)
+        model.update()
+        rm.options = [m["name"] for m in ms]
+        rm.update()
+
+    def set_default(name):
+        _, use = S.oc_settings()
+        if name and name != use:
+            S.oc_save_settings(u(), name)
+            refresh(f"✔ {name} is now the default: used for captions, sorting and picture checks.")
+
+    def test():
+        _, m = S.oc_settings()
+        S.oc_save_settings(u(), m)
+        ok = oc.running(u(), fresh=True) is not None
+        tmsg.content = ("✔ Ollama answers at " if ok else "❌ Ollama does not answer at ") + u() + "."
+        refresh()
+
+    def action(v):
+        act, _, name = (v or "").partition("|")
+        if act == "use":
+            S.oc_save_settings(u(), name)
+            refresh(f"✔ {name} is used for captions, sorting and picture checks.")
+        elif act == "start":
+            refresh(oc.start(name, u()))
+        elif act == "stop":
+            refresh(oc.stop(name, u()))
+    page.on_ai = action
+    refresh()
+    with card():
+        ui.label("Hugging Face token").classes("font-semibold")
+        note(f"Kept in {S.hf_path()} (readable only by you) and written into export HF_TOKEN=\"...\" of launch scripts that "
+             "download models. The token is masked in the run log.")
+        cur = ui.input("Current token", value=S.read_hf_token(), password=True, password_toggle_button=True) \
+            .props("outlined dense readonly").classes("w-full")
+        with ui.row().classes("w-full items-end gap-2"):
+            new = ui.input("Paste a new token", password=True, placeholder="hf_...").props("outlined dense").classes("grow")
+            hmsg = ui.markdown("")
+
+            def save_tok():
+                m, _, _ = S.save_hf_token(new.value)
+                hmsg.content = m
+                new.value = ""
+                cur.value = S.read_hf_token()
+            ui.button("Save token", on_click=save_tok).props("unelevated dense no-caps color=primary")

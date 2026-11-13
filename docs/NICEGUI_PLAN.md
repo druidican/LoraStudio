@@ -43,5 +43,8 @@ Owner's decisions (2026-11-13):
 - [x] Queue (+ test pictures after a queue: one LoRA best + final, several the final file of each; comfytest.WHICH, last_batch.json)
 - [x] Datasets: list, new dataset, dataset page (steps 2-8 in UI/ds_steps.py, Train UI/ds_train.py, Results
   UI/ds_results.py, LoRA). Still open: Improvements' *Fix the ticked datasets* (batch, settings_ui.batch_panel).
-- [ ] Settings (all groups), first-run setup page
+- [ ] Settings: done Health, Start, Folders, AI helpers (+ HF token), Test pictures, Look, Backup, Updates,
+  Version (UI/pg_settings.py, UI/set_panels.py). Still: Trainers and GPU, Model files, Speed test, Improvements' batch
+  Fix, the first-run setup page.
+- [ ] When complete (owner, 2026-11-13): copy the current `main` to a branch `old`, then make `nicegui` the new `main`.
 - [ ] Manual text and pip screenshots; selftest; Gradio removed; beta release

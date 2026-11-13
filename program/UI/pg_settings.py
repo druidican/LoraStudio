@@ -49,6 +49,7 @@ class Settings:
                         self.btns[key] = ui.button(SU.nav_label(key), on_click=lambda k=key: self.open(k)) \
                             .props("flat no-caps align=left").classes("w-full ls-set-item")
             self.body = ui.column().classes("grow min-w-0 gap-3")
+        ui.on("ls_ai_box", lambda e: getattr(self, "on_ai", lambda v: None)(str(e.args)))
         self.open("health")
 
 
