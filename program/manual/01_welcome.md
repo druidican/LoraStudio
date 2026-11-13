@@ -10,11 +10,13 @@ Everything you see here (pictures, runs, losses) is made-up test data.
 
 | Tab | What it is for |
 |---|---|
-| **Collection** | Your finished LoRAs: one tile per dataset, the LoRA page with versions, pictures made with it, its training data; Maintenance (sync with LoRA Manager) |
-| **Datasets** | Making and improving the training pictures, in nine steps, ending with the launch script; Improvements |
+| **Home** | The start page: what is training now, what needs a look (setup, datasets, LoRA files), the last results and the datasets you worked on last |
+| **Datasets** | Your datasets (+ New dataset), the nine steps from a folder of pictures to training; Improvements |
 | **Training** | **Run**: the launch scripts and the queue. **Results**: every finished run, what to try first, comparing versions, your rating. **Insights**: what your own runs say |
-| **Manual** | This guide |
+| **Collection** | Your finished LoRAs: one tile per dataset, the LoRA page with versions, pictures made with it, its training data; Maintenance (sync with LoRA Manager) |
 | **Settings** | Folders, model files, trainers and GPU, Ollama, ComfyUI, backups, updates, version |
+
+**?** at the top right opens this manual at the chapter of the page you are on; *← Back* takes you back there.
 
 ## The bar at the top
 
@@ -24,7 +26,7 @@ It is the same on every page: what is training now (step, loss, time left), how 
 from `amd-smi` with ROCm 10 and newer, `rocm-smi` before; NVIDIA: `nvidia-smi`), and
 which Ollama model sits in video memory (Settings › AI helpers starts and stops it). *Dark / Normal* at the top right
 switches between dark and light. When a run ends it says so, with the save point to try first, or what went
-wrong. Click it to go to Training › Run.
+wrong. Click it to go to the queue, or to the finished run in Training › Results.
 
 ## Where to start
 

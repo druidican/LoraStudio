@@ -21,7 +21,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.111126j"  # LoRA Studio version, see version.py
+__version__ = "1.131126"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -157,6 +157,20 @@ window.lsClickTab = function(label){
   var b = Array.from(document.querySelectorAll('button[role="tab"]')).find(function(x){ return x.textContent.trim() === label; });
   if (b) { b.click(); return true; } return false;
 };
+window.lsHelp = function(){            // "?": the manual chapter of the page you are on; "← Back" returns there
+  var on = document.querySelector('#ls_tabs button[role="tab"][aria-selected="true"]');
+  var cur = on ? on.textContent.trim() : 'Home';
+  if (cur === 'Manual') return;
+  var key = {'Home': 'welcome', 'Datasets': 'datasets', 'Training': 'training', 'Collection': 'collection',
+             'Settings': 'settings'}[cur] || 'welcome';
+  window.lsPrevTab = cur;
+  window.lsClickTab('Manual');
+  var n = 0; (function t(){
+    if (document.querySelector('#mn_box textarea, #mn_box input')) { setTimeout(function(){ lsManual(key); }, 400); return; }
+    if (++n < 40) setTimeout(t, 100);
+  })();
+};
+window.lsHelpBack = function(){ window.lsClickTab(window.lsPrevTab || 'Home'); };
 window.lsGoQueue = function(){
   window.lsClickTab('Training');
   var n = 0; (function t(){ if (!window.lsClickTab('Run') && ++n < 30) setTimeout(t, 100); })();
@@ -272,7 +286,8 @@ def main():
     import manual
     head = ll.head_html(s["style"]) + STUDIO_JS % (settings_ui.NAV_JS + datasets_ui.GRID_JS + manual.JS,
                                                    "true" if lo["notify"] else "false") + livepoll.JS
-    css = sdgui.CSS + "\n" + ll.CSS + "\n" + studio_css.CSS
+    import home
+    css = sdgui.CSS + "\n" + ll.CSS + "\n" + studio_css.CSS + "\n" + home.CSS
     style_in_launch = "css" in inspect.signature(gr.Blocks.launch).parameters
     blocks_kwargs = {"title": f"LoRA Studio {version.VERSION}"}
     if not style_in_launch:
@@ -288,6 +303,8 @@ def main():
         notice.build_gate(app, notice.logo_data_url())
         with gr.Row(elem_id="ls_top"):
             gr.HTML(f'<div class="ls-title">{logo_img(40)}<h1>LoRA Studio</h1><span class="ls-ver">{version.VERSION}</span></div>')
+            gr.Button("?", size="sm", scale=0, min_width=44, elem_id="ls_help").click(
+                None, None, None, js="() => { window.lsHelp && lsHelp(); }")
             gr.Button("Dark / Normal", size="sm", scale=0).click(None, None, None, js=ll.TOGGLE_JS)
         gr.HTML(statusbar.strip_html(), elem_id="ls_strip")
         sdgui.build_ui(app)                 # the training pages, placed below
@@ -300,8 +317,9 @@ def main():
                 gr.Markdown(f"This page could not be built: {e!r}")
 
         with gr.Tabs(selected=start, elem_id="ls_tabs") as top:
-            with gr.Tab("Collection", id="collection"):
-                ll.build_library_ui(app)
+            with gr.Tab("Home", id="home") as t_home:
+                import home
+                HM = home.build()
             with gr.Tab("Datasets", id="datasets"):
                 import datasets_ui
                 DS = datasets_ui.build(app, show)
@@ -319,9 +337,8 @@ def main():
                 t_run.select(*TR["refresh"], show_progress="hidden")
                 t_res.select(*RS["refresh"], show_progress="hidden")
                 t_ins.select(*INS, show_progress="hidden")
-            with gr.Tab("Manual", id="manual") as t_man:
-                MN = manual.build(app)
-                t_man.select(*MN["load"], show_progress="hidden")
+            with gr.Tab("Collection", id="collection"):
+                ll.build_library_ui(app)
             with gr.Tab("Settings", id="settings"):
                 def _backup():
                     import backup
@@ -360,9 +377,15 @@ def main():
                                         "comfy": lambda: settings_ui.comfy_panel(app),
                                         "speed": lambda: settings_ui.speed_panel(app),
                                         "version": lambda: settings_ui.version_panel(app)})
+            with gr.Tab("Manual", id="manual", elem_id="ls_manual_tab") as t_man:   # opened by the ? button only
+                MN = manual.build(app)
+                t_man.select(*MN["load"], show_progress="hidden")
+        app.load(*HM["load"], show_progress="hidden")
+        t_home.select(*HM["load"], show_progress="hidden")
 
         # the status strip, and moving between pages
         livepoll.register("ls_strip", statusbar.strip_html)     # refreshed by the page itself (livepoll.py)
+        livepoll.register("hm_live", home.training_html)
         def _busy():
             import dsflow
             import hfdownload
@@ -382,6 +405,21 @@ def main():
             pass
         ticker.build()                          # the one timer for the whole page (see ticker.py)
         loadjoin.build(app)
+
+        # Home's clicks: open a dataset (at its next step or where you were), Improvements, + New dataset
+        def home_go(v, cur):
+            import dsflow
+            act, *rest = (v or "").split("|")
+            if act == "ds" and rest:
+                return DS["go"](cur, view="flow", mode="edit", ds=rest[0], step=dsflow.next_step(rest[0])), \
+                    gr.Tabs(selected="datasets")
+            if act == "dsstep" and len(rest) >= 2:
+                return DS["go"](cur, view="flow", mode="edit", ds=rest[0], step=int(rest[1] or 2)), \
+                    gr.Tabs(selected="datasets")
+            if act in ("imp", "new"):
+                return DS["go"](cur, view=act, mode="edit" if act == "imp" else "new"), gr.Tabs(selected="datasets")
+            return cur, gr.update()
+        DS["after_nav"](HM["box"].change(home_go, [HM["box"], DS["state"]], [DS["state"], top], show_progress="hidden"))
 
         # "Train a new version": Datasets › 9 Train of that dataset
         def to_step9(cur, ds):

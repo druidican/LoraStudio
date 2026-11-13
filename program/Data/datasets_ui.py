@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.111126j"  # LoRA Studio version, see version.py
+__version__ = "1.131126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -1560,6 +1560,9 @@ def build(app, show):
     def nav_all(s, find, show8, text, leave, trig):
         """A new page or step: everything in one event (four events used to follow every click, each costing the
         browser about a second on a big page)."""
+        if s.get("view") == "flow" and s.get("ds"):
+            import home
+            home.remember(s["ds"], s.get("step") or 2)       # Home › Continue where you left off
         return refresh_all(s, find, show8, text, leave) + list(desc_load(s)) + list(mv_view(s, trig)) + list(worn_view(s))
     navbox.change(nav_all, [st, e_find, s8_show, UI["cs_text"], UI["oc"]["leave"], UI["oc"]["trigger"]],
                   all_outs + [s7_desc_card, s7_desc, s7_desc_msg, s7_desc_title] + MV_OUT + WORN_OUT,

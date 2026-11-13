@@ -74,6 +74,11 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
   8 Review, 9 Train. Setup comes first because the scan judges sizes for the LoRA types; its card shows missing model
   files (downloaded in the background by `hfdownload.start_background`, also used by step 9) and Ollama's state.
   The redesign plan (moderate + bold) is in the walkthrough document's Usability tab; built release by release.
+- **Home and the Manual** (1.131126): `Other/home.py` is the start page (cards read the other pages' caches;
+  clicks go to the hidden `#home_box`, handled in lora_studio.py `home_go`; its Training card is refreshed via
+  livepoll `hm_live`). Datasets records the last five opened datasets (`home.remember`). The Manual tab's button is
+  hidden; the top **?** (`lsHelp`) opens the chapter of the current tab, *← Back* (`lsHelpBack`) returns.
+  `tools/make_test_world.py` makes an invented world with a pretend sd-scripts (runs end to end in seconds).
 - **Class word** (step 2, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).
 - **Detailed scan** (`Data/detailscan.py`, characters, on per dataset in step 4): an extra Ollama question per
   picture, coverage over the kept pictures, suggestions in step 5 (add / upscale / sharpen / crop into a new picture),

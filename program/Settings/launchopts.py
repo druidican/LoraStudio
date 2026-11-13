@@ -5,7 +5,7 @@ Saved in launch_settings.json next to the program (readable only by you: it can 
 lora_studio.py reads it at start; an option given on the command line (./start.sh --port 7861) still wins.
 """
 from __future__ import annotations
-__version__ = "1.111126i"  # LoRA Studio version, see version.py
+__version__ = "1.131126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -16,14 +16,18 @@ import time
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 APP_DIR = _LP.USER
 FILE = APP_DIR / "launch_settings.json"
-START_PAGES = [("Collection", "collection"), ("Datasets", "datasets"), ("Training", "training"), ("Settings", "settings")]
-DEFAULTS = {"network": False, "port": 7860, "browser": True, "user": "", "password": "", "start_page": "collection",
-            "check_updates": True, "resume_queue": False, "notify": True, "queue_autostart": True}
+START_PAGES = [("Home", "home"), ("Datasets", "datasets"), ("Training", "training"), ("Collection", "collection"),
+               ("Settings", "settings")]
+DEFAULTS = {"network": False, "port": 7860, "browser": True, "user": "", "password": "", "start_page": "home",
+            "check_updates": True, "resume_queue": False, "notify": True, "queue_autostart": True,
+            "home_page": True}          # set once Home exists (1.131126): the old default start page becomes Home
 
 
 def load() -> dict:
     try:
         d = json.loads(FILE.read_text(encoding="utf-8"))
+        if "home_page" not in d and d.get("start_page") == "collection":
+            d["start_page"] = "home"            # Collection was the start page before Home existed
         return {**DEFAULTS, **{k: d[k] for k in DEFAULTS if k in d}}
     except Exception:
         return dict(DEFAULTS)

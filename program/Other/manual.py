@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""The Manual tab: a guide with text and pictures, read from manual/NN_name.md (pictures in manual/img/).
+"""The Manual (opened with the ? button at the top, at the chapter of the page you are on): a guide with text and pictures, read from manual/NN_name.md (pictures in manual/img/).
 
 Each chapter is one Markdown file; its first "# " line is the title in the list on the left. Pictures are written
 as ![what it shows](img/name.jpg) and are shown from the program folder. Links to another chapter:
 [text](#chapter-name) where chapter-name is the file name without the number (04_training.md -> #training).
 """
 from __future__ import annotations
-__version__ = "1.111126d"  # LoRA Studio version, see version.py
+__version__ = "1.131126"  # LoRA Studio version, see version.py
 
 import html
 import re
@@ -71,6 +71,7 @@ window.lsManual = function(key){
 
 
 def build(app):
+    gr.HTML('<div class="ls-bar"><button class="tr-btn" onclick="window.lsHelpBack && lsHelpBack()">← Back</button></div>')
     with gr.Row(equal_height=False, elem_id="mn_wrap"):
         with gr.Column(scale=1, min_width=230):
             nav = gr.HTML(elem_id="mn_navbox")
