@@ -280,3 +280,319 @@ def panel_backup(page):
             B.restart_program()
             restart_soon(rmsg, text + "\n\nLoRA Studio restarts now; this page reloads by itself.")
         ui.button("Restore", on_click=restore).props("unelevated dense no-caps color=negative")
+
+
+# --------------------------------------------------------------------------- helpers for long jobs
+def log_box(label: str, rows: int = 10):
+    return ui.textarea(label).props(f"readonly outlined rows={rows} input-style='font-family:monospace;font-size:12px'") \
+        .classes("w-full")
+
+
+async def thread_lines(work, box):
+    """Run work(say) in a thread; every line it says shows in the box (refreshed twice a second)."""
+    import asyncio
+    lines: list[str] = []
+    task = asyncio.ensure_future(run.io_bound(work, lines.append))
+    while not task.done():
+        box.value = "\n".join(lines)
+        await asyncio.sleep(0.5)
+    box.value = "\n".join(lines)
+    return task.result()
+
+
+async def saved_upload(e) -> str:
+    """An uploaded file, saved to a temporary file; its path."""
+    import tempfile
+    d = Path(tempfile.mkdtemp(prefix="lorastudio_up_"))
+    p = d / Path(e.file.name).name
+    await e.file.save(p)
+    return str(p)
+
+
+# --------------------------------------------------------------------------- Version
+def panel_version(page):
+    from widgets import stream
+    out = ui.html(SU.version_html(), sanitize=False).classes("w-full")
+    ui.button("Check again", on_click=lambda: setattr(out, "content", SU.version_html())).props("flat dense no-caps")
+    with card():
+        note("Check this machine. Looks at your GPU, the trainers and their venv, the model files of every LoRA type, "
+             "Ollama, ComfyUI and the picture tools, and can train a tiny LoRA (10 steps at 512 px on 8 made-up "
+             "pictures, in a temporary folder that is deleted afterwards) to see that a real run starts, uses the GPU "
+             "and saves a file. Nothing of yours is changed. The report (userdata/lorastudio_check_<time>.md; no token, "
+             "home folder as ~, no dataset names) is the file to upload when something is not right.")
+        log = log_box("Machine check", 14)
+
+        async def check(train: bool):
+            await stream(SU.machine_check(train), lambda t: setattr(log, "value", t))
+        with ui.row().classes("gap-2"):
+            ui.button("Check (no training, about a minute)", on_click=lambda: check(False)).props("outline dense no-caps")
+            ui.button("Check + tiny training (a few minutes)", on_click=lambda: check(True)) \
+                .props("unelevated dense no-caps color=primary")
+    import notice
+    with ui.expansion("Licences and credits").classes("w-full ls-card"):
+        ui.markdown(f"### {notice.TITLE}\n\n{notice.TEXT}\n\nThe full GPL-3.0 text is in LICENSE, this text in NOTICE, "
+                    "both in the program folder.")
+    with card():
+        note("Report for Claude. One file with the version, the machine and the newest machine check (token and home "
+             "folder removed), copied so you can paste it into a chat. For a failed run, use the button on that run in "
+             "its dataset's Results.")
+        rnote = ui.input("What do you see? (optional)").props("outlined dense").classes("w-full")
+        rmsg = ui.markdown("")
+
+        def report():
+            import report as R
+            path, text = R.make("", rnote.value or "")
+            ui.clipboard.write(text)
+            rmsg.content = f"✔ Made and copied: userdata/reports/{path.name}."
+        ui.button("Report for Claude", on_click=report).props("outline dense no-caps")
+
+
+# --------------------------------------------------------------------------- Updates
+def panel_updates(page):
+    import features as FT
+    import ghupdate as GH
+    import selfupdate as SUP
+    with card():
+        ui.label("LoRA Studio itself").classes("font-semibold")
+        note("Install a newer LoraStudio.zip: only the program files change (your settings, databases, token, logs and "
+             "venv are never touched). The files it replaces are kept in update_backups/ first, the self-test runs with "
+             "the new files, and when it fails the old files go back by themselves. Then restart LoRA Studio.")
+        st = {"zip": ""}
+        plan = ui.html("", sanitize=False).classes("w-full")
+
+        async def got_zip(e):
+            st["zip"] = await saved_upload(e)
+            plan.content = SU.selfupdate_plan_html(st["zip"])
+            try:
+                ok = any(r["state"] in ("changed", "new") for r in SUP.plan(st["zip"])["rows"])
+            except Exception:                            # noqa: BLE001
+                ok = False
+            inst.set_enabled(ok)
+        ui.upload(label="LoraStudio.zip", auto_upload=True, on_upload=got_zip).props("accept=.zip flat bordered") \
+            .classes("w-full")
+        ulog = log_box("LoRA Studio update")
+
+        async def install():
+            ok = await thread_lines(lambda say: SUP.install(st["zip"], say=say), ulog)
+            if ok:
+                try:
+                    import venvcheck as VC
+                    r = VC.inspect()
+                    ulog.value += "\n" + ("✔ " if r["ok"] else "! ") + "Training venv: " + r["text"]
+                except Exception:                        # noqa: BLE001
+                    pass
+
+        async def rollback():
+            await thread_lines(lambda say: SUP.rollback(say=say), ulog)
+        with ui.row().classes("gap-2"):
+            inst = ui.button("Install this update", on_click=install).props("unelevated dense no-caps color=primary")
+            inst.set_enabled(False)
+            ui.button("Restart LoRA Studio", on_click=lambda: restart_soon(rmsg, SUP.restart())).props("outline dense no-caps")
+            ui.button("Roll back the last update", on_click=rollback).props("flat dense no-caps")
+        rmsg = ui.markdown("")
+        with ui.expansion("From GitHub: updates without a zip", value=True).classes("w-full"):
+            note(f"Checks github.com/{GH.repo()} (branch {GH.branch()}) for a new release (or, with Betas too, the "
+                 "newest upload) and installs it the same safe way as a zip. Only when you press the buttons. While the "
+                 "repository is private, a GitHub token with read access to it is needed (fine-grained token: this "
+                 "repository, Contents: Read-only); it is saved in userdata/github_token.txt, readable only by you.")
+            with ui.row().classes("w-full items-end gap-2"):
+                tok = ui.input("GitHub token", password=True,
+                               placeholder=(f"saved: {GH.mask(GH.read_token())}" if GH.read_token()
+                                            else "github_pat_… (empty: no token)")).props("outlined dense").classes("grow")
+                gmd = ui.markdown("")
+
+                def save_tok():
+                    gmd.content = GH.save_token(tok.value)
+                    tok.value = ""
+                ui.button("Save token", on_click=save_tok).props("outline dense no-caps")
+                ui.button("Test token", on_click=lambda: setattr(gmd, "content", GH.test_token())).props("flat dense no-caps")
+            chan = ui.radio({k: v for k, v in GH.CHANNELS.items()}, value=GH.channel(),
+                            on_change=lambda e: (GH.set_channel(GH.CHANNELS[e.value]), gh_inst.set_enabled(False))) \
+                .props("inline")
+            note("Releases only: the versions published as a release (tested). Betas too: also every newer upload in "
+                 "between, which may still have rough edges.")
+
+            async def gh_check():
+                c = await run.io_bound(GH.check)
+                gmd.content = c["text"]
+                gh_inst.set_enabled(bool(c.get("ok")) and not c.get("same"))
+
+            async def gh_install():
+                ok = await thread_lines(lambda say: GH.install(say=say), ulog)
+                gh_inst.set_enabled(not ok)
+            with ui.row().classes("gap-2"):
+                ui.button("Check GitHub", on_click=gh_check).props("outline dense no-caps")
+                gh_inst = ui.button("Install from GitHub", on_click=gh_install).props("unelevated dense no-caps color=primary")
+                gh_inst.set_enabled(False)
+            _ = chan
+    if FT.have("sd_scripts") or FT.have("musubi"):
+        venv_card()
+        import updater as UP
+        with card():
+            ui.label("The trainers").classes("font-semibold")
+            note("Updates for sd-scripts and musubi-tuner from GitHub (the branch each one is on). Checked quietly when "
+                 "the program starts; nothing is installed until you press Update now. PyTorch / ROCm are never changed, "
+                 "and if a test fails after the update, the code and the venv go back to how they were.")
+            status = ui.markdown(UP.status_md())
+            tlog = log_box("Update log", 14)
+
+            async def tcheck():
+                status.content = "Checking for updates …"
+                if UP.STATUS["running"] or UP.LOCK.locked():
+                    status.content = UP.status_md() + "\n\n(a check or update is already running)"
+                    return
+                await run.io_bound(UP.check)
+                status.content = UP.status_md()
+
+            async def tupdate():
+                from widgets import stream
+                await stream(UP.update(), lambda r: (setattr(tlog, "value", r[0]), setattr(status, "content", r[1])))
+            with ui.row().classes("gap-2"):
+                ui.button("Check for updates", on_click=tcheck).props("outline dense no-caps")
+                ui.button("Update now", on_click=tupdate).props("unelevated dense no-caps color=primary")
+    else:
+        note("The trainers (sd-scripts and musubi-tuner missing).")
+
+
+def venv_card():
+    import venvcheck as VC
+    from widgets import stream
+    with card():
+        ui.label("The training venv").classes("font-semibold")
+        note("PyTorch decides: every ROCm or CUDA part must be the version PyTorch is built for (a newer part is wrong "
+             "too: it crashes trainings with Memory access fault by GPU). Checked at every start and after an update, "
+             "without downloading anything. Fix puts the parts that do not fit back and writes the locks again.")
+        st = ui.html(SU.venv_html(), sanitize=False).classes("w-full")
+        vlog = log_box("Training venv", 8)
+        vlog.set_visibility(False)
+
+        def again():
+            VC.inspect()
+            st.content = SU.venv_html()
+
+        async def fix():
+            vlog.set_visibility(True)
+            await stream(VC.fix(), lambda t: setattr(vlog, "value", t))
+            st.content = SU.venv_html()
+        with ui.row().classes("gap-2"):
+            ui.button("Check again", on_click=again).props("outline dense no-caps")
+            ui.button("Fix the training venv", on_click=fix).props("unelevated dense no-caps color=primary")
+        ui.label("A newer PyTorch / ROCm").classes("font-semibold mt-2")
+        note("Asks AMD's server (ROCm) or PyPI (CUDA) which PyTorch builds exist; only stable releases count. The "
+             "upgrade keeps the old versions in update_backups/, tests the GPU and puts them back when the test fails.")
+        nmd = ui.markdown("")
+
+        async def look():
+            nmd.content = "Asking the server …"
+            n = await run.io_bound(VC.look)
+            md = f"**{n['text']}**" if n["newer"] else n["text"]
+            if n["newer"] and not n["managed"]:
+                md += ("\n\nYour own venv: LoRA Studio shows the command, it does not change it:\n\n```\n"
+                       + VC._upgrade_cmd(VC.LAST, n["newest"]) + "\n```")
+            nmd.content = md
+            up.set_visibility(n["newer"] and n["managed"])
+            up.text = f"Upgrade to torch {n['newest']}"
+
+        async def upgrade():
+            tgt = VC.NEWER.get("newest")
+            if not tgt or not await confirm("Upgrade PyTorch (several GB; no training until it has finished)?",
+                                            "Upgrade"):
+                return
+            vlog.set_visibility(True)
+            await stream(VC.upgrade(tgt), lambda t: setattr(vlog, "value", t))
+            st.content = SU.venv_html()
+        with ui.row().classes("gap-2"):
+            ui.button("Look for a newer PyTorch", on_click=look).props("outline dense no-caps")
+            up = ui.button("Upgrade", on_click=upgrade).props("unelevated dense no-caps color=primary")
+            up.set_visibility(False)
+
+
+# --------------------------------------------------------------------------- Test pictures (ComfyUI)
+def panel_comfy(page):
+    import comfytest as CT
+    import comfyupscale as U
+    s = CT.settings()
+    note("After a training run, LoRA Studio can make the same test pictures with each save point in your ComfyUI, "
+         "side by side in a dataset's Results, to pick the best epoch (after a queue: Home › Just trained). It reads "
+         "your own workflow for the model, sampler, steps, CFG, size and negative prompt, and sends ComfyUI a small "
+         "graph of its own nodes with those settings. Saved in comfy_settings.json; your workflows are kept in "
+         "comfy_workflows/.")
+    with card():
+        with ui.row().classes("w-full items-end gap-2"):
+            url = ui.input("ComfyUI address", value=s["url"]).props("outlined dense").classes("grow")
+            tmsg = ui.markdown("")
+
+            def test():
+                u = (url.value or "").strip() or CT.DEFAULTS["url"]
+                tmsg.content = (f"✔ ComfyUI answers at {u} ({len(CT.lora_names(u))} LoRAs in its list)." if CT.alive(u)
+                                else f"❌ ComfyUI does not answer at {u}. Start it, then press Test again.")
+            ui.button("Test", on_click=test).props("outline dense no-caps")
+        lora_dir = ui.input("The LoRA folder ComfyUI reads (empty = your first LoRA folder)", value=s["lora_dir"]) \
+            .props("outlined dense").classes("w-full")
+        with ui.row().classes("gap-3"):
+            n = ui.number("Test prompts per LoRA", value=s["prompts"], min=1, max=24, precision=0).props("outlined dense")
+            around = ui.number("Save points on each side of the one to try first", value=s["around"], min=0, max=6,
+                               precision=0).props("outlined dense").classes("w-80")
+        auto = ui.checkbox("Make them by themselves after the training queue has finished (one LoRA: the save point "
+                           "to try first and the final file; several: the final file of each)", value=s["auto"])
+    fams = {}
+    for fam, lab in CT.FAMILIES.items():
+        with card():
+            ui.label(lab).classes("font-semibold")
+            info = ui.markdown(_wf_summary(CT, fam))
+            fixed = ui.textarea("Fixed tags in front of every test prompt (e.g. quality tags)",
+                                value=s["fixed"].get(fam, "")).props("outlined autogrow").classes("w-full")
+            wmsg = ui.markdown("")
+
+            async def got(e, fam=fam, info=info, wmsg=wmsg):
+                path = await saved_upload(e)
+                try:
+                    _, note_ = CT.import_workflow(fam, path)
+                except Exception as ex:                  # noqa: BLE001
+                    wmsg.content = f"❌ Could not read that workflow: {ex}"
+                    return
+                info.content = _wf_summary(CT, fam)
+                wmsg.content = note_
+            ui.upload(label="Your workflow (ComfyUI › Workflow › Save / Export, the .json file)", auto_upload=True,
+                      on_upload=got).props("accept=.json flat bordered").classes("w-full")
+            fams[fam] = fixed
+    msg = ui.markdown("")
+
+    def save():
+        CT.save_settings(url=(url.value or "").strip() or CT.DEFAULTS["url"], lora_dir=(lora_dir.value or "").strip(),
+                         prompts=int(n.value or 8), around=int(around.value or 0), auto=bool(auto.value),
+                         fixed={f: w.value for f, w in fams.items()})
+        msg.content = "✔ Saved."
+    ui.button("Save", on_click=save).props("unelevated no-caps color=primary")
+    with card():
+        ui.label("Upscale workflow (dataset pictures)").classes("font-semibold")
+        note("Used by the Detailed scan (Datasets › Sort, characters) to upscale small pictures, sharpen soft ones and "
+             "enlarge detail crops. Give it your own upscale workflow (for example SeedVR2) saved from ComfyUI. It runs "
+             "as it is, with your models; LoRA Studio only puts the picture into its Load Image node and, in a SeedVR2 "
+             "node, sets the size and the noise. The originals stay in _originals/.")
+        us = U.settings()
+        uinfo = ui.markdown(f"Workflow: {us['name']} · {us['note']}" if U.ready() else "No upscale workflow yet.")
+        umsg = ui.markdown("")
+
+        async def uget(e):
+            path = await saved_upload(e)
+            try:
+                umsg.content = U.import_workflow(path)
+            except Exception as ex:                      # noqa: BLE001
+                umsg.content = f"❌ Could not use that workflow: {ex}"
+                return
+            s2 = U.settings()
+            uinfo.content = f"Workflow: {s2['name']} · {s2['note']}"
+        ui.upload(label="Your upscale workflow (.json)", auto_upload=True, on_upload=uget) \
+            .props("accept=.json flat bordered").classes("w-full")
+        ui.radio(dict((v, lab) for lab, v in U.NOISE_CHOICES), value=us["noise"],
+                 on_change=lambda e: (U.save_settings(noise=e.value), setattr(umsg, "content", "✔ Saved."))).props("inline")
+
+
+def _wf_summary(CT, fam) -> str:
+    wf = CT.settings()["families"].get(fam)
+    if not wf:
+        return "No workflow yet."
+    model = wf["ckpt"] or wf["unet"]
+    return (f"Model {model} · {wf['sampler']} / {wf['scheduler']} · {wf['steps']} steps · CFG {wf['cfg']} · "
+            f"{wf['width']}×{wf['height']}" + (f" · CLIP skip {abs(wf['clip_skip'])}" if wf.get("clip_skip") else ""))
