@@ -703,3 +703,320 @@ def panel_ai(page):
                 new.value = ""
                 cur.value = S.read_hf_token()
             ui.button("Save token", on_click=save_tok).props("unelevated dense no-caps color=primary")
+
+
+# --------------------------------------------------------------------------- Trainers and GPU
+def panel_trainers(page):
+    import html as _h
+    import sd_settings as SSET
+    import sdgui as S
+    note(f"The two trainers and the GPU they run on. Saved in {Path(S.settings_path()).name} under [general].")
+    wd, venv, trace, sd, mu = S.runner_load()
+    with card():
+        with ui.row().classes("w-full no-wrap gap-3"):
+            rn_sd = ui.input("sd-scripts folder (Illustrious, SDXL, Pony, Anima, FLUX.1, SD 1.5 …)",
+                             value=sd or str(S.ROOT)).props("outlined dense").classes("grow")
+            rn_mu = ui.input("musubi-tuner folder (Z-Image, Qwen-Image, FLUX.2 klein; empty = ~/musubi-tuner)",
+                             value=mu).props("outlined dense").classes("grow")
+        facts = ui.html(S.trainer_facts_html(), sanitize=False).classes("w-full")
+    with card():
+        ui.label("Picture tools").classes("font-semibold")
+        note("Quality rating, look-alikes, crops around the person, watermark removal (LaMa) and gentle upscaling "
+             "(Real-ESRGAN). They run in the sd-scripts venv on your GPU, never during a training run, and stop after 5 "
+             "idle minutes.")
+        pt = ui.html("", sanitize=False)
+        pmsg = ui.markdown("")
+
+        def pt_draw(fresh=False):
+            try:
+                import pictools
+                st = pictools.status(fresh)
+            except Exception as e:                       # noqa: BLE001
+                pt.content = f'<div class="ls-note">✕ {_h.escape(str(e))}</div>'
+                return
+            have = sorted(p.name for p in pictools.MODELS_DIR.glob("*") if p.suffix in (".pt", ".pth"))
+            models = (f" · model files here: {_h.escape(', '.join(have))}" if have else
+                      " · the model files (about 2.5 GB) download the first time a tool is used")
+            line = ("● ready" + models if st["ok"] else "○ " + _h.escape(st["text"]))
+            pt.content = f'<div class="ls-note">{line}<br><span class="rs-mono">{_h.escape(st["python"] or "")}</span></div>'
+            inst.set_visibility(not st["ok"])
+
+        async def install():
+            import pictools
+            pmsg.content = "Installing spandrel into the sd-scripts venv (PyTorch is left as it is) …"
+            pmsg.content = await run.io_bound(pictools.install)
+            pt_draw(True)
+        with ui.row().classes("gap-2"):
+            inst = ui.button("Install the picture tools", on_click=install).props("unelevated dense no-caps color=primary")
+            ui.button("Check again", on_click=lambda: pt_draw(True)).props("flat dense no-caps")
+        pt_draw()
+    with ui.expansion("Advanced: low-level trainer and GPU values").classes("w-full ls-card"):
+        with ui.row().classes("w-full no-wrap gap-3"):
+            rn_wd = ui.input("Working folder (scripts run from here)", value=wd).props("outlined dense").classes("grow")
+            rn_venv = ui.input("Venv to activate first (optional)", value=venv).props("outlined dense").classes("grow")
+        rn_trace = ui.checkbox("Write a full trace to the log (set -x; for bug reports)", value=bool(trace))
+        nv = S.S_NVIDIA()
+        note("GPU and CUDA environment (NVIDIA): the AMD ROCm values are not needed and are left out." if nv else
+             "GPU and ROCm environment. Change the GFX version when you change GPU. Used by the program, put into every "
+             "new launch script, and written into existing scripts with the button below.")
+        g = SSET.gfx_load()
+        with ui.row().classes("w-full items-end gap-2") as gx_row:
+            ui.select({val: f"{lab}: {val}" for lab, val in SSET.KNOWN_GFX}, value=g[1], label="Known GPUs",
+                             on_change=lambda e: e.value and gx.set_value(e.value)).props("outlined dense").classes("grow")
+            gx = ui.input("GFX version override", value=g[0], placeholder="e.g. 12.0.1").props("outlined dense") \
+                .classes("w-40")
+
+            def detect():
+                v, m = SSET.detect_gfx()
+                if v:
+                    gx.value = v
+                gmsg.content = m
+            ui.button("Detect GPU", on_click=detect).props("outline dense no-caps")
+        gx_row.set_visibility(not nv)
+        extra = [ui.input(lab, value=g[3 + i], placeholder=f"empty = preset default ({d})").props("outlined dense")
+                 .classes("w-full") for i, (_, lab, d) in enumerate(SSET.ENV_EXTRA)]
+        gmsg = ui.markdown(g[2])
+
+        def env_save():
+            gmsg.content = SSET.env_save(gx.value, *[w.value for w in extra])[0]
+
+        async def env_update():
+            if await confirm("Rewrite the export line in all your launch scripts (a .bak is kept)?", "Update"):
+                gmsg.content = SSET.env_update_scripts(True)
+        with ui.row().classes("gap-2"):
+            ui.button("Save environment", on_click=env_save).props("outline dense no-caps")
+            ui.button("Update all launch scripts", on_click=env_update).props("flat dense no-caps")
+    msg = ui.markdown("")
+
+    def save():
+        m, _ = S.runner_save(rn_wd.value, rn_venv.value, rn_trace.value, rn_sd.value, rn_mu.value)
+        sdp = (rn_sd.value or "").strip()
+        if sdp and m.startswith("Saved to") and Path(os.path.expanduser(sdp)).is_dir():
+            for cb in S.ON_SD_DIR:
+                try:
+                    cb(sdp)
+                except Exception as e:                   # noqa: BLE001
+                    m += f" (could not update the folder list: {e})"
+        msg.content = m
+        facts.content = S.trainer_facts_html()
+    ui.button("Save", on_click=save).props("unelevated no-caps color=primary")
+
+
+# --------------------------------------------------------------------------- Model files
+def panel_models(page):
+    import sd_settings as SSET
+    import sdgui as S
+    from widgets import stream
+    HD = SSET._hd()
+    types = dict((v, lab) for lab, v in S.type_choices())
+    st = {"tkey": next(iter(types), ""), "flags": [], "slots": []}
+    note(f"Model, VAE and text-encoder files for each LoRA type, saved in {Path(S.settings_path()).name}. Pick the type, "
+         "then for every file type paste a folder (press Enter) and pick a file. New launch scripts use these files "
+         "instead of the preset defaults.")
+    with ui.row().classes("w-full items-end gap-3"):
+        tsel = ui.select(types, value=st["tkey"], label="LoRA type", on_change=lambda e: load(e.value)) \
+            .props("outlined dense").classes("w-72")
+        rec = ui.checkbox("Also list files in subfolders (2 levels)", value=True, on_change=lambda: refresh_lists())
+        ui.button("Refresh file lists", on_click=lambda: refresh_lists()).props("flat dense no-caps")
+    info = ui.markdown("")
+    slots_box = ui.column().classes("w-full gap-2")
+    dl_md = ui.markdown("")
+    msg = ui.markdown("")
+
+    def files_of(d):
+        return SSET.list_model_files(d, rec.value)
+
+    def load(tkey):
+        st["tkey"] = tkey
+        st["slots"].clear()
+        st["flags"] = []
+        slots_box.clear()
+        if not tkey:
+            return
+        saved = SSET.read_settings().get(tkey, {})
+        kn = HD.known(tkey)
+        with slots_box:
+            for key, default in SSET.type_slots(tkey):
+                path = saved.get(key) or default
+                d = SSET._slot_dir(path, saved.get(key + ".dir"))
+                lab = SSET.slot_label(key)
+                with ui.row().classes("w-full items-end gap-2 no-wrap"):
+                    din = ui.input(f"{lab}: folder", value=d).props("outlined dense").classes("w-80")
+                    opts = files_of(d)
+                    if path and path not in opts:
+                        opts = [path] + opts
+                    fsel = ui.select(opts, value=path or None, label=f"{lab}: file (--{key})", with_input=True,
+                                     new_value_mode="add-unique").props("outlined dense").classes("grow")
+                    b = ui.button("⬇ From Hugging Face").props("outline dense no-caps")
+                    b.set_visibility(key in kn and HD.is_missing(path or ""))
+                slot = {"key": key, "dir": din, "file": fsel, "btn": b}
+                din.on("keydown.enter", lambda _, s=slot: relist(s))
+                din.on("blur", lambda _, s=slot: relist(s))
+                b.on_click(lambda _, s=slot: download_one(s))
+                st["slots"].append(slot)
+                st["flags"].append(key)
+        have = SSET.settings_path().is_file()
+        info.content = (f"Settings for this type are read from {SSET.settings_path()}." if saved else
+                        "No saved settings for this type yet: showing the defaults from your preset. Save writes them"
+                        + (" (the file is created)." if not have else "."))
+        dl_all.set_visibility(sum(1 for s in st["slots"] if s["btn"].visible) >= 2)
+        link_slot.options = {s["key"]: SSET.slot_label(s["key"]) for s in st["slots"]}
+        link_slot.value = st["flags"][0] if st["flags"] else None
+        link_slot.update()
+        suggest()
+
+    def relist(s):
+        cur = s["file"].value
+        opts = files_of(s["dir"].value)
+        s["file"].options = ([cur] if cur and cur not in opts else []) + opts
+        s["file"].update()
+
+    def refresh_lists():
+        for s in st["slots"]:
+            relist(s)
+
+    def set_slot(key, path):
+        s = next((x for x in st["slots"] if x["key"] == key), None)
+        if s is None or path is None:
+            return
+        p = Path(path)
+        s["dir"].value = str(p.parent.parent if HD.GENERIC.match(p.name) else p.parent)
+        relist(s)
+        s["file"].options = list(dict.fromkeys([str(p)] + list(s["file"].options)))
+        s["file"].value = str(p)
+        s["file"].update()
+        s["btn"].set_visibility(False)
+
+    async def download_one(s):
+        res = await stream(HD.fetch(st["tkey"], s["key"], slot_dir=s["dir"].value or ""),
+                           lambda line: setattr(dl_md, "content", line))
+        set_slot(s["key"], res)
+
+    async def download_all():
+        todo = HD.missing(st["tkey"])
+        if not todo:
+            dl_md.content = "✔ Every model file of this LoRA type is on this computer."
+            return
+        log, n = [], 0
+        for key in todo:
+            s = next((x for x in st["slots"] if x["key"] == key), None)
+            last = {"t": ""}
+
+            def show(line):
+                last["t"] = line
+                dl_md.content = "\n\n".join(log + [line])
+            res = await stream(HD.fetch(st["tkey"], key, slot_dir=(s["dir"].value if s else "") or ""), show)
+            if res is not None:
+                n += 1
+                set_slot(key, res)
+            log.append(last["t"])
+            if HD.STOP.is_set():
+                break
+        dl_md.content = "\n\n".join(log + [f"**{n} of {len(todo)} files downloaded.**"])
+
+    def save():
+        args = [s["dir"].value for s in st["slots"]] + [s["file"].value for s in st["slots"]]
+        n = len(st["slots"])
+        S.ST_N = max(S.ST_N, n)
+        pad = S.ST_N - n
+        dirs, files = args[:n] + [""] * pad, args[n:] + [""] * pad
+        msg.content = SSET.st_save(st["tkey"], st["flags"] + [""] * pad, *dirs, *files)[0]
+        raw.value = SSET.st_raw()
+    with ui.row().classes("gap-2"):
+        ui.button(f"Save to {Path(S.settings_path()).name}", on_click=save).props("unelevated no-caps color=primary")
+        dl_all = ui.button("⬇ Download all missing files", on_click=download_all).props("outline no-caps")
+        ui.button("Stop download", on_click=SSET.st_download_stop).props("flat no-caps color=negative")
+    with ui.expansion("Download any file from Hugging Face (paste its link)").classes("w-full ls-card"):
+        note("For a file that is not in the built-in list, or another version of it: open the file on huggingface.co and "
+             "copy the link (…/blob/main/… or …/resolve/main/…). Your Hugging Face token is used, so gated repos work "
+             "once you have accepted their licence. A file in several parts is fetched whole.")
+        with ui.row().classes("w-full items-end gap-2"):
+            link_slot = ui.select({}, label="For the slot").props("outlined dense").classes("w-56")
+            link = ui.input("Hugging Face file link",
+                            placeholder="https://huggingface.co/<owner>/<repo>/blob/main/<file>.safetensors") \
+                .props("outlined dense").classes("grow")
+
+            async def by_link():
+                s = next((x for x in st["slots"] if x["key"] == link_slot.value), None)
+                if not link_slot.value or not (link.value or "").strip():
+                    dl_md.content = "Pick the slot and paste the link of the file first."
+                    return
+                res = await stream(HD.fetch(st["tkey"], link_slot.value, slot_dir=(s["dir"].value if s else "") or "",
+                                            link=link.value), lambda line: setattr(dl_md, "content", line))
+                set_slot(link_slot.value, res)
+            ui.button("⬇ Download", on_click=by_link).props("unelevated dense no-caps color=primary")
+    with ui.expansion("Suggestions: which files fit this LoRA type and base model", value=True).classes("w-full ls-card"):
+        note("Every model file in the slot folders (and the models folder above them) is identified from its header: "
+             "model family, text encoder / VAE kind, fp16 / fp8. The best match for each slot is marked ★. Apply "
+             "suggestions fills the empty or unsuitable slots; nothing is saved until you press Save.")
+        sug_md = ui.markdown("")
+        sug = {"picks": {}}
+        all_ = ui.checkbox("Also replace files that already fit")
+        online_md = ui.markdown("")
+
+        def suggest():
+            args = [s["dir"].value for s in st["slots"]] + [s["file"].value for s in st["slots"]]
+            n = len(st["slots"])
+            S.ST_N = max(S.ST_N, n)
+            pad = S.ST_N - n
+            md, picks = SSET.st_suggest(st["tkey"], st["flags"] + [""] * pad, *(args[:n] + [""] * pad),
+                                        *(args[n:] + [""] * pad))
+            sug_md.content, sug["picks"] = md, picks
+
+        def apply():
+            req = S.GUIDE.requirements_for(st["tkey"], SSET._type_base(st["tkey"])) if S.GUIDE else {}
+            changed = []
+            for s in st["slots"]:
+                cur = os.path.expanduser((s["file"].value or "").strip())
+                new = (sug["picks"] or {}).get(s["key"])
+                fits = bool(cur) and "/PATH/TO" not in cur and Path(cur).is_file() and S.GUIDE is not None \
+                    and not S.GUIDE.problems(S.GUIDE.identify(cur), s["key"], req.get(s["key"], []))
+                if new and (all_.value or not fits) and new != cur:
+                    set_slot(s["key"], new)
+                    changed.append(f"{SSET.slot_label(s['key'])}: {Path(new).name}")
+            msg.content = ("Filled " + "; ".join(changed) + ". Press Save to keep them.") if changed else \
+                "Nothing to change: the slots already hold fitting files."
+
+        async def online():
+            base = st["slots"][0]["file"].value if st["slots"] else ""
+            online_md.content = "Asking Hugging Face and Civitai …"
+            online_md.content = await run.io_bound(SSET.st_online, st["tkey"], base, lambda *a, **k: None)
+        with ui.row().classes("gap-2"):
+            ui.button("Apply suggestions", on_click=apply).props("outline dense no-caps")
+            ui.button("Check again", on_click=suggest).props("flat dense no-caps")
+            ui.button("Look up online (Hugging Face, Civitai)", on_click=online).props("flat dense no-caps")
+    with ui.expansion("LoRA subtypes (for example Pony: its own model files and file tag)").classes("w-full ls-card"):
+        note("A subtype trains exactly like its base type (same trainer, flags and recommended settings) but has its own "
+             "model files and file tag. Saved as a section such as [pony] with base = sdxl, label and tag.")
+        sub_md = ui.markdown(SSET.sub_list_md())
+        with ui.row().classes("w-full items-end gap-2"):
+            sname = ui.input("Name (e.g. Pony)").props("outlined dense")
+            sbase = ui.select({"sdxl": "SDXL", "anima": "Anima"}, value="sdxl", label="Based on").props("outlined dense")
+            stag = ui.input("File tag (empty = the name in capitals)").props("outlined dense")
+
+            def add():
+                r = SSET.sub_add(sname.value, sbase.value, stag.value)
+                smsg.content, sub_md.content = r[0], SSET.sub_list_md()
+                after_subs()
+            ui.button("Add subtype", on_click=add).props("unelevated dense no-caps color=primary")
+        with ui.row().classes("w-full items-end gap-2"):
+            srm = ui.select(dict((v, lab) for lab, v in SSET.sub_choices()), label="Subtype to remove") \
+                .props("outlined dense").classes("w-72")
+
+            async def remove():
+                if srm.value and await confirm(f"Remove the subtype {srm.value} from settings.txt?", "Remove"):
+                    smsg.content = SSET.sub_remove(srm.value, True, st["tkey"], "")[0]
+                    sub_md.content = SSET.sub_list_md()
+                    after_subs()
+            ui.button("Remove subtype", on_click=remove).props("flat dense no-caps color=negative")
+        smsg = ui.markdown("")
+
+        def after_subs():
+            tsel.options = dict((v, lab) for lab, v in S.type_choices())
+            tsel.update()
+            srm.options = dict((v, lab) for lab, v in SSET.sub_choices())
+            srm.update()
+    with ui.expansion(f"{Path(S.settings_path()).name} as it is on disk").classes("w-full ls-card"):
+        raw = ui.textarea(value=SSET.st_raw()).props("readonly outlined rows=14 input-style='font-family:monospace'") \
+            .classes("w-full")
+    load(st["tkey"])

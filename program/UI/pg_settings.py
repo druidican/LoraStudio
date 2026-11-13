@@ -46,8 +46,8 @@ class Settings:
                     if grp:
                         ui.label(grp).classes("ls-note tracking-widest mt-3 mb-1 text-xs")
                     for key, label in items:
-                        self.btns[key] = ui.button(SU.nav_label(key), on_click=lambda k=key: self.open(k)) \
-                            .props("flat no-caps align=left").classes("w-full ls-set-item")
+                        self.btns[key] = ui.label(SU.nav_label(key)).classes("w-full ls-set-item") \
+                            .on("click", lambda _, k=key: self.open(k))
             self.body = ui.column().classes("grow min-w-0 gap-3")
         ui.on("ls_ai_box", lambda e: getattr(self, "on_ai", lambda v: None)(str(e.args)))
         self.open("health")

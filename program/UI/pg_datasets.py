@@ -205,8 +205,8 @@ class Datasets:
     def build(self):
         with ui.column().classes("ls-page gap-3"):
             with ui.row().classes("gap-2"):
-                self.b_edit = ui.button("Datasets", on_click=lambda: self.go(view="edit")).props("flat no-caps").classes("ls-nav")
-                self.b_imp = ui.button("Improvements", on_click=lambda: self.go(view="imp")).props("flat no-caps").classes("ls-nav")
+                self.b_edit = ui.label("Datasets").classes("ls-nav").on("click", lambda: self.go(view="edit"))
+                self.b_imp = ui.label("Improvements").classes("ls-nav").on("click", lambda: self.go(view="imp"))
             self.build_new()
             self.build_list()
             self.build_imp()
