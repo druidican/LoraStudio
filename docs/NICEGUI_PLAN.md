@@ -32,7 +32,7 @@ Owner's decisions (2026-11-13):
 
 - [x] Test page: Collection › Browse (`try-nicegui/`), owner: "amazingly fast".
 - [x] Shell: tabs, status strip, login, theme, ? help (first version)
-- [ ] Collection: Browse (done), LoRA page, Insights, Maintenance
+- [x] Collection: Browse, LoRA page (Overview, Pictures, Training, Edit), Insights, Maintenance (logic in Gallery/lorapage.py, maint.py)
 - [ ] Home (+ the after-training link)
 - [ ] Queue (+ test pictures after a run / a queue)
 - [ ] Datasets: list, Improvements, dataset page (Prepare steps 1-8, Train, Results, LoRA)

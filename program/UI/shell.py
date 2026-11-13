@@ -71,6 +71,10 @@ def _strip(shell: Shell):
 
 def build_page():
     """The whole program for one browser tab."""
+    import lora_library as LL
+    import studio_css
+    ui.add_head_html(f"<style>{LL.CSS}</style>")          # the cards, tiles and tables drawn as HTML
+    ui.add_head_html(f"<style>{studio_css.CSS}</style>")  # the shared page parts (+ your userdata/custom.css)
     ui.add_css(CSS)
     # the older page parts (lora_library's cards) colour themselves with body.dark; NiceGUI sets body--dark
     ui.add_body_html("<script>(function(){var b=document.body;var f=function(){b.classList.toggle('dark',"

@@ -143,6 +143,14 @@ class Collection:
                 note("Click a tile: its dataset page. Click a type label on a tile, or a card in Status: that LoRA's page. "
                      "A green label = Completed.")
 
+    async def insights(self, force: bool):
+        if self.ins_html.content and not force:
+            return
+        import insights
+        self.ins_html.content = '<p class="ls-note">Reading …</p>'
+        data = await run.io_bound(insights.compute, LIB, force=force)
+        self.ins_html.content = insights.page_html(data, LL.esc)
+
     # ------------------------------------------------------------------ events
     def open_tile(self, ds_name: str):
         if "datasets" in self.shell.pages:
@@ -165,12 +173,12 @@ class Collection:
 
 
 def build(shell):
-    ui.add_head_html(COL_JS + f"<style>{LL.CSS}</style>")
+    ui.add_head_html(COL_JS)
     c = Collection(shell)
     ui.on("ll_tile", lambda e: c.open_tile(e.args))
     ui.on("ll_open", lambda e: c.open_lora(e.args))
     with ui.column().classes("ls-page gap-2"):
-        c.tabs = ui.tabs().props("dense no-caps align=left active-color=amber-8 indicator-color=amber-8") \
+        c.tabs = ui.tabs(on_change=lambda e: e.value == "insights" and c.insights(False)).props("dense no-caps align=left active-color=amber-8 indicator-color=amber-8") \
             .classes("ls-sub-tabs")
         with c.tabs:
             ui.tab("browse", "Browse")
@@ -187,7 +195,109 @@ def build(shell):
                 except ModuleNotFoundError:
                     note("The LoRA page comes in the next step of the move.")
             with ui.tab_panel("insights").classes("p-0 pt-2"):
-                note("Insights comes in a later step of the move.")
+                build_insights(c)
             with ui.tab_panel("maint").classes("p-0 pt-2"):
-                note("Maintenance comes in a later step of the move.")
+                build_maintenance(c)
     return c
+
+
+def build_insights(c: Collection):
+    ui.label("Insights").classes("ls-h")
+    note("What your own datasets, LoRAs and runs say, read on this computer: the datasets behind your good and weak "
+         "LoRAs, and what your graphics card managed per LoRA type. Rate runs in Results (or on a LoRA page) to teach "
+         "it. With few LoRAs these are hints, not rules: each says how many it comes from.")
+    ui.button("Read again", on_click=lambda: c.insights(True)).props("outline dense no-caps")
+    c.ins_html = ui.html("", sanitize=False).classes("w-full")
+
+
+def build_maintenance(c: Collection):
+    import maint
+    with ui.row().classes("w-full no-wrap items-start gap-4"):
+        with ui.card().props("flat bordered").classes("ls-card grow basis-0 gap-2"):
+            ui.label("IN · SYNC").classes("ls-note tracking-widest")
+            ui.label("Personal sync from your LoRA folder").classes("text-lg font-semibold")
+            note(f"Copies the LoRA Manager files of your own LoRAs (.metadata.json, preview and example pictures) from "
+                 f"the LoRA folder into each dataset's {LL.ARCHIVE_DIR}/ folder, where the Collection reads them. A LoRA "
+                 "belongs to a dataset when it has the same name and size as a model file in the dataset, or the same "
+                 "SHA256 hash (renamed copies). Downloads are left alone. The .metadata.json files are synced both ways: "
+                 "what only one side has is copied to the other, and where both differ the newer file wins. A .bak is "
+                 "made before a file is changed.")
+            with ui.expansion("LoRA Manager's example pictures folder").classes("w-full"):
+                roots = LL.lm_example_roots(LIB)
+                lm = ui.input("Example pictures folder (empty = read from LoRA Manager's settings)",
+                              value=LIB.data.get("lm_examples_dir") or "",
+                              placeholder=roots[0] if roots else "the 'Example images' folder set in LoRA Manager") \
+                    .props("outlined dense").classes("w-full")
+                lm_msg = note("Found now: " + (roots[0] if roots else "nothing (set the folder here)") + ".")
+                ui.button("Save folder", on_click=lambda: setattr(lm_msg, "text", maint.set_example_folder(lm.value))) \
+                    .props("outline dense no-caps")
+            sync_msg = ui.markdown("")
+
+            async def do_sync():
+                sync_msg.content = "Syncing …"
+                sync_msg.content = await run.io_bound(maint.sync)
+                c.redraw()
+            ui.button("Sync now", on_click=do_sync).props("unelevated no-caps color=primary")
+            ui.label("TRAINING CARDS").classes("ls-note tracking-widest mt-4")
+            ui.label("Scan all LoRAs").classes("text-lg font-semibold")
+            note(f"Reads every LoRA of your datasets once: its launch script, the LoRA file's training data, the repeat "
+                 f"folders and the run log, into the LoRA page's Training part (saved in the dataset's {LL.ARCHIVE_DIR}/ "
+                 "copy of the LoRA Manager file). A scanned version is read again only when its file changes.")
+            with ui.row().classes("items-center gap-3"):
+                force = ui.checkbox("Read the scanned ones again too")
+                tc_msg = ui.markdown("")
+
+                async def do_cards():
+                    tc_msg.content = "Reading …"
+                    tc_msg.content = await run.io_bound(maint.training_cards, force.value)
+                ui.button("Scan all LoRAs", on_click=do_cards).props("unelevated no-caps color=primary")
+        with ui.card().props("flat bordered").classes("ls-card grow basis-0 gap-2"):
+            ui.label("OUT · CLEAN UP").classes("ls-note tracking-widest")
+            ui.label("Free disk space").classes("text-lg font-semibold")
+            note("Everything goes to the desktop Trash; restore it from the file manager. One run at a time: Results "
+                 "on the dataset page.")
+            with ui.expansion("Leftovers of all finished LoRAs", value=True).classes("w-full"):
+                note("Epoch files, saved states (-state folders), .tmp.safetensors, .npz latent caches and musubi-tuner's "
+                     "cache folders. Only for LoRAs that have a final file; a dataset with a training run in progress is "
+                     "skipped.")
+                lo = {"paths": []}
+                lo_md = ui.markdown("")
+
+                async def find_lo():
+                    lo_md.content = "Looking …"
+                    lo_md.content, lo["paths"] = await run.io_bound(maint.find_leftovers)
+
+                async def trash_lo():
+                    if not lo["paths"]:
+                        lo_md.content = "Press Find leftovers first."
+                        return
+                    from widgets import confirm
+                    if await confirm(f"Move {len(lo['paths'])} item(s) to the Trash?", "Move to Trash"):
+                        lo_md.content = await run.io_bound(maint.trash_leftovers, lo["paths"])
+                        lo["paths"] = []
+                with ui.row().classes("gap-2"):
+                    ui.button("Find leftovers", on_click=find_lo).props("outline dense no-caps")
+                    ui.button("Move to Trash", on_click=trash_lo).props("unelevated dense no-caps color=negative")
+            with ui.expansion("Orphaned LoRA Manager files").classes("w-full"):
+                note("A .metadata.json / .civitai.info with its preview and example images, whose .safetensors file no "
+                     "longer exists (deleted or renamed LoRAs).")
+                or_md = ui.markdown("")
+                or_pick = ui.select({}, multiple=True, label="Orphaned meta files").props("outlined dense use-chips") \
+                    .classes("w-full")
+
+                async def find_or():
+                    md, choices = await run.io_bound(maint.find_orphans)
+                    or_md.content = md
+                    or_pick.options = {v: label for label, v in choices}
+                    or_pick.value = [v for _, v in choices]
+                    or_pick.update()
+
+                async def trash_or():
+                    from widgets import confirm
+                    if or_pick.value and await confirm(f"Move {len(or_pick.value)} ticked group(s) to the Trash?",
+                                                       "Move to Trash"):
+                        or_md.content = await run.io_bound(maint.trash_orphans, or_pick.value)
+                        await find_or()
+                with ui.row().classes("gap-2"):
+                    ui.button("Scan", on_click=find_or).props("outline dense no-caps")
+                    ui.button("Move ticked to Trash", on_click=trash_or).props("unelevated dense no-caps color=negative")
