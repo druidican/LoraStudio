@@ -227,7 +227,12 @@ TICKED_JS = ("(x) => [JSON.stringify(Array.from(document.querySelectorAll('#ds_s
 
 # --------------------------------------------------------------------------- 2 Setup: is everything there?
 def setup_ready(types, purpose="character") -> tuple:
-    """(card html, download button update): the model files of the ticked LoRA types and the trainer, and whether
+    html_, missing = setup_card(types, purpose)
+    return html_, gr.update(visible=missing)
+
+
+def setup_card(types, purpose="character") -> tuple[str, bool]:
+    """(card html, model files missing): the model files of the ticked LoRA types and the trainer, and whether
     Ollama has a picture model (steps 4 and 7). Missing files can download in the background while you go on."""
     import hfdownload as HD
     rows, missing = [], False
@@ -266,7 +271,7 @@ def setup_ready(types, purpose="character") -> tuple:
     if HD.BG["running"]:
         missing = False                                    # the download is already on its way
     return (f'<div class="ls-card"><b>Ready for these LoRA types?</b><ul class="ds-ready">{"".join(rows)}</ul></div>',
-            gr.update(visible=missing))
+            missing)
 
 
 # --------------------------------------------------------------------------- 3 Usable scan

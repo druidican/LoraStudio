@@ -67,3 +67,5 @@ body { background:var(--ls-bg); color:var(--ls-text); font-family:Inter, system-
 .ls-page .nicegui-markdown p { margin:4px 0; }
 .ls-row { display:flex; padding:5px 8px; border-radius:6px; text-decoration:none; color:inherit; font-size:14px; width:100%; }
 .ls-row:hover { background:rgba(127,127,127,.12); }
+.ls-nav { color:var(--ls-muted) !important; border-radius:0 !important; border-bottom:2px solid transparent; font-weight:600; }
+.ls-nav.ls-nav-on { color:var(--ls-text) !important; border-bottom-color:var(--ls-accent); }
