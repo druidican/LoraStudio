@@ -1,9 +1,10 @@
 # Results: picking the best version
 
-**Training › Results** lists every finished run, newest first: the result, the save point to try first, whether it is
+A dataset page's **Results** part lists the finished runs of that dataset, newest first (*Runs of* shows another
+dataset's or all runs): the result, the save point to try first, whether it is
 copied to your LoRA folder, and the leftovers *Clean up* can remove.
 
-![Training › Results](img/results.jpg)
+![A dataset page › Results](img/results.jpg)
 
 ## One run
 
@@ -19,7 +20,7 @@ a few test pictures with it and the final file.
 - **Test pictures (ComfyUI)**: the same prompts and seeds with several save points side by side; *Use this one*
   copies that save point and makes its first picture the preview.
 - **Clean up this run** moves epoch files you did not copy, saved states and caches to the Trash.
-- **This run**: *Train a new version…* opens Datasets › 9 Train for the dataset; *Run it again* puts the same
+- **This run**: *Train a new version…* opens the dataset's Train part; *Run it again* puts the same
   script in the queue; *★ Best version* marks it; *Your rating* (4-5 good, 1-2 weak) teaches Insights; *Report for Claude* makes the report file (see [Training](#training)).
 - **TensorBoard** (folded): *Start TensorBoard* opens the run's logs in TensorBoard; *End of the run log* shows the
   last lines as the trainer wrote them.
@@ -36,9 +37,9 @@ shows that version first, even when a newer one exists.
 
 > **Do** compare two versions that differ in one or two settings: then you know what made the difference.
 
-## Insights (Training › Insights)
+## Insights (Collection › Insights)
 
-![Training › Insights: the datasets behind your good and weak LoRAs](img/insights.jpg)
+![Collection › Insights: the datasets behind your good and weak LoRAs](img/insights.jpg)
 
 **Insights** compares your own LoRAs, read on this computer. Rate versions on the run's page in Results or on their LoRA page › Edit (*Your rating*:
 4-5 good, 1-2 weak; without a rating the ★ best version and versions you made pictures with count as good). Per LoRA

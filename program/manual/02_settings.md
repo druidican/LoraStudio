@@ -40,7 +40,7 @@ command line still wins). The same page has **What is installed**: see [Installi
 - **Dataset folders**: one folder per dataset inside them (for example `~/Datasets/pip/`). New datasets are made in
   the first one. Several folders: one per line.
 - **LoRA folders**: where ComfyUI reads LoRAs, together with LoRA Manager's files. Finished LoRAs are copied there
-  from Training › Results, into the folder of their LoRA type.
+  from a dataset's Results, into the folder of their LoRA type.
 - **Extra launch script folders** (optional), the **Monitor sample folder** and the **Model folder** (where the
   model file lists start).
 - **ComfyUI picture folder**: where ComfyUI saves pictures, so the LoRA page can show the ones made with a LoRA.

@@ -11,13 +11,13 @@ A mark says: this VERSION of the LoRA of this LoRA type for this dataset is fini
 Stored in completed.json next to this file:
   {"mychar|anima": {"done": true, "versions": [1, 2, 3], "how": "auto", "lora": "mycharAnimaV3", "at": "2026-10-13 22:41",
                     "best": 2, "best_at": "2026-10-24 16:10"}}
-"best" is the version marked as the best one in Training › Results (the Collection shows it first).
+"best" is the version marked as the best one in a dataset's Results (the Collection shows it first).
 Marks from before versions were tracked have no "versions": they count for every version up to the one in "lora"
 (mycharAnimaV3 -> V1-V3), so the versions that existed then stay Completed and V4 does not.
 """
 
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -64,7 +64,7 @@ def _save(data: dict):
 
 
 def best_version(dataset: str, tkey: str, data: dict | None = None):
-    """The version marked as the best of a dataset + LoRA type (Training › Results), or None."""
+    """The version marked as the best of a dataset + LoRA type (a dataset's Results), or None."""
     if not dataset or not tkey:
         return None
     return ((data if data is not None else load()).get(key(dataset, tkey)) or {}).get("best")

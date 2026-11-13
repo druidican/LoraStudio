@@ -37,7 +37,7 @@ LoRA Studio has been tested on Linux with an AMD Radeon (ROCm). Anything else is
 - the **install report** (step 2),
 - the **machine check** file (step 4),
 - for anything that went wrong in LoRA Studio: Settings › Version › **Report for Claude** (or the *Report* button of
-  a failed run in Training › Results). It also includes the main lines of the install report.
+  a failed run in its dataset's Results). It also includes the main lines of the install report.
 - a few words: what you expected, what happened, what was unclear. A screenshot helps for anything that looks wrong.
 
 Please don't send your LoRA Studio folder itself: it holds your settings and your Hugging Face token.

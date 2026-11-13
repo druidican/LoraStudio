@@ -1,12 +1,14 @@
 # The Collection
 
-The Collection has three pages: **Browse**, **LoRA page** and **Maintenance**.
+The Collection has four pages: **Browse**, **LoRA page**, **Insights** (see [Results](#results)) and **Maintenance**.
 
 ## Browse
 
 One tile per dataset with the picture of its newest (or ★ best) LoRA, and a label per LoRA type (✓ = Completed). With
 *Colour the Collection cards by purpose* on (Settings › Look and base models), each card has a border and a label in
-the colour of its purpose (character, art style, object, worn item, action / pose, concept).
+the colour of its purpose (character, art style, object, worn item, action / pose, concept). A click on a tile opens
+the dataset page at its **LoRA** part (its LoRAs, with *Open the LoRA page*); a click on a type label on the tile opens
+that LoRA page directly.
 
 ![The Collection](img/collection.jpg)
 
@@ -15,7 +17,7 @@ the colour of its purpose (character, art style, object, worn item, action / pos
 - **Pictures / Status**: the tiles, or a list with the warnings and problems of the LoRA files themselves (what a
   dataset still needs is in Datasets › Improvements).
 - **Select**: tick tiles (or *Select all shown*), then *✓ Mark Completed* or *Mark not completed*. **Completed** marks a
-  version as finished: its launch script is hidden in Training › Run. A new version starts unmarked.
+  version as finished: its launch script is hidden in the Queue. A new version starts unmarked.
 - *Rescan folders* reads your LoRA folders again (new or removed files).
 
 ## The LoRA page
@@ -38,9 +40,9 @@ Click a tile for its **LoRA page**; the *Version* menu at the top switches betwe
 - **Training**: what the version was trained with, in separate fields: the dataset and its repeat folders, epochs and
   how the steps add up, the network and optimizer settings, and the result (training time, final loss, the save point
   to try first). They are read from the LoRA file, its launch script and its logs, once per version; *Read the
-  training again* after you changed the script or the log. *Train a new version…* opens Datasets › 9 Train.
+  training again* after you changed the script or the log. *Train a new version…* opens the dataset's Train part.
 - **Edit**: display name, character (groups it in Browse), version (shown in ComfyUI's LoRA Manager), clip skip,
-  **Your rating** (4-5 good, 1-2 weak, for Training › Insights; the same rating as on the run's page in Results), trigger words, description, notes, strength and CLIP strength,
+  **Your rating** (4-5 good, 1-2 weak, for Collection › Insights; the same rating as on the run's page in Results), trigger words, description, notes, strength and CLIP strength,
   the preview's NSFW level, favorite, and a flag with its reason. Saved in LoRA Manager's format in the dataset's
   `LoraManager/` folder (a `.bak` is kept).
 

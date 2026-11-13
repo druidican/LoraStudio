@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.111126j"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -730,7 +730,7 @@ def version_panel(app):
     with gr.Column(elem_classes=["ls-card"]):
         gr.Markdown("**Report for Claude.** One file with the version, the machine and the newest machine check "
                     "(token and home folder removed), copied so you can paste it into a chat. For a failed run, use "
-                    "the button on that run in Training › Results: it adds the launch script and the end of the log.",
+                    "the button on that run in its dataset's Results: it adds the launch script and the end of the log.",
                     elem_classes=["ls-note"])
         rnote = gr.Textbox(label="What do you see? (optional)", lines=2)
         with gr.Row(elem_classes=["ls-bar"]):
@@ -755,7 +755,7 @@ def version_panel(app):
 def comfy_panel(app):
     import comfytest as CT
     gr.Markdown("After a training run, LoRA Studio can make the same test pictures with each save point in your "
-                "ComfyUI, side by side in **Training › Results**, to pick the best epoch. It reads your own workflow for "
+                "ComfyUI, side by side in **a dataset's Results**, to pick the best epoch. It reads your own workflow for "
                 "the model, sampler, steps, CFG, size and negative prompt, and sends ComfyUI a small graph of its own "
                 "nodes with those settings (no custom nodes needed; upscaling and face detailers are left out). "
                 "Saved in `comfy_settings.json`; your workflows are kept in `comfy_workflows/`.", elem_classes=["ls-note"])

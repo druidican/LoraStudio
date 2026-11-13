@@ -79,6 +79,12 @@ Linux, also NVIDIA. It also makes datasets (sort, select, crop, captions), keeps
   livepoll `hm_live`). Datasets records the last five opened datasets (`home.remember`). The Manual tab's button is
   hidden; the top **?** (`lsHelp`) opens the chapter of the current tab, *← Back* (`lsHelpBack`) returns.
   `tools/make_test_world.py` makes an invented world with a pretend sd-scripts (runs end to end in seconds).
+- **The dataset page** (1.131126b): an open dataset has four parts in `datasets_ui.parts_html`: Prepare (steps 1-8,
+  reopens at `prep`), Train (step 9 + `queue_card`), Results (pseudo-step 10: `training_ui.build_results` lives there,
+  filled by `RS["show"]` in the same nav event; filters use `.input`) and LoRA (pseudo-step 11: `lora_html`, cards from
+  the Collection's groups → `lsOpenLora`). ds_box actions `part|`, `dspart|ds|n` (`lsDsPart`, Collection tiles) and
+  `run|log` (`lsGoRun`: the status strip, Home; `open_run` opens the run once). The Training tab is now **Queue**
+  (Run only); Insights is a Collection tab.
 - **Class word** (step 2, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).
 - **Detailed scan** (`Data/detailscan.py`, characters, on per dataset in step 4): an extra Ollama question per
   picture, coverage over the kept pictures, suggestions in step 5 (add / upscale / sharpen / crop into a new picture),
@@ -121,12 +127,10 @@ Playwright long tasks; `LS_TICK_DEBUG=1` prints what each tick changes.
 
 ## Open
 
-- **Redesign, bold part (owner approved 2026-11-11, moderate part done in 1.111126h-j):** a Home tab as start page
-  (what needs a look: Health check + Improvements + Collection warnings; what is training; last results; continue
-  where you left off); one page per dataset with Prepare (steps 1-8), Train (step 9 + its queue items), Results (its
-  runs, rating, compare) and LoRA (the Collection's LoRA page); a Queue tab (Training › Run); Collection tiles open the
-  dataset page; Manual as a ? button opening the chapter of the current page. Then the manual rewritten with new pip
-  screenshots. Every release removes the code it replaces (owner: no leftovers, no loops). The plan and the task
+- **Redesign, bold part (owner approved 2026-11-11):** moderate part 1.111126h-j; Home and the ? Manual 1.131126; the
+  dataset page, the Queue tab and Insights in the Collection 1.131126b. Still to do: the manual's pictures retaken
+  from a new pip demo world (the text is up to date; old screenshots still show Training › Run / Results), and a last
+  clean-up pass. Every release removes the code it replaces (owner: no leftovers, no loops). The plan and the task
   walk-throughs are in the owner's walkthrough document (Usability tab) and the "LoRA Studio flow" whiteboard.
 
 - Worn items, later (owner deferred): sort and crop around the item; weight per kind.

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE */
-/* LoRA Studio version 1.111126h */
+/* LoRA Studio version 1.131126b */
 /* LoRA Studio: the look of the pages (colours come from the --ll-* variables of the Collection style).
    Edit freely. For your own changes that survive updates, use custom.css next to this file instead:
    it is loaded after this one, and an update never replaces it. Reload the page after a change
@@ -124,6 +124,20 @@ table.rs-table { border:0 !important; width:100%; border-collapse:collapse; font
           border-radius:10px; background:var(--ll-card); font-size:14px; }
 .ds-bar-l { color:var(--ll-muted); font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
 .ds-bar-n { margin-left:auto; color:var(--ll-muted); }
+.ds-parts { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px; margin:8px 0 4px; }
+.ds-part { display:flex; flex-direction:column; align-items:flex-start; gap:1px; padding:8px 14px; cursor:pointer; text-align:left;
+           border:1px solid var(--ll-line); border-bottom:3px solid var(--ll-line); border-radius:8px; background:var(--ll-card);
+           color:var(--ll-text); font-size:14px; }
+.ds-part span { color:var(--ll-muted); font-size:12px; }
+.ds-part:hover { border-color:#E8A33D; }
+.ds-part-on { border-color:#E8A33D; border-bottom-color:#E8A33D; background:#FBE9C8; color:#1C1F24; }
+.ds-part-on span { color:#5A4A2A; }
+@media (max-width: 700px) { .ds-parts { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+.ds-lcard { display:flex; gap:14px; align-items:flex-start; }
+.ds-lcard img, .ds-lph { width:120px; height:120px; object-fit:cover; border-radius:8px; flex:none; background:var(--ll-chip, #ECEEF1); }
+.ds-lph { display:flex; align-items:center; justify-content:center; color:var(--ll-muted); font-size:12px; }
+.ds-lbody { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.ds-qrow { display:flex; gap:10px; align-items:center; padding:4px 0; font-size:14px; }
 .ds-flist, .ds-elist, .ds-slist { display:flex; flex-direction:column; gap:6px; }
 .ds-frow, .ds-erow { display:flex; gap:10px; align-items:center; padding:9px 12px; border:1px solid var(--ll-line); border-radius:8px;
                      background:var(--ll-card); color:var(--ll-text); text-align:left; font-size:14px; }

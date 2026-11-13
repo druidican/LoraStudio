@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -871,7 +871,7 @@ FLAG_WHY = [
     ("--model_version", "Which variant of the model family musubi builds (FLUX.2: klein-base-4b / klein-base-9b, Qwen-Image: "
                         "original). It must match the DiT and text-encoder files."),
     ("--weighting_scheme", "How the loss is weighted over noise levels; `none` is the flow-matching default for musubi."),
-    ("--save_state", "Training state is saved with the checkpoints, so a crashed run can be resumed from Training › Run."),
+    ("--save_state", "Training state is saved with the checkpoints, so a crashed run can be resumed from the Queue."),
     ("--model_type", "Tells flux_train_network.py which model family the base file is. `chroma` switches to Chroma: "
                      "T5-XXL only (no CLIP-L), Chroma's own modulation layers and its timestep handling."),
     ("--apply_t5_attn_mask", "T5 padding tokens are masked, the way Chroma was trained. sd-scripts refuses to train "
@@ -1110,7 +1110,7 @@ def explain_md(ds, tkey, cfg, stats, text, rec, existing, planned_repeats=None, 
         A.append("No `--logging_dir`: nothing is written to the `log` folder, so TensorBoard has no loss curves. "
                  "Put `${LOG_DIR}` (or a folder path) in the form field 'Logging dir'.")
     if not _has(text, "--save_state"):
-        A.append("No `--save_state`: a crashed run cannot be resumed (resuming in Training › Run needs it).")
+        A.append("No `--save_state`: a crashed run cannot be resumed (resuming in the Queue needs it).")
     for name in MODEL_FIELDS:
         v = os.path.expandvars(os.path.expanduser(f.get(name, "") or ""))
         if v and "$" not in v and not Path(v).exists():
@@ -1555,7 +1555,7 @@ def cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, pla
     tidy = S.script_saved_hook(ds)
     if tidy:
         msg += f" {tidy[:1].upper()}{tidy[1:]}."
-    msg += " Add it to the queue in Training › Run."
+    msg += " Add it to the queue in the Queue."
     gr.Info(f"Saved {name}")
     res = _cs_result(script=gr.update(choices=cs_script_choices(ds), value=str(dest)), save_over=gr.update(visible=True),
                      status=msg, plan={})

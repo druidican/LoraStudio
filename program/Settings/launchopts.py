@@ -5,7 +5,7 @@ Saved in launch_settings.json next to the program (readable only by you: it can 
 lora_studio.py reads it at start; an option given on the command line (./start.sh --port 7861) still wins.
 """
 from __future__ import annotations
-__version__ = "1.131126"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -16,7 +16,7 @@ import time
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 APP_DIR = _LP.USER
 FILE = APP_DIR / "launch_settings.json"
-START_PAGES = [("Home", "home"), ("Datasets", "datasets"), ("Training", "training"), ("Collection", "collection"),
+START_PAGES = [("Home", "home"), ("Datasets", "datasets"), ("Queue", "queue"), ("Collection", "collection"),
                ("Settings", "settings")]
 DEFAULTS = {"network": False, "port": 7860, "browser": True, "user": "", "password": "", "start_page": "home",
             "check_updates": True, "resume_queue": False, "notify": True, "queue_autostart": True,
@@ -28,6 +28,8 @@ def load() -> dict:
         d = json.loads(FILE.read_text(encoding="utf-8"))
         if "home_page" not in d and d.get("start_page") == "collection":
             d["start_page"] = "home"            # Collection was the start page before Home existed
+        if d.get("start_page") == "training":
+            d["start_page"] = "queue"           # Training became the Queue tab (1.131126b)
         return {**DEFAULTS, **{k: d[k] for k in DEFAULTS if k in d}}
     except Exception:
         return dict(DEFAULTS)
@@ -99,7 +101,7 @@ def build_ui():
 
     def collect(n, p, u, w, b, s, c, r, no):
         return {"network": bool(n), "port": int(p or 7860), "browser": bool(b), "user": (u or "").strip(),
-                "password": w or "", "start_page": s or "collection", "check_updates": bool(c),
+                "password": w or "", "start_page": s or "home", "check_updates": bool(c),
                 "resume_queue": bool(r), "notify": bool(no)}
 
     def check(d) -> str:

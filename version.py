@@ -14,22 +14,22 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.131126"
-VERSION = "1.131126"
+__version__ = "1.131126b"
+VERSION = "1.131126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.131126",
-    "version.py": "1.131126",
+    "lora_studio.py": "1.131126b",
+    "version.py": "1.131126b",
     "program/lspaths.py": "1.011126",
-    "program/Training/sdgui.py": "1.111126i",
-    "program/Training/sd_script.py": "1.111126h",
-    "program/Data/sd_prepare.py": "1.111126j",
-    "program/Training/sd_settings.py": "1.111126f",
-    "program/Data/datasets_ui.py": "1.131126",
+    "program/Training/sdgui.py": "1.131126b",
+    "program/Training/sd_script.py": "1.131126b",
+    "program/Data/sd_prepare.py": "1.131126b",
+    "program/Training/sd_settings.py": "1.131126b",
+    "program/Data/datasets_ui.py": "1.131126b",
     "program/Data/dsflow.py": "1.111126j",
-    "program/Training/training_ui.py": "1.111126j",
-    "program/Settings/settings_ui.py": "1.111126j",
-    "program/Gallery/lora_library.py": "1.111126j",
+    "program/Training/training_ui.py": "1.131126b",
+    "program/Settings/settings_ui.py": "1.131126b",
+    "program/Gallery/lora_library.py": "1.131126b",
     "program/Training/comfytest.py": "1.011126",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.111126b",
@@ -47,18 +47,18 @@ RELEASE: dict = {
     "program/Gallery/picgallery.py": "1.011126",
     "program/Data/trim.py": "1.111126g",
     "program/Data/housekeeping.py": "1.011126",
-    "program/Gallery/completed.py": "1.011126",
+    "program/Gallery/completed.py": "1.131126b",
     "program/Gallery/model_guide.py": "1.091126",
     "program/Gallery/trainingcard.py": "1.111126g",
-    "program/Gallery/insights.py": "1.111126i",
+    "program/Gallery/insights.py": "1.131126b",
     "program/Other/livepoll.py": "1.101126c",
     "program/Other/loadjoin.py": "1.111126d",
     "program/Other/ticker.py": "1.111126e",
-    "program/Other/statusbar.py": "1.111126i",
-    "program/Other/home.py": "1.131126",
+    "program/Other/statusbar.py": "1.131126b",
+    "program/Other/home.py": "1.131126b",
     "program/Other/gpusmi.py": "1.051126b",
     "program/Training/savepoint.py": "1.011126",
-    "program/Settings/launchopts.py": "1.131126",
+    "program/Settings/launchopts.py": "1.131126b",
     "program/Settings/firstrun.py": "1.011126",
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.011126",
@@ -66,7 +66,7 @@ RELEASE: dict = {
     "selftest.py": "1.111126h",
     "program/Settings/machinecheck.py": "1.111126d",
     "program/Settings/selfupdate.py": "1.011126",
-    "program/Training/failcodes.py": "1.111126j",
+    "program/Training/failcodes.py": "1.131126b",
     "program/Other/report.py": "1.011126",
     "program/Other/manual.py": "1.131126",
     "program/Settings/notice.py": "1.011126",
@@ -75,12 +75,13 @@ RELEASE: dict = {
     "program/Other/studio_css.py": "1.011126",
     "program/Training/Lora_Datatypes.py": "1.111126h",
     "program/Training/Training_Recommendations.py": "1.091126",
-    "program/Other/lora_studio.css": "1.111126h",
+    "program/Other/lora_studio.css": "1.131126b",
     "install.sh": "1.051126b",
     "start.sh": "1.051126",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.131126b", "One page per dataset: an open dataset has four parts in a bar under its name: Prepare (steps 1-8, it reopens at the step you were at), Train (the launch script, plus this dataset's queue items and last runs), Results (its runs, moved here from Training › Results; 'Runs of' still shows other datasets or all) and LoRA (its LoRA files with versions, status, best and Completed, and a button to the LoRA page). The Training tab is now the Queue tab; Insights moved to the Collection. A Collection tile opens the dataset page's LoRA part (a type label on the tile still opens that LoRA page). The status strip and Home's Last results open the run in its dataset's Results. The old Training › Results start-up load and its wiring are removed. Manual updated."),
     ("1.131126", "Redesign 4: Home is the new start page: what is training now, what needs a look (setup problems, datasets that could be better, warnings in your LoRA files), the last five results and the datasets you worked on last, each a click away. The Manual left the tab row: the ? button at the top opens it at the chapter of the page you are on, and ← Back returns there. If Collection was your start page, Home takes its place (Settings › Start and network changes it)."),
     ("1.111126j", "Redesign 3: Datasets is one list with + New dataset on top (New dataset and Edit existing are no longer two pages). Improvements has its own choices folded on the page (What Fix does; they left Settings) and Check the next fixed dataset, which opens each fixed dataset at step 5 to look it over. Training › Run's Mark as run is now Mark Completed, the one done mark. Settings is grouped like the work: Start, Datasets, Training, Results, Collection, Care."),
     ("1.111126i", "Redesign 2 (from dataset to training in one go): step 9's last button is now Save and add to the queue; with Start the queue when nothing is training ticked (remembered) the run starts at once. When a run ends, clicking the status strip opens that run in Training › Results. Results has Your rating next to the best-version mark, and Insights moved to Training as its third page (Training › Insights). Every click inside the Results lists is one event instead of four or five."),

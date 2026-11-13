@@ -1,11 +1,11 @@
-# Training
+# Training: the Queue
 
-**Training › Run** lists one launch script per dataset and LoRA type, with when it last ran and how. Tick several and
-*Add the ticked to the queue*, or press *Add* on one. *Start queue* trains them one after the other. (Datasets › 9 Train
-can put a script in the queue and start it in one go.) When a run ends, the status strip says so; click it to open that
-run in Results.
+The **Queue** tab lists one launch script per dataset and LoRA type, with when it last ran and how. Tick several and
+*Add the ticked to the queue*, or press *Add* on one. *Start queue* trains them one after the other. (A dataset page's
+Train part can put a script in the queue and start it in one go.) When a run ends, the status strip says so; click it
+to open that run in its dataset's Results.
 
-![Training › Run: the launch scripts and the queue](img/run.jpg)
+![The Queue: the launch scripts and the queue](img/run.jpg)
 
 - The queue **stops Ollama** first, to free the video memory (it is not started again by itself).
 - Each LoRA runs as its own program, so its memory is free again when it ends. When the next one uses another model

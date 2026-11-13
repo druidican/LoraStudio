@@ -5,7 +5,7 @@ and the GPU / GFX values.
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.111126f"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import glob
 import math
@@ -607,7 +607,7 @@ def st_save(tkey, flags, *args):
     gr.Info(f"Saved {Path(settings_path()).name}")
     return (f"**Saved to `{settings_path()}`** for this LoRA type (other types are untouched; the previous file is kept as "
             "`settings.txt.bak`). New launch scripts of this type now use these files. For an existing script press "
-            "**Use model files from Settings** on Training › Launch script.\n\n" + "\n".join(rows)), st_raw()
+            "**Use model files from Settings** on a dataset's Train.\n\n" + "\n".join(rows)), st_raw()
 
 
 # ---- LoRA subtypes (e.g. Pony or another SDXL / Anima variant), stored as their own section in settings.txt

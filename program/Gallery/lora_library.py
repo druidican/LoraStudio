@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.111126j"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -187,7 +187,7 @@ dataset_dirs ={block(v["dataset_dirs"])}
 # (.metadata.json, preview and example images). Only read by Personal sync.
 lora_dirs ={block(v["lora_dirs"])}
 
-# Extra folders with launch scripts (.sh) for Training › Run, besides the dataset folders
+# Extra folders with launch scripts (.sh) for the Queue, besides the dataset folders
 script_dirs ={block(v["script_dirs"])}
 
 # Folder the Monitor tab shows sample images from (empty = <sd-scripts>/output)
@@ -1050,7 +1050,7 @@ class Library:
         return self.groups.get(lora.gid) or [lora]
 
     def newest(self, gid: str):
-        """The version a card and the LoRA page show: the one marked best (Training › Results), else the newest."""
+        """The version a card and the LoRA page show: the one marked best in a dataset's Results, else the newest."""
         members = self.groups.get(gid)
         if not members:
             return None
@@ -1575,9 +1575,9 @@ def best_member(members: list):
     return next((m for m in members if v is not None and m.version == v), None)
 
 
-BEST_BADGE = ('<span class="ll-done ll-best" title="Marked as the best version in Training › Results: shown first">'
+BEST_BADGE = ('<span class="ll-done ll-best" title="Marked as the best version in Results (on the dataset page): shown first">'
               '&#9733; Best</span>')
-DONE_BADGE = '<span class="ll-done" title="Completed: its launch scripts are hidden in Training › Run">&#10003; Completed</span>'
+DONE_BADGE = '<span class="ll-done" title="Completed: its launch scripts are hidden in the Queue">&#10003; Completed</span>'
 
 
 def picture_source(members: list):
@@ -1784,8 +1784,9 @@ def render_gallery(lib: Library, search: str, base: str, sort: str, only_preview
         fav = '<span class="ll-fav">&#9733;</span>' if any((l.sidecar or {}).get("favorite") for l in members) else ""
         note = f"newest: {newest.stem}" + ("" if src is None or src is newest else f" · picture from {src.stem}")
         return (f'<button class="ll-card ll-gtile{" ll-pcol" if col else ""}" '
-                f'onclick="llOpenCard(this.dataset.open, this, this.dataset.ds)"{col[0] if col else ""} '
-                f'data-gid="ds:{esc(key)}" data-ds="{esc(key)}" data-open="{newest.gid}" title="{esc(note)}">'
+                f'onclick="llTile(this)"{col[0] if col else ""} '
+                f'data-gid="ds:{esc(key)}" data-ds="{esc(key)}" data-dsn="{esc(ds.name)}" data-open="{newest.gid}" '
+                f'title="{esc(note)}">'
                 f'<span class="ll-selmark" aria-hidden="true"></span>{pic}'
                 f'<span class="ll-gcap ll-gcap2"><span class="ll-name">{fav}{dot}{esc(ds.name)}</span>'
                 f'<span class="ll-tchips">{col[1] if col else ""}{"".join(chips)}{exn}</span></span></button>')
@@ -2821,6 +2822,14 @@ if (!window.llOpenCard) {
     window.scrollTo({top: 0, behavior: 'smooth'});
   };
 }
+if (!window.llTile) {
+  // Browse tile: the dataset page (its LoRA part); a type label on it opens that LoRA page; Select mode: pick it
+  window.llTile = function(card){
+    if (llSelecting(card)) { card.classList.toggle('ll-picked'); llSelCount(); return; }
+    if (window.lsDsPart && card.dataset.dsn) { lsDsPart(card.dataset.dsn, 11); return; }
+    llOpenCard(card.dataset.open, card);
+  };
+}
 if (!window.llPicOpen) {
   // Gallery tab: show one picture with its prompt in the viewer next to the grid
   window.llPicOpen = function(path, tile){
@@ -3013,7 +3022,7 @@ def versions_html(lora) -> str:
 
 
 def build_insights():
-    """Training › Insights: what your own datasets, LoRAs and runs say. Returns (fn, inputs, outputs) for the tab's
+    """Collection › Insights: what your own datasets, LoRAs and runs say. Returns (fn, inputs, outputs) for the tab's
     select event (filled when the page is opened, not with the start)."""
     gr.Markdown("### Insights", elem_classes=["ls-h"])
     gr.Markdown("What your own datasets, LoRAs and runs say, read on this computer: the datasets behind your good "
@@ -3079,7 +3088,8 @@ def build_library_ui(app, maint_extra=None):
                         gal_sel = sel_toolbar("ll_gal")
                         gal_html = gr.HTML(elem_id="ll_gal", **({"js_on_load": PICK_JS}
                                            if "js_on_load" in inspect.signature(gr.HTML.__init__).parameters else {}))
-                        gr.Markdown("Click a tile: its LoRA page. A green chip = Completed.", elem_classes=["ls-note"])
+                        gr.Markdown("Click a tile: the dataset page (its LoRA part). Click a type label on a tile: that LoRA page. "
+                                    "A green chip = Completed.", elem_classes=["ls-note"])
                     with gr.Column(visible=False) as look_status:
                         html_kwargs = {}
                         if "js_on_load" in inspect.signature(gr.HTML.__init__).parameters:
@@ -3115,7 +3125,7 @@ def build_library_ui(app, maint_extra=None):
                         with gr.Column(scale=3):
                             e_done = gr.Checkbox(label="Completed", value=False, interactive=False,
                                                  info="Ticked automatically when training finishes. Completed hides this "
-                                                      "launch script in Training › Run.")
+                                                      "launch script in the Queue.")
                             e_done_msg = gr.Markdown()
                             d_head = gr.HTML()
                             with gr.Row(elem_classes=["ls-bar"]):
@@ -3181,7 +3191,7 @@ def build_library_ui(app, maint_extra=None):
                     lp_versions = gr.HTML(elem_id="lp_versions")
                     with gr.Row(elem_classes=["ls-bar"]):
                         lp_newv = gr.Button("Train a new version…", size="sm", scale=0, min_width=190)
-                        gr.Markdown("opens Datasets › 9 Train", elem_classes=["ls-note"])
+                        gr.Markdown("opens Train on the dataset page", elem_classes=["ls-note"])
                 with gr.Tab("Edit", id="lp_edit"):
                     with gr.Row():
                         e_name = gr.Textbox(label="Display name")
@@ -3190,7 +3200,7 @@ def build_library_ui(app, maint_extra=None):
                         e_ver = gr.Textbox(label="Version", info="shown as the version in ComfyUI's LoRA Manager", scale=1)
                         e_cskip = gr.Number(label="Clip skip", value=None, precision=0, minimum=1, scale=1)
                         e_rate = gr.Radio([("–", 0), ("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5)], value=0,
-                                          label="Your rating", info="4-5 good, 1-2 weak: Training › Insights compares "
+                                          label="Your rating", info="4-5 good, 1-2 weak: Collection › Insights compares "
                                           "the datasets behind them", scale=2)
                     e_trig = gr.Textbox(label="Trigger words (one per line)", lines=3)
                     e_desc = gr.Textbox(label="Description", lines=3)
@@ -3210,6 +3220,11 @@ def build_library_ui(app, maint_extra=None):
                                     "(the Training tab) come from the LoRA file, its launch script and its log and cannot be edited.",
                                     elem_classes=["ls-note"])
                     e_msg = gr.Markdown()
+
+        # ---------------- Insights: what your datasets, LoRAs and runs say ---------------- #
+        with gr.Tab("Insights", id="insights") as t_ins:
+            ins_load = build_insights()
+        t_ins.select(*ins_load, show_progress="hidden")
 
         # ---------------- Maintenance: Sync | Clean up ---------------- #
         with gr.Tab("Maintenance", id="maint"):
@@ -3255,7 +3270,7 @@ def build_library_ui(app, maint_extra=None):
                 gr.HTML('<div class="rs-label">OUT · CLEAN UP</div>')
                 gr.Markdown("### Free disk space")
                 gr.Markdown("Everything goes to the desktop **Trash**; restore it from the file manager. One run at a "
-                            "time: Training › Results.", elem_classes=["ls-note"])
+                            "time: Results (on the dataset page).", elem_classes=["ls-note"])
                 with gr.Accordion("Leftovers of all finished LoRAs", open=True):
                     gr.Markdown("Epoch files, saved states (`-state` folders), `.tmp.safetensors`, `.npz` latent caches and "
                                 "musubi-tuner's cache folders. Only for LoRAs that have a final file; a dataset with a "
@@ -3303,7 +3318,7 @@ def build_library_ui(app, maint_extra=None):
             with gr.Row():
                 st_scripts = gr.Textbox(
                     label="Extra launch script folders (optional)",
-                    info="Folders with .sh launch scripts for Training › Run, besides your dataset folders.",
+                    info="Folders with .sh launch scripts for the Queue, besides your dataset folders.",
                     lines=2, value="\n".join(s["script_dirs"]))
                 st_sample = gr.Textbox(
                     label="Monitor sample folder (optional)",
@@ -3429,7 +3444,7 @@ def build_library_ui(app, maint_extra=None):
         msg = f"Marked **{len(changed)}** as {what}: " + ", ".join(sorted(set(changed))) if changed else ""
         if skipped:
             msg += f"{' ' if msg else ''}Skipped {skipped} without a dataset (downloads cannot be marked)."
-        return msg + " Training › Run shows it after *Refresh*."
+        return msg + " The Queue shows it after *Refresh*."
 
     for tb in (gal_sel, lib_sel):
         sc = tb["scope"]
@@ -3548,8 +3563,8 @@ def build_library_ui(app, maint_extra=None):
             return gr.update(value=False), ""
         COMPLETED.set_done(ds, t, bool(value), how="manual", lora=lora.stem)
         msg = (f"**{ds} · {lora.base} {lora.vlabel}** marked Completed: the launch script of this version is hidden "
-               "in Training › Run (press *Refresh* there). A new version starts unmarked." if value else
-               f"**{ds} · {lora.base} {lora.vlabel}** is no longer Completed: its launch script shows in Training › Run "
+               "in the Queue (press *Refresh* there). A new version starts unmarked." if value else
+               f"**{ds} · {lora.base} {lora.vlabel}** is no longer Completed: its launch script shows in the Queue "
                "again (press *Refresh* there).")
         return done_checkbox(lora), msg
 

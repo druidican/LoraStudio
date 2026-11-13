@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Insights: what your own datasets, LoRAs and runs say (Training › Insights, and short hints in the steps).
+"""Insights: what your own datasets, LoRAs and runs say (Collection › Insights, and short hints in the steps).
 
 Everything is read on this computer from what LoRA Studio already has; nothing is sent anywhere.
 
@@ -23,7 +23,7 @@ Everything is read on this computer from what LoRA Studio already has; nothing i
 With few LoRAs these are hints, not rules: every number says how many LoRAs or runs it comes from.
 """
 from __future__ import annotations
-__version__ = "1.111126i"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import re
 import statistics
@@ -491,7 +491,7 @@ def dataset_hint(tkey: str) -> str:
         bits.append(f"{_fmt(vals['Full body'], True)} full body")
     if vals.get("Outfits") is not None:
         bits.append(f"{_fmt(vals['Outfits'])} outfits")
-    return (f"Your {s['n_good']} good {s['label']} LoRAs had (median) " + ", ".join(bits) + ". Training › Insights."
+    return (f"Your {s['n_good']} good {s['label']} LoRAs had (median) " + ", ".join(bits) + ". Collection › Insights."
             if bits else "")
 
 
@@ -541,8 +541,8 @@ def page_html(v: dict, esc) -> str:
     H.append("<h3>Datasets behind good and weak LoRAs</h3>")
     ds = [s for s in v["datasets"] if s["n_good"] or s["n_weak"]]
     if not ds:
-        H.append("<p class='ll-muted'>No version counts as good or weak yet: mark the best version in Training › "
-                 "Results, rate versions on their LoRA page, or scan your ComfyUI pictures (LoRA page › Pictures).</p>")
+        H.append("<p class='ll-muted'>No version counts as good or weak yet: mark the best version in a "
+                 "dataset's Results, rate versions on their LoRA page, or scan your ComfyUI pictures (LoRA page › Pictures).</p>")
     for s in ds:
         other = "weak (rated 1-2)" if s["weak_is_rated"] else "the others"
         H.append(f"<div class='ll-tcard' style='margin:8px 0'><div class='rs-label'>{esc(s['label'].upper())}</div>"
@@ -597,7 +597,7 @@ def page_html(v: dict, esc) -> str:
             mb = sum(u["size"] for u in unused) / 1e6
             H.append(f"<p><b>Never used in your pictures</b> ({len(unused)}, {mb:.0f} MB): "
                      + ", ".join(esc(u["name"]) for u in unused[:40])
-                     + ". Candidates for a clean-up, or for a test (Training › Results › test pictures).</p>")
+                     + ". Candidates for a clean-up, or for a test (a dataset's Results › test pictures).</p>")
     H.append("<h3>Your graphics card</h3>")
     if not v["gpu"]:
         H.append("<p class='ll-muted'>No run logs yet (userdata/gui_logs/): they are written by every run started "

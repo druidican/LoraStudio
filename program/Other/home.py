@@ -12,7 +12,7 @@ Nothing is scanned here: every part reads what the other pages already know (the
 the hidden #home_box (lora_studio.py opens the dataset or the page); jumps that need no Python are plain JavaScript.
 """
 from __future__ import annotations
-__version__ = "1.131126"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -139,6 +139,7 @@ def continue_html() -> str:
     try:
         import dsflow as F
         labels = {n: lab for n, _, lab in F.STEPS}
+        labels.update({10: "Results", 11: "LoRA"})
         import sdgui as S
         have = set(S.list_lora_dirs())
     except Exception:                                    # noqa: BLE001
@@ -149,7 +150,7 @@ def continue_html() -> str:
             continue
         step = r.get("step") or 0
         out.append(f'<a href="#" class="hm-row" onclick="{_send("dsstep|" + r["ds"] + "|" + str(step))}; return false;">'
-                   f'<b>{esc(r["ds"])}</b> · {step} {esc(labels.get(step, ""))}</a>')
+                   f'<b>{esc(r["ds"])}</b> · {(str(step) + " ") if step <= 9 else ""}{esc(labels.get(step, ""))}</a>')
     body = "".join(out) or '<p class="ls-note">The datasets you open appear here.</p>'
     foot = f'<button class="tr-btn" onclick="{_send("new")}">+ New dataset</button>'
     return _card("Continue where you left off", body, foot)

@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.111126i"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 import atexit
 import codecs
 import contextlib
@@ -744,7 +744,7 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
 
     LOG_DIR.mkdir(exist_ok=True)
     logfile = LOG_DIR / f"{datetime.now():%Y%m%d_%H%M%S}_{src.stem}.log"
-    try:                                            # Training › Results finds the launch script of a run from this line
+    try:                                            # Results finds the launch script of a run from this line
         gpu = gpu_name()
         logfile.write_text(f"##LS_SCRIPT {src}\n" + (f"##LS_RESUME {resume}\n" if resume else "")
                            + (f"##LS_GPU {gpu}\n" if gpu else ""), encoding="utf-8")
@@ -977,7 +977,7 @@ def mark_completed_after_run(run, code) -> str:
     v = COMPLETED.version_of(out_name)
     label += f" V{v}" if v else ""
     return (f"--- {final.name} finished: '{ds} · {label}' is marked Completed. Its launch scripts are hidden on the "
-            f"Training › Run after Refresh (tick 'show finished' to see them; untick Completed in Collection › "
+            f"the Queue after Refresh (tick 'show finished' to see them; untick Completed in Collection › "
             f"Details to undo) ---")
 
 
@@ -2014,7 +2014,7 @@ def auto_script(ds, tkey) -> str:
         archive_old_scripts(lora_path(ds), keep=dest)
         tidy = script_saved_hook(ds)
         return (f" New launch script **`{dest.name}`** written with the recommended settings for "
-                f"{dict((v, l) for l, v in type_choices()).get(tkey, tkey)} (check it in Training › Launch script)."
+                f"{dict((v, l) for l, v in type_choices()).get(tkey, tkey)} (check it in the dataset's Train)."
                 + (f" {tidy[:1].upper()}{tidy[1:]}." if tidy else ""))
     except Exception as e:                  # noqa: BLE001
         return f" (No launch script written: {e})"
@@ -2069,7 +2069,7 @@ RUN_LOG_RE = re.compile(r"^(\d{8})_(\d{6})_(.+)\.log$")
 
 
 def run_history(limit: int = 100):
-    """Training › History: one row per run log in gui_logs/ (newest first)."""
+    """The run history: one row per run log in gui_logs/ (newest first)."""
     rows = []
     if not LOG_DIR.is_dir():
         return rows

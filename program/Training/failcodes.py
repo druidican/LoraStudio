@@ -6,7 +6,7 @@ The patterns are checked in order; the first one that matches wins, so the speci
 log line that matched (shown under the description, for the curious).
 """
 from __future__ import annotations
-__version__ = "1.111126j"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import re
 
@@ -85,7 +85,7 @@ RULES = [
     ("DISK", r"No space left on device|Disk quota exceeded|OSError: \[Errno 28\]",
      "The disk is full",
      "There was no room left to save a file (save points, latent caches or the log).",
-     "Free some space: Training › Results › Clean up removes epoch files you did not copy, saved states and caches."),
+     "Free some space: the run's Clean up (its dataset's Results) removes epoch files you did not copy, saved states and caches."),
     ("PERM", r"Permission denied|PermissionError|Read-only file system",
      "No permission to read or write a file",
      "The trainer could not read a picture or model, or not write into the output folder.",
@@ -99,7 +99,7 @@ RULES = [
                 r"exited with code 143",
      "Stopped",
      "The run was stopped (Stop now, a restart of the computer or the program, or another program ended it).",
-     "Training › Run: a saved state shows as Resume from epoch N; else run it again."),
+     "The Queue: a saved state shows as Resume from epoch N; else run it again."),
     ("SEGV", r"Segmentation fault|core dumped|exited with code -11|exited with code 139|Fatal Python error",
      "The trainer crashed",
      "The trainer stopped with a crash inside a library (often the GPU driver or PyTorch, sometimes bitsandbytes).",

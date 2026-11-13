@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.111126j"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -158,7 +158,7 @@ def _oc_check(ds, url, model, trigger):
         return "Enter the trigger word (one word, no commas)."
     if S.RUN.running():
         return ("A training run is active. Captioning would share the GPU's 16 GB with it: wait until it has finished "
-                "(or press Stop now in Training › Run).")
+                "(or press Stop now in the Queue).")
     return ""
 
 

@@ -92,9 +92,9 @@ what still works.
 
 ![Step 7 without Ollama](img/missing_tags.jpg)
 
-Without either trainer, **Training › Run** shows the launch scripts but no queue and no Start; each script says which
+Without either trainer, the **Queue** tab shows the launch scripts but no queue and no Start; each script says which
 trainer it needs.
 
-![Training › Run without sd-scripts and musubi-tuner](img/missing_run.jpg)
+![The Queue without sd-scripts and musubi-tuner](img/missing_run.jpg)
 
 See also [Settings](#settings) and [Training](#training).

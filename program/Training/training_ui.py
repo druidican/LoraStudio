@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.111126j"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -849,7 +849,7 @@ def run_again(state):
         return "The launch script of this run no longer exists."
     with sg.QLOCK:
         sg.QUEUE["items"].append({"path": state["script"], "resume": "", "state": "queued", "note": ""})
-    return "Added to the queue: Training › Run."
+    return "Added to the queue (the Queue tab)."
 
 
 # --------------------------------------------------------------------------- the pages
@@ -1222,10 +1222,21 @@ def _cmp_status(running, waiting) -> str:
     return out
 
 
+def dataset_of_log(logname: str) -> str:
+    """The dataset a run belongs to (its launch script's dataset), '' when unknown."""
+    script = log_script(sg.LOG_DIR / (logname or ""))
+    if not script:
+        return ""
+    info = script_info(script) if Path(script).is_file() else None
+    return info["dataset"] if info else Path(script).parent.name
+
+
 def build_results(app):
+    """A dataset page's Results part (datasets_ui.py step 10): its runs, one run, comparing runs. The list is filled
+    by the dataset page when the part opens (the filters follow only what you pick: .input, never a chain)."""
     with gr.Column(visible=True) as list_col:
         with gr.Row(elem_classes=["ls-bar"]):
-            ds = gr.Dropdown(["All"] + sg.list_lora_dirs(), value="All", label="Dataset", scale=0, min_width=220)
+            ds = gr.Dropdown(["All"] + sg.list_lora_dirs(), value="All", label="Runs of", scale=0, min_width=220)
             res = gr.Radio(["All", "Done", "Failed", "Stopped"], value="All", label="Result", scale=0, min_width=330)
             notc = gr.Checkbox(label="only not copied yet", value=False, scale=0, min_width=190)
             refresh = gr.Button("Refresh", size="sm", scale=0, min_width=100)
@@ -1237,7 +1248,7 @@ def build_results(app):
     state = gr.State({})
     cmp_logs = gr.State([])
     with gr.Column(visible=False) as cmp_col:
-        cmp_back = gr.Button("← All results", size="sm", scale=0, min_width=140)
+        cmp_back = gr.Button("← All runs", size="sm", scale=0, min_width=140)
         gr.Markdown("### Compare runs")
         cmp_head = gr.HTML(elem_id="rs_cmphead")
         cmp_bmsg = gr.Markdown()
@@ -1261,7 +1272,7 @@ def build_results(app):
                 cmp_rf = gr.Button("Refresh", size="sm", scale=0, min_width=100)
             cmp_pics = gr.HTML(elem_id="rs_cmppics")
     with gr.Column(visible=False) as one:
-        back = gr.Button("← All results", size="sm", scale=0, min_width=140)
+        back = gr.Button("← All runs", size="sm", scale=0, min_width=140)
         head = gr.HTML()
         with gr.Row(equal_height=False):
             with gr.Column(scale=2, elem_classes=["ls-card"]):
@@ -1309,7 +1320,7 @@ def build_results(app):
                 rep_file = gr.File(label="The report", visible=False, interactive=False, scale=1)
                 rep_msg = gr.Markdown()
             rep_text = gr.Textbox(visible=False)
-            gr.Markdown("A new version opens Datasets › 9 Train for this dataset.",
+            gr.Markdown("A new version opens Train of this dataset.",
                         elem_classes=["ls-note"])
             again_msg = gr.Markdown()
             with gr.Accordion("TensorBoard", open=False):
@@ -1325,9 +1336,8 @@ def build_results(app):
 
     filt = [ds, res, notc]
     for c in filt:
-        c.change(results_html, filt, lst)
+        c.input(results_html, filt, lst, show_progress="hidden")
     refresh.click(lambda *a: (gr.update(choices=["All"] + sg.list_lora_dirs()), results_html(*a)), filt, [ds, lst])
-    app.load(results_html, filt, lst)
 
     def do_open(v):
         act, _, rest = (v or "").partition("|")
@@ -1444,4 +1454,18 @@ def build_results(app):
         None, rep_text, None, js=COPY_JS)
     tb_start.click(sg.tb_start, [tb_dir, tb_port], tb_md)
     tb_stop.click(sg.tb_stop_ui, None, tb_md)
-    return {"newv": newv, "state": state, "list": lst, "refresh": (results_html, filt, lst)}
+    def show(ds_name: str, log: str = ""):
+        """The part opened on a dataset page: its runs, or one run (log) with the list behind it."""
+        ch = ["All"] + sg.list_lora_dirs()
+        v = ds_name if ds_name in ch else "All"
+        if log:
+            out = list(do_open("open|" + log))
+            more = [compare_html(out[open_outs.index(state)])]
+        else:
+            out = [gr.update()] * len(open_outs)
+            out[0], out[1], out[open_outs.index(cmp_col)] = (gr.update(visible=True), gr.update(visible=False),
+                                                              gr.update(visible=False))
+            more = [gr.update()]
+        return out + more + [gr.update(choices=ch, value=v), "All", False, results_html(v)]
+    return {"newv": newv, "state": state, "show": show,
+            "outputs": open_outs + [cmp_html, ds, res, notc, lst]}

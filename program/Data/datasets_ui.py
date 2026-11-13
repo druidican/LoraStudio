@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.131126"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -24,7 +24,10 @@ import detailscan as DSC
 import dsflow as F
 import features as FT
 
-FLOW = list(range(2, 10))
+FLOW = list(range(2, 12))      # 2-8 Prepare, 9 Train, 10 Results, 11 LoRA (one page per dataset)
+PARTS = [("prepare", "Prepare", "steps 1-8"), ("train", "Train", "launch script and queue"),
+         ("results", "Results", "its runs"), ("lora", "LoRA", "in the Collection")]
+PART_STEP = {"train": 9, "results": 10, "lora": 11}
 _THUMBS: dict = {}
 
 
@@ -79,14 +82,29 @@ def bar_html(st) -> str:
         chips.append('<span class="ls-chip">LoRA type: not set yet</span>')
     n = len(F.images(ds))
     return (f'<div class="ds-bar"><span class="ds-bar-l">Dataset</span><b>{esc(ds)}</b>{"".join(chips)}'
-            f'<span class="ds-bar-n">{n} pictures</span></div>')
+            f'<span class="ds-bar-n">{n} pictures</span></div>' + parts_html(st))
+
+
+def part_of(step) -> str:
+    return {9: "train", 10: "results", 11: "lora"}.get(step, "prepare")
+
+
+def parts_html(st) -> str:
+    """The dataset page's four parts: Prepare (steps 1-8), Train (9), Results (its runs), LoRA (its LoRA files)."""
+    cur = part_of(st.get("step"))
+    out = []
+    for key, label, sub in PARTS:
+        on = " ds-part-on" if key == cur else ""
+        out.append(f'<button class="ds-part{on}" onclick="{send("part|" + key)}"><b>{esc(label)}</b>'
+                   f'<span>{esc(sub)}</span></button>')
+    return '<nav class="ds-parts" aria-label="Parts of the dataset page">' + "".join(out) + "</nav>"
 
 
 def stepper_html(st) -> str:
     ds, cur = st.get("ds"), st.get("step", 2)
     states = F.step_states(ds) if ds else {}
     out = []
-    for n, key, label in F.STEPS:
+    for n, key, label in F.STEPS[:8]:                       # 9 Train is a part of its own (parts_html)
         s = states.get(key, ("todo", ""))[0]
         cls = "ds-st-now" if n == cur else {"done": "ds-st-done", "warn": "ds-st-warn"}.get(s, "")
         mark = "✓" if s == "done" and n != cur else str(n)
@@ -113,7 +131,7 @@ def nav_updates(st):
     for n in FLOW:
         outs.append(gr.update(visible=flow and st.get("step") == n))
     outs.append(bar_html(st) if flow else "")
-    outs.append(stepper_html(st) if flow else "")
+    outs.append(stepper_html(st) if flow and (st.get("step") or 2) <= 8 else "")
     return outs
 
 
@@ -682,7 +700,7 @@ def calc(ds, tkey, text):
                 sps = sorted(same)[len(same) // 2]
             if g["oom_at"] and bs >= g["oom_at"]:
                 gnote = (f"batch {g['oom_at']} ran out of video memory before"
-                         + (f"; batch {g['safe']} finished" if g["safe"] else "") + " (Training › Insights)")
+                         + (f"; batch {g['safe']} finished" if g["safe"] else "") + " (Collection › Insights)")
             elif g["safe"] and bs <= g["safe"]:
                 gnote = f"batch {bs} has finished before on this computer"
     except Exception:                                    # noqa: BLE001
@@ -693,7 +711,7 @@ def calc(ds, tkey, text):
         import insights as IN
         sh, eh = IN.settings_hint(tkey), IN.epochs_hint(tkey, ep)
         if sh:
-            eff.append(("Your good LoRAs", "for comparison", sh[:1].upper() + sh[1:] + " (Training › Insights)."))
+            eff.append(("Your good LoRAs", "for comparison", sh[:1].upper() + sh[1:] + " (Collection › Insights)."))
         if eh:
             eff.append(("Epochs", "maybe fewer", eh[:1].upper() + eh[1:] + "."))
     except Exception:                                    # noqa: BLE001
@@ -785,6 +803,61 @@ def apply_settings(ds, tkey, text, *vals):
             msgs.append(f"{label}: no place for --{flag} in this script")
     return new, (("✔ Written into the script text. " if new != text else "") + "; ".join(msgs)
                  + (" Press **Save** to keep it." if new != text else "") if new != text or msgs else "")
+
+
+# --------------------------------------------------------------------------- 9 Train's queue card, 11 LoRA
+def queue_card(ds) -> str:
+    """The queue items and the last run of this dataset (Train part)."""
+    S = sg()
+    home = F.root(ds)
+    mine = [i for i in S.QUEUE["items"] if Path(i["path"]).parent == home]
+    rows = [f'<div class="ds-qrow"><span class="ls-chip{" ok" if i["state"] == "done" else " warn" if i["state"] == "running" else ""}">'
+            f'{esc(i["state"])}</span><b>{esc(Path(i["path"]).name)}</b><span class="ls-note">{esc(i.get("note") or "")}</span></div>'
+            for i in mine[-8:]]
+    body = "".join(rows) or '<p class="ls-note">Nothing of this dataset is in the queue.</p>'
+    try:
+        import training_ui as TU
+        last = [r for r in TU.runs(40) if r["result"] != "running" and r["info"] and r["info"]["dataset"] == ds][:3]
+    except Exception:                                    # noqa: BLE001
+        last = []
+    if last:
+        body += '<p class="ls-note">Its last runs:</p>' + "".join(
+            f'<div class="ds-qrow"><span class="ls-chip{" ok" if r["result"] == "done" else " bad"}">{esc(r["result"])}'
+            f'</span><a href="#" onclick="window.lsGoRun && lsGoRun(\'{q(r["log"])}\'); return false;">'
+            f'<b>{esc(r["info"]["type"])} {esc(r["info"]["version"])}</b></a><span class="ls-note">{esc(r["started"])}</span></div>'
+            for r in last)
+    return (body + '<div class="ds-qrow"><button class="tr-btn tr-small" onclick="window.lsGoQueue && lsGoQueue()">'
+            'Open the queue</button><button class="tr-btn tr-small" onclick="' + send("part|results") + '">'
+            'Its results →</button></div>')
+
+
+def lora_html(ds) -> str:
+    """The LoRA part: this dataset's LoRA files as the Collection knows them, one card per LoRA (all its versions)."""
+    import lora_library as LL
+    groups = [m for m in LL.LIB.groups.values() if m and m[-1].dataset is not None and m[-1].dataset.name == ds]
+    if not groups:
+        return ('<p class="ls-empty">No LoRA of this dataset in your LoRA folders yet. Train makes one; the Collection '
+                'finds it after a run (or Collection › Browse › Rescan folders).</p>')
+    order = {b: i for i, b in enumerate(LL.LIB.base_names())}
+    cards = []
+    for m in sorted(groups, key=lambda m: (order.get(m[-1].base, 99), m[-1].base)):
+        n = LL.LIB.newest(m[-1].gid) or m[-1]
+        src = n if n.preview else next((x for x in reversed(m) if x.preview), None)
+        uri = LL.thumb_data_uri(src.preview, 240) if src else ""
+        pic = f'<img src="{uri}" alt="">' if uri else '<span class="ds-lph">No preview yet</span>'
+        status, issues = LL.group_status(m)
+        chip = {"ok": "ok", "warning": "warn", "problem": "bad"}.get(status, "")
+        best = LL.best_member(m)
+        badges = (" · ★ best: " + esc(best.vlabel) if best else "") + (" · ✓ Completed" if LL.is_completed(n) else "")
+        iss = "".join(f'<div class="ls-note">{esc(x)}</div>' for _, x in issues[:3])
+        cards.append(f'<div class="ls-card ds-lcard">{pic}<div class="ds-lbody"><b>{esc(LL.group_title(m))}</b>'
+                     f'<span>{esc(n.base)} · {len(m)} version{"s" if len(m) != 1 else ""} '
+                     f'({esc(", ".join(x.vlabel for x in m))}){badges}</span>'
+                     f'<span><span class="ls-chip {chip}">{esc(status)}</span></span>{iss}'
+                     f'<span><button class="tr-btn tr-small" onclick="lsOpenLora(\'{q(n.gid)}\')">Open the LoRA page'
+                     f'</button></span></div></div>')
+    return ("".join(cards) + '<p class="ls-note">The LoRA page (Collection) has its pictures, the training of each '
+            'version and the LoRA Manager data. Rate runs and mark the best version in Results.</p>')
 
 
 # --------------------------------------------------------------------------- the page
@@ -1124,9 +1197,9 @@ def build(app, show):
                     s8_msg = gr.Markdown()
                     s8_path = gr.State("")
             with gr.Row(elem_classes=["ls-bar", "ds-bottom"]):
-                s8_next = gr.Button("Continue to Launch script →", variant="primary", size="sm", scale=0, min_width=260)
+                s8_next = gr.Button("Continue to Train →", variant="primary", size="sm", scale=0, min_width=260)
         with gr.Column(visible=False, elem_id="ds_s9") as steps[9]:
-            gr.Markdown("### Launch script")
+            gr.Markdown("### Train: the launch script")
             s9_type = gr.Radio(choices=[], label="LoRA type", elem_id="ds_s9type")
             s9_caps = gr.Radio(choices=[], label="Caption set for this launch script", visible=False,
                                info="This dataset has a tag set and a sentence set that this LoRA type can read. "
@@ -1169,6 +1242,16 @@ def build(app, show):
                 show("s9_text")
             show("s9_save")
             show("script")                       # the (now empty) holder of the parts above
+            with gr.Column(elem_classes=["ls-card"]):
+                gr.Markdown("**This dataset in the queue**")
+                s9_queue = gr.HTML(elem_id="ds_s9queue")
+        with gr.Column(visible=False, elem_id="ds_s10") as steps[10]:
+            gr.Markdown("### Results: the runs of this dataset")
+            import training_ui as TU
+            RS = TU.build_results(app)
+        with gr.Column(visible=False, elem_id="ds_s11") as steps[11]:
+            gr.Markdown("### LoRA: its LoRA files in the Collection")
+            s11_html = gr.HTML(elem_id="ds_lora")
 
 
     # ------------------------------------------------------------------ navigation
@@ -1176,6 +1259,10 @@ def build(app, show):
 
     def go(cur, **kw):
         s = dict(cur or {})
+        s.pop("open_run", None)                          # a run is opened once (Results), not on every later visit
+        if kw.get("step") and kw["step"] <= 8:
+            kw.setdefault("prep", kw["step"])            # Prepare reopens at the step you were at
+            kw.setdefault("prep_ds", kw.get("ds", s.get("ds")))
         s.update(kw)
         return s
 
@@ -1386,10 +1473,26 @@ def build(app, show):
         cur = s.get("tkey") if s.get("tkey") in m["types"] else (m["types"][0] if m["types"] else "")
         return gr.update(visible=bool(cur) and FT.can_train(cur))
 
+    def s9_queue_load(s):
+        if s.get("view") != "flow" or s.get("step") != 9 or not s.get("ds"):
+            return gr.update()
+        return queue_card(s["ds"])
+
+    def s10_load(s):
+        if s.get("view") != "flow" or s.get("step") != 10 or not s.get("ds"):
+            return [gr.update()] * len(RS["outputs"])
+        return RS["show"](s["ds"], s.get("open_run", ""))
+
+    def s11_load(s):
+        if s.get("view") != "flow" or s.get("step") != 11 or not s.get("ds"):
+            return gr.update()
+        return lora_html(s["ds"])
+
     all_outs = (nav_outs + [n_list] + [e_list, e_head, e_steps] + [i_head, i_html, i_what] + [s3_md, s3_grid, s3_show, s3_extra]
                 + [s2_types, s2_purpose, s2_wm, s2_trig, s2_pics, s2_words, s2_worn, s2_class, s2_caps, s2_ready, s2_dl] + [s4_box, s4_status, s4_detail] + [s5_sug, s5_keep, s5_mix, s5_gridh, s5_mode, s5_dcard, s5_dhtml, s5_dpick]
                 + [s6_max, s6_sum, s6_table, s6_go, s6_crop] + [s7_sets, s7_mirror_row, s7_rec, s7_cons, UI["oc"]["leave"]] + [s8_tree, s8_checks, s8_grid, s8_cap2]
-                + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, s9_caps, sync, s9_calc, s9_eff] + s9_vals)
+                + [s9_type, UI["cs_queue_btn"], s9_dl_row, s9_dl_note, s9_caps, sync, s9_calc, s9_eff] + s9_vals
+                + [s9_queue] + RS["outputs"] + [s11_html])
 
     def refresh_all(s, find, show8, text, leave):
         out = list(nav_updates(s))
@@ -1407,6 +1510,9 @@ def build(app, show):
         out += list(s9_load(s))
         out.append(sync_key(s))
         out += list(s9_calc_fn(s, text))
+        out.append(s9_queue_load(s))
+        out += list(s10_load(s))
+        out.append(s11_load(s))
         return out
 
     # ---- the router for clicks inside the HTML parts
@@ -1425,6 +1531,22 @@ def build(app, show):
             except ValueError:
                 return s, keep, keep, keep, keep
             return go(s, view="flow", step=n), now, keep, keep, keep
+        if act == "part" and s.get("ds"):                # Prepare / Train / Results / LoRA
+            n = (s.get("prep") if s.get("prep_ds") == s["ds"] and s.get("prep") else min(F.next_step(s["ds"]), 8)) \
+                if arg == "prepare" else PART_STEP.get(arg, 9)
+            return go(s, view="flow", step=n), now, keep, keep, keep
+        if act == "dspart":                              # from the Collection: a dataset page at a part
+            ds, _, n = arg.rpartition("|")
+            if ds in S.list_lora_dirs():
+                return go(s, view="flow", mode="edit", ds=ds, step=int(n or 11)), now, keep, keep, keep
+            return s, keep, keep, keep, keep
+        if act == "run":                                 # the status strip or Home: that run in its dataset's Results
+            have = S.list_lora_dirs()
+            ds = TU.dataset_of_log(arg)
+            ds = ds if ds in have else (s.get("ds") or (have[0] if have else ""))
+            if not ds:
+                return s, keep, keep, keep, keep
+            return go(s, view="flow", mode="edit", ds=ds, step=10, open_run=arg), now, keep, keep, keep
         if act == "folder":
             return go(s, src=arg), keep, keep, keep, v
         if act in ("pick", "rmode") and s.get("step") == 6:      # only the part that the click is for runs
@@ -2014,7 +2136,12 @@ def build(app, show):
             if S.QUEUE.get("running"):
                 return msg + " Training starts now: the status strip at the top follows it."
         waiting = sum(1 for i in S.QUEUE["items"] if i["state"] == "queued")
-        return msg + f" {waiting} waiting; Training › Run starts the queue."
+        return msg + f" {waiting} waiting; the Queue tab starts the queue."
+    def new_version(s, rst):
+        ds = TU.dataset_of_log((rst or {}).get("log", "")) if rst else ""
+        return go(s, view="flow", mode="edit", ds=ds if ds in S.list_lora_dirs() else s.get("ds"), step=9)
+    after_nav(RS["newv"].click(new_version, [st, RS["state"]], st, show_progress="hidden"))
+
     UI["save_queue_ev"].then(s9_queue_start, [st, UI["cs_script"], UI["cs_autostart"], UI["cs_save_msg"]],
                              UI["cs_save_msg"])
 

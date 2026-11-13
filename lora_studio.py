@@ -5,9 +5,11 @@ LoRA Studio
 ===========
 One window for your LoRA collection, your datasets and training:
 
-  Collection  - Browse (Pictures or Status), the LoRA page (Overview, Pictures, Training, Edit), Maintenance
-  Datasets    - the dataset list (+ New dataset), Improvements; nine steps from a folder of pictures to training
-  Training    - Run (launch scripts, the queue, the live run) and Results (every finished run)
+  Collection  - Browse (Pictures or Status), the LoRA page (Overview, Pictures, Training, Edit), Insights, Maintenance
+  Home        - the start page: what is training, what needs a look, last results, where you left off
+  Datasets    - the dataset list (+ New dataset), Improvements; a page per dataset: Prepare (steps 1-8), Train,
+                Results (its runs) and LoRA (its LoRA files)
+  Queue       - launch scripts, the queue and the live run
   Settings    - a grouped list that opens on a Health check
 
 A status strip on every page shows the training run and the machine (GPU, VRAM, CPU, RAM).
@@ -21,7 +23,7 @@ Options typed on the command line (--port, --host, --auth, --no-browser) win ove
 """
 
 from __future__ import annotations
-__version__ = "1.131126"  # LoRA Studio version, see version.py
+__version__ = "1.131126b"  # LoRA Studio version, see version.py
 
 import argparse
 import inspect
@@ -161,8 +163,8 @@ window.lsHelp = function(){            // "?": the manual chapter of the page yo
   var on = document.querySelector('#ls_tabs button[role="tab"][aria-selected="true"]');
   var cur = on ? on.textContent.trim() : 'Home';
   if (cur === 'Manual') return;
-  var key = {'Home': 'welcome', 'Datasets': 'datasets', 'Training': 'training', 'Collection': 'collection',
-             'Settings': 'settings'}[cur] || 'welcome';
+  var key = {'Home': 'welcome', 'Datasets': 'datasets', 'Queue': 'training', 'Collection': 'collection',
+             'Settings': 'settings'}[cur.replace(/ \\(.*\\)$/, '')] || 'welcome';
   window.lsPrevTab = cur;
   window.lsClickTab('Manual');
   var n = 0; (function t(){
@@ -172,16 +174,25 @@ window.lsHelp = function(){            // "?": the manual chapter of the page yo
 };
 window.lsHelpBack = function(){ window.lsClickTab(window.lsPrevTab || 'Home'); };
 window.lsGoQueue = function(){
-  window.lsClickTab('Training');
-  var n = 0; (function t(){ if (!window.lsClickTab('Run') && ++n < 30) setTimeout(t, 100); })();
+  window.lsClickTab('Queue') || window.lsClickTab('Queue (trainers missing)');
 };
-window.lsGoRun = function(log){        // the status strip's finished or failed run: open it in Training › Results
-  window.lsClickTab('Training');
+window.lsWhen = function(sel, fn){       // run fn once the element exists (a tab's contents appear when it is opened)
   var n = 0; (function t(){
-    if (window.lsClickTab('Results') && document.querySelector('#rs_box textarea, #rs_box input')) {
-      window.lsSend('rs_box', 'open|' + log); return; }
-    if (++n < 40) setTimeout(t, 100);
+    if (document.querySelector(sel)) { fn(); return; }
+    if (++n < 50) setTimeout(t, 100);
   })();
+};
+window.lsGoRun = function(log){        // a finished or failed run (status strip, Home): its dataset page › Results
+  window.lsClickTab('Datasets');
+  window.lsWhen('#ds_box textarea, #ds_box input', function(){ window.lsSend('ds_box', 'run|' + log); });
+};
+window.lsDsPart = function(ds, n){     // a dataset page at a part (Collection tiles: 11 = LoRA)
+  window.lsClickTab('Datasets');
+  window.lsWhen('#ds_box textarea, #ds_box input', function(){ window.lsSend('ds_box', 'dspart|' + ds + '|' + n); });
+};
+window.lsOpenLora = function(gid){     // the dataset page's LoRA part: that LoRA's page in the Collection
+  window.lsClickTab('Collection');
+  window.lsWhen('#pick_box textarea, #pick_box input', function(){ window.llOpenCard && llOpenCard(gid); });
 };
 (function(){
   if (!%s || !window.Notification) return;
@@ -292,7 +303,7 @@ def main():
     blocks_kwargs = {"title": f"LoRA Studio {version.VERSION}"}
     if not style_in_launch:
         blocks_kwargs.update(css=css, head=head, theme=theme)
-    start = lo["start_page"] if lo["start_page"] in {v for _, v in launchopts.START_PAGES} else "collection"
+    start = lo["start_page"] if lo["start_page"] in {v for _, v in launchopts.START_PAGES} else "home"
 
     ticker.ACTIVE["on"] = True                 # the parts register their refreshes; one timer does them all
     with gr.Blocks(**blocks_kwargs) as app:
@@ -323,20 +334,12 @@ def main():
             with gr.Tab("Datasets", id="datasets"):
                 import datasets_ui
                 DS = datasets_ui.build(app, show)
-            with gr.Tab("Training", id="training"):
+            import features as FT
+            _q_lab = "Queue" if (FT.have("sd_scripts") or FT.have("musubi")) else "Queue (trainers missing)"
+            with gr.Tab(_q_lab, id="queue") as t_run:
                 import training_ui
-                with gr.Tabs(selected="tr_run"):
-                    import features as FT
-                    _run_lab = "Run" if (FT.have("sd_scripts") or FT.have("musubi")) else "Run (trainers missing)"
-                    with gr.Tab(_run_lab, id="tr_run") as t_run:
-                        TR = training_ui.build_run(app)
-                    with gr.Tab("Results", id="tr_results") as t_res:
-                        RS = training_ui.build_results(app)
-                    with gr.Tab("Insights", id="tr_insights") as t_ins:
-                        INS = ll.build_insights()
-                t_run.select(*TR["refresh"], show_progress="hidden")
-                t_res.select(*RS["refresh"], show_progress="hidden")
-                t_ins.select(*INS, show_progress="hidden")
+                TR = training_ui.build_run(app)
+            t_run.select(*TR["refresh"], show_progress="hidden")
             with gr.Tab("Collection", id="collection"):
                 ll.build_library_ui(app)
             with gr.Tab("Settings", id="settings"):
@@ -427,14 +430,9 @@ def main():
                 return cur, gr.update()
             return DS["go"](cur, view="flow", mode="edit", ds=ds, step=9), gr.Tabs(selected="datasets")
 
-        def ds_of_run(st):
-            return Path(st["script"]).parent.name if st and st.get("script") else ""
-
         def ds_of_lora(key):
             l = ll.LIB.loras.get(key)
             return l.dataset.name if l is not None and l.dataset is not None else ""
-        DS["after_nav"](RS["newv"].click(lambda cur, st: to_step9(cur, ds_of_run(st)), [DS["state"], RS["state"]],
-                                         [DS["state"], top]))
         if "lp_newv" in ll.UI_HOOKS:
             btn, key = ll.UI_HOOKS["lp_newv"]
             DS["after_nav"](btn.click(lambda cur, k: to_step9(cur, ds_of_lora(k)), [DS["state"], key], [DS["state"], top]))

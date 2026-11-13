@@ -1,6 +1,16 @@
 # Making a dataset
 
-**Datasets** has two pages: the **dataset list** (with **+ New dataset** on top) and **Improvements**, and the nine steps.
+**Datasets** has two pages: the **dataset list** (with **+ New dataset** on top) and **Improvements**. A dataset you
+open gets its own page with four parts, in the bar under its name:
+
+| Part | What is there |
+|---|---|
+| **Prepare** | steps 1-8 below: from a folder of pictures to checked captions; it opens at the step you were at |
+| **Train** | step 9: the launch script, its settings, *Save and add to the queue*, and this dataset's queue items and last runs |
+| **Results** | the runs of this dataset (see [Results](#results)); *Runs of* shows another dataset's or all runs |
+| **LoRA** | its LoRA files as the Collection knows them: one card per LoRA with its versions, status, ★ best and Completed, and *Open the LoRA page* |
+
+The status strip, Home's *Last results* and a click on a Collection tile open the right dataset page and part.
 A dataset is one folder with one repeat folder `<N>_<name>` (for example `10_pip`): **only that folder is the
 dataset**. Pictures anywhere else in the dataset folder (`_reserve/`, `_extra/`, other folders) are left out of every
 count and check, so they never give false warnings.
@@ -176,7 +186,7 @@ other caption set too* takes the same traits out of the second one.
 The last look: pictures without a caption, captions without the trigger word first, very long captions. Click a
 picture to see and edit its caption, then *Save caption changes*.
 
-## 9 · Train
+## 9 · Train (the Train part)
 
 ![Step 9: the plan, the settings and their recommendations](img/step9.jpg)
 
@@ -219,7 +229,8 @@ Z-Image …) always train on their own set.
 **Save as new version** writes `pipILLV1.sh`, the next one `pipILLV2.sh`; older scripts move to `_old_runs/`.
 **Save and add to the queue** saves the open script (or saves it as its new version when none is open) and puts it in
 the queue. With *Start the queue when nothing is training* ticked (remembered), training starts at once and the status
-strip at the top follows it; otherwise Training › Run starts the queue.
+strip at the top follows it; otherwise the **Queue** tab starts the queue. The card *This dataset in the queue*
+at the bottom shows its queue items and its last runs (a click opens the run in Results).
 
 ## Improvements
 
