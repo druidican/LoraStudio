@@ -82,13 +82,19 @@ def build_page():
     import lora_library as LL
     import studio_css
     ui.add_head_html(f"<style>{LL.CSS}</style>")          # the cards, tiles and tables drawn as HTML
+    import sdgui
+    ui.add_head_html(f"<style>{sdgui.CSS}</style>")       # the queue, run and results parts
     ui.add_head_html(f"<style>{studio_css.CSS}</style>")  # the shared page parts (+ your userdata/custom.css)
     ui.add_css(CSS)
     # the older page parts (lora_library's cards) colour themselves with body.dark; NiceGUI sets body--dark
     ui.add_body_html("<script>(function(){var b=document.body;var f=function(){b.classList.toggle('dark',"
                      "b.classList.contains('body--dark'));};new MutationObserver(f).observe(b,{attributes:true,"
                      "attributeFilter:['class']});f();})();</script>")
+    ui.add_head_html(BRIDGE_JS)
     shell = Shell()
+    ui.on("ls_nav", lambda e: shell.go("settings", group=e.args))
+    ui.on("ls_go", lambda e: shell.go("datasets", run=e.args[4:]) if str(e.args).startswith("run|")
+          else shell.go(str(e.args)))
     shell.dark = ui.dark_mode(app.storage.user.get("dark", False))
     with ui.header(elevated=False).classes("ls-header column gap-0 p-0"):
         with ui.row().classes("w-full items-center gap-3 px-4 pt-2 no-wrap"):
@@ -123,6 +129,18 @@ def build_page():
                     continue
                 shell.pages[key] = mod.build(shell)
     return shell
+
+
+BRIDGE_JS = """
+<script>
+// Links inside the HTML parts the program draws (cards, tables, lists) send events to the page's Python side:
+// lsSend('<box>', value) -> event ls_<box>; lsSetNav('<settings group>'); lsGoQueue(); lsGoRun('<log>').
+window.lsSend = function(box, v){ emitEvent('ls_' + box, v); };
+window.lsSetNav = function(k){ emitEvent('ls_nav', k); };
+window.lsGoQueue = function(){ emitEvent('ls_go', 'queue'); };
+window.lsGoRun = function(log){ emitEvent('ls_go', 'run|' + log); };
+</script>
+"""
 
 
 def help_dialog(shell: Shell):

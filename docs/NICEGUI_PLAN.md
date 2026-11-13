@@ -28,13 +28,19 @@ Owner's decisions (2026-11-13):
 - Pictures are served by the program (thumbnails from the Collection's cache), never as inline data.
 - `requirements.txt` gets `nicegui` and loses `gradio` at the end.
 
+## Notes for the next session
+
+- Test world: `tools/make_test_world.py /tmp/ngw`, then copy `lora_studio_ng.py`, `program/`, `version.py` into
+  `/tmp/ngw/app` and run it with `HOME=/tmp/ngw/home`; `tools/fake_comfy.py` + `userdata/comfy_settings.json` for test
+  pictures. HTML parts drawn by the old renderers send `lsSend(box, v)` → NiceGUI event `ls_<box>` (shell.BRIDGE_JS).
+
 ## Progress
 
 - [x] Test page: Collection › Browse (`try-nicegui/`), owner: "amazingly fast".
 - [x] Shell: tabs, status strip, login, theme, ? help (first version)
 - [x] Collection: Browse, LoRA page (Overview, Pictures, Training, Edit), Insights, Maintenance (logic in Gallery/lorapage.py, maint.py)
-- [ ] Home (+ the after-training link)
-- [ ] Queue (+ test pictures after a run / a queue)
+- [x] Home (+ Just trained: the last queue's runs with their test pictures; the status strip opens it)
+- [x] Queue (+ test pictures after a queue: one LoRA best + final, several the final file of each; comfytest.WHICH, last_batch.json)
 - [ ] Datasets: list, Improvements, dataset page (Prepare steps 1-8, Train, Results, LoRA)
 - [ ] Settings (all groups), first-run setup page
 - [ ] Manual text and pip screenshots; selftest; Gradio removed; beta release
