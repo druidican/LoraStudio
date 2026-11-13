@@ -225,3 +225,37 @@ def _work(todo, depth):
         JOB["running"] = False
         JOB["now"] = ""
         _say("stopped" if JOB["stop"].is_set() else "Speed test finished.")
+
+
+def table_html() -> str:
+    """Settings › Speed test: one row per LoRA type (can it be tested, last result, faster settings in use)."""
+    import html
+    rows = []
+    for t in types():
+        r = t["result"] or {}
+        if r.get("baseline"):
+            gain = (f" → <b>{r['best_s']}</b> ({(1 - r['best_s'] / r['baseline']) * 100:.0f}% faster)"
+                    if r.get("best_s") and r.get("best") not in (None, "baseline") else " (already the fastest)")
+            res = f"{r['date']} · {r.get('depth', '')} · {r['baseline']} s/step{gain}"
+        else:
+            res = "not tested"
+        state = "✔ in use" if t["use"] else ""
+        rows.append(f"<tr><td>{html.escape(t['label'])}</td><td>{'ready' if t['ready'] else html.escape(t['why'])}"
+                    f"</td><td>{res}</td><td>{state}</td></tr>")
+    return ('<table class="ls-table"><tr><th>LoRA type</th><th>Can be tested</th><th>Last test: now → fastest'
+            '</th><th>Faster settings</th></tr>' + "".join(rows) + "</table>")
+
+
+def report_of(tkey: str) -> tuple[str, bool]:
+    """The report text of a tested type and whether it found faster settings."""
+    r = results().get(tkey) or {}
+    try:
+        text = Path(r.get("report", "")).read_text(encoding="utf-8")
+    except OSError:
+        text = "The report file is gone."
+    return text, bool(r.get("changes") or r.get("env"))
+
+
+def live_text() -> str:
+    lines = JOB["lines"][-14:] + ([f"⏳ {JOB['now']}"] if JOB["now"] else [])
+    return "\n".join(lines)

@@ -1020,3 +1020,81 @@ def panel_models(page):
         raw = ui.textarea(value=SSET.st_raw()).props("readonly outlined rows=14 input-style='font-family:monospace'") \
             .classes("w-full")
     load(st["tkey"])
+
+
+# --------------------------------------------------------------------------- Speed test
+def panel_speed(page):
+    import speedjobs as SJ
+    note("Tick the LoRA types to test. Each one trains a few steps on an invented test dataset (20 plain pictures; "
+         "none of your datasets is used) with different settings: fewer swapped blocks, pinned memory, no gradient "
+         "checkpointing, other attention, fp8, torch.compile and ROCm speed settings. It measures seconds per step "
+         "and video memory. Test some types now and others later; the results stay. When a type has faster "
+         "settings, tick Use the faster settings below to make every new launch script of that type use them. "
+         "Close ComfyUI before a test; Ollama is stopped by itself.")
+    table = ui.html(SJ.table_html(), sanitize=False).classes("w-full")
+
+    def tested():
+        return {t["key"]: t["label"] for t in SJ.types() if t["result"]}
+    with card():
+        ready = {t["key"]: t["label"] for t in SJ.types() if t["ready"]}
+        pick = ui.select(ready, multiple=True, label="Test these LoRA types").props("outlined dense use-chips") \
+            .classes("w-full")
+        depth = ui.radio({v: k for k, v in SJ.DEPTHS}, value="quick").props("dense")
+        msg = ui.markdown("")
+        with ui.row().classes("gap-2"):
+            ui.button("Start the speed test", on_click=lambda: (setattr(msg, "content", SJ.start(
+                list(pick.value or []), depth.value or "quick")), follow())).props("unelevated dense no-caps")
+            ui.button("Stop", on_click=lambda: setattr(msg, "content", SJ.stop())) \
+                .props("outline dense no-caps color=negative")
+        live = log_box("Progress", 12)
+        live.set_visibility(bool(SJ.JOB["lines"]))
+    with card():
+        ui.label("Results").classes("font-bold")
+        t0 = tested()
+        which = ui.select(t0, label="LoRA type", value=next(iter(t0), None)).props("outlined dense").classes("w-80")
+        use = ui.checkbox("Use the faster settings for new launch scripts of this type")
+        note("Existing launch scripts stay as they are; make a new version in step 9. Untick to go back to the "
+             "normal settings.")
+        use_msg = ui.markdown("")
+        rep = ui.markdown("").classes("w-full")
+
+    def show(k):
+        busy["set"] = True
+        if not k:
+            use.value, rep.content = False, ""
+            use.disable()
+        else:
+            text, can = SJ.report_of(k)
+            use.value, rep.content = SJ.use_on(k), text
+            use.enable() if can else use.disable()
+        busy["set"] = False
+    busy = {"set": False}
+
+    def use_changed(e):
+        if busy["set"] or not which.value:
+            return
+        use_msg.content = SJ.set_use(which.value, bool(e.value))
+        table.content = SJ.table_html()
+    which.on_value_change(lambda e: show(e.value))
+    use.on_value_change(use_changed)
+    show(which.value)
+
+    def follow():
+        if not (SJ.JOB["running"] or SJ.JOB["done"] or SJ.JOB["lines"]):
+            return
+        live.set_visibility(True)
+        live.value = SJ.live_text()
+        table.content = SJ.table_html()
+        t = tested()
+        if t != which.options:
+            which.set_options(t)
+        cur = which.value if which.value in t else (SJ.JOB["done"][-1] if SJ.JOB["done"] else next(iter(t), None))
+        if cur != which.value:
+            which.value = cur
+    was = {"run": SJ.JOB["running"]}
+
+    def tick():
+        if SJ.JOB["running"] or was["run"]:              # while it runs, and once more after it ended
+            follow()
+        was["run"] = SJ.JOB["running"]
+    ui.timer(2.0, tick)
