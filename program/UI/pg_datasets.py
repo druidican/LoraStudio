@@ -16,6 +16,7 @@ from pathlib import Path
 from nicegui import run, ui
 
 import datasets_ui as V
+import ds_batch
 import dsflow as F
 import sdgui as S
 from widgets import note
@@ -280,9 +281,13 @@ class Datasets:
             note("From what is known already; nothing is scanned on this page.")
             with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
                 self.i_what = ui.html("", sanitize=False)
-                self.i_tools = ui.row().classes("items-center gap-2")   # Fix the ticked: ds_steps.attach
+                self.i_tools = ui.row().classes("items-center gap-2")
                 self.i_msg = ui.markdown("")
                 self.i_prog = ui.html("", sanitize=False).classes("w-full")
+                with ui.expansion("What Fix does: the choices (pictures to keep, LoRA type, watermarks, captions)") \
+                        .classes("w-full"):
+                    ds_batch.settings(self)
+                ds_batch.tools(self)
             self.i_html = ui.html("", sanitize=False).classes("w-full")
 
 
