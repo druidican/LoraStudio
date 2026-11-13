@@ -500,13 +500,33 @@ def wm_paint_apply(ds, rp, ed):
             continue
         al = lay.convert("RGBA").getchannel("A")
         a = al if a is None else ImageChops.lighter(a, al)
+    msg = wm_paint_mask(ds, rp, a)
+    return msg, (gr.update(visible=False) if msg.startswith("✔") else gr.update())
+
+
+def wm_tool_info(ds, rp) -> tuple:
+    """(picture to show, crop box as fractions) for the paint and crop tools of one picture."""
+    root = S.lora_path(ds)
+    e = S.DC.marks_load(root).get(rp) or {}
+    src = _wm_source(root, rp, e)
+    from PIL import Image, ImageOps
+    with Image.open(src) as o:
+        W, H = ImageOps.exif_transpose(o).size
+    box = e.get("custom_box") or next((o["box"] for o in e.get("options") or []), None) or [0, 0, W, H]
+    return src, [box[0] / W, box[1] / H, box[2] / W, box[3] / H]
+
+
+def wm_paint_mask(ds, rp, a) -> str:
+    """Fill in the painted part (a: the mask, an 'L' picture, white = painted) with the picture tools."""
+    if S.RUN.running():
+        return "A training run is using the GPU: paint over it when the run has finished."
     if a is None or not a.getbbox():
-        return "Paint over the mark first.", gr.update()
+        return "Paint over the mark first."
     root = S.lora_path(ds)
     marks = S.DC.marks_load(root)
     e = marks.get(rp)
     if e is None:
-        return "This picture is no longer in the watermark list.", gr.update()
+        return "This picture is no longer in the watermark list."
     mdir = S.CACHE_DIR / "wm_masks"
     mdir.mkdir(parents=True, exist_ok=True)
     mp = mdir / (hashlib.md5(f"{root}|{rp}".encode()).hexdigest() + ".png")
@@ -514,9 +534,9 @@ def wm_paint_apply(ds, rp, ed):
     err = S.DC._back_to_original(root, rp, e) or S.DC.apply_choice(root, rp, e, "P", mask=mp)
     S.DC.marks_save(root, marks)
     if err:
-        return f"❌ {err}", gr.update()
-    return (f"✔ The painted part of `{rp}` is filled in (see *now* in its row). The original is in "
-            "`_set_aside/originals/`, the cut-out in `_originals/_watermarks/`.", gr.update(visible=False))
+        return f"❌ {err}"
+    return (f"✔ The painted part of {rp} is filled in (see now in its row). The original is in "
+            "_set_aside/originals/, the cut-out in _originals/_watermarks/.")
 
 
 def wm_apply(ds, choices_json, only_pending=False, prefer="remove"):

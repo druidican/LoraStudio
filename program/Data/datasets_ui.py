@@ -492,7 +492,7 @@ def s6_html(ds, max_side):
                   '</tbody></table></div></details>')
     n_do = len(big) + len(crop) + len(up)
     label = (f"Resize {len(big)}, crop {len(crop)}" + (f", upscale {len(up)}" if up else "") + " →") if n_do else "Continue to Tags →"
-    return sm, table, gr.update(value=label)
+    return sm, table, label
 
 
 # --------------------------------------------------------------------------- 7 Captions
