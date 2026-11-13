@@ -396,8 +396,8 @@ def move_back(dataset_root: Path) -> tuple[int, list[str]]:
     return moved, errors
 
 
-# LoRA Studio sets this to a folder Gradio may serve: pictures on the pages are then links to small files there,
-# which the browser keeps, instead of being sent inside every page update (that made every click slow).
+# LoRA Studio sets this to a folder it serves (lspaths.file_url): pictures on the pages are then links to small files
+# there, which the browser keeps, instead of data inside every page.
 URL_DIR: dict = {"dir": None}
 
 
@@ -406,7 +406,6 @@ def _url_of(im, key: str) -> str:
     d = URL_DIR["dir"]
     if d is not None:
         import hashlib
-        from urllib.parse import quote
         fp = Path(d) / (hashlib.md5(key.encode()).hexdigest() + ".jpg")
         if not fp.exists():
             Path(d).mkdir(parents=True, exist_ok=True)
@@ -429,7 +428,6 @@ def _cached_url(key: str):
     if d is None:
         return None
     import hashlib
-    from urllib.parse import quote
     fp = Path(d) / (hashlib.md5(key.encode()).hexdigest() + ".jpg")
     return lspaths.file_url(fp) if fp.exists() else None
 

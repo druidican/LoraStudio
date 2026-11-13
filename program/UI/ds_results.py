@@ -17,14 +17,13 @@ PLOT = {"grid": {"left": 50, "right": 20, "top": 20, "bottom": 30}, "tooltip": {
         "yAxis": {"type": "value", "scale": True}, "series": []}
 
 
-def _series(df, by=None) -> list:
-    if df is None or df.empty:
+def _series(points) -> list:
+    """echarts lines: points is [(epoch, loss)] (one run) or {run name: [(epoch, loss)]} (compare)."""
+    if not points:
         return []
-    if by is None:
-        return [{"type": "line", "name": "loss", "data": [[float(e), float(v)] for e, v in zip(df["epoch"], df["loss"])],
-                 "color": "#E8A33D"}]
-    return [{"type": "line", "name": str(k), "data": [[float(e), float(v)] for e, v in zip(g["epoch"], g["loss"])]}
-            for k, g in df.groupby(by)]
+    if isinstance(points, list):
+        return [{"type": "line", "name": "loss", "data": [[float(e), float(v)] for e, v in points], "color": "#E8A33D"}]
+    return [{"type": "line", "name": str(k), "data": [[float(e), float(v)] for e, v in pts]} for k, pts in points.items()]
 
 
 class Results:
@@ -106,7 +105,7 @@ class Results:
             return
         self.logs = logs
         self.cmp_head.content = T.compare_head_html(logs)
-        self.cmp_plot.options["series"] = _series(T.compare_plot(logs), "run")
+        self.cmp_plot.options["series"] = _series(T.compare_plot(logs))
         self.cmp_plot.options["legend"]["show"] = True
         self.cmp_plot.update()
         self.cmp_set.content = T.compare_settings_html(logs, self.cmp_all.value)

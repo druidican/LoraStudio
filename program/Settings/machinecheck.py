@@ -167,10 +167,10 @@ def check_program(R, version):
           ", ".join(f"{p['name']} ({p['state']} {p['version']})" for p in bad))
     R.add("info", "System", f"{platform.platform()} · Python {platform.python_version()}")
     try:
-        import gradio
-        R.add("info", "Gradio", gradio.__version__)
+        import nicegui
+        R.add("info", "NiceGUI", nicegui.__version__)
     except Exception as e:                               # noqa: BLE001
-        R.add("bad", "Gradio", repr(e))
+        R.add("bad", "NiceGUI", repr(e))
 
 
 def check_folders(R, G, s):

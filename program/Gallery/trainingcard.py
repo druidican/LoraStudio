@@ -20,6 +20,7 @@ sync: LoRA Manager's when LoRA Studio has none, the dataset's trigger word when 
 from __future__ import annotations
 __version__ = "1.111126g"  # LoRA Studio version, see version.py
 
+import copy
 import json
 import math
 import re
@@ -452,7 +453,7 @@ def scan_one(lib, lora, force=False) -> str:
         return ""
     card = build(lib, lora)
     # no file yet: only what the card brings, so a later sync takes everything else from LoRA Manager's file
-    base = LL.copy.deepcopy(lora.sidecar) if lora.sidecar else {"file_name": lora.stem}
+    base = copy.deepcopy(lora.sidecar) if lora.sidecar else {"file_name": lora.stem}
     if lora.base and lora.base != "Unknown" and not base.get("base_model"):
         base["base_model"] = lora.base
     new = apply(base, card, file_sig(lora))

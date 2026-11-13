@@ -168,10 +168,6 @@ def rp_refresh(ds, tkey, steps_over):
             "newname": rp_new_name(ds, str(pick), repeats), "info": "\n".join(lines)}
 
 
-def rp_name_update(ds, folder, repeats):
-    return rp_new_name(ds, folder, repeats)
-
-
 def rp_rename(ds, folder, newname, move_ok):
     """Rename a repeat folder to <N>_name, or move loose images into a new repeat folder. Returns (message, done)."""
     keep = False

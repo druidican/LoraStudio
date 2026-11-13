@@ -34,10 +34,8 @@ never into the .safetensors file or the LoRA folder.
 from __future__ import annotations
 __version__ = "1.131126b"  # LoRA Studio version, see version.py
 
-import copy
 import hashlib
 import html
-import inspect
 import json
 import math
 import os
@@ -57,7 +55,6 @@ try:                                   # shared "Completed" marks (completed.py 
     import completed as COMPLETED
 except Exception:
     COMPLETED = None
-import pandas as pd
 try:                                   # copy to LoRA folder, Trash, leftovers, orphaned meta files
     import housekeeping as HK
 except Exception:                      # noqa: BLE001

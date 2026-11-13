@@ -37,4 +37,3 @@ userdata/
 
 # release builds (tools/build_zip.sh)
 dist/
-try-nicegui/venv/

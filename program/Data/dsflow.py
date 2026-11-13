@@ -337,6 +337,47 @@ def _pictures_in(folder: Path, recursive: bool) -> list[Path]:
                   and not (set(p.relative_to(folder).parts[:-1]) & skip))
 
 
+def add_pictures(ds: str, folder: str, sub: bool) -> str:
+    """Datasets › Add pictures from a folder: copy its pictures (and their captions) into the repeat folder and
+    _originals/. Pictures that are already in the dataset (the same file) are left out; too small or blurry ones
+    are found by the usable scan (step 3) as usual."""
+    import hashlib
+    src = Path(os.path.expanduser((folder or "").strip()))
+    if not src.is_dir():
+        return f"{folder or 'That'} is not a folder."
+    rows = sg().dataset_stats(ds)["rows"]
+    if not rows:
+        return "This dataset has no repeat folder yet."
+    rep = Path(rows[0]["folder"])
+
+    def digest(p: Path) -> str:
+        try:
+            return hashlib.sha1(p.read_bytes()).hexdigest()
+        except OSError:
+            return ""
+    have = {digest(p) for p in images(ds)}
+    pics = _pictures_in(src, bool(sub))
+    copied, same = [], 0
+    for p in pics:
+        if digest(p) in have:
+            same += 1
+            continue
+        dest, k = rep / p.name, 1
+        while dest.exists():
+            dest, k = rep / f"{p.stem}_{k}{p.suffix}", k + 1
+        shutil.copy2(p, dest)
+        for c in DC.caption_of(p):
+            shutil.copy2(c, rep / (dest.stem + c.name[len(p.stem):]))
+        copied.append(dest)
+    ensure_originals(ds, copied)
+    if not pics:
+        return f"No pictures in {src}."
+    if not copied:
+        return f"Nothing new: all {same} pictures are in the dataset already."
+    return (f"✔ {len(copied)} pictures copied into {rep.name}/" + (f"; {same} were in the dataset already" if same else "")
+            + ". Run the usable scan, sort and select again (steps 3-5).")
+
+
 def create(source: str, name: str, repeats: int, outside: str = "") -> tuple[str, str]:
     """Make a dataset. source = a folder in the dataset folder with only pictures (moved in place), or outside =
     any folder (its pictures are copied). Returns (dataset name or '', message)."""

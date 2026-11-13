@@ -548,11 +548,6 @@ def wm_apply_steps(ds, choices_json, only_pending=False, prefer="remove"):
             + ("\n\nProblems: " + "; ".join(errs[:5]) if errs else ""))
 
 
-def oc_stop():
-    OC_STOP["flag"] = True
-    return "Stopping after the current image..."
-
-
 def rv_undo():
     files = S.LAST_CHANGE["files"]
     if not files:

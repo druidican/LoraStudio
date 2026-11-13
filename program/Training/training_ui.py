@@ -569,9 +569,8 @@ def _final_and_epochs(info) -> tuple[Path | None, dict]:
 
 def open_run(logname: str):
     """Everything the one-run page shows: (head, try-first, plot, save points, cleanup text, this-run, log, dest,
-    state)."""
-    import pandas as pd
-    empty = pd.DataFrame({"epoch": [], "loss": []})
+    state). The plot is a list of (epoch, loss)."""
+    empty: list = []
     f = sg.LOG_DIR / (logname or "")
     if not logname or not f.is_file():
         return ("", "", empty, "", "", "", "", "", {})
@@ -601,7 +600,7 @@ def open_run(logname: str):
         fh = fail_html(logname)
         if fh:
             try_first = fh + (try_first if (a or final) else "")
-    plot = pd.DataFrame({"epoch": [e for e, _ in a["points"]], "loss": [v for _, v in a["points"]]}) if a else empty
+    plot = [(e, v) for e, v in a["points"]] if a else empty
     pts = dict(a["points"]) if a else {}
     try:
         lora_names = {f_.name for f_ in sg.HK.lora_files(sg.lora_dirs_setting())} if sg.HK else set()
@@ -992,14 +991,14 @@ def _cmp_runs(logs: list[str]) -> list[dict]:
     return out
 
 
-def compare_plot(logs: list[str]):
-    import pandas as pd
-    rows = []
+def compare_plot(logs: list[str]) -> dict:
+    """{run name: [(epoch, loss), …]} of the compared runs."""
+    out: dict = {}
     for r in _cmp_runs(logs):
         for e, v in (r["advice"] or {}).get("points") or []:
             if isinstance(v, float) and math.isfinite(v):
-                rows.append({"epoch": e, "loss": v, "run": r["name"]})
-    return pd.DataFrame(rows or [], columns=["epoch", "loss", "run"])
+                out.setdefault(r["name"], []).append((e, v))
+    return out
 
 
 def _short(v: str) -> str:

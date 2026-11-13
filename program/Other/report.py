@@ -67,8 +67,8 @@ def _log_end(path: Path, n: int = LOG_LINES) -> str:
 def _machine() -> list[str]:
     lines = [f"- System: {platform.platform()} · Python {platform.python_version()}"]
     try:
-        import gradio
-        lines.append(f"- Gradio {gradio.__version__}")
+        import nicegui
+        lines.append(f"- NiceGUI {nicegui.__version__}")
     except Exception:                                    # noqa: BLE001
         pass
     try:

@@ -16,7 +16,6 @@ import os
 import re
 import shutil
 import subprocess
-from datetime import datetime
 from pathlib import Path
 
 import notify
@@ -1167,107 +1166,6 @@ def explain_for(ds, tkey, script, text, plan):
 
 
 # ---- report for renewing the recommendations
-def _cmd(args, timeout=20) -> str:
-    try:
-        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
-        return (r.stdout or r.stderr or "").strip()
-    except Exception as e:                              # noqa: BLE001
-        return f"(not available: {e})"
-
-
-def _mask(text: str) -> str:
-    text = re.sub(r"(HF_TOKEN=)\"?[^\s\"]+\"?", r'\1"***"', text)
-    return re.sub(r"hf_[A-Za-z0-9]{10,}", "hf_***", text)
-
-
-def _log_summary(f: Path) -> list:
-    try:
-        lines = re.split(r"[\r\n]+", f.read_text(encoding="utf-8", errors="ignore"))
-    except OSError:
-        return [f"- `{f.name}`: unreadable"]
-    exit_line = next((l for l in reversed(lines) if l.startswith("--- exited with code")), "--- (no exit line) ---")
-    steps = [l for l in lines if "steps:" in l and "it" in l]
-    speed = steps[-1].strip()[-120:] if steps else "(no step line)"
-    cmd = next((l for l in lines if "_train_network.py" in l or "train_network.py" in l), "")
-    errs = [l.strip() for l in lines if re.search(r"(Error|Exception|Traceback|out of memory|NaN)", l)][-4:]
-    m = re.search(r"code (-?\d+)(?:.*?ran ([\d:]+))?", exit_line)
-    ended = (("finished OK" if m.group(1) == "0" else f"exit code {m.group(1)}") + (f" after {m.group(2)}" if m.group(2) else "")) \
-        if m else "no exit line (still running, or from an older version)"
-    out = [f"- **{f.name}**: {ended}", f"  - last progress: `{speed}`"]
-    if cmd:
-        out.append(f"  - command: `{_mask(cmd.strip())[:600]}`")
-    out += [f"  - {e[:240]}" for e in errs]
-    return out
-
-
-def export_report():
-    """One Markdown file with everything needed to renew Training_Recommendations.py: versions, hardware,
-    software, model settings, recent runs (speed, loss, errors) and the LoRAs' status and your notes."""
-    now = datetime.now()
-    recs = load_recs()
-    _, presets = merged_presets()
-    L = [f"# LoRA Studio report, {now:%Y-%m-%d %H:%M}", "",
-         "Send this file together with `Training_Recommendations.py` to renew the recommendations.", "",
-         "## Versions",
-         "- Training_Recommendations.py: " + (f"v{recs.VERSION} ({recs.UPDATED})" if recs else RECS_ERROR["msg"]),
-         f"- LoRA types: {', '.join(sorted(presets))}",
-         f"- sd-scripts: `{S.sd_root()}` " + _cmd(["git", "-C", str(S.sd_root()), "log", "-1", "--format=%h %cd", "--date=short"]),
-         f"- musubi-tuner: `{S.musubi_root()}` " + _cmd(["git", "-C", str(S.musubi_root()), "log", "-1", "--format=%h %cd", "--date=short"]),
-         "", "## Hardware and software",
-         f"- GPU: {_cmd(['bash', '-c', 'lspci | grep -iE \"vga|3d\" | head -2'])}",
-         f"- VRAM / ROCm: {_cmd(['bash', '-c', '(amd-smi static --asic --vram 2>/dev/null | grep -iE \"market_name|size\" | head -3) || (rocm-smi --showproductname --showmeminfo vram 2>/dev/null | grep -iE \"card series|vram total|Total Memory\" | head -3)'])}",
-         f"- RAM: {_cmd(['bash', '-c', 'free -h | head -2 | tail -1'])}",
-         f"- Kernel: {_cmd(['uname', '-r'])}"]
-    wd, venv, _ = S.runner_settings()
-    py = Path(os.path.expanduser(venv or str(S.sd_root() / "venv"))) / "bin" / "python"
-    if py.is_file():
-        L.append("- sd-scripts venv: " + _cmd([str(py), "-c", "import sys, torch; print('Python', sys.version.split()[0], "
-                                                "'| torch', torch.__version__, '| HIP', torch.version.hip, '| GPU', "
-                                                "torch.cuda.is_available())"], 60))
-    L += ["", "## Model files per LoRA type (Settings › Model files)"]
-    for tkey, kv in S.read_settings().items():
-        files = {k: v for k, v in kv.items() if not k.endswith(".dir") and k not in META_KEYS}
-        if not files:
-            continue
-        L.append(f"- **{tkey}**")
-        for k, v in files.items():
-            desc = S.GUIDE.describe(S.GUIDE.identify(v)) if S.GUIDE and os.path.isfile(os.path.expanduser(v)) else "not found"
-            L.append(f"  - {k}: `{Path(v).name}` ({desc})")
-    L += ["", "## Recent runs (newest first)"]
-    logs = sorted([f for f in S.LOG_DIR.glob("*.log") if not f.name.startswith("caption_")],
-                  key=lambda f: f.stat().st_mtime, reverse=True)[:12] if S.LOG_DIR.is_dir() else []
-    for f in logs:
-        L += _log_summary(f)
-    if not logs:
-        L.append("- (no run logs yet)")
-    try:
-        import lora_library as LL
-        lib = LL.LIB
-        lib.ensure_loaded()
-        L += ["", "## Your LoRAs (newest version per dataset + type)"]
-        for gid, members in sorted(lib.groups.items(), key=lambda kv: (kv[1][-1].character.lower(), kv[1][-1].base)):
-            l = members[-1]
-            if l.dataset is None:
-                continue
-            m = l.meta
-            ov = lib.overrides(l.key)
-            notes = (l.sidecar or {}).get("notes", "")
-            loss = f"{l.loss[-1][1]:.4f}" if l.loss else "-"
-            L.append(f"- **{l.character} · {l.base}** `{l.stem}` ({len(members)} version(s)): status {l.status}; "
-                     f"dim {m.get('ss_network_dim', '?')}/{m.get('ss_network_alpha', '?')}, lr {m.get('ss_learning_rate', '?')}, "
-                     f"epochs {m.get('ss_epoch', '?')}/{m.get('ss_num_epochs', '?')}, steps {m.get('ss_steps', '?')}, "
-                     f"images {m.get('ss_num_train_images', '?')}, last loss {loss}"
-                     + (f"; issues: {'; '.join(t for _, t in l.issues)}" if l.issues else "")
-                     + (f"; your flag: {ov.get('flag')} {ov.get('flag_reason', '')}" if ov.get("flag") else "")
-                     + (f"; your notes: {notes}" if notes else ""))
-    except Exception as e:                              # noqa: BLE001
-        L.append(f"\n(LoRA list not available: {e})")
-    L += ["", "## What I would like improved", "", "(write here: what worked, what did not, what you want next)", ""]
-    out = (S.CONFIG_DIR or S.ROOT) / f"LoRA_Studio_report_{now:%Y%m%d_%H%M}.md"
-    out.write_text(_mask("\n".join(L)), encoding="utf-8")
-    return (str(out),
-            f"**Report written:** `{out}`. Add a few words under *What I would like improved*, then send it with "
-            f"`{RECS_FILE}`. Hugging Face tokens are masked.")
 
 
 # ---- handlers
@@ -1422,17 +1320,6 @@ def cs_retype(ds, script, tkey, text, steps_over, use_rep, hf_auto=True, samples
             return cs_load(ds, script_for_type(ds, tkey), tkey, steps_over, use_rep, hf_auto, samples)
     return _cs_result(explain=explain_for(ds, tkey, script, text, {}),
                       status="Comparison updated for the chosen type. Your script text is unchanged.")
-
-
-def cs_apply(ds, tkey, script, text, plan, *vals):
-    new, changes, failed = apply_form(text or "", list(vals))
-    if changes:
-        notify.info("Applied to the script text (not saved yet): " + "; ".join(changes))
-    if failed:
-        notify.warning("No training command found to add these to: " + ", ".join(failed))
-    if not changes and not failed:
-        notify.info("Nothing to change: the form matches the text, or its fields are empty.")
-    return _cs_result(text=new, explain=explain_for(ds, tkey, script, new, plan), plan=plan)
 
 
 def cs_read(ds, tkey, script, text, plan):

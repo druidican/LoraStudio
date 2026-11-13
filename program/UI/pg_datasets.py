@@ -199,7 +199,7 @@ class Datasets:
             self.e_add_msg.content = f"{folder or 'That'} is not a folder." if ds else "Pick a dataset first."
             return
         self.e_add_msg.content = "Looking at the pictures …"
-        self.e_add_msg.content = await run.io_bound(add_pictures, ds, folder, self.e_add_sub.value)
+        self.e_add_msg.content = await run.io_bound(F.add_pictures, ds, folder, self.e_add_sub.value)
         self.draw_list()
 
     # ------------------------------------------------------------------ build
@@ -289,22 +289,6 @@ class Datasets:
                     ds_batch.settings(self)
                 ds_batch.tools(self)
             self.i_html = ui.html("", sanitize=False).classes("w-full")
-
-
-def add_pictures(ds, folder, sub) -> str:
-    """Copy the good pictures of a folder into the dataset's repeat folder (and _originals/)."""
-    import picker
-    rows = S.dataset_stats(ds)["rows"]
-    if not rows:
-        return "This dataset has no repeat folder yet."
-    res = picker.scan(folder, bool(sub), F.images(ds), F.min_side(F.meta(ds)["types"]), F.meta(ds)["purpose"],
-                      "", "", False, lambda p: None, lambda p, d: None)
-    pick = [e["path"] for e in res["pics"] if e["pick"]]
-    copied, errs = picker.copy_pictures(pick, rows[0]["folder"])
-    F.ensure_originals(ds, copied)
-    skipped = len(res["pics"]) - len(pick)
-    return (f"✔ {len(copied)} pictures copied into {rows[0]['folder'].name}/" + (f"; {skipped} left out (too small, "
-            "blurry or already in the dataset)" if skipped else "") + ". Sort and select again (steps 4 and 5).")
 
 
 def build(shell):

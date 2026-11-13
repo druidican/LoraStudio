@@ -1,4 +1,6 @@
-gradio
-pandas
+nicegui
 pillow
+numpy
 tensorboard
+markdown-it-py
+huggingface_hub
