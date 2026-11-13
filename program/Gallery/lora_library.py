@@ -555,13 +555,13 @@ def thumb_file(path: Path, width: int = 360) -> Path | None:
 
 
 def thumb_data_uri(path: Path, width: int = 360) -> str:
-    """Link to the thumbnail (served by Gradio from .thumbs). The browser caches it, so pages stay small:
+    """Link to the thumbnail (served from .thumbs, lspaths.file_url). The browser caches it, so pages stay small:
     pictures used to be embedded in the page itself and sent again on every page load and filter change."""
     tp = thumb_file(path, width)
     if not tp:
         return ""
-    from urllib.parse import quote
-    return "/gradio_api/file=" + quote(str(tp))
+    import lspaths
+    return lspaths.file_url(tp)
 
 
 def warm_thumbnails(lib) -> None:
@@ -2963,6 +2963,38 @@ def make_theme():
 
 STATUS_CHOICES = ["OK", "Warnings", "Problems"]
 
+
+def mark_completed(gids, done) -> str:
+    """Tick or untick Completed for every selected card (Library card = one dataset + LoRA type,
+    Carddex tile = every LoRA type of one dataset)."""
+    picked = [g for g in (gids.split(",") if isinstance(gids, str) else gids or []) if g]
+    if not picked:
+        return "Nothing selected: tick **Select**, click the cards you want (or *Select all shown*), then press the button again."
+    changed, skipped = [], 0
+    # a Carddex tile is a whole dataset ("ds:mychar"): it stands for every LoRA type of that dataset
+    expanded = []
+    for gid in picked:
+        if gid.startswith("ds:"):
+            name = gid[3:]
+            expanded += [g for g, m in LIB.groups.items()
+                         if m and m[-1].dataset is not None and m[-1].dataset.name.lower() == name]
+        else:
+            expanded.append(gid)
+    for gid in dict.fromkeys(expanded):
+        l = LIB.newest(gid)
+        ds, t = done_key(l) if l else ("", "")
+        if not ds:
+            skipped += 1
+            continue
+        COMPLETED.set_done(ds, t, done, how="manual", lora=l.stem)
+        changed.append(f"{ds} · {l.base}")
+    what = "Completed" if done else "not completed"
+    msg = f"Marked **{len(changed)}** as {what}: " + ", ".join(sorted(set(changed))) if changed else ""
+    if skipped:
+        msg += f"{' ' if msg else ''}Skipped {skipped} without a dataset (downloads cannot be marked)."
+    return msg + " The Queue shows it after *Refresh*."
+
+
 LIB = Library()
 
 
@@ -3416,43 +3448,13 @@ def build_library_ui(app, maint_extra=None):
     app.load(do_startup, filters, [lib_html, base_f, pick_dd, gal_base]).then(do_gallery, gal_inputs, gal_html
              ).then(lambda: gr.update(choices=lora_choices()), None, pg_lora)
 
-    def mass_mark(gids, done):
-        """Tick or untick Completed for every selected card (Library card = one dataset + LoRA type,
-        Carddex tile = every LoRA type of one dataset)."""
-        picked = [g for g in (gids or "").split(",") if g]
-        if not picked:
-            return "Nothing selected: tick **Select**, click the cards you want (or *Select all shown*), then press the button again."
-        changed, skipped = [], 0
-        # a Carddex tile is a whole dataset ("ds:mychar"): it stands for every LoRA type of that dataset
-        expanded = []
-        for gid in picked:
-            if gid.startswith("ds:"):
-                name = gid[3:]
-                expanded += [g for g, m in LIB.groups.items()
-                             if m and m[-1].dataset is not None and m[-1].dataset.name.lower() == name]
-            else:
-                expanded.append(gid)
-        for gid in dict.fromkeys(expanded):
-            l = LIB.newest(gid)
-            ds, t = done_key(l) if l else ("", "")
-            if not ds:
-                skipped += 1
-                continue
-            COMPLETED.set_done(ds, t, done, how="manual", lora=l.stem)
-            changed.append(f"{ds} · {l.base}")
-        what = "Completed" if done else "not completed"
-        msg = f"Marked **{len(changed)}** as {what}: " + ", ".join(sorted(set(changed))) if changed else ""
-        if skipped:
-            msg += f"{' ' if msg else ''}Skipped {skipped} without a dataset (downloads cannot be marked)."
-        return msg + " The Queue shows it after *Refresh*."
-
     for tb in (gal_sel, lib_sel):
         sc = tb["scope"]
         tb["cb"].change(None, tb["cb"], None, js=f"(v) => llSelMode('{sc}', v)")
         tb["all"].click(lambda: True, None, tb["cb"], js=f"() => {{ llSelMode('{sc}', true); llSelAll('{sc}', true); }}")
         tb["none"].click(None, None, None, js=f"() => llSelAll('{sc}', false)")
         for btn, flag in ((tb["done"], True), (tb["undone"], False)):
-            btn.click(lambda g, f=flag: mass_mark(g, f), sel_box, tb["msg"], js=f"(v) => [llSelGet('{sc}')]"
+            btn.click(lambda g, f=flag: mark_completed(g, f), sel_box, tb["msg"], js=f"(v) => [llSelGet('{sc}')]"
                       ).then(do_render, filters, lib_html).then(do_gallery, gal_inputs, gal_html
                       ).then(None, None, None, js="() => { if (window.llSelCount) llSelCount(); }")
 

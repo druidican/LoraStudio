@@ -1,0 +1,59 @@
+/* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
+   LoRA Studio's look for the NiceGUI pages: the same colours as before, light and dark (body--dark). */
+:root { --ls-bg:#F4F2EE; --ls-card:#FDFDFB; --ls-line:#D3D6DB; --ls-line2:#BCC2CA; --ls-text:#1C1F24; --ls-muted:#5A626C;
+        --ls-dim:#7D858F; --ls-ok:#21857C; --ls-warn:#A86A0C; --ls-bad:#C0392B; --ls-chip:#EDEFF2; --ls-chip-text:#3A4048;
+        --ls-imgbg:#E6E9ED; --ls-accent:#E8A33D; --ls-accent-bg:#FBE9C8; --ls-warn-bg:#FBF1DF; --ls-bad-bg:#FBE6E3; }
+.body--dark { --ls-bg:#14161A; --ls-card:#1B1E23; --ls-line:#2A2E36; --ls-line2:#343944; --ls-text:#E6E8EB;
+        --ls-muted:#9AA1AB; --ls-dim:#6B7280; --ls-ok:#4FB3A9; --ls-warn:#E8A33D; --ls-bad:#F07C6A; --ls-chip:#262A31;
+        --ls-chip-text:#C3C8CF; --ls-imgbg:#0E0F12; --ls-accent-bg:#3A2E18; --ls-warn-bg:#2B2417; --ls-bad-bg:#2E1D1B; }
+body { background:var(--ls-bg); color:var(--ls-text); font-family:Inter, system-ui, sans-serif; }
+.nicegui-content { padding:0; }
+
+/* header and tabs */
+.ls-header { background:#1C1F24; color:#F3F4F6; }
+.ls-header .q-tab { text-transform:none; font-weight:600; font-size:15px; min-height:44px; }
+.ls-header .q-tab--active { color:var(--ls-accent); }
+.ls-title { font-size:19px; font-weight:700; letter-spacing:-.01em; }
+.ls-ver { font-size:12px; color:#9AA1AB; }
+.ls-logo { width:34px; height:34px; border-radius:8px; }
+
+/* the status strip */
+.ls-strip { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 18px;
+            padding:6px 16px; background:#262A31; color:#E6E8EB; font-size:13px; width:100%; }
+.ls-run { cursor:pointer; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 320px; }
+.ls-st-run .ls-run { color:#F4C06F; } .ls-st-done .ls-run { color:#7FD3C9; } .ls-st-fail .ls-run { color:#F2A497; }
+.ls-st-idle .ls-run { color:#C3C8CF; font-weight:500; }
+.ls-machine { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }
+.ls-meter { display:inline-flex; flex-direction:column; gap:3px; min-width:96px; }
+.ls-mlab { font-family:'JetBrains Mono',monospace; font-size:11px; color:#C3C8CF; white-space:nowrap; }
+.ls-mbar { display:block; height:4px; border-radius:2px; background:#3A404B; overflow:hidden; }
+.ls-mbar > span { display:block; height:100%; background:#21857C; }
+.ls-hot .ls-mbar > span { background:#E8A33D; } .ls-hot .ls-mlab { color:#F4C06F; }
+.ls-mnote { font-size:11px; color:#9AA1AB; }
+.ls-oll { font-family:'JetBrains Mono',monospace; font-size:12px; white-space:nowrap; align-self:center; }
+.ls-oll-on { color:#7FDDD3; font-weight:600; } .ls-oll-off { color:#B8BEC7; }
+
+/* page parts */
+.ls-page { padding:18px 24px 40px; width:100%; max-width:1800px; margin:0 auto; }
+.ls-h { font-size:20px; font-weight:650; }
+.ls-note { color:var(--ls-muted); font-size:13px; }
+.ls-card { background:var(--ls-card) !important; border-color:var(--ls-line) !important; border-radius:12px !important; }
+.ls-chip { font-size:11px; padding:1px 8px; border-radius:999px; border:1px solid var(--ls-line2); color:var(--ls-chip-text);
+           background:var(--ls-chip); white-space:nowrap; line-height:18px; }
+.ls-chip.ok { background:var(--ls-ok); border-color:var(--ls-ok); color:white; }
+.ls-chip.warn { background:var(--ls-warn-bg); border-color:var(--ls-warn); color:var(--ls-warn); }
+.ls-chip.bad { background:var(--ls-bad-bg); border-color:var(--ls-bad); color:var(--ls-bad); }
+.ls-chip.cur { border-color:var(--ls-accent); }
+.ls-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
+.ls-dot.warning { background:var(--ls-warn); } .ls-dot.problem { background:var(--ls-bad); } .ls-dot.ok { background:var(--ls-ok); }
+.ls-sub-tabs .q-tab { text-transform:none; font-weight:600; }
+
+/* Collection tiles */
+.ls-tile { width:200px; cursor:pointer; border-radius:12px; overflow:hidden; background:var(--ls-card);
+           border:1px solid var(--ls-line); transition: transform .12s, box-shadow .12s; }
+.ls-tile:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.12); border-color:var(--ls-accent); }
+.ls-tile img, .ls-tile .ph { width:200px; height:260px; object-fit:cover; display:block; background:var(--ls-imgbg); }
+.ls-tile .ph { display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--ls-dim); font-size:12px; }
+.ls-tile .ph b { font-size:56px; font-weight:600; opacity:.5; }
+.ls-tile.picked { outline:3px solid var(--ls-accent); }
+.ls-blur img { filter:blur(14px); }

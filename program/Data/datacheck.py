@@ -24,6 +24,7 @@ is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can 
 from __future__ import annotations
 __version__ = "1.031126"  # LoRA Studio version, see version.py
 
+import lspaths
 import base64
 import io
 import glob
@@ -412,7 +413,7 @@ def _url_of(im, key: str) -> str:
             tmp = fp.with_suffix(".tmp.jpg")
             im.save(tmp, "JPEG", quality=82)
             tmp.replace(fp)
-        return "/gradio_api/file=" + quote(str(fp))
+        return lspaths.file_url(fp)
     buf = io.BytesIO()
     im.save(buf, "JPEG", quality=82)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
@@ -430,7 +431,7 @@ def _cached_url(key: str):
     import hashlib
     from urllib.parse import quote
     fp = Path(d) / (hashlib.md5(key.encode()).hexdigest() + ".jpg")
-    return "/gradio_api/file=" + quote(str(fp)) if fp.exists() else None
+    return lspaths.file_url(fp) if fp.exists() else None
 
 
 def thumb_uri(p: Path, side: int = 160) -> str:

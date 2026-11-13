@@ -23,7 +23,7 @@ from pathlib import Path
 PROG = Path(__file__).resolve().parent
 ROOT = PROG.parent
 USER = ROOT / "userdata"
-TOPICS = ("Gallery", "Data", "Training", "Settings", "Other")
+TOPICS = ("Gallery", "Data", "Training", "Settings", "Other", "UI")
 try:                                    # every module may write to it at import (settings made on first use)
     USER.mkdir(exist_ok=True)
 except OSError:
@@ -46,6 +46,15 @@ OLD_PROGRAM = ("lora_library.py picgallery.py completed.py model_guide.py datase
                "setup.py backup.py features.py notice.py venvcheck.py selfupdate.py machinecheck.py updater.py "
                "ollamactl.py statusbar.py studio_css.py lora_studio.css ticker.py report.py manual.py").split()
 OLD_DIRS = ("manual", "logo")
+
+
+FILE_ROUTE = "/lsfile/"            # the program serves files from the allowed folders here (UI/widgets.py)
+
+
+def file_url(path) -> str:
+    """The link a page uses for a file (a thumbnail, a manual picture, a report)."""
+    from urllib.parse import quote
+    return FILE_ROUTE + quote(str(path).replace("\\", "/"))
 
 
 def folders() -> list[str]:
