@@ -16,6 +16,7 @@ import subprocess
 from pathlib import Path
 import gradio as gr
 
+import notify
 import sdgui as S
 
 
@@ -89,10 +90,10 @@ def fill_hf(text: str, force: bool):
 def cs_fill_hf(text, plan):
     tok = read_hf_token()
     if not tok:
-        gr.Warning(f"No token found in {hf_path()}.")
+        notify.warning(f"No token found in {hf_path()}.")
         return S._cs_result(status=f"No token found in `{hf_path()}`.", plan=plan)
     if not re.fullmatch(r"[\w.\-]+", tok):
-        gr.Warning("The token contains unusual characters; not written into the script.")
+        notify.warning("The token contains unusual characters; not written into the script.")
         return S._cs_result(status="The token contains unusual characters, so it was not written into the script.", plan=plan)
     new, changed = fill_hf(text or "", force=True)
     return S._cs_result(text=new, plan=plan,
@@ -134,10 +135,10 @@ def rp_new_name(ds, folder, repeats):
 
 def rp_refresh(ds, tkey, steps_over):
     if not ds or not S.lora_path(ds).is_dir():
-        return [gr.update(choices=[], value=None), 0, "", ""]
+        return {"choices": [], "folder": None, "repeats": 0, "newname": "", "info": ""}
     rows = folder_rows(ds)
     if not rows:
-        return [gr.update(choices=[], value=None), 0, "", "No folders with images found in this dataset."]
+        return {"choices": [], "folder": None, "repeats": 0, "newname": "", "info": "No folders with images found in this dataset."}
     n_total = sum(n for _, _, n in rows)
     rec, label = None, tkey
     try:
@@ -164,7 +165,8 @@ def rp_refresh(ds, tkey, steps_over):
         nm = "(LoRA folder itself)" if f == lora else f"`{f.relative_to(lora)}`"
         lines.append(f"- {nm}: {n} images, " + (f"{r} repeats" + (" (matches)" if rec and r == rec else "")
                                                 if r else "**no repeat count: sd-scripts ignores these images**"))
-    return [gr.update(choices=rp_choices(ds), value=str(pick)), repeats, rp_new_name(ds, str(pick), repeats), "\n".join(lines)]
+    return {"choices": rp_choices(ds), "folder": str(pick), "repeats": repeats,
+            "newname": rp_new_name(ds, str(pick), repeats), "info": "\n".join(lines)}
 
 
 def rp_name_update(ds, folder, repeats):
@@ -172,22 +174,22 @@ def rp_name_update(ds, folder, repeats):
 
 
 def rp_rename(ds, folder, newname, move_ok):
-    """Rename a repeat folder to <N>_name, or move loose images into a new repeat folder. Returns (message, userep)."""
-    keep = gr.update()
+    """Rename a repeat folder to <N>_name, or move loose images into a new repeat folder. Returns (message, done)."""
+    keep = False
     if not ds or not folder:
-        gr.Warning("Pick a folder first.")
+        notify.warning("Pick a folder first.")
         return "Pick a folder first.", keep
     lora, f, name = S.lora_path(ds), Path(folder), (newname or "").strip()
     if not re.fullmatch(r"\d+_[^/\\\x00]+", name):
-        gr.Warning("The name must look like 4_name (a repeat count, an underscore, then a name).")
+        notify.warning("The name must look like 4_name (a repeat count, an underscore, then a name).")
         return "The name must look like `4_name`.", keep
     if f == lora:                                   # loose images directly in the LoRA folder
         if not move_ok:
-            gr.Warning("Tick the box to allow moving the images into a new folder.")
+            notify.warning("Tick the box to allow moving the images into a new folder.")
             return "Tick the box above to allow moving these images into a new folder.", keep
         dest = lora / name
         if dest.exists():
-            gr.Warning(f"{name} already exists.")
+            notify.warning(f"{name} already exists.")
             return f"`{name}` already exists.", keep
         dest.mkdir()
         moved = 0
@@ -196,25 +198,25 @@ def rp_rename(ds, folder, newname, move_ok):
                 if src.is_file():
                     shutil.move(str(src), str(dest / src.name))
                     moved += 1
-        gr.Info(f"Moved {moved} files into {name}/")
-        return f"Moved {moved} files (images and captions) into `{name}/`.", gr.update(value=False)
+        notify.info(f"Moved {moved} files into {name}/")
+        return f"Moved {moved} files (images and captions) into `{name}/`.", True
     dest = f.with_name(name)
     if dest == f:
         return "The folder already has that name.", keep
     if dest.exists():
-        gr.Warning(f"{name} already exists.")
+        notify.warning(f"{name} already exists.")
         return f"`{name}` already exists next to it.", keep
     f.rename(dest)
-    gr.Info(f"Renamed {f.name} -> {name}")
-    return f"Renamed `{f.name}` to `{name}`. Epochs are re-planned for the folder's actual repeat count.", gr.update(value=False)
+    notify.info(f"Renamed {f.name} -> {name}")
+    return f"Renamed `{f.name}` to `{name}`. Epochs are re-planned for the folder's actual repeat count.", True
 
 
 def rp_make(ds, tkey, text, plan):
     if not ds:
-        gr.Warning("Pick a LoRA folder first.")
+        notify.warning("Pick a LoRA folder first.")
         return "Pick a LoRA folder first."
     notes = S.ensure_folders(ds, text or "", plan, tkey)
-    gr.Info("Folders checked.")
+    notify.info("Folders checked.")
     return ("Done: " + "; ".join(notes) + ".") if notes else "Nothing to create: the repeat folder, `model` and `log` already exist."
 
 
@@ -233,7 +235,7 @@ def cs_set_epochs(ds, tkey, script, text, plan, steps_over):
         spe = max(1, math.ceil(samples / (bs * ga)))
         ep = max(1, round(steps / spe))
     except Exception as e:
-        gr.Warning(f"Could not calculate epochs: {e}")
+        notify.warning(f"Could not calculate epochs: {e}")
         return S._cs_result(status=f"Could not calculate epochs: {e}", plan=plan)
     vals = [""] * len(S.FORM_FIELDS)
     vals[[n for n, _ in S.FORM_FIELDS].index("max_train_epochs")] = str(ep)
@@ -441,9 +443,9 @@ def st_apply_suggestions(tkey, flags, picks, replace_fitting, recursive, *args):
             out_d.append(gr.update())
             out_f.append(gr.update())
     if changed:
-        gr.Info("Filled " + "; ".join(changed) + ". Press Save to keep them.")
+        notify.info("Filled " + "; ".join(changed) + ". Press Save to keep them.")
     else:
-        gr.Info("Nothing to change: the slots already hold fitting files (tick 'Also replace files that already fit' "
+        notify.info("Nothing to change: the slots already hold fitting files (tick 'Also replace files that already fit' "
                 "to use the ★ ones).")
     return out_d + out_f
 
@@ -562,7 +564,7 @@ def st_download_link(tkey, flags, slot, link, recursive, *args):
 
 def st_download_stop():
     _hd().STOP.set()
-    gr.Info("Stopping the download: it goes on from there next time.")
+    notify.info("Stopping the download: it goes on from there next time.")
 
 
 def st_raw() -> str:
@@ -575,7 +577,7 @@ def st_raw() -> str:
 def st_save(tkey, flags, *args):
     dirs, files = args[:S.ST_N], args[S.ST_N:2 * S.ST_N]
     if not tkey:
-        gr.Warning("Pick a LoRA type first.")
+        notify.warning("Pick a LoRA type first.")
         return "Pick a LoRA type first.", st_raw()
     data = read_settings()
     sec = {}
@@ -586,7 +588,7 @@ def st_save(tkey, flags, *args):
         f = (f or "").strip()
         d = (d or "").strip()
         if "\n" in f or "\n" in d:
-            gr.Warning(f"{key}: paths cannot contain line breaks.")
+            notify.warning(f"{key}: paths cannot contain line breaks.")
             return f"{key}: paths cannot contain line breaks.", st_raw()
         if d:
             sec[key + ".dir"] = d
@@ -602,9 +604,9 @@ def st_save(tkey, flags, *args):
     try:
         write_settings(data)
     except OSError as e:
-        gr.Warning(f"Could not write settings.txt: {e}")
+        notify.warning(f"Could not write settings.txt: {e}")
         return f"Could not write `{settings_path()}`: {e}", st_raw()
-    gr.Info(f"Saved {Path(settings_path()).name}")
+    notify.info(f"Saved {Path(settings_path()).name}")
     return (f"**Saved to `{settings_path()}`** for this LoRA type (other types are untouched; the previous file is kept as "
             "`settings.txt.bak`). New launch scripts of this type now use these files. For an existing script press "
             "**Use model files from Settings** on a dataset's Train.\n\n" + "\n".join(rows)), st_raw()
@@ -638,17 +640,17 @@ def sub_add(name, base, tag):
     name = (name or "").strip()
     key = re.sub(r"[^a-z0-9]+", "", name.lower())
     if not key:
-        gr.Warning("Give the subtype a name, for example Pony.")
+        notify.warning("Give the subtype a name, for example Pony.")
         return _sub_outs("Give the subtype a name, for example **Pony**.")
     _, builtin = S.builtin_presets()
     if key in S.RESERVED_TYPES or key in builtin:
-        gr.Warning(f"'{name}' is already a built-in type.")
+        notify.warning(f"'{name}' is already a built-in type.")
         return _sub_outs(f"`{key}` is already a built-in type, so it cannot be added again. Pick it in the LoRA type list below.")
     if key in S.custom_subtypes():
-        gr.Warning(f"The subtype '{name}' already exists.")
+        notify.warning(f"The subtype '{name}' already exists.")
         return _sub_outs(f"The subtype `{key}` already exists. Pick it in the LoRA type list below.", st_val=key)
     if base not in S.SUBTYPE_BASES:
-        gr.Warning("Pick SDXL or Anima as the base.")
+        notify.warning("Pick SDXL or Anima as the base.")
         return _sub_outs("Pick SDXL or Anima as the base.")
     tag = re.sub(r"[^A-Za-z0-9]", "", tag or "") or re.sub(r"[^A-Za-z0-9]", "", name).upper()
     data = read_settings()
@@ -658,17 +660,17 @@ def sub_add(name, base, tag):
         write_settings(data)
     except OSError as e:
         return _sub_outs(f"Could not write `{settings_path()}`: {e}")
-    gr.Info(f"Subtype {name} added")
+    notify.info(f"Subtype {name} added")
     return _sub_outs(f"Added **{name}** (based on {S.SUBTYPE_BASES[base]}, file tag `{tag}`). It is now in the LoRA type lists. "
                      f"Choose its model files below and press **Save to settings.txt**.", st_val=key)
 
 
 def sub_remove(key, confirm, st_cur, cs_cur):
     if not key:
-        gr.Warning("Pick a subtype to remove.")
+        notify.warning("Pick a subtype to remove.")
         return _sub_outs("Pick a subtype to remove.")
     if not confirm:
-        gr.Warning("Tick the confirmation box first.")
+        notify.warning("Tick the confirmation box first.")
         return _sub_outs("Tick the confirmation box first.")
     data = read_settings()
     if key not in S.custom_subtypes() or key not in data:
@@ -678,7 +680,7 @@ def sub_remove(key, confirm, st_cur, cs_cur):
         write_settings(data)
     except OSError as e:
         return _sub_outs(f"Could not write `{settings_path()}`: {e}")
-    gr.Info("Subtype removed")
+    notify.info("Subtype removed")
     return _sub_outs(f"Removed `{key}` from `{settings_path()}` (a `.bak` copy of the previous file was kept). Launch scripts that were "
                      "made with it are not changed.",
                      st_val="sdxl" if st_cur == key else None, cs_val="sdxl" if cs_cur == key else None)
@@ -817,11 +819,11 @@ def env_save(gfx, *extra):
     vals = {} if NVIDIA else {GFX_VAR: (gfx or "").strip()}
     vals.update({n: (x or "").strip() for (n, _, _), x in zip(ENV_EXTRA, extra)})
     if vals.get(GFX_VAR) and not re.fullmatch(r"\d+\.\d+\.\d+", vals[GFX_VAR]):
-        gr.Warning("The GFX version must look like 12.0.1")
+        notify.warning("The GFX version must look like 12.0.1")
         return "The GFX version must look like `12.0.1` (major.minor.step).", st_raw()
     for n, v in vals.items():
         if "\n" in v or '"' in v:
-            gr.Warning(f"{n}: no line breaks or double quotes please.")
+            notify.warning(f"{n}: no line breaks or double quotes please.")
             return f"{n}: no line breaks or double quotes please.", st_raw()
     data = read_settings()
     sec = data.setdefault("general", {})
@@ -839,7 +841,7 @@ def env_save(gfx, *extra):
             os.environ[n] = v
         else:
             os.environ.pop(n, None)
-    gr.Info(f"Saved {Path(settings_path()).name}")
+    notify.info(f"Saved {Path(settings_path()).name}")
     shown = "\n".join(f"- `{n} = {v}`" for n, v in vals.items() if v) or "- (all empty: the preset defaults are used)"
     return (f"Saved to `{settings_path()}` (`[general]`):\n\n{shown}\n\nThe GUI uses them now and every new launch script gets them "
             "(an empty field means the preset's own value is kept). Use **Update all launch scripts** for existing ones."), st_raw()
@@ -850,7 +852,7 @@ def env_update_scripts(confirm):
     if not saved:
         return "Save at least one value first."
     if not confirm:
-        gr.Warning("Tick the confirmation box first.")
+        notify.warning("Tick the confirmation box first.")
         return "Tick the confirmation box first."
     changed = []
     for _, path in S.list_scripts():
@@ -893,7 +895,7 @@ def cs_use_settings(ds, tkey, script, text, plan):
     """Write the model files saved in settings.txt for this LoRA type into the script text."""
     ov = settings_models(tkey)
     if not ov and not env_saved():
-        gr.Warning("No saved model files for this LoRA type: set them in Settings › Model files first.")
+        notify.warning("No saved model files for this LoRA type: set them in Settings › Model files first.")
         return S._cs_result(status="No saved model files for this LoRA type: set them in the **Settings** tab first.", plan=plan)
     new, changed, failed = text or "", [], []
     for key, val in ov.items():

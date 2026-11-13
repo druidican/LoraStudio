@@ -22,7 +22,9 @@ from widgets import CropPanel, PaintPanel, note, pic_url, stream
 
 
 def attach(page):
-    for n, fn in ((2, step2), (3, step3), (4, step4), (5, step5), (6, step6), (7, step7), (8, step8)):
+    import ds_train
+    for n, fn in ((2, step2), (3, step3), (4, step4), (5, step5), (6, step6), (7, step7), (8, step8),
+                  (9, ds_train.step9), (11, step11)):
         page.steps[n] = (lambda fn=fn: fn(page))
 
 
@@ -878,3 +880,9 @@ def step8(page):
     show.on_value_change(lambda: draw())
     ui.button("Continue to Train →", on_click=done).props("unelevated no-caps color=primary")
     draw()
+
+
+# --------------------------------------------------------------------------- 11 LoRA
+def step11(page):
+    head("LoRA: its LoRA files in the Collection")
+    ui.html(V.lora_html(page.s["ds"]), sanitize=False).classes("w-full")

@@ -18,8 +18,8 @@ import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
-import gradio as gr
 
+import notify
 import sdgui as S
 
 
@@ -1265,7 +1265,7 @@ def export_report():
     L += ["", "## What I would like improved", "", "(write here: what worked, what did not, what you want next)", ""]
     out = (S.CONFIG_DIR or S.ROOT) / f"LoRA_Studio_report_{now:%Y%m%d_%H%M}.md"
     out.write_text(_mask("\n".join(L)), encoding="utf-8")
-    return (gr.update(value=str(out), visible=True),
+    return (str(out),
             f"**Report written:** `{out}`. Add a few words under *What I would like improved*, then send it with "
             f"`{RECS_FILE}`. Hugging Face tokens are masked.")
 
@@ -1274,13 +1274,10 @@ def export_report():
 KEEP = object()
 
 
-def _cs_result(script=KEEP, type_=KEEP, text=KEEP, fields=None, explain=KEEP, prompts_path=KEEP,
-               prompts_text=KEEP, newname=KEEP, save_over=KEEP, status=KEEP, plan=None, samples=KEEP):
-    def k(v):
-        return gr.update() if v is KEEP else v
-    flds = fields if fields is not None else [gr.update()] * len(FORM_FIELDS)
-    return ([k(script), k(type_), k(text)] + list(flds)
-            + [k(explain), k(prompts_path), k(prompts_text), k(newname), k(save_over), k(status), plan or {}, k(samples)])
+def _cs_result(**kw) -> dict:
+    """What the launch script page changes: only the keys given. Keys: script, script_choices, type, text, fields
+    (the values of FORM_FIELDS), explain, prompts_path, prompts_text, newname, can_save_over, status, plan, samples."""
+    return {k: v for k, v in kw.items() if v is not KEEP}
 
 
 def _plan_state(plan):
@@ -1318,22 +1315,22 @@ def cs_load(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
             script = script_for_type(ds, tkey)
         else:
             script = str(files[0]) if files else NEW
-    upd = gr.update(choices=cs_script_choices(ds), value=script)
+    upd = {"script": script, "script_choices": cs_script_choices(ds)}
     n = len(FORM_FIELDS)
     if script == NEW:
         try:
             plan = make_plan(ds, tkey, steps_over, use_rep, hf_auto, samples)
         except Exception as e:
-            return _cs_result(script=upd, text="", fields=[""] * n, explain="", prompts_path="", prompts_text="",
-                              newname="", save_over=gr.update(visible=False),
+            return _cs_result(**upd, text="", fields=[""] * n, explain="", prompts_path="", prompts_text="",
+                              newname="", can_save_over=False,
                               status=f"**Cannot build a recommendation:** {e}")
         text, ps = plan["script_text"], _plan_state(plan)
-        return _cs_result(script=upd, text=text, fields=read_form(text),
+        return _cs_result(**upd, text=text, fields=read_form(text),
                           explain=explain_md(ds, tkey, plan["cfg"], plan["stats"], text, plan["rec"], False,
                                              ps["repeats"], ps["rename"], ps["create"]),
                           prompts_path=str(plan["prompts_path"]) if samples else "",
                           prompts_text=plan["prompts_text"] if samples else "",
-                          newname=plan["filename"], save_over=gr.update(visible=False),
+                          newname=plan["filename"], can_save_over=False,
                           status=_new_status(plan), plan=ps)
     text = Path(script).read_text(encoding="utf-8", errors="ignore")
     filled = False
@@ -1344,12 +1341,12 @@ def cs_load(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
     pp = prompts_path_from_text(text, S.lora_path(ds))
     ptext = pp.read_text(encoding="utf-8", errors="ignore") if pp and pp.is_file() else ""
     label = presets.get(tk, {}).get("label", tk)
-    return _cs_result(script=upd, type_=tk, text=text, fields=read_form(text),
+    return _cs_result(**upd, type=tk, text=text, fields=read_form(text),
                       explain=explain_for(ds, tk, script, text, {}),
                       samples=has_samples(text),
                       prompts_path=str(pp) if pp else "", prompts_text=ptext,
                       newname=_next_name(ds, text, script),
-                      save_over=gr.update(visible=True),
+                      can_save_over=True,
                       status=f"**Loaded `{Path(script).name}`** (detected type: {label}). Edit the form or the text, then Save. "
                              "Use Save as new to keep the original untouched."
                              + (" `HF_TOKEN` was empty and has been filled from huggingtoken.txt (not saved yet)." if filled else ""))
@@ -1383,7 +1380,7 @@ def cs_suggest(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True
         if renamed and not renamed.startswith("⚠"):
             plan = make_plan(ds, tkey, steps_over, use_rep, hf_auto, samples)   # the folder has the count now
     text, ps = plan["script_text"], _plan_state(plan)
-    gr.Info("The editor now shows the recommended script. Nothing is saved until you press a Save button.")
+    notify.info("The editor now shows the recommended script. Nothing is saved until you press a Save button.")
     return _cs_result(text=text, fields=read_form(text),
                       explain=explain_md(ds, tkey, plan["cfg"], plan["stats"], text, plan["rec"], False,
                                          ps["repeats"], ps["rename"], ps["create"]),
@@ -1407,7 +1404,7 @@ def cs_apply_quiet(ds, tkey, script, text, plan, *vals):
     """LoRA Studio: a field of More settings was changed: write it into the script text, without a message."""
     new, _, _ = apply_form(text or "", list(vals))
     if new == (text or ""):
-        return [gr.update()] * len(_cs_result())
+        return {}
     return _cs_result(text=new, explain=explain_for(ds, tkey, script, new, plan), plan=plan)
 
 
@@ -1430,11 +1427,11 @@ def cs_retype(ds, script, tkey, text, steps_over, use_rep, hf_auto=True, samples
 def cs_apply(ds, tkey, script, text, plan, *vals):
     new, changes, failed = apply_form(text or "", list(vals))
     if changes:
-        gr.Info("Applied to the script text (not saved yet): " + "; ".join(changes))
+        notify.info("Applied to the script text (not saved yet): " + "; ".join(changes))
     if failed:
-        gr.Warning("No training command found to add these to: " + ", ".join(failed))
+        notify.warning("No training command found to add these to: " + ", ".join(failed))
     if not changes and not failed:
-        gr.Info("Nothing to change: the form matches the text, or its fields are empty.")
+        notify.info("Nothing to change: the form matches the text, or its fields are empty.")
     return _cs_result(text=new, explain=explain_for(ds, tkey, script, new, plan), plan=plan)
 
 
@@ -1485,7 +1482,7 @@ def _folder_note(notes):
 
 def cs_save_over(ds, script, text, tkey, plan, makedirs):
     if script in (None, "", NEW) or not Path(script).is_file():
-        gr.Warning("No existing launch script is selected: use Save as new.")
+        notify.warning("No existing launch script is selected: use Save as new.")
         return "No existing launch script is selected."
     p = Path(script)
     text = S.fix_flags(text or "")[0]
@@ -1502,7 +1499,7 @@ def cs_save_over(ds, script, text, tkey, plan, makedirs):
             except Exception:
                 pass
     notes = ensure_folders(ds, text, plan, tkey) if makedirs else []
-    gr.Info(f"Saved {p.name}")
+    notify.info(f"Saved {p.name}")
     return msg + _folder_note(notes)
 
 
@@ -1520,17 +1517,17 @@ def _bump_if_taken(lora: Path, text: str) -> tuple[str, str]:
 
 def cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, plan, makedirs):
     if not ds:
-        return _cs_result(status="Pick a LoRA folder.", plan=plan) + [gr.update()]
+        return _cs_result(status="Pick a LoRA folder.", plan=plan)
     name = (newname or "").strip()
     if name and not name.endswith(".sh"):
         name += ".sh"
     if not name or not re.fullmatch(r"[\w][\w .\-]*\.sh", name):
-        gr.Warning("Enter a file name like MyCharacterFLUXtraining.sh (letters, digits, space, _ - . only).")
-        return _cs_result(status="Invalid file name.", plan=plan) + [gr.update()]
+        notify.warning("Enter a file name like MyCharacterFLUXtraining.sh (letters, digits, space, _ - . only).")
+        return _cs_result(status="Invalid file name.", plan=plan)
     dest = S.lora_path(ds) / name
     if dest.exists():
-        gr.Warning(f"{name} already exists. Pick another name, or select it and use Save (overwrite).")
-        return _cs_result(status=f"`{name}` already exists. Choose another name.", plan=plan) + [gr.update()]
+        notify.warning(f"{name} already exists. Pick another name, or select it and use Save (overwrite).")
+        return _cs_result(status=f"`{name}` already exists. Choose another name.", plan=plan)
     text, vnote = _bump_if_taken(S.lora_path(ds), S.fix_flags(text or "")[0])
     if (plan or {}).get("rename") and (plan or {}).get("repeats"):
         r = _auto_rename(ds, plan["repeats"][0])
@@ -1556,7 +1553,5 @@ def cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, pla
     if tidy:
         msg += f" {tidy[:1].upper()}{tidy[1:]}."
     msg += " Add it to the queue in the Queue."
-    gr.Info(f"Saved {name}")
-    res = _cs_result(script=gr.update(choices=cs_script_choices(ds), value=str(dest)), save_over=gr.update(visible=True),
-                     status=msg, plan={})
-    return res + [gr.update(choices=S.list_scripts(), value=str(dest))]
+    notify.info(f"Saved {name}")
+    return _cs_result(script=str(dest), script_choices=cs_script_choices(ds), can_save_over=True, status=msg, plan={})

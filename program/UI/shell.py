@@ -93,6 +93,9 @@ def build_page():
     ui.add_head_html(BRIDGE_JS)
     shell = Shell()
     ui.on("ls_nav", lambda e: shell.go("settings", group=e.args))
+    ui.on("ls_lora", lambda e: shell.go("collection", lora=str(e.args)))
+    import notify
+    notify.SHOW = lambda msg, kind: ui.notify(msg, type="warning" if kind == "warning" else "info")
     ui.on("ls_go", lambda e: shell.go("datasets", run=e.args[4:]) if str(e.args).startswith("run|")
           else shell.go(str(e.args)))
     shell.dark = ui.dark_mode(app.storage.user.get("dark", False))
@@ -139,6 +142,7 @@ window.lsSend = function(box, v){ emitEvent('ls_' + box, v); };
 window.lsSetNav = function(k){ emitEvent('ls_nav', k); };
 window.lsGoQueue = function(){ emitEvent('ls_go', 'queue'); };
 window.lsGoRun = function(log){ emitEvent('ls_go', 'run|' + log); };
+window.lsOpenLora = function(gid){ emitEvent('ls_lora', 'gid:' + gid); };
 </script>
 """
 

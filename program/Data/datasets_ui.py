@@ -651,7 +651,7 @@ def calc(ds, tkey, text):
     """(calculation html, effects html, values for the settings inputs)."""
     S = sg()
     if not ds or not tkey or not text:
-        return '<p class="ls-empty">Pick the LoRA type above.</p>', "", [gr.update()] * len(SETTINGS)
+        return '<p class="ls-empty">Pick the LoRA type above.</p>', "", []
     base = S.lora_path(ds)
     stats = S.dataset_stats(ds)
     pics = stats["total"]
@@ -776,7 +776,7 @@ def calc(ds, tkey, text):
                                              else "" if same else "  ·  yours is different")
                     + (" (the folder is renamed when you change it here or press Fill with recommended)" if flag == "repeats" and not same else "")
                     + f".  {why}")
-        vals.append(gr.update(value=cur, info=info))
+        vals.append((cur, info))
     return calc_html, eff_html, vals
 
 
@@ -790,7 +790,7 @@ def _same(a, b) -> bool:
 def apply_settings(ds, tkey, text, *vals):
     S = sg()
     if not ds or not text:
-        return gr.update(), "Open a launch script first."
+        return text, "Open a launch script first."
     new = text
     msgs = []
     for (flag, label, _), v in zip(SETTINGS, vals):
