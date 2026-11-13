@@ -22,9 +22,10 @@ from widgets import CropPanel, PaintPanel, note, pic_url, stream
 
 
 def attach(page):
+    import ds_results
     import ds_train
     for n, fn in ((2, step2), (3, step3), (4, step4), (5, step5), (6, step6), (7, step7), (8, step8),
-                  (9, ds_train.step9), (11, step11)):
+                  (9, ds_train.step9), (10, ds_results.step10), (11, step11)):
         page.steps[n] = (lambda fn=fn: fn(page))
 
 

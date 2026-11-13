@@ -41,6 +41,7 @@ Owner's decisions (2026-11-13):
 - [x] Collection: Browse, LoRA page (Overview, Pictures, Training, Edit), Insights, Maintenance (logic in Gallery/lorapage.py, maint.py)
 - [x] Home (+ Just trained: the last queue's runs with their test pictures; the status strip opens it)
 - [x] Queue (+ test pictures after a queue: one LoRA best + final, several the final file of each; comfytest.WHICH, last_batch.json)
-- [ ] Datasets: list, Improvements, dataset page (Prepare steps 1-8, Train, Results, LoRA)
+- [x] Datasets: list, new dataset, dataset page (steps 2-8 in UI/ds_steps.py, Train UI/ds_train.py, Results
+  UI/ds_results.py, LoRA). Still open: Improvements' *Fix the ticked datasets* (batch, settings_ui.batch_panel).
 - [ ] Settings (all groups), first-run setup page
 - [ ] Manual text and pip screenshots; selftest; Gradio removed; beta release
