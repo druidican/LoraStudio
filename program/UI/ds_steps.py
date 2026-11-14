@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -261,8 +261,10 @@ def step5(page):
             ui.html(V.s5_suggest_html(ds, n, rng, why), sanitize=False)
             with ui.row().classes("items-center gap-2"):
                 keep = ui.number("Keep", value=n, min=1, precision=0).props("outlined dense").classes("w-28")
-                ui.button("Use the suggestion", on_click=lambda: (keep.set_value(F.suggest_size(ds)[0]), draw())) \
-                    .props("outline dense no-caps")
+                async def use_suggestion():
+                    keep.set_value(F.suggest_size(ds)[0])
+                    await draw()
+                ui.button("Use the suggestion", on_click=use_suggestion).props("outline dense no-caps")
             mode = ui.radio({"safe": "Safe: the cleanest pictures first",
                              "varied": "Varied: more close-ups, angles, outfits and details"}, value=mode0)
         with ui.card().props("flat bordered").classes("ls-card grow basis-0"):
@@ -270,7 +272,7 @@ def step5(page):
     r = DSC.result(ds)
     if r and DSC.enabled(ds):
         with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
-            dhtml = ui.html(V.detail_html(ds, r), sanitize=False)
+            dhtml = ui.html('<p class="ls-note">Loading the suggestions …</p>', sanitize=False)
             dpick = ui.select({i["id"]: i["label"] for i in r["items"]}, multiple=True,
                               label="Tick what to do (nothing happens until you press the button)") \
                 .props("outlined dense use-chips").classes("w-full")
@@ -280,11 +282,11 @@ def step5(page):
                 ids = list(dpick.value or [])
                 await stream(DSC.apply(ds, ids), lambda line: setattr(dmsg, "text", line))
                 rr = DSC.result(ds) or {}
-                dhtml.content = V.detail_html(ds, rr)
+                dhtml.content = await run.io_bound(V.detail_html, ds, rr)
                 dpick.options = {i["id"]: i["label"] for i in rr.get("items") or []}
                 dpick.value = []
                 dpick.update()
-                draw()
+                await draw()
             with ui.row().classes("items-center gap-2"):
                 ui.button("Tick all suggestions", on_click=lambda: dpick.set_value(list(dpick.options))) \
                     .props("flat dense no-caps")
@@ -293,17 +295,19 @@ def step5(page):
     with ui.row().classes("items-center gap-2"):
         ui.button("Tick all", on_click=lambda: ui.run_javascript("dsTickAll(true)")).props("flat dense no-caps")
         ui.button("Untick all", on_click=lambda: ui.run_javascript("dsTickAll(false)")).props("flat dense no-caps")
-    g = ui.html("", sanitize=False).classes("w-full").props('id="ds_s5"')
+    g = ui.html('<p class="ls-note">Loading the pictures …</p>', sanitize=False).classes("w-full").props('id="ds_s5"')
     msg = ui.markdown("")
 
-    def draw():
-        mix.content, g.content = V.s5_grid(ds, keep.value)
+    async def draw():
+        """The grid and the mix are made in a thread: thumbnails of big pictures take seconds, and the page must keep
+        its connection meanwhile."""
+        mix.content, g.content = await run.io_bound(V.s5_grid, ds, keep.value)
 
-    def set_mode(e):
+    async def set_mode(e):
         mm = F.meta(ds)
         mm["select_mode"] = e.value
         F.meta_save(ds, mm)
-        draw()
+        await draw()
 
     async def confirm():
         sel = await ui.run_javascript("Array.from(document.querySelectorAll('#ds_s5 .ds-cell input:checked'))"
@@ -311,19 +315,24 @@ def step5(page):
         if not sel:
             msg.content = "Nothing is ticked."
             return
-        msg.content = F.apply_select(ds, sel)
+        msg.content = await run.io_bound(F.apply_select, ds, sel)
         page.go(step=6)
 
-    def back():
-        msg.content = f"✔ {F.back_from_reserve(ds)[0]} pictures put back."
-        draw()
+    async def back():
+        msg.content = f"✔ {(await run.io_bound(F.back_from_reserve, ds))[0]} pictures put back."
+        await draw()
     mode.on_value_change(set_mode)
-    keep.on("keydown.enter", lambda: draw())
-    keep.on("blur", lambda: draw())
+    keep.on("keydown.enter", draw)
+    keep.on("blur", draw)
     with ui.row().classes("items-center gap-2"):
         ui.button("Confirm selection →", on_click=confirm).props("unelevated no-caps color=primary")
         ui.button("Move all back from _reserve", on_click=back).props("outline no-caps")
-    draw()
+
+    async def first():
+        await draw()
+        if r and DSC.enabled(ds):
+            dhtml.content = await run.io_bound(V.detail_html, ds, r)
+    ui.timer(0, first, once=True)
 
 
 # --------------------------------------------------------------------------- 6 Watermarks and size

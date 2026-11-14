@@ -7,7 +7,7 @@ and the consistency check (7), the repeat folder and the launch script page (9).
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -251,14 +251,18 @@ def setup_card(types, purpose="character") -> tuple[str, bool]:
 # --------------------------------------------------------------------------- 3 Usable scan
 
 
-def _where(ds, p) -> str:
+def _repeat_folders(ds) -> list:
+    """The repeat folders of a dataset (read once per page, not once per picture)."""
+    return [Path(x["folder"]) for x in F.sg().dataset_stats(ds)["rows"]]
+
+
+def _where(ds, p, reps=None) -> str:
     """'from _reserve/' for a picture outside the repeat folder, '' for one in it."""
     try:
         rel = Path(p).relative_to(F.root(ds))
     except ValueError:
         return ""
-    rows = [x["folder"] for x in F.sg().dataset_stats(ds)["rows"]]
-    if any(Path(p).parent == f for f in rows):
+    if any(Path(p).parent == f for f in (reps if reps is not None else _repeat_folders(ds))):
         return ""
     return f"from {rel.parts[0]}/ · " if len(rel.parts) > 1 else "from the dataset folder · "
 
@@ -272,7 +276,8 @@ def s3_render(ds, sc, show):
     chips = (f'<span class="ls-chip ok">{c.get("usable", 0)} usable</span>' +
              "".join(f'<span class="ls-chip bad">{n} {esc(k)}</span>' for k, n in c.items() if k != "usable"))
     md = f'<div class="ds-chips">{chips}<span class="ls-note">scanned {esc(sc["at"])}, smallest side wanted {sc["min_side"] or "—"} px</span></div>'
-    rows = [{"path": p, "why": _where(ds, p) + (e["why"] if e["bad"] else f'{e["w"]}×{e["h"]}'), "keep": not e["bad"],
+    reps = _repeat_folders(ds)
+    rows = [{"path": p, "why": _where(ds, p, reps) + (e["why"] if e["bad"] else f'{e["w"]}×{e["h"]}'), "keep": not e["bad"],
              "bad": e["bad"]}
             for p, e in sorted(pics.items(), key=lambda kv: (not kv[1]["bad"], Path(kv[0]).name))
             if show == "All" or e["bad"]]
@@ -369,7 +374,8 @@ def s5_grid(ds, keep_n):
                                        "counts as much as its quality." if F.meta(ds).get("select_mode") == "varied" else
                                        "Picked by quality first, then what each picture adds (framing, outfit, place).")
            + '</div></div>')
-    cells = [{"path": r["path"], "why": _where(ds, r["path"]) + r.get("reason", ""), "keep": r["keep"],
+    reps = _repeat_folders(ds)
+    cells = [{"path": r["path"], "why": _where(ds, r["path"], reps) + r.get("reason", ""), "keep": r["keep"],
               "bad": r["cat"] in ("out", "poor") and not r.get("pin"), "pin": r.get("pin", "")}
              for r in sorted(rows, key=lambda r: (not r["keep"], r["cat"] in ("out", "poor", "dup"), Path(r["path"]).name))]
     outside = {str(x) for x in F.extra_pictures(ds)} if F.include_extra(ds) else set()

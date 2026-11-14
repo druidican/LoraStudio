@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.131126c"
-VERSION = "1.131126c"
+__version__ = "1.141126"
+VERSION = "1.141126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.131126c",
+    "version.py": "1.141126",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.131126c",
     "program/Training/sd_script.py": "1.131126c",
-    "program/Data/sd_prepare.py": "1.131126c",
+    "program/Data/sd_prepare.py": "1.141126",
     "program/Training/sd_settings.py": "1.131126c",
-    "program/Data/datasets_ui.py": "1.131126c",
-    "program/Data/dsflow.py": "1.131126c",
+    "program/Data/datasets_ui.py": "1.141126",
+    "program/Data/dsflow.py": "1.141126",
     "program/Training/training_ui.py": "1.131126c",
     "program/Settings/settings_ui.py": "1.131126c",
     "program/Gallery/lora_library.py": "1.131126c",
@@ -40,10 +40,10 @@ RELEASE: dict = {
     "program/Settings/ghupdate.py": "1.011126",
     "program/Settings/hfdownload.py": "1.131126c",
     "program/Settings/ollamactl.py": "1.011126",
-    "program/Data/datacheck.py": "1.131126c",
+    "program/Data/datacheck.py": "1.141126",
     "program/Data/consistency.py": "1.011126",
     "program/Data/pictools.py": "1.011126",
-    "program/Data/pictools_worker.py": "1.011126",
+    "program/Data/pictools_worker.py": "1.141126",
     "program/Gallery/picgallery.py": "1.011126",
     "program/Data/trim.py": "1.111126g",
     "program/Data/housekeeping.py": "1.011126",
@@ -58,7 +58,7 @@ RELEASE: dict = {
     "program/UI/setup_page.py": "1.131126c",
     "program/UI/pg_home.py": "1.131126c",
     "program/UI/pg_datasets.py": "1.131126c",
-    "program/UI/ds_steps.py": "1.131126c",
+    "program/UI/ds_steps.py": "1.141126",
     "program/UI/ds_train.py": "1.131126c",
     "program/UI/ds_results.py": "1.131126c",
     "program/UI/ds_batch.py": "1.131126c",
@@ -66,7 +66,7 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.131126c",
     "program/UI/lora_page.py": "1.131126c",
     "program/UI/pg_settings.py": "1.131126c",
-    "program/UI/set_panels.py": "1.131126c",
+    "program/UI/set_panels.py": "1.141126",
     "program/Gallery/lorapage.py": "1.131126c",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -97,6 +97,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.141126", "Going from Sort to Select no longer drops the connection: step 5 builds its picture list in the background and no longer reads the whole dataset once per picture. Step 6 opens at once (picture sizes are read from the file header instead of decoding every picture). The picture tools work with transformers 5 (the AttributeError in step 4's quick pass)."),
     ("1.131126c", "Beta: LoRA Studio on NiceGUI. The same pages, much faster; after training, Home's Just trained card leads straight to the test pictures (one LoRA: its best save point and the final file; a queue: the final file of each). The ? button opens the manual with pictures. Add pictures from a folder works again."),
     ("1.131126b", "One page per dataset: an open dataset has four parts in a bar under its name: Prepare (steps 1-8, it reopens at the step you were at), Train (the launch script, plus this dataset's queue items and last runs), Results (its runs, moved here from Training › Results; 'Runs of' still shows other datasets or all) and LoRA (its LoRA files with versions, status, best and Completed, and a button to the LoRA page). The Training tab is now the Queue tab; Insights moved to the Collection. A Collection tile opens the dataset page's LoRA part (a type label on the tile still opens that LoRA page). The status strip and Home's Last results open the run in its dataset's Results. The old Training › Results start-up load and its wiring are removed. Manual updated."),
     ("1.131126", "Redesign 4: Home is the new start page: what is training now, what needs a look (setup problems, datasets that could be better, warnings in your LoRA files), the last five results and the datasets you worked on last, each a click away. The Manual left the tab row: the ? button at the top opens it at the chapter of the page you are on, and ← Back returns there. If Collection was your start page, Home takes its place (Settings › Start and network changes it)."),

@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -932,8 +932,7 @@ def resize_plan(ds, max_side: int, over: dict | None = None, upscale: bool = Tru
     tools = tools_ok() and upscale
     for p in images(ds):
         try:
-            with Image.open(p) as im:
-                w, h = ImageOps.exif_transpose(im).size
+            w, h = DC.shown_size(p)
         except Exception:                                # noqa: BLE001
             continue
         rel = str(p.relative_to(r))
@@ -976,8 +975,7 @@ def person_box(path: str, aspect: str = "free", run: bool = False) -> list[float
             e = pictools.cached(p)
         if not e:
             return None
-        with Image.open(p) as im:
-            w, h = ImageOps.exif_transpose(im).size
+        w, h = DC.shown_size(p)
         a = {"1:1": 1.0, "3:4": 0.75, "4:3": 4 / 3}.get(aspect)
         return pictools.smart_box(e, w, h, a)
     except Exception:                                    # noqa: BLE001

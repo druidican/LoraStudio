@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126"  # LoRA Studio version, see version.py
 
 import lspaths
 import base64
@@ -432,6 +432,34 @@ def _cached_url(key: str):
     return lspaths.file_url(fp) if fp.exists() else None
 
 
+_SIZES: dict = {}
+
+
+def shown_size(p) -> tuple[int, int]:
+    """Width and height as the picture is shown (EXIF rotation counted) without decoding it: only the header is read,
+    and the answer is kept per file version. Decoding every picture just for its size made pages wait seconds."""
+    st = Path(p).stat()
+    k = (str(p), st.st_mtime, st.st_size)
+    if k not in _SIZES:
+        if len(_SIZES) > 20000:
+            _SIZES.clear()
+        with Image.open(p) as im:
+            w, h = im.size
+            try:
+                if im.format == "PNG":                   # PNG's getexif() decodes the whole picture: use the header
+                    raw, ex = im.info.get("exif"), Image.Exif()
+                    if raw:
+                        ex.load(raw)
+                else:
+                    ex = im.getexif()
+                if ex.get(0x0112) in (5, 6, 7, 8):       # rotated by 90° or 270°
+                    w, h = h, w
+            except Exception:                            # noqa: BLE001
+                pass
+        _SIZES[k] = (w, h)
+    return _SIZES[k]
+
+
 def thumb_uri(p: Path, side: int = 160) -> str:
     try:
         key = _sigkey(p, "thumb", side)
@@ -726,8 +754,7 @@ def apply_choice(dataset_root: Path, rp: str, e: dict, choice: str, mask: Path |
             try:
                 from PIL import Image as _I
                 with _I.open(mask) as mk:
-                    with Image.open(orig) as o:
-                        W, H = ImageOps.exif_transpose(o).size
+                    W, H = shown_size(orig)
                     bb = mk.convert("L").resize((W, H)).point(lambda v: 255 if v > 20 else 0).getbbox()
                 if bb:
                     pictools.keep_cutout(root, rp, orig, [{"box": list(bb), "kind": "painted", "text": ""}])

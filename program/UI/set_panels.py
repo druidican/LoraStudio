@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -523,10 +523,12 @@ def panel_comfy(page):
             url = ui.input("ComfyUI address", value=s["url"]).props("outlined dense").classes("grow")
             tmsg = ui.markdown("")
 
-            def test():
+            async def test():
                 u = (url.value or "").strip() or CT.DEFAULTS["url"]
-                tmsg.content = (f"✔ ComfyUI answers at {u} ({len(CT.lora_names(u))} LoRAs in its list)." if CT.alive(u)
-                                else f"❌ ComfyUI does not answer at {u}. Start it, then press Test again.")
+                tmsg.content = "Asking ComfyUI …"
+                ok = await run.io_bound(CT.alive, u)
+                tmsg.content = (f"✔ ComfyUI answers at {u} ({len(await run.io_bound(CT.lora_names, u))} LoRAs in its "
+                                "list)." if ok else f"❌ ComfyUI does not answer at {u}. Start it, then press Test again.")
             ui.button("Test", on_click=test).props("outline dense no-caps")
         lora_dir = ui.input("The LoRA folder ComfyUI reads (empty = your first LoRA folder)", value=s["lora_dir"]) \
             .props("outlined dense").classes("w-full")

@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -407,9 +407,8 @@ def _wm_box(ds, rp, l, r, t, b, aspect):
     root = S.lora_path(ds)
     e = S.DC.marks_load(root).get(rp) or {}
     src = _wm_source(root, rp, e)
-    from PIL import Image, ImageOps
-    with Image.open(src) as im:
-        W, H = ImageOps.exif_transpose(im).size
+    import datacheck as DC
+    W, H = DC.shown_size(src)
     import dsflow as F
     fr = F.fit_box(W, H, l / 100, t / 100, r / 100, b / 100, aspect)
     return src, W, H, fr, [round(fr[0] * W), round(fr[1] * H), round(fr[2] * W), round(fr[3] * H)]
@@ -451,9 +450,8 @@ def wm_tool_info(ds, rp) -> tuple:
     root = S.lora_path(ds)
     e = S.DC.marks_load(root).get(rp) or {}
     src = _wm_source(root, rp, e)
-    from PIL import Image, ImageOps
-    with Image.open(src) as o:
-        W, H = ImageOps.exif_transpose(o).size
+    import datacheck as DC
+    W, H = DC.shown_size(src)
     box = e.get("custom_box") or next((o["box"] for o in e.get("options") or []), None) or [0, 0, W, H]
     return src, [box[0] / W, box[1] / H, box[2] / W, box[3] / H]
 

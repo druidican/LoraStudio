@@ -13,7 +13,7 @@ until the worker is told to quit (LoRA Studio quits it before a training run and
 Model files are downloaded on first use into the models folder given as the first argument.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.141126"  # LoRA Studio version, see version.py
 
 import base64
 import json
@@ -57,6 +57,17 @@ def fetch(name: str) -> Path:
     return p
 
 
+def _emb(x):
+    """CLIP features: a tensor (transformers 4) or an output object holding them (transformers 5)."""
+    if hasattr(x, "norm"):
+        return x
+    for k in ("image_embeds", "text_embeds", "pooler_output"):
+        v = getattr(x, k, None)
+        if v is not None:
+            return v
+    return x[0]
+
+
 def torch_dev():
     import torch
     if "dev" not in M:
@@ -77,7 +88,7 @@ def clip():
             kinds = {}
             for k, texts in KIND_TEXT.items():
                 t = proc(text=texts, return_tensors="pt", padding=True).to(dev)
-                e = model.get_text_features(**t).float()
+                e = _emb(model.get_text_features(**t)).float()
                 e = e / e.norm(dim=-1, keepdim=True)
                 kinds[k] = e.mean(0)
                 kinds[k] = kinds[k] / kinds[k].norm()
@@ -129,7 +140,7 @@ def analyze(paths):
             continue
         with torch.no_grad():
             px = proc(images=im, return_tensors="pt")["pixel_values"].to(dev, dt)
-            emb = model.get_image_features(pixel_values=px).float()[0]
+            emb = _emb(model.get_image_features(pixel_values=px)).float()[0]
             emb = emb / emb.norm()
             score = float(aes(emb[None])[0, 0])
             sims = {k: float(emb @ v) for k, v in kinds.items()}
