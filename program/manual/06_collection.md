@@ -17,8 +17,28 @@ that LoRA page directly.
 - **Pictures / Status**: the tiles, or a list with the warnings and problems of the LoRA files themselves (what a
   dataset still needs is in Datasets › Improvements).
 - **Select**: tick tiles (or *Select all shown*), then *✓ Mark Completed* or *Mark not completed*. **Completed** marks a
-  version as finished: its launch script is hidden in the Queue. A new version starts unmarked.
+  version as finished: its launch script is hidden in the Queue. A new version starts unmarked. *Delete…* removes the
+  selected LoRAs (see *Deleting a LoRA* below).
 - *Rescan folders* reads your LoRA folders again (new or removed files).
+
+## Deleting a LoRA
+
+*Delete…* (Browse › Select, or on the LoRA page) opens a list of everything that belongs to each LoRA, with the size.
+Tick what goes:
+
+- the **versions** (all are ticked; untick one to keep it);
+- **LoRA folder**: the file ComfyUI uses and its LoRA Manager files (`.metadata.json`, preview, example pictures);
+- **Dataset's model/ folder**: the final file, the save points and the resume states;
+- **Runs**: the run logs, the test pictures, the sample pictures and the TensorBoard logs;
+- **Launch script**;
+- **The dataset folder too** (unticked at first): the pictures, the captions and everything in the dataset. When the
+  dataset also has other LoRA types, the list says so.
+
+![Delete: what goes, per LoRA](img/delete.jpg)
+
+*Show the files* lists every file. Tick *I want these moved to the Trash* and press **Move to the Trash**. Nothing is
+deleted for good: everything goes to Ubuntu's Trash, so the file manager can put it back until the Trash is emptied.
+A dataset that is training right now, and a launch script waiting in the queue, are left alone.
 
 ## The LoRA page
 

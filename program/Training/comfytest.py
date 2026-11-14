@@ -15,8 +15,9 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126b"  # LoRA Studio version, see version.py
 
+import contextlib
 import json
 import random
 import shutil
@@ -382,6 +383,50 @@ def results(info) -> dict:
     return meta
 
 
+def _lora_root():
+    cfg = settings()
+    if cfg.get("lora_dir"):
+        return Path(cfg["lora_dir"]).expanduser()
+    dirs = [Path(p).expanduser() for p in sg().lora_dirs_setting()]
+    return dirs[0] if dirs else None
+
+
+def _stage(f: Path, url: str, root: Path) -> tuple[Path, str]:
+    """Copy a LoRA file into <LoRA folder>/_lorastudio_test/ and return (the copy, the name ComfyUI knows it by)."""
+    tdir = root / TEST_DIR
+    tdir.mkdir(parents=True, exist_ok=True)
+    tmp = tdir / f.name
+    shutil.copy2(f, tmp)
+    name = f"{TEST_DIR}/{f.name}"
+    names = lora_names(url)
+    if names and name not in names:
+        alt = next((x for x in names if x.replace("\\", "/").endswith(name)), None)
+        if not alt:
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError(f"ComfyUI does not see `{tdir}`: set the LoRA folder ComfyUI reads in Settings › "
+                               "Test pictures.")
+        name = alt
+    return tmp, name
+
+
+@contextlib.contextmanager
+def staged_lora(f: Path, url: str):
+    """with staged_lora(file, url) as name: the LoRA is in ComfyUI's LoRA folder for the time of the block."""
+    root = _lora_root()
+    if root is None:
+        raise RuntimeError("No LoRA folder is set (Settings › Folders, or Settings › Test pictures).")
+    tmp, name = _stage(Path(f), url, root)
+    try:
+        yield name
+    finally:
+        tmp.unlink(missing_ok=True)
+        try:
+            if tmp.parent.is_dir() and not any(tmp.parent.iterdir()):
+                tmp.parent.rmdir()
+        except OSError:
+            pass
+
+
 def make(logname: str, say=None) -> str:
     """Make the test pictures of one run. Returns a message (starting with ✔ or ❌)."""
     say = say or (lambda t: None)
@@ -419,19 +464,11 @@ def make(logname: str, say=None) -> str:
     JOBS[logname] = {"state": "running", "done": 0, "total": total, "text": ""}
     tdir = root / TEST_DIR
     try:
-        tdir.mkdir(parents=True, exist_ok=True)
         for lab, f in eps:
-            tmp = tdir / f.name
-            shutil.copy2(f, tmp)
-            name = f"{TEST_DIR}/{f.name}"
-            names = lora_names(url)
-            if names and name not in names:
-                alt = next((x for x in names if x.replace("\\", "/").endswith(name)), None)
-                if not alt:
-                    tmp.unlink(missing_ok=True)
-                    return (f"❌ ComfyUI does not see `{tdir}`: set the LoRA folder ComfyUI reads in Settings › "
-                            "Test pictures.")
-                name = alt
+            try:
+                tmp, name = _stage(f, url, root)
+            except RuntimeError as e:
+                return f"❌ {e}"
             for i, pr in enumerate(prompts):
                 text = (fixed + ", " if fixed else "") + pr["text"]
                 dest = d / f"{lab.replace(' ', '')}_p{i + 1}.png"

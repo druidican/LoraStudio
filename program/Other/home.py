@@ -13,7 +13,7 @@ Nothing is scanned here: every part reads what the other pages already know (the
 data of the cards; UI/pg_home.py draws them.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126b"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -42,6 +42,15 @@ def remember(ds: str, step: int):
         RECENT.parent.mkdir(parents=True, exist_ok=True)
         RECENT.write_text(json.dumps(new[:5]), encoding="utf-8")
     except OSError:
+        pass
+
+
+def forget(datasets: list[str]):
+    """Datasets that were deleted leave the Continue card."""
+    try:
+        old = json.loads(RECENT.read_text(encoding="utf-8"))
+        RECENT.write_text(json.dumps([r for r in old if r.get("ds") not in set(datasets)]), encoding="utf-8")
+    except (OSError, ValueError):
         pass
 
 

@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.141126"
-VERSION = "1.141126"
+__version__ = "1.141126b"
+VERSION = "1.141126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.141126",
+    "version.py": "1.141126b",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.131126c",
     "program/Training/sd_script.py": "1.131126c",
@@ -30,7 +30,7 @@ RELEASE: dict = {
     "program/Training/training_ui.py": "1.131126c",
     "program/Settings/settings_ui.py": "1.131126c",
     "program/Gallery/lora_library.py": "1.131126c",
-    "program/Training/comfytest.py": "1.131126c",
+    "program/Training/comfytest.py": "1.141126b",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
@@ -58,20 +58,24 @@ RELEASE: dict = {
     "program/UI/setup_page.py": "1.131126c",
     "program/UI/pg_home.py": "1.131126c",
     "program/UI/pg_datasets.py": "1.131126c",
-    "program/UI/ds_steps.py": "1.141126",
+    "program/UI/ds_steps.py": "1.141126b",
     "program/UI/ds_train.py": "1.131126c",
     "program/UI/ds_results.py": "1.131126c",
     "program/UI/ds_batch.py": "1.131126c",
     "program/UI/pg_queue.py": "1.131126c",
-    "program/UI/pg_collection.py": "1.131126c",
-    "program/UI/lora_page.py": "1.131126c",
+    "program/UI/pg_collection.py": "1.141126b",
+    "program/UI/lora_page.py": "1.141126b",
     "program/UI/pg_settings.py": "1.131126c",
     "program/UI/set_panels.py": "1.141126",
     "program/Gallery/lorapage.py": "1.131126c",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
+    "program/Gallery/delete.py": "1.141126b",
+    "program/UI/delete_dialog.py": "1.141126b",
+    "program/Data/gapfill.py": "1.141126b",
+    "program/UI/ds_gapfill.py": "1.141126b",
     "program/Other/statusbar.py": "1.131126c",
-    "program/Other/home.py": "1.131126c",
+    "program/Other/home.py": "1.141126b",
     "program/Other/gpusmi.py": "1.051126b",
     "program/Training/savepoint.py": "1.011126",
     "program/Settings/launchopts.py": "1.131126c",
@@ -97,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.141126b", "Collection: Delete… (Browse › Select, and the LoRA page) moves a LoRA's versions, its LoRA Manager files, save points, runs, test pictures, launch scripts and, if you tick it, its dataset to the Trash. Step 5: after a detailed scan, Fill the gaps with your LoRA makes the missing kinds of pictures (close-ups, back views, other places …) with the dataset's own LoRA through ComfyUI; you pick the good ones. Too many of one framing can be set aside."),
     ("1.141126", "Going from Sort to Select no longer drops the connection: step 5 builds its picture list in the background and no longer reads the whole dataset once per picture. Step 6 opens at once (picture sizes are read from the file header instead of decoding every picture). The picture tools work with transformers 5 (the AttributeError in step 4's quick pass)."),
     ("1.131126c", "Beta: LoRA Studio on NiceGUI. The same pages, much faster; after training, Home's Just trained card leads straight to the test pictures (one LoRA: its best save point and the final file; a queue: the final file of each). The ? button opens the manual with pictures. Add pictures from a folder works again."),
     ("1.131126b", "One page per dataset: an open dataset has four parts in a bar under its name: Prepare (steps 1-8, it reopens at the step you were at), Train (the launch script, plus this dataset's queue items and last runs), Results (its runs, moved here from Training › Results; 'Runs of' still shows other datasets or all) and LoRA (its LoRA files with versions, status, best and Completed, and a button to the LoRA page). The Training tab is now the Queue tab; Insights moved to the Collection. A Collection tile opens the dataset page's LoRA part (a type label on the tile still opens that LoRA page). The status strip and Home's Last results open the run in its dataset's Results. The old Training › Results start-up load and its wiring are removed. Manual updated."),
@@ -182,6 +187,10 @@ PARTS = [
     ("program/Gallery/lorapage.py", "the LoRA page's logic (details, edits, pictures)"),
     ("program/Gallery/maint.py", "Collection › Maintenance logic (sync, leftovers, orphans)"),
     ("program/Other/notify.py", "short messages at the corner of the page"),
+    ("program/Gallery/delete.py", "Collection › Delete: what belongs to a LoRA, moved to the Trash"),
+    ("program/UI/delete_dialog.py", "the Delete dialog of the Collection"),
+    ("program/Data/gapfill.py", "step 5: fill the gaps of a dataset with its own LoRA through ComfyUI"),
+    ("program/UI/ds_gapfill.py", "step 5's card Fill the gaps with your LoRA"),
     ("program/Other/statusbar.py", "status bar"),
     ("program/Other/home.py", "Home page"),
     ("program/Other/gpusmi.py", "AMD GPU values: amd-smi (ROCm 10 and newer) or rocm-smi"),

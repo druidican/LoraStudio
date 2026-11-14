@@ -108,6 +108,19 @@ the reason. **Nothing happens until you tick a suggestion and press *Do the tick
   next to the original (`b07_face1.png`), upscaled when it is small, and pinned 📌 Always. It has no caption yet:
   step 7 *Only pictures without a caption* writes it.
 
+![Fill the gaps with your LoRA](img/step5_gaps.jpg)
+
+**Fill the gaps with your LoRA** card (after a detailed scan): when the dataset has too few pictures of a kind (no
+close-ups, no back view, one place only …), new pictures of that kind can be made with the dataset's own LoRA (its
+newest version) through your test-picture workflow in ComfyUI (Settings › Test pictures). Set how many of each, press
+**Make the pictures**, then click a picture to see it large, tick the good ones and press **Add the ticked to the
+dataset**: they join the repeat folder as `made_<kind>_N.png` with an 📌 Always pin, and the rest go to the Trash
+(*Throw them all away* discards them all). Their captions are written in step 7. **Too many of one kind** (more than
+60 % full body, for example) is outweighed by making more of the other kinds; for a framing, *Set some aside* also
+gives the lowest-ranked of them the ⛔ Never pin. The prompts only name the kind (framing, angle, pose, expression,
+light, outfit, place), with the trigger word and the class word. Look at made pictures carefully: a LoRA repeats its
+own mistakes, so only add the ones that are right.
+
 Upscaling and sharpening use your **upscale workflow** in ComfyUI (Settings › Test pictures (ComfyUI)); without it,
 upscales use LoRA Studio's own picture tools when they are installed, and sharpening waits. The originals, and the crops
 as they were cut, stay in `_originals/`.

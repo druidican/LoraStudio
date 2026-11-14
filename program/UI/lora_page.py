@@ -2,7 +2,7 @@
 """Collection › LoRA page: one LoRA (all its versions) in four parts: Overview, Pictures (made with it), Training and
 Edit. The data and the actions are in Gallery/lorapage.py; this file only draws them."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126b"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -140,6 +140,15 @@ class LoraPage:
         await run.io_bound(LP.read_training_again, self.key)
         self.show(self.key)
 
+    async def delete(self):
+        import delete_dialog as DD
+        if self.gid:
+            await DD.open_dialog([self.gid], after=self.deleted)
+
+    def deleted(self, text: str):
+        self.col.deleted(text)
+        self.col.tabs.value = "browse"
+
     def new_version(self):
         lora = LIB.loras.get(self.key)
         if lora and lora.dataset is not None:
@@ -193,6 +202,7 @@ class LoraPage:
                               on_click=lambda: (setattr(self.accept_msg, "text", LP.accept_warnings(self.key)),
                                                 self.show(self.key), self.col.redraw())).props("outline dense no-caps")
                     ui.button("Pictures made with it", on_click=self.pictures_now).props("outline dense no-caps")
+                    ui.button("Delete…", on_click=self.delete).props("outline dense no-caps color=negative")
                 self.accept_msg = note("")
                 with ui.expansion("Copy this LoRA to your LoRA folder").classes("w-full ls-card"):
                     self.cp_dest = ui.input("Copy to folder").props("outlined dense").classes("w-full")

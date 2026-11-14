@@ -7,7 +7,7 @@ that send an event back here (emitEvent): a tile opens its dataset page, a type 
 Select mode is kept in the browser (picked cards get the class ll-picked) and read when a button needs it.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.141126b"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -91,6 +91,17 @@ class Collection:
         self.msg.text = LL.mark_completed(gids or [], done).replace("**", "")
         self.redraw()
 
+    async def delete(self):
+        import delete_dialog as DD
+        gids = await ui.run_javascript(
+            "[...document.querySelectorAll('.ll-card.ll-picked[data-gid]')].map(e => e.dataset.gid)")
+        await DD.open_dialog(list(gids or []), after=self.deleted)
+
+    def deleted(self, text: str):
+        self.msg.text = text.split("\n")[0]
+        ui.notify(text, multi_line=True, close_button=True, timeout=0)
+        self.redraw()
+
     def select_mode(self, on: bool):
         ui.run_javascript(f"document.body.classList.toggle('ls-selecting', {str(bool(on)).lower()});"
                           + ("" if on else "document.querySelectorAll('.ll-picked').forEach(e => e.classList.remove('ll-picked'));")
@@ -137,6 +148,7 @@ class Collection:
                         ui.label("0 selected").classes("ls-selcount ls-note")
                         ui.button("✓ Mark Completed", on_click=lambda: self.mark(True)).props("unelevated dense no-caps color=teal")
                         ui.button("Mark not completed", on_click=lambda: self.mark(False)).props("flat dense no-caps")
+                        ui.button("Delete…", on_click=self.delete).props("outline dense no-caps color=negative")
                     self.sel_tools.set_visibility(False)
                 self.msg = note("")
                 self.view = ui.html(self.browse_html(), sanitize=False).classes("w-full")
