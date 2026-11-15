@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126b"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -874,25 +874,33 @@ def compare_html(st: dict) -> str:
         return head + '<p class="ls-empty">No test pictures yet. Press <b>Make test pictures</b> (ComfyUI must be running).</p>'
     labs = grid["labels"]
     best = st.get("best")
-    cols = []
-    for lab in labs:
-        mark = " rs-cbest" if best is not None and lab == f"epoch {best}" else ""
-        cols.append(f'<th class="rs-chead{mark}"><div>{_esc(lab)}' + (" · try first" if mark else "") + '</div>'
-                    f'<button class="tr-btn tr-small" onclick="lsSend(\'rs_box\', \'cmpuse|{_esc(lab)}\')">Use this one'
-                    '</button></th>')
+    kept = grid.get("kept")
+    prompts = grid.get("prompts") or []
+    heads = "".join(f'<th class="rs-cprompt" title="{_esc(pr.get("text", "")[:300])}">{i + 1}</th>'
+                    for i, pr in enumerate(prompts))
     rows = []
-    for i, pr in enumerate(grid.get("prompts") or []):
+    for lab in labs:                                     # one row per save point: the overview reads left to right
+        mark = " rs-cbest" if best is not None and lab == f"epoch {best}" else ""
+        f = (grid.get("files") or {}).get(lab) or ""
+        if kept == lab:
+            act = '<div class="tr-ok">✔ kept</div>'
+        elif f and Path(f).is_file():
+            act = (f'<button class="tr-btn tr-small" onclick="lsSend(\'rs_box\', \'cmpkeep|{_esc(lab)}\')">Keep this '
+                   'one</button>')
+        else:
+            act = '<div class="tr-muted">file gone</div>'
+        pics = (grid.get("pics") or {}).get(lab) or []
         cells = []
-        for lab in labs:
-            pics = (grid.get("pics") or {}).get(lab) or []
-            f = pics[i] if i < len(pics) else None
-            cells.append(f'<td>{"<img loading=lazy src=" + chr(39) + sg.DC.thumb_uri(Path(f), 320) + chr(39) + ">" if f else "<span class=tr-muted>—</span>"}</td>')
-        tip = _esc(pr.get("text", "")[:300])
-        rows.append(f'<tr><td class="rs-cprompt" title="{tip}">{i + 1}</td>{"".join(cells)}</tr>')
-    return (head + f'<div class="rs-cwrap"><table class="rs-cgrid"><thead><tr><th></th>{"".join(cols)}</tr></thead>'
+        for i in range(len(prompts)):
+            pf = pics[i] if i < len(pics) else None
+            cells.append(f'<td>{"<img loading=lazy src=" + chr(39) + sg.DC.thumb_uri(Path(pf), 320) + chr(39) + ">" if pf else "<span class=tr-muted>—</span>"}</td>')
+        rows.append(f'<tr><th class="rs-chead{mark}"><div>{_esc(lab)}' + (" · try first" if mark else "")
+                    + f'</div>{act}</th>{"".join(cells)}</tr>')
+    return (head + f'<div class="rs-cwrap"><table class="rs-cgrid rs-crow"><thead><tr><th></th>{heads}</tr></thead>'
             f'<tbody>{"".join(rows)}</tbody></table></div><p class="ls-note">Made {_esc(grid.get("at", ""))} · the same '
-            'prompt and seed in each row · hover a row number for its prompt. <b>Use this one</b> copies that save point '
-            'to the folder above with its LoRA Manager data, and its first picture as the preview.</p>')
+            'prompt and seed in each column · hover a column number for its prompt. <b>Keep this one</b> makes that save '
+            'point the final file of the run, moves the other save points to the Trash and uses its first picture as '
+            'the LoRA card\'s preview.</p>')
 
 
 # --------------------------------------------------------------------------- comparing runs
@@ -1134,3 +1142,57 @@ def dataset_of_log(logname: str) -> str:
     info = script_info(script) if Path(script).is_file() else None
     return info["dataset"] if info else Path(script).parent.name
 
+
+
+def keep_epoch(st: dict, label: str) -> str:
+    """Keep one save point of a run: it becomes the run's final file (<name>.safetensors); the other save points of
+    this run, its old final file and its resume states go to the Trash; a copy in your LoRA folder is replaced by the
+    kept file; the LoRA card gets its first test picture as preview."""
+    import comfytest as CT
+    import lorapage
+    if not st or not st.get("log"):
+        return "Open a run first."
+    if sg.RUN.running() and sg.RUN.logfile and Path(sg.RUN.logfile).name == st["log"]:
+        return "This run is still training."
+    facts = CT._run_facts(st["log"])
+    if not facts:
+        return "❌ The launch script of this run is gone."
+    info = facts["info"]
+    grid = CT.results(info)
+    f = Path((grid.get("files") or {}).get(label) or "")
+    if not f.is_file():
+        return "❌ That save point file is gone (kept or cleaned up already?)."
+    final = info["out_dir"] / f"{info['out_name']}.safetensors"
+    if sg.HK is None:
+        return "❌ housekeeping.py is missing."
+    size, moved = 0, 0
+    if f.resolve() != final.resolve():
+        if final.exists():
+            size += sg._size(final)
+            n, failed = sg.HK.trash([final])
+            if final.exists():
+                return f"❌ The old final file could not be moved to the Trash: {'; '.join(failed[:2])}"
+            moved += n
+        f.rename(final)
+    _, eps = _final_and_epochs(info)
+    trash = [p for p in eps.values() if p.exists()]
+    trash += [d for d in sg.scan_states(info["out_dir"]) if d.name.startswith(info["out_name"] + "-")]
+    replaced = ""
+    for c in sg.HK.lora_files(sg.lora_dirs_setting()):
+        if c.name == final.name and c.stat().st_size != final.stat().st_size:
+            sg.HK.trash([c])
+            if not c.exists():
+                import shutil
+                shutil.copy2(final, c)
+                replaced = f" Your LoRA folder's copy `{c.parent.name}/{c.name}` was replaced (the old one is in the Trash)."
+    size += sum(sg._size(p) for p in trash)
+    n, failed = sg.HK.trash(trash)
+    moved += n
+    grid["kept"] = label
+    grid["files"] = {k: (str(final) if k == label else "") for k in (grid.get("files") or {})}
+    CT._save_grid(CT.compare_dir(info), grid)
+    pics = [p for p in (grid.get("pics") or {}).get(label) or [] if p]
+    card = lorapage.write_card(final, Path(pics[0]) if pics else None, f"kept {label} of run {st['log']}")
+    _LEFT.clear()
+    return (f"✔ Kept **{label}** as `{final.name}`. {moved} other file(s), {_gb(size)}, moved to the Trash.{replaced} "
+            f"{card}" + (f" Could not move: {'; '.join(failed[:3])}" if failed else ""))

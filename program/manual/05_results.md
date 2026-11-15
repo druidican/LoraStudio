@@ -8,17 +8,21 @@ copied to your LoRA folder, and the leftovers *Clean up* can remove.
 
 ## One run
 
-![One run: try first, the loss per epoch, the save points](img/result_one.jpg)
+![One run: what was made, and which file to keep](img/result_one.jpg)
+
+**What was made** comes first: the test pictures that were made right after the run, one row per save point (the one
+to try first and the final file), the same prompt and seed in each column. **Keep this one** makes that save point the
+run's final file (`<name>.safetensors`); the other save points of the run, the old final file and the resume states go
+to the Trash, a copy in your LoRA folder with the same name is replaced, and the LoRA card gets that row's first
+picture as its preview. *Make them again* makes the pictures anew (for example when ComfyUI was off).
 
 **Try first** is the earliest saved epoch whose loss is within 1 % of the lowest, and it says when the loss rose at the
 end (trained too long) or was still falling (could train longer). Loss is only a rough guide for image LoRAs: make
 a few test pictures with it and the final file.
 
-- *Copy the one to try first* / *Copy the final* copies the file into your LoRA folder, with its LoRA Manager data:
-  into the folder of its LoRA type (next to an older version when there is one, in a subfolder), never into the LoRA
-  folder's root.
-- **Test pictures (ComfyUI)**: the same prompts and seeds with several save points side by side; *Use this one*
-  copies that save point and makes its first picture the preview.
+- *Copy a file to your LoRA folder* (folded): *Copy the one to try first* / *Copy the final* copies the file into
+  your LoRA folder, with its LoRA Manager data: into the folder of its LoRA type (next to an older version when there
+  is one, in a subfolder), never into the LoRA folder's root.
 - **Clean up this run** moves epoch files you did not copy, saved states and caches to the Trash.
 - **This run**: *Train a new version…* opens the dataset's Train part; *Run it again* puts the same
   script in the queue; *★ Best version* marks it; *Your rating* (4-5 good, 1-2 weak) teaches Insights; *Report for Claude* makes the report file (see [Training](#training)).

@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126b"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
@@ -1143,6 +1143,15 @@ def _queue_worker():
                 it["state"], it["note"] = "done", f"finished in {took}" + (f" · {room}" if room else "")
                 if run.logfile:
                     _Q_DONE_LOGS.append(Path(run.logfile).name)
+                    try:                                  # test pictures and the LoRA card before the next run
+                        import comfytest
+                        base_note = it["note"]
+                        it["note"] = base_note + " · making the test pictures …"
+                        res = comfytest.after_run(Path(run.logfile).name,
+                                                  lambda t, it=it, b=base_note: it.__setitem__("note", f"{b} · {t}"))
+                        it["note"] = base_note + " · " + res.split(" · ")[0][:160]
+                    except Exception as e:            # noqa: BLE001
+                        it["note"] += f" · test pictures: {e}"
             else:
                 try:
                     import failcodes
@@ -1161,7 +1170,7 @@ def _queue_worker():
             QUEUE["stop_flag"] = False
             QUEUE["killed"] = False
         done, _Q_DONE_LOGS[:] = list(_Q_DONE_LOGS), []
-        if done:                                    # test pictures in ComfyUI, after the whole queue (LoRA Studio)
+        if done:                                    # Home › Just trained (the test pictures were made after each run)
             try:
                 import comfytest
                 comfytest.after_queue(done)

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """The dataset page's Results part (step 10): its runs, one run (advice, save points, test pictures, clean up,
 rating, report, TensorBoard) and comparing runs. The data and the HTML parts are training_ui's; clicks inside them
-come back as ls_rs_box events (open, copy, cmpuse, best)."""
+come back as ls_rs_box events (open, copy, cmpkeep, best)."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126b"  # LoRA Studio version, see version.py
 
-from nicegui import ui
+from nicegui import run, ui
 
 import features as FT
 import sdgui as sg
@@ -77,15 +77,23 @@ class Results:
         elif act == "copy":
             self.cmsg.content = T.copy_file(self.st, arg, self.dest.value, self.over.value)
             self.reopen()
-        elif act == "cmpuse":
-            import comfytest as CT
-            self.cmsg.content = CT.use(self.st.get("log"), arg, self.dest.value, self.st, self.over.value)
-            self.cmp_html.content = T.compare_html(self.st)
+        elif act == "cmpkeep":
+            ui.timer(0, lambda: self.keep(arg), once=True)
         elif act == "best":
             msg = T.toggle_best(arg)
             self.again_msg.content = self.cmp_bmsg.content = msg
             if self.logs:
                 self.cmp_head.content = T.compare_head_html(self.logs)
+
+    async def keep(self, label: str):
+        from widgets import confirm
+        if not await confirm(f"Keep {label} of this run? It becomes the run's final file; the other save points, the "
+                             "old final file and the resume states go to the Trash.", "Keep it"):
+            return
+        self.kmsg.content = "⏳ Keeping …"
+        self.kmsg.content = await run.io_bound(T.keep_epoch, self.st, label)
+        self.cmp_html.content = T.compare_html(self.st)
+        self.reopen()
 
     def tick(self):
         import comfytest as CT
@@ -174,8 +182,25 @@ class Results:
         with ui.column().classes("w-full gap-3") as self.one:
             ui.button("← All runs", on_click=lambda: (self.draw_list(), self.show("list"))).props("flat dense no-caps")
             self.head = ui.html("", sanitize=False).classes("w-full")
+            with ui.card().props("flat bordered").classes("ls-card w-full gap-1"):
+                ui.label("What was made: the test pictures, and which file to keep").classes("font-semibold")
+                note("Made by themselves after the run (the save point to try first and the final file). Pick the one "
+                     "to keep with Keep this one.")
+                self.kmsg = ui.markdown("")
+
+                def make():
+                    import comfytest as CT
+                    if self.st.get("log"):
+                        CT.WHICH[self.st["log"]] = "best+final"
+                        self.cmsg.content = CT.make_in_background(self.st["log"])
+                        self.cmp_html.content = T.compare_html(self.st)
+                self.cmp_html = ui.html("", sanitize=False).classes("w-full")
+                with ui.row().classes("gap-2"):
+                    ui.button("Make them again", on_click=make).props("flat dense no-caps")
+                    ui.button("Refresh", on_click=lambda: setattr(self.cmp_html, "content", T.compare_html(self.st))) \
+                        .props("flat dense no-caps")
             with ui.row().classes("w-full no-wrap items-start gap-4"):
-                with ui.card().props("flat bordered").classes("ls-card grow basis-2/5 gap-2"):
+                with ui.expansion("Copy a file to your LoRA folder").classes("ls-card grow basis-2/5"):
                     self.tryf = ui.html("", sanitize=False)
                     with ui.row().classes("gap-2"):
                         ui.button("Copy the one to try first", on_click=lambda: (setattr(self.cmsg, "content", T.copy_best(
@@ -192,19 +217,6 @@ class Results:
                     self.plot = ui.echart(dict(PLOT)).classes("w-full h-60")
             ui.label("Save points").classes("font-semibold")
             self.sp = ui.html("", sanitize=False).classes("w-full")
-            with ui.card().props("flat bordered").classes("ls-card w-full gap-1"):
-                ui.label("Test pictures (ComfyUI)").classes("font-semibold")
-
-                def make():
-                    import comfytest as CT
-                    if self.st.get("log"):
-                        self.cmsg.content = CT.make_in_background(self.st["log"])
-                        self.cmp_html.content = T.compare_html(self.st)
-                with ui.row().classes("gap-2"):
-                    ui.button("Make test pictures", on_click=make).props("unelevated dense no-caps color=primary")
-                    ui.button("Refresh", on_click=lambda: setattr(self.cmp_html, "content", T.compare_html(self.st))) \
-                        .props("flat dense no-caps")
-                self.cmp_html = ui.html("", sanitize=False).classes("w-full")
             with ui.card().props("flat bordered").classes("ls-card w-full gap-1"):
                 ui.label("Clean up this run").classes("font-semibold")
                 self.clean_md = ui.markdown("")

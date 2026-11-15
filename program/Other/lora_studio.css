@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE */
-/* LoRA Studio version 1.131126c */
+/* LoRA Studio version 1.151126b */
 /* LoRA Studio: the look of the pages (colours come from the --ll-* variables of the Collection style).
    Edit freely. For your own changes that survive updates, use custom.css next to this file instead:
    it is loaded after this one, and an update never replaces it. Reload the page after a change
@@ -189,6 +189,7 @@ table.ds-calc { border-collapse:collapse; font-size:14px; } .ds-calc td { paddin
 .rs-chead { font-size:13px; text-align:left; } .rs-chead div { margin-bottom:4px; }
 .rs-cbest div { color:#B9741A; font-weight:700; }
 .rs-cprompt { font-size:12px; color:var(--ll-muted); cursor:help; }
+.rs-crow img { width:auto; height:170px; max-width:none; } .rs-crow th.rs-chead { min-width:120px; vertical-align:middle; }
 
 /* version: next to the title, and the parts table in Settings › Version */
 .ls-ver { font-size: 0.45em; font-weight: 500; opacity: 0.55; vertical-align: middle; margin-left: 6px; }

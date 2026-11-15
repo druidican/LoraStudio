@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.141126"  # LoRA Studio version, see version.py
+__version__ = "1.151126b"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -536,8 +536,9 @@ def panel_comfy(page):
             n = ui.number("Test prompts per LoRA", value=s["prompts"], min=1, max=24, precision=0).props("outlined dense")
             around = ui.number("Save points on each side of the one to try first", value=s["around"], min=0, max=6,
                                precision=0).props("outlined dense").classes("w-80")
-        auto = ui.checkbox("Make them by themselves after the training queue has finished (one LoRA: the save point "
-                           "to try first and the final file; several: the final file of each)", value=s["auto"])
+        auto = ui.checkbox("Make them by themselves right after each run, before the next one in the queue starts "
+                           "(the save point to try first and the final file; then ComfyUI's memory is freed)",
+                           value=s["auto"])
     fams = {}
     for fam, lab in CT.FAMILIES.items():
         with card():

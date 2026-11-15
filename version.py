@@ -14,23 +14,23 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.151126"
-VERSION = "1.151126"
+__version__ = "1.151126b"
+VERSION = "1.151126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.151126",
+    "version.py": "1.151126b",
     "program/lspaths.py": "1.131126c",
-    "program/Training/sdgui.py": "1.131126c",
+    "program/Training/sdgui.py": "1.151126b",
     "program/Training/sd_script.py": "1.131126c",
     "program/Data/sd_prepare.py": "1.141126",
     "program/Training/sd_settings.py": "1.131126c",
     "program/Data/datasets_ui.py": "1.141126",
     "program/Data/dsflow.py": "1.141126",
-    "program/Training/training_ui.py": "1.131126c",
+    "program/Training/training_ui.py": "1.151126b",
     "program/Settings/settings_ui.py": "1.131126c",
     "program/Gallery/lora_library.py": "1.131126c",
-    "program/Training/comfytest.py": "1.141126b",
+    "program/Training/comfytest.py": "1.151126b",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
@@ -60,14 +60,14 @@ RELEASE: dict = {
     "program/UI/pg_datasets.py": "1.131126c",
     "program/UI/ds_steps.py": "1.141126b",
     "program/UI/ds_train.py": "1.131126c",
-    "program/UI/ds_results.py": "1.131126c",
+    "program/UI/ds_results.py": "1.151126b",
     "program/UI/ds_batch.py": "1.131126c",
     "program/UI/pg_queue.py": "1.131126c",
     "program/UI/pg_collection.py": "1.141126b",
     "program/UI/lora_page.py": "1.141126b",
     "program/UI/pg_settings.py": "1.131126c",
-    "program/UI/set_panels.py": "1.141126",
-    "program/Gallery/lorapage.py": "1.131126c",
+    "program/UI/set_panels.py": "1.151126b",
+    "program/Gallery/lorapage.py": "1.151126b",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
     "program/Gallery/delete.py": "1.141126b",
@@ -95,12 +95,13 @@ RELEASE: dict = {
     "program/Other/studio_css.py": "1.011126",
     "program/Training/Lora_Datatypes.py": "1.111126h",
     "program/Training/Training_Recommendations.py": "1.091126",
-    "program/Other/lora_studio.css": "1.131126c",
+    "program/Other/lora_studio.css": "1.151126b",
     "install.sh": "1.131126c",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.151126b", "Test pictures are made right after each run, before the next one in the queue starts (the save point to try first and the final file); then ComfyUI's memory is freed and the LoRA card gets the first test picture as its preview. Results opens a run with what was made: one row of test pictures per save point and Keep this one, which makes that save point the run's final file and moves the other save points to the Trash."),
     ("1.151126", "Step 4 Sort no longer stops with 'bad typecode': the look-alike check read the picture tools' results in a way that needs Python 3.13; it now works on the 3.12 LoRA Studio uses."),
     ("1.141126b", "Collection: Delete… (Browse › Select, and the LoRA page) moves a LoRA's versions, its LoRA Manager files, save points, runs, test pictures, launch scripts and, if you tick it, its dataset to the Trash. Step 5: after a detailed scan, Fill the gaps with your LoRA makes the missing kinds of pictures (close-ups, back views, other places …) with the dataset's own LoRA through ComfyUI; you pick the good ones. Too many of one framing can be set aside."),
     ("1.141126", "Going from Sort to Select no longer drops the connection: step 5 builds its picture list in the background and no longer reads the whole dataset once per picture. Step 6 opens at once (picture sizes are read from the file header instead of decoding every picture). The picture tools work with transformers 5 (the AttributeError in step 4's quick pass)."),

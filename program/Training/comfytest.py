@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.141126b"  # LoRA Studio version, see version.py
+__version__ = "1.151126b"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -557,22 +557,57 @@ def share_prompts(lognames: list[str]) -> str:
 
 
 # --------------------------------------------------------------------------- after the queue
+def free_memory(url=None):
+    """Ask ComfyUI to unload its models, so the next training gets the whole GPU."""
+    try:
+        _req(url or settings()["url"], "/free", {"unload_models": True, "free_memory": True}, timeout=30)
+    except Exception:                                    # noqa: BLE001
+        pass
+
+
+def _finish(logname: str, say=None) -> str:
+    """After a run: its test pictures (the save point to try first and the final file), ComfyUI's memory freed, and
+    the LoRA card (LoRA Manager data, the first test picture as preview)."""
+    msg = make(logname, say)
+    free_memory()
+    try:
+        import lorapage
+        msg += " " + lorapage.write_card_for_run(logname)
+    except Exception as e:                               # noqa: BLE001
+        msg += f" (LoRA card: {e})"
+    return msg
+
+
+def after_run(logname: str, say=None) -> str:
+    """Called by the queue right after a run finished well, before the next one starts."""
+    say = say or (lambda t: None)
+    cfg = settings()
+    if not cfg.get("auto"):
+        try:
+            import lorapage
+            return lorapage.write_card_for_run(logname)
+        except Exception as e:                           # noqa: BLE001
+            return f"LoRA card: {e}"
+    WHICH[logname] = "best+final"
+    if not alive(cfg["url"]):
+        with _LOCK:
+            if logname not in PENDING:
+                PENDING.append(logname)
+        _kick()
+        return "ComfyUI does not answer: the test pictures are made when it does."
+    JOBS[logname] = {"state": "running", "done": 0, "total": 0, "text": "starting"}
+    msg = _finish(logname, say)
+    JOBS[logname] = {"state": "done", "text": msg, "done": 0, "total": 0}
+    return msg
+
+
 def after_queue(lognames: list[str]):
-    """Called when the training queue has finished: remember its runs (Home › Just trained) and make their test
-    pictures (when switched on): one LoRA trained: its best save point and its final file; several: the final file of
-    each, so they can be compared side by side."""
+    """Called when the training queue has finished: remember its runs for Home › Just trained (their test pictures
+    were made after each run, see after_run)."""
     try:
         BATCH_FILE.write_text(json.dumps({"logs": list(lognames), "at": time.time()}), encoding="utf-8")
     except OSError:
         pass
-    if not settings().get("auto"):
-        return
-    with _LOCK:
-        for ln in lognames:
-            WHICH[ln] = "best+final" if len(lognames) == 1 else "final"
-            if ln not in PENDING:
-                PENDING.append(ln)
-    _kick()
 
 
 def _kick():
@@ -592,7 +627,7 @@ def _kick():
                 ln = PENDING.pop(0) if PENDING else None
             if ln:
                 JOBS[ln] = {"state": "running", "done": 0, "total": 0, "text": "starting"}
-                msg = make(ln)
+                msg = _finish(ln)
                 JOBS[ln] = {"state": "done", "text": msg, "done": 0, "total": 0}
     if not any(t.name == "comfy-pending" for t in threading.enumerate()):
         threading.Thread(target=work, daemon=True, name="comfy-pending").start()
@@ -626,37 +661,3 @@ def batch_view(logs: list[str]) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- choosing one
-def use(logname: str, label: str, dest_dir: str, state: dict, overwrite: bool = False) -> str:
-    """Copy the save point `label` to the LoRA folder (with its LoRA Manager data) and use its first test picture as
-    the LoRA Manager preview."""
-    import training_ui as T
-    facts = _run_facts(logname)
-    if not facts:
-        return "❌ The launch script of this run is gone."
-    grid = results(facts["info"])
-    f = Path((grid.get("files") or {}).get(label) or "")
-    if not f.is_file():
-        return "❌ That save point file is gone."
-    msg = T.copy_file(state, f.name, dest_dir, overwrite)
-    if not msg.startswith("✔"):
-        return msg
-    copied_name = f.name
-    m = __import__("re").search(r"-(\d{6})$", f.stem)
-    if m and f.stem[:-7] == state.get("out"):
-        copied_name = f"{state['out']}-e{int(m.group(1))}.safetensors"
-    dest = Path(dest_dir).expanduser() / copied_name
-    pics = [p for p in (grid.get("pics") or {}).get(label) or [] if p]
-    if pics:
-        prev = dest.with_name(dest.stem + ".preview.png")
-        shutil.copy2(pics[0], prev)
-        sc = dest.with_name(dest.stem + ".metadata.json")
-        try:
-            data = json.loads(sc.read_text(encoding="utf-8"))
-            if not data.get("preview_url"):
-                data["preview_url"] = str(prev)
-                import lora_library as ll
-                ll.write_sidecar(sc, data)
-        except Exception:                                # noqa: BLE001
-            pass
-        msg += f" · preview `{prev.name}`"
-    return msg

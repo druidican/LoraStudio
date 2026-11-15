@@ -122,9 +122,11 @@ by you, written into launch scripts that download models, and masked in the run 
 
 The ComfyUI address (*Test* checks it) and your LoRA folder as ComfyUI sees it. Import your own ComfyUI workflow per
 model family once (Workflow › Save in ComfyUI). LoRA Studio then makes test pictures with every save point of a run,
-with the same model, sampler and size as your workflow: how many prompts, and whether they are made by themselves
-when a run ends. After one LoRA they are made for its best save point and its final file; after a queue of several,
-for the final file of each (see *Just trained* on [Home](#welcome)).
+with the same model, sampler and size as your workflow: how many prompts, and whether they are made by themselves.
+When they are, they are made **right after each run, before the next one in the queue starts**: for the save point
+to try first and the final file. Then ComfyUI is told to unload its models, so the next training gets the whole GPU,
+and the LoRA card gets the first test picture as its preview. ComfyUI must be running during the queue; when it is
+not, the pictures are made as soon as it answers.
 
 **Upscale workflow** (dataset pictures): your own ComfyUI workflow for the Detailed scan's upscales, sharpening and
 detail crops, for example **SeedVR2** (with a GGUF model if your video memory needs it). Save it in ComfyUI (*Workflow ›

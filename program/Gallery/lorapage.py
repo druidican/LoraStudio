@@ -5,7 +5,7 @@ fields, Completed, accepting warnings, copying to the LoRA folder, reading the t
 (head, training card, versions, picture grid) come from lora_library.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126b"  # LoRA Studio version, see version.py
 
 import copy
 import json
@@ -314,3 +314,73 @@ def save_old_names(gid: str, picked: list, typed: str) -> str:
     LL.set_picture_aliases(gid, names)
     n = len(LL.picture_aliases(gid))
     return f"✔ {n} old name{'s' if n != 1 else ''} linked to this LoRA." if n else "No old names linked."
+
+
+# --------------------------------------------------------------------------- the LoRA card after a run
+def _lora_of(final: Path):
+    """The Collection's entry of a LoRA file in a dataset's model/ folder (the Collection reads its folders again
+    when it does not know the file yet)."""
+    def find():
+        return next((lo for lo in LIB.loras.values() if lo.dataset_path is not None
+                     and Path(lo.dataset_path).resolve() == final.resolve()), None)
+    lo = find()
+    if lo is None:
+        LIB.scan()
+        lo = find()
+    return lo
+
+
+def write_card(final: Path, preview: Path | None, note: str = "") -> str:
+    """LoRA Manager data of a just-trained (or just-kept) LoRA, in <dataset>/LoraManager/<name>.metadata.json (the
+    training facts are written when the run ends, training_ui.sidecar_after_run): size and hash of the file, the
+    trigger word when missing, a note, and `preview` as its preview picture."""
+    import shutil
+    import time
+    final = Path(final)
+    lo = _lora_of(final) if final.is_file() else None
+    if lo is None or lo.sidecar_path is None:
+        return ""
+    data = copy.deepcopy(lo.sidecar) if lo.sidecar else LL.new_sidecar(LIB, lo)
+    st = final.stat()
+    LIB.hash_cache.pop(str(final), None)
+    data.update({"file_name": lo.stem, "file_path": str(final), "size": st.st_size, "modified": st.st_mtime,
+                 "sha256": LL.file_sha256(final, LIB.hash_cache), "base_model": lo.base or data.get("base_model", "")})
+    civ = data.setdefault("civitai", {})
+    if not civ.get("trainedWords") and lo.dataset is not None:
+        try:
+            import dsflow as F
+            trig = (F.meta(lo.dataset.name).get("trigger") or "").strip()
+        except Exception:                                # noqa: BLE001
+            trig = ""
+        if trig:
+            civ["trainedWords"] = [trig]
+    if note:
+        line = f"{time.strftime('%Y-%m-%d')}: {note}"
+        data["notes"] = (data.get("notes") or "").rstrip() + ("\n" if data.get("notes") else "") + line
+    if preview is not None and Path(preview).is_file():
+        prev = lo.sidecar_path.with_name(lo.stem + ".preview" + Path(preview).suffix)
+        prev.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(preview, prev)
+        data["preview_url"] = str(prev)
+    LL.write_sidecar(lo.sidecar_path, data)
+    LIB.save_hash_cache()
+    lo.sidecar = data
+    if data.get("preview_url"):
+        lo.preview = Path(data["preview_url"])
+    LIB._evaluate(lo)
+    LIB.save_cache()
+    return "LoRA card written" + (" with a preview." if preview is not None else ".")
+
+
+def write_card_for_run(logname: str) -> str:
+    """After a run: the card of its final file, with the first test picture of the save point to try first (else of
+    the final file) as preview."""
+    import comfytest as CT
+    facts = CT._run_facts(logname)
+    if not facts or not facts["final"]:
+        return ""
+    grid = CT.results(facts["info"])
+    pics = grid.get("pics") or {}
+    best = f"epoch {facts['best']}" if facts.get("best") is not None else ""
+    first = next((p for lab in (best, "final") for p in (pics.get(lab) or []) if p), None)
+    return write_card(facts["final"], Path(first) if first else None)
