@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE */
-/* LoRA Studio version 1.151126b */
+/* LoRA Studio version 1.151126i */
 /* LoRA Studio: the look of the pages (colours come from the --ll-* variables of the Collection style).
    Edit freely. For your own changes that survive updates, use custom.css next to this file instead:
    it is loaded after this one, and an update never replaces it. Reload the page after a change
@@ -165,6 +165,8 @@ table.ds-calc { border-collapse:collapse; font-size:14px; } .ds-calc td { paddin
 .ds-effrow span:first-child { min-width:220px; color:var(--ll-muted); }
 .ds-impcard { margin-bottom:10px; } .ds-imph { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:6px; }
 .ds-improw { display:flex; gap:10px; align-items:baseline; padding:4px 0; font-size:14px; }
+.ds-imppics summary { cursor:pointer; font-size:13px; opacity:.8; margin-top:2px; } .ds-imppics div { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.ds-imppics img { width:96px; height:96px; object-fit:cover; border-radius:6px; }
 .ds-seg label { border:1px solid var(--ll-line) !important; border-radius:0 !important; padding:4px 12px !important; margin:0 !important; }
 .ds-seg label.selected { background:#262A31 !important; color:#F6F5F1 !important; }
 .ds-seg input { display:none; }

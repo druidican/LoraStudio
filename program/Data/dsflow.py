@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.151126i"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1798,6 +1798,12 @@ def ds_sig(ds) -> tuple:
         fd = r / FLOW_DIR
         if fd.is_dir():
             parts += [(f.name, f.stat().st_mtime) for f in fd.glob("*.json")]
+            gf = fd / "gapfill" / "made.json"
+            if gf.is_file():
+                parts.append(("gapfill", gf.stat().st_mtime))
+        for d in r.iterdir():                            # captions rewritten in place change no folder time
+            if d.is_dir() and re.match(r"^\d+_", d.name):
+                parts.append(("caps", d.name, max((c.stat().st_mtime for c in d.glob("*.txt")), default=0)))
         mk = r / DC.SET_ASIDE / DC.MARKS_FILE
         if mk.is_file():
             parts.append(("marks", mk.stat().st_mtime))
@@ -1833,9 +1839,61 @@ def overview(ds_list) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- Improvements
-def improvements(ds) -> list[tuple[str, str]]:
-    """What could be better, from what is known already (nothing is scanned here). Cached per dataset."""
+def improvements(ds) -> list[tuple]:
+    """What could be better, from what is known already (nothing is scanned here). Cached per dataset.
+    [(kind, text, [pictures the note is about])]"""
     return _cached("improvements", ds, lambda: _improvements(ds))
+
+
+_NOT_WORDS = {"with", "wearing", "and", "the", "her", "his", "their", "its", "some", "plain", "simple", "casual",
+              "light", "dark", "background", "setting", "room", "indoor", "indoors", "outdoor", "outdoors"}
+
+
+def _words_of(value: str) -> list[str]:
+    """The words of an outfit or place answer that a caption would use ('red leather jacket' → red, leather, jacket)."""
+    return [w for w in re.findall(r"[a-z]+", (value or "").lower()) if len(w) >= 3 and w not in _NOT_WORDS]
+
+
+def named_in_captions(ds, pics, value: str, share: float = 0.7) -> bool:
+    """Do the captions of these pictures name the outfit / place (a word of it in at least `share` of them), in every
+    caption set that has captions? Then the trigger word does not take it over, and there is nothing to warn about."""
+    words = _words_of(value)
+    if not words or not pics:
+        return False
+    pat = re.compile(r"\b(" + "|".join(map(re.escape, words)) + r")", re.I)
+    checked = False
+    for st in caption_sets(ds):
+        caps = [read_set(Path(p), st["ext"]) for p in pics]
+        caps = [c for c in caps if c]
+        if len(caps) < share * len(pics):
+            return False                                  # most have no caption in this set yet
+        checked = True
+        if sum(1 for c in caps if pat.search(c)) < share * len(caps):
+            return False
+    return checked
+
+
+def _same_kind(ds, act: dict) -> list[tuple]:
+    """'The same outfit / place in most pictures', only when the captions do not name it."""
+    out = []
+    usable = {p: e for p, e in act.items() if e.get("framing") and e["cat"] != "out"}
+    n = len(usable)
+    if n < 6:
+        return out
+    for field, what in (("outfit", "outfit"), ("place", "place / background")):
+        by = {}
+        for p, e in usable.items():
+            v = re.sub(r"\s+", " ", str(e.get(field) or "").strip().lower())
+            if v:
+                by.setdefault(v, []).append(p)
+        if not by:
+            continue
+        top, pics = max(by.items(), key=lambda kv: len(kv[1]))
+        if len(pics) / n > 0.4 and not named_in_captions(ds, pics, top):
+            out.append(("balance", f"the same {what} ('{top}') in {len(pics)} of {n} pictures, and the captions do not "
+                                   "name it: it may stick to the trigger word. Vary it, or write it in the captions "
+                                   "(step 7) so it stays separate.", sorted(pics)))
+    return out
 
 
 def active_sort(ds) -> tuple[dict, list[Path]]:
@@ -1882,7 +1940,8 @@ def _improvements(ds) -> list[tuple[str, str]]:
         act, unsorted = active_sort(ds)
         if unsorted:
             out.append(("not checked", f"{len(unsorted)} picture{'s' if len(unsorted) != 1 else ''} in the repeat "
-                                       "folder came after the sort and are not checked yet: sort again (step 4)."))
+                                       "folder came after the sort and are not checked yet: sort again (step 4).",
+                        sorted(str(p) for p in unsorted)))
         alike = sum(1 for e in act.values() if e["cat"] == "alike")
         if m["purpose"] == "character" and n > 60:
             sug, _, _ = suggest_size(ds, so)
@@ -1899,13 +1958,19 @@ def _improvements(ds) -> list[tuple[str, str]]:
                                                       "place": e.get("place"), "people": 1}}
                                 for p, e in act.items() if e.get("framing") and e["cat"] != "out"}, m["purpose"])
             for note in notes:
-                if "full-body" not in note:
+                if "full-body" not in note and not note.startswith("the same "):
                     out.append(("balance", note))
+            out += _same_kind(ds, act)
         try:
             import detailscan as DSC
             if DSC.enabled(ds):
                 for g in DSC.active(ds)[1]:
                     out.append(("coverage", g))
+            import gapfill as GF
+            waiting = list(GF.state(ds)["made"])
+            if waiting:
+                out.append(("gaps", f"{len(waiting)} picture{'s' if len(waiting) != 1 else ''} for the gaps wait for "
+                                    "your pick in step 5 (Fill the gaps).", [str(GF._dir(ds) / f) for f in waiting]))
         except Exception:                                # noqa: BLE001
             pass
     if m["purpose"] == "character" and 0 < n < 15:
@@ -1979,6 +2044,8 @@ def batch_summary(b: dict | None = None) -> str:
             f"not usable) · 4 Sort · 5 Select: {keep}, the rest to `_reserve/` · 6 Watermarks and size"
             + (", small pictures upscaled" if b["upscale"] else "") + f", watermarks {wm} · 7 Captions: "
             + ("captions only for pictures without one" if b["captions"] == "missing" else "every caption written again")
+            + " · for a character with the detailed scan on, your own pictures made with its LoRA are looked "
+              "through for the gaps (they wait for your pick in step 5)"
             + (" · 9 a launch script with the recommended settings." if b["launch_script"]
                else ". Review and Train are skipped."))
 
@@ -2070,6 +2137,20 @@ def _batch_one(ds, url, model, say) -> list[str]:
     m = meta(ds)
     m["steps"]["tags"] = {"at": time.strftime("%Y-%m-%d %H:%M"), "auto": True}
     meta_save(ds, m)
+    if m["purpose"] == "character" and not BATCH["stop"]:   # gaps: only your own pictures, nothing is made
+        try:
+            import detailscan as DSC
+            import gapfill as GF
+            if DSC.enabled(ds):
+                jobs = [(d, v, 2) for d, v, _ in GF.analyse(ds)["few"]]
+                if jobs and GF.candidates(ds):
+                    say("5 Gaps · looking through your own pictures with this LoRA")
+                    found, gmsg = GF.search(ds, jobs, lambda line: say(f"5 Gaps · {line.lstrip('⏳ ')}"))
+                    n = sum(found.values())
+                    done.append(f"gaps: {n} of your own picture(s) found, they wait for your pick in step 5" if n
+                                else "gaps: " + re.sub(r"[*`✔]", "", gmsg).strip()[:140])
+        except Exception as e:                           # noqa: BLE001
+            done.append(f"gaps: not looked through ({e})")
     if B["launch_script"] and not BATCH["stop"]:
         say("9 Train")
         for t in m["types"]:

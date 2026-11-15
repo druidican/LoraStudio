@@ -8,7 +8,7 @@ Pictures, grids and lists are drawn as HTML by datasets_ui's renderers; their cl
 (route). What each step does to the dataset folder is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.151126i"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -19,7 +19,7 @@ import datasets_ui as V
 import ds_batch
 import dsflow as F
 import sdgui as S
-from widgets import note
+from widgets import note, pic_url
 
 NAMES = {2: "Setup", 3: "Usable scan", 4: "Sort", 5: "Select", 6: "Watermarks and size", 7: "Captions", 8: "Review",
          9: "Train", 10: "Results", 11: "LoRA"}
@@ -176,8 +176,18 @@ class Datasets:
                 items = [("error", str(e))]
             if not items:
                 continue
-            body = "".join(f'<div class="ds-improw"><span class="ls-chip warn">{V.esc(t)}</span><span>{V.esc(x)}</span></div>'
-                           for t, x in items)
+            rows = []
+            for it in items:
+                t, x, pics = it[0], it[1], (it[2] if len(it) > 2 else [])
+                more = ""
+                if pics:
+                    thumbs = "".join(f'<img loading="lazy" src="{pic_url(q, 160)}" title="{V.esc(Path(q).name)}">'
+                                     for q in pics[:60])
+                    more = (f'<details class="ds-imppics"><summary>Show the {len(pics)} picture'
+                            f'{"s" if len(pics) != 1 else ""}</summary><div>{thumbs}</div></details>')
+                rows.append(f'<div class="ds-improw"><span class="ls-chip warn">{V.esc(t)}</span>'
+                            f'<span>{V.esc(x)}{more}</span></div>')
+            body = "".join(rows)
             cards.append(f'<div class="ls-card ds-impcard"><div class="ds-imph"><label class="ds-tick ds-imptick">'
                          f'<input type="checkbox" data-ds="{V.esc(ds)}"><b>{V.esc(ds)}</b></label>'
                          f'<button class="tr-btn tr-small" onclick="{V.send("edit|" + ds)}">Open</button></div>{body}</div>')

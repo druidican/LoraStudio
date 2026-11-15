@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.151126h"
-VERSION = "1.151126h"
+__version__ = "1.151126i"
+VERSION = "1.151126i"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.151126h",
+    "version.py": "1.151126i",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.131126c",
     "program/Data/sd_prepare.py": "1.151126h",
     "program/Training/sd_settings.py": "1.131126c",
     "program/Data/datasets_ui.py": "1.151126h",
-    "program/Data/dsflow.py": "1.151126h",
+    "program/Data/dsflow.py": "1.151126i",
     "program/Training/training_ui.py": "1.151126b",
     "program/Settings/settings_ui.py": "1.151126h",
     "program/Gallery/lora_library.py": "1.131126c",
@@ -57,7 +57,7 @@ RELEASE: dict = {
     "program/UI/login.py": "1.131126c",
     "program/UI/setup_page.py": "1.131126c",
     "program/UI/pg_home.py": "1.131126c",
-    "program/UI/pg_datasets.py": "1.151126h",
+    "program/UI/pg_datasets.py": "1.151126i",
     "program/UI/ds_steps.py": "1.151126h",
     "program/UI/ds_train.py": "1.131126c",
     "program/UI/ds_results.py": "1.151126b",
@@ -95,12 +95,13 @@ RELEASE: dict = {
     "program/Other/studio_css.py": "1.011126",
     "program/Training/Lora_Datatypes.py": "1.111126h",
     "program/Training/Training_Recommendations.py": "1.091126",
-    "program/Other/lora_studio.css": "1.151126b",
+    "program/Other/lora_studio.css": "1.151126i",
     "install.sh": "1.151126h",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.151126i", "Improvements: the outfit / place note only when the captions do not name it; Show the pictures under each note; Fix looks through your own LoRA pictures for the gaps (waiting for your pick in step 5)."),
     ("1.151126h", "The caption consistency check is removed (step 7 and Automatic improvement)."),
     ("1.151126g", "Fill the gaps looks through your own ComfyUI pictures made with the dataset's LoRA alone first (Ollama says what each shows) and makes only what is still missing; a warning when more than a quarter of the dataset is LoRA-made."),
     ("1.151126f", "Step 6 removes watermarks with your own ComfyUI inpaint workflow (Settings › Test pictures (ComfyUI) › Inpaint workflow): Remove and Paint over it yourself use it while ComfyUI runs, else the picture tools."),
