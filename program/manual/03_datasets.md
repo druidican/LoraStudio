@@ -111,15 +111,20 @@ the reason. **Nothing happens until you tick a suggestion and press *Do the tick
 ![Fill the gaps with your LoRA](img/step5_gaps.jpg)
 
 **Fill the gaps with your LoRA** card (after a detailed scan): when the dataset has too few pictures of a kind (no
-close-ups, no back view, one place only …), new pictures of that kind can be made with the dataset's own LoRA (its
-newest version) through your test-picture workflow in ComfyUI (Settings › Test pictures). Set how many of each, press
-**Make the pictures**, then click a picture to see it large, tick the good ones and press **Add the ticked to the
-dataset**: they join the repeat folder as `made_<kind>_N.png` with an 📌 Always pin, and the rest go to the Trash
-(*Throw them all away* discards them all). Their captions are written in step 7. **Too many of one kind** (more than
-60 % full body, for example) is outweighed by making more of the other kinds; for a framing, *Set some aside* also
-gives the lowest-ranked of them the ⛔ Never pin. The prompts only name the kind (framing, angle, pose, expression,
-light, outfit, place), with the trigger word and the class word. Look at made pictures carefully: a LoRA repeats its
-own mistakes, so only add the ones that are right.
+close-ups, no back view, one place only …), set how many of each and press **Fill the gaps**. First your own ComfyUI
+pictures made with this dataset's LoRA **and no other LoRA** are looked through (the ones the LoRA page found when
+scanning your picture folders; newest version and highest strength first): Ollama tells what each one shows, with the
+same questions as the sort and the detailed scan, and the ones that fit a gap are offered, marked *yours* (a copy; the
+original stays where it is). Up to 60 pictures are looked at per press; the answers are kept, so pressing again goes
+on. What they cannot fill is then made new with the dataset's own LoRA (its newest version) through your test-picture
+workflow in ComfyUI (Settings › Test pictures). Click a picture to see it large, tick the good ones and press **Add
+the ticked to the dataset**: they join the repeat folder as `found_<kind>_N` / `made_<kind>_N` with an 📌 Always pin,
+and the rest go to the Trash (*Throw them all away* discards them all); your own pictures offered once are not offered
+again. Their captions are written in step 7. **Too many of one kind** (more than 60 % full body, for example) is
+outweighed by more of the other kinds; for a framing, *Set some aside* also gives the lowest-ranked of them the ⛔ Never
+pin. The prompts only name the kind (framing, angle, pose, expression, light, outfit, place), with the trigger word and
+the class word. Look at these pictures carefully: a LoRA repeats its own mistakes, so only add the ones that are
+right. When more than a quarter of the repeat folder is made by the LoRA, the card warns.
 
 Upscaling and sharpening use your **upscale workflow** in ComfyUI (Settings › Test pictures (ComfyUI)); without it,
 upscales use LoRA Studio's own picture tools when they are installed, and sharpening waits. The originals, and the crops

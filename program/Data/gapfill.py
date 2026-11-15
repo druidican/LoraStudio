@@ -1,17 +1,21 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """Fill the gaps the detailed scan found (step 5), for a new version of a LoRA:
 
-  too few    pictures of a framing, angle, pose, expression, light, outfit or place: new pictures are made with the
-             dataset's own LoRA (its newest or best version) through your ComfyUI test-picture workflow, with a prompt
-             written for what is missing ("<trigger>, <class word>, close-up portrait, …")
+  too few    pictures of a framing, angle, pose, expression, light, outfit or place: first your own ComfyUI pictures
+             made with this dataset's LoRA (and no other LoRA) are looked through: Ollama tells what each one shows,
+             the same questions as the sort and the detailed scan; what they cannot fill is made new with the LoRA
+             (its newest version) through your ComfyUI test-picture workflow, with a prompt written for what is
+             missing ("<trigger>, <class word>, close-up portrait, …")
   too many   one kind is most of the dataset: it can be outweighed by the new pictures, or some of those pictures
              (the ones the sort ranked lowest) get the 'never' pin, so Select leaves them out
-The made pictures wait in .lsflow/gapfill/ until you pick: the ticked ones join the repeat folder as made_<kind>_N.png
-with an 'always keep' pin; the rest go to the Trash. The prompts only name framing, angle, pose, expression, light,
+Found and made pictures wait in .lsflow/gapfill/ (found ones as copies) until you pick: the ticked ones join the repeat
+folder as found_<kind>_N / made_<kind>_N with an 'always keep' pin; the rest go to the Trash (the originals of found
+pictures stay where they are and are not offered again). More than a quarter LoRA-made pictures gets a warning: a LoRA
+trained on its own pictures learns its own mistakes harder. The prompts only name framing, angle, pose, expression, light,
 outfit and place, never anything about the person's body or looks.
 """
 from __future__ import annotations
-__version__ = "1.151126d"  # LoRA Studio version, see version.py
+__version__ = "1.151126g"  # LoRA Studio version, see version.py
 
 import json
 import random
@@ -47,6 +51,8 @@ LABEL = {d: lab for d, (lab, _) in DSC.DIMS.items()}
 TOO_MANY = 0.6                                           # one kind is more than 60 % of the kept pictures …
 TOO_MANY_MIN = 6                                         # … and at least this many pictures
 DIR = "gapfill"
+SHARE_WARN = 0.25                                        # warn when more of the repeat folder than this is LoRA-made
+MAX_ASK = 60                                             # pictures Ollama is asked about per search (answers are kept)
 
 
 def _dir(ds) -> Path:
@@ -136,6 +142,162 @@ def prompt(ds, dim: str, value: str) -> str:
     return ", ".join(x for x in (trig, cls, what) if x)
 
 
+# --------------------------------------------------------------------------- looking in your own pictures
+def _groups(ds) -> list[str]:
+    import lora_library as LL
+    LL.LIB.ensure_loaded()
+    return [g for g, m in LL.LIB.groups.items() if m and m[-1].dataset is not None and m[-1].dataset.name == ds]
+
+
+def candidates(ds) -> list[dict]:
+    """Your ComfyUI pictures made with this dataset's LoRA and no other LoRA, not offered before: newest version,
+    highest strength and newest picture first. [{"path", "lora", "strength"}]"""
+    import lora_library as LL
+    seen = set(state(ds).get("seen") or [])
+    out = []
+    for gid in _groups(ds):
+        members = LL.LIB.groups[gid]
+        order = {m.key: i for i, m in enumerate(members)}
+        for x in LL.group_pictures(gid):
+            loras = (x["e"].get("loras") or {})
+            if len(loras) != 1 or str(x["path"]) in seen or not Path(x["path"]).is_file():
+                continue
+            try:
+                strength = float(x.get("strength") or 1.0)
+            except (TypeError, ValueError):
+                strength = 1.0
+            out.append({"path": str(x["path"]), "lora": f"{x['lora'].stem} ({x['lora'].vlabel})", "strength": strength,
+                        "rank": (order.get(x["lora"].key, -1), strength, Path(x["path"]).stat().st_mtime)})
+    out.sort(key=lambda c: c["rank"], reverse=True)
+    return out
+
+
+def _what(url, model, p: Path, purpose: str) -> dict:
+    """What a picture shows, in the words of the sort and the detailed scan; {"bad": reason} when it is not usable."""
+    import datacheck as DC
+    d = DC.content(url, model, p)
+    bad = [t for s_, t in DC.content_issues(d, purpose) if s_ == DC.BAD]
+    if bad:
+        return {"bad": bad[0]}
+    x = DSC.ask(url, model, p)
+    return {"framing": F._norm(d.get("framing")), "outfit": F._norm(d.get("outfit")), "place": F._norm(d.get("place")),
+            **{k: x.get(k) or "" for k in ("angle", "pose", "expression", "lighting")}}
+
+
+def search(ds, jobs: list[tuple[str, str, int]], say=None) -> tuple[dict, str]:
+    """Fill the jobs from your own pictures. Returns ({(dim, value): found}, message); found pictures are copied into
+    .lsflow/gapfill/ to be picked like made ones."""
+    import features as FT
+    say = say or (lambda t: None)
+    S = F.sg()
+    cands = candidates(ds)
+    if not cands:
+        return {}, "No pictures of your own with only this LoRA (scan your ComfyUI picture folders on the LoRA page)."
+    url, model = S.oc_settings()
+    if FT.have("ollama") and S.CAP is not None and not model:   # no default chosen: the first vision model
+        try:
+            model = next((m["name"] for m in S.CAP.list_models(url) if m["vision"]), "")
+        except Exception:                                # noqa: BLE001
+            model = ""
+    if not (FT.have("ollama") and model and S.CAP is not None):
+        return {}, "Your own pictures were not looked through: Ollama is not available (Settings › AI helpers)."
+    counts, _, _, _ = DSC.active(ds)
+    have = {d: set(c) for d, c in counts.items()}
+    need = {(d, v): n for d, v, n in jobs if n > 0}
+    purpose = F.meta(ds).get("purpose") or "character"
+    cache_f = _dir(ds) / "found_cache.json"
+    try:
+        cache = json.loads(cache_f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        cache = {}
+    st = state(ds)
+    out, used, asked = Counter(), set(), 0
+    _dir(ds).mkdir(parents=True, exist_ok=True)
+    for i, c in enumerate(cands, 1):
+        if not any(need[k] > out[k] for k in need) or F.STOP.is_set():
+            break
+        p = Path(c["path"])
+        try:
+            sig = f"{p}|{p.stat().st_size}|{int(p.stat().st_mtime)}"
+        except OSError:
+            continue
+        w = cache.get(sig)
+        if w is None:
+            if asked >= MAX_ASK:
+                continue
+            say(f"⏳ Looking through your pictures with this LoRA: {i} of {len(cands)} (Ollama)")
+            try:
+                w = _what(url, model, p, purpose)
+            except Exception as e:                       # noqa: BLE001
+                return dict(out), f"Ollama stopped answering while looking through your pictures: {e}"
+            cache[sig] = w
+            asked += 1
+            if asked % 5 == 0:
+                cache_f.write_text(json.dumps(cache), encoding="utf-8")
+        if w.get("bad"):
+            continue
+        for (dim, value), n in need.items():
+            if out[(dim, value)] >= n:
+                continue
+            v = w.get(dim) or ""
+            fits = (v and v not in have.get(dim, set()) and v not in used) if dim in DSC.VARIETY else v == value
+            if fits:
+                k = 1
+                stem = f"found_{dim}_{value}".replace(" ", "-").replace("/", "-")
+                while (_dir(ds) / f"{stem}_{k}{p.suffix.lower()}").exists():
+                    k += 1
+                fname = f"{stem}_{k}{p.suffix.lower()}"
+                shutil.copy2(p, _dir(ds) / fname)
+                st["made"][fname] = {"dim": dim, "value": v if dim in DSC.VARIETY else value, "prompt": "",
+                                     "found": str(p), "lora": c["lora"], "strength": c["strength"]}
+                st.setdefault("seen", []).append(str(p))
+                if dim in DSC.VARIETY:
+                    used.add(v)
+                out[(dim, value)] += 1
+                break
+    cache_f.write_text(json.dumps(cache), encoding="utf-8")
+    _save_state(ds, st)
+    n = sum(out.values())
+    left = len([c for c in cands if f"{c['path']}" not in set(st.get("seen") or [])])
+    return dict(out), (f"✔ {n} of your own picture(s) with this LoRA fit a gap." if n else
+                       "None of your own pictures with this LoRA fit the gaps.") + \
+        (f" ({asked} looked at now; answers are kept, so the next search is quicker.)" if asked else "") + \
+        (f" {left} not looked at yet: search again for more." if asked >= MAX_ASK and left else "")
+
+
+def lora_made_share(ds) -> tuple[int, int]:
+    """(LoRA-made pictures in the repeat folder: found and made ones, all pictures there)."""
+    rows = F.sg().dataset_stats(ds)["rows"]
+    if not rows:
+        return 0, 0
+    rep = Path(rows[0]["folder"])
+    pics = [p for p in rep.iterdir() if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")]
+    ours = set((F.meta(ds).get("made_pictures") or []))
+    return sum(1 for p in pics if p.name in ours or p.name.startswith(("made_", "found_"))), len(pics)
+
+
+def share_note(ds, extra: int = 0) -> str:
+    n, tot = lora_made_share(ds)
+    n, tot = n + extra, tot + extra
+    if tot and n / tot > SHARE_WARN:
+        return (f"⚠ {n} of {tot} pictures ({n / tot:.0%}) are made by the LoRA. More than a quarter: the LoRA learns "
+                "its own mistakes harder (a face that drifts, hands). Real pictures are better where you have them.")
+    return ""
+
+
+def fill(ds, jobs: list[tuple[str, str, int]], say=None) -> str:
+    """Search first, then make what is still missing."""
+    say = say or (lambda t: None)
+    found, msg1 = search(ds, jobs, say)
+    rest = [(d, v, n - found.get((d, v), 0)) for d, v, n in jobs if n - found.get((d, v), 0) > 0]
+    if not rest:
+        return msg1 + " Nothing left to make. Tick the good ones and press *Add the ticked to the dataset*."
+    if F.STOP.is_set():
+        return msg1 + " Stopped."
+    msg2 = make(ds, rest, say)
+    return msg1 + "\n\n" + msg2
+
+
 # --------------------------------------------------------------------------- making them
 def make(ds, jobs: list[tuple[str, str, int]], say=None) -> str:
     """jobs = [(dim, value, how many)]. Makes the pictures into .lsflow/gapfill/. Returns a message."""
@@ -152,6 +314,11 @@ def make(ds, jobs: list[tuple[str, str, int]], say=None) -> str:
     url = cfg["url"]
     if not CT.alive(url):
         return f"❌ ComfyUI does not answer at {url}. Start it and press the button again."
+    try:
+        import comfyupscale as U
+        U._free_ollama()                                 # Ollama (the search) and the image model share the GPU
+    except Exception:                                    # noqa: BLE001
+        pass
     wf = cfg["families"][lo["fam"]]
     fixed = (cfg["fixed"].get(lo["fam"]) or "").strip().rstrip(",")
     st = state(ds)
@@ -201,11 +368,13 @@ def add(ds, files: list[str]) -> str:
         src = _dir(ds) / f
         if not meta_ or not src.is_file():
             continue
-        base = f"made_{meta_['dim']}_{meta_['value']}".replace(" ", "-").replace("/", "-")
+        kind = "found" if meta_.get("found") else "made"
+        base = f"{kind}_{meta_['dim']}_{meta_['value']}".replace(" ", "-").replace("/", "-")
+        ext = src.suffix.lower() or ".png"
         k = 1
-        while (rep / f"{base}_{k}.png").exists():
+        while (rep / f"{base}_{k}{ext}").exists():
             k += 1
-        dest = rep / f"{base}_{k}.png"
+        dest = rep / f"{base}_{k}{ext}"
         shutil.move(str(src), str(dest))
         F.set_pin(ds, dest, "keep")
         added.append(dest)
@@ -219,8 +388,10 @@ def add(ds, files: list[str]) -> str:
     m.setdefault("made_pictures", [])
     m["made_pictures"] = sorted(set(m["made_pictures"]) | {p.name for p in added})
     F.meta_save(ds, m)
-    return (f"✔ {len(added)} picture(s) added to {rep.name}/ (pinned 📌 always keep), {len(rest)} thrown away (Trash). "
-            "Write their captions in step 7.")
+    warn = share_note(ds)
+    return (f"✔ {len(added)} picture(s) added to {rep.name}/ (pinned 📌 always keep), {len(rest)} thrown away (Trash; "
+            "the originals of your own pictures stay where they are). Write their captions in step 7."
+            + (f"\n\n{warn}" if warn else ""))
 
 
 def discard(ds) -> str:
