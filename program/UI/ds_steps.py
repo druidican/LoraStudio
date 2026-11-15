@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.141126b"  # LoRA Studio version, see version.py
+__version__ = "1.151126f"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -345,7 +345,8 @@ def step6(page):
     saved = (F._load(ds, "resize.json", {}) or {}).get("max_side")
     with ui.expansion("Watermarks", value=True).classes("w-full ls-card"):
         note("Pictures where the sort found marks added on top of the picture (watermarks, site names, logo stamps, "
-             "signatures, date stamps): remove them (picture tools), crop them off, set the picture aside, or keep it "
+             "signatures, date stamps): remove them (your ComfyUI inpaint workflow while ComfyUI runs, else the "
+             "picture tools), crop them off, set the picture aside, or keep it "
              "(it may be learned). Text that belongs to the scene (signs, shirts) is left alone.")
         wm_sum = ui.markdown("")
         wm_html = ui.html("", sanitize=False).classes("w-full").props('id="wm_html"')
@@ -353,8 +354,8 @@ def step6(page):
         with ui.card().props("flat bordered").classes("ls-card w-full gap-2") as tool:
             tool_title = ui.label("").classes("font-semibold")
             with ui.column().classes("w-full") as paint_col:
-                note("Paint over the mark with the brush (a little over its edges is fine). The picture tools fill in "
-                     "what is under it; the rest of the picture stays as it is.")
+                note("Paint over the mark with the brush (a little over its edges is fine). Your ComfyUI inpaint "
+                     "workflow (or the picture tools) fills in what is under it; the rest of the picture stays as it is.")
                 paint = PaintPanel()
             with ui.column().classes("w-full max-w-2xl") as crop_col:
                 note("Move the edges until the mark is outside; the shaded part is cut off.")
@@ -370,8 +371,8 @@ def step6(page):
             tool_msg = ui.label("").classes("ls-note")
         tool.set_visibility(False)
 
-    def wm_draw():
-        wm_sum.content, wm_html.content = SP.wm_render(ds)
+    async def wm_draw():
+        wm_sum.content, wm_html.content = await run.io_bound(SP.wm_render, ds)
 
     def open_tool(v):
         act, _, rp = v.partition("|")
@@ -393,20 +394,20 @@ def step6(page):
 
     async def do_paint():
         a = await paint.mask()
-        tool_msg.text = "⏳ The picture tools fill in what you painted …"
+        tool_msg.text = f"⏳ {(await run.io_bound(SP._filler)).capitalize()} fills in what you painted …"
         msg = await run.io_bound(SP.wm_paint_mask, ds, tool_rp["rp"], a)
         wm_msg.text = msg
         if msg.startswith("✔"):
             tool.set_visibility(False)
-        wm_draw()
+        await wm_draw()
 
-    def do_crop():
+    async def do_crop():
         l, t, r, b = wm_crop.box()
         msg = SP.wm_crop_apply(ds, tool_rp["rp"], l * 100, r * 100, t * 100, b * 100, wm_crop.aspect.value)[0]
         wm_msg.text = msg
         if msg.startswith("✔"):
             tool.set_visibility(False)
-        wm_draw()
+        await wm_draw()
     paint_go.on_click(do_paint)
     crop_go.on_click(do_crop)
 
@@ -415,7 +416,7 @@ def step6(page):
             "var o = {}; document.querySelectorAll('#wm_html .wm-row').forEach(function(r){ "
             "var s = r.querySelector('.wm-opt.sel'); if (s) o[r.dataset.p] = s.dataset.c; }); return o;") or {})
         await stream(SP.wm_apply_live(ds, choices, only_pending=only_pending), lambda line: setattr(wm_msg, "text", line))
-        wm_draw()
+        await wm_draw()
         draw()
     page.on_wm_tool = open_tool
 
@@ -511,7 +512,7 @@ def step6(page):
                                                            setattr(page.bar, "content", V.bar_html(page.s)))) \
             .props("outline dense no-caps")
         go_b = ui.button("Resize →", on_click=resize).props("unelevated no-caps color=primary")
-    wm_draw()
+    ui.timer(0, wm_draw, once=True)
     draw()
 
 

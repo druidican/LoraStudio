@@ -140,6 +140,14 @@ Image* node and takes the result from its *Save Image* node. In a *SeedVR2 Video
 
 Before an upscale, LoRA Studio unloads the Ollama models, so the two don't share the video memory.
 
+**Inpaint workflow** (removing watermarks): your own ComfyUI inpaint workflow for step 6's *Remove* and *Paint over
+it yourself*, for example an SDXL / Illustrious one (Load Image → Grow Mask → Inpaint Model Conditioning → KSampler →
+VAE Decode → Image Composite Masked → Save Image). It needs one *Load Image* node whose MASK output says what to fill
+in. LoRA Studio cuts a window of about 1024 px around each mark, sends it with the mark as the mask (the transparent
+part), gives the KSampler a new seed and pastes back only the filled-in part, so the rest of the picture stays as it
+was. Marks close together share one window. While ComfyUI is not running, the picture tools fill in instead.
+*Stop using it* goes back to the picture tools.
+
 ## Look and base models
 
 How the Collection looks and how it tells which base model a LoRA was trained on:

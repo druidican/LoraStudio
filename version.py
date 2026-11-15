@@ -14,16 +14,16 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.151126e"
-VERSION = "1.151126e"
+__version__ = "1.151126f"
+VERSION = "1.151126f"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.151126e",
+    "version.py": "1.151126f",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126e",
     "program/Training/sd_script.py": "1.131126c",
-    "program/Data/sd_prepare.py": "1.151126e",
+    "program/Data/sd_prepare.py": "1.151126f",
     "program/Training/sd_settings.py": "1.131126c",
     "program/Data/datasets_ui.py": "1.141126",
     "program/Data/dsflow.py": "1.151126e",
@@ -34,13 +34,14 @@ RELEASE: dict = {
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
+    "program/Training/comfyinpaint.py": "1.151126f",
     "program/Data/detailscan.py": "1.151126d",
     "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.051126",
     "program/Settings/ghupdate.py": "1.011126",
     "program/Settings/hfdownload.py": "1.131126c",
     "program/Settings/ollamactl.py": "1.011126",
-    "program/Data/datacheck.py": "1.151126e",
+    "program/Data/datacheck.py": "1.151126f",
     "program/Data/consistency.py": "1.011126",
     "program/Data/pictools.py": "1.151126e",
     "program/Data/pictools_worker.py": "1.151126e",
@@ -58,7 +59,7 @@ RELEASE: dict = {
     "program/UI/setup_page.py": "1.131126c",
     "program/UI/pg_home.py": "1.131126c",
     "program/UI/pg_datasets.py": "1.131126c",
-    "program/UI/ds_steps.py": "1.141126b",
+    "program/UI/ds_steps.py": "1.151126f",
     "program/UI/ds_train.py": "1.131126c",
     "program/UI/ds_results.py": "1.151126b",
     "program/UI/ds_batch.py": "1.131126c",
@@ -66,7 +67,7 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.141126b",
     "program/UI/lora_page.py": "1.141126b",
     "program/UI/pg_settings.py": "1.131126c",
-    "program/UI/set_panels.py": "1.151126b",
+    "program/UI/set_panels.py": "1.151126f",
     "program/Gallery/lorapage.py": "1.151126b",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -101,6 +102,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.151126f", "Step 6 removes watermarks with your own ComfyUI inpaint workflow (Settings › Test pictures (ComfyUI) › Inpaint workflow): Remove and Paint over it yourself use it while ComfyUI runs, else the picture tools."),
     ("1.151126e", "Step 6 finds more watermarks: a watermark and logo detector (OWLv2) in the picture tools, and frames, black or white bars and app bars at the edges, which the recommended crop cuts off."),
     ("1.151126d", "Improvements judge only the pictures in the repeat folder (what trains): framing, balance, alike pictures and the detailed scan's gaps were counted over every picture the sort had seen, including those Select had moved to _reserve. Pictures in _reserve are now only named as where to find what is missing; pictures added after the sort are listed as not checked. Fill the gaps (step 5) counts the repeat folder too."),
     ("1.151126c", "While the test pictures of a finished run are made, before the next run starts, the Queue page shows a card with what is made and a progress bar, and the top bar says so on every page, so the queue no longer looks stopped."),
@@ -156,6 +158,7 @@ PARTS = [
     ("program/Training/speedtest.py", "training speed test for a launch script (terminal)"),
     ("program/Training/speedjobs.py", "speed tests per LoRA type (Settings › Speed test)"),
     ("program/Training/comfyupscale.py", "upscale and sharpen pictures with your ComfyUI workflow"),
+    ("program/Training/comfyinpaint.py", "remove watermarks with your ComfyUI inpaint workflow"),
     ("program/Data/detailscan.py", "the detailed scan: gaps and per-picture suggestions"),
     ("program/Data/captioner.py", "captions with Ollama"),
     ("program/Data/wdtagger.py", "tags with the WD tagger (wd-eva02-large-tagger-v3) for the tag-style caption sets"),

@@ -133,7 +133,8 @@ sort and count in the automatic improvement too; click a pin again to remove it.
 
 ![Step 6: watermarks first, then the size of each picture](img/step6.jpg)
 
-**Watermarks** found by the sort: remove them (the picture tools paint over them), crop them off, set the picture
+**Watermarks** found by the sort: remove them (your ComfyUI inpaint workflow fills them in while ComfyUI runs, see
+Settings › Test pictures (ComfyUI); else the picture tools), crop them off, set the picture
 aside or keep it. The sort finds them three ways: a watermark detector in the picture tools (logos, signatures, site
 names and text near the edges; marked *(detector)*; the first use downloads it, about 0.6 GB), the Ollama question in
 pass 2, and a check of the edges for **frames, black or white bars and app bars** (a status bar, a screenshot's

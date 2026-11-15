@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.151126e"  # LoRA Studio version, see version.py
+__version__ = "1.151126f"  # LoRA Studio version, see version.py
 
 import lspaths
 import base64
@@ -786,6 +786,42 @@ def _save_like(im: Image.Image, src: Path, dest: Path, info: dict):
         im.save(dest, **kw)
 
 
+def fill_in(orig: Path, dest: Path, boxes=None, mask: Path | None = None, say=None) -> str:
+    """Fill in the marks (boxes) or a painted mask: your ComfyUI inpaint workflow while ComfyUI runs, else the picture
+    tools. Returns which one did it ("ComfyUI" / "picture tools"); raises on failure."""
+    try:
+        import comfyinpaint as CI
+        use = CI.usable()
+    except Exception:                                    # noqa: BLE001
+        use = False
+    if use:
+        with Image.open(orig) as im:
+            info = dict(im.info)
+        out = CI.inpaint(orig, boxes=boxes, mask_file=mask, say=say)
+        _save_like(out, orig, dest, info)
+        return "ComfyUI"
+    import pictools
+    r = pictools.inpaint(orig, dest, boxes or [], mask=mask)
+    if not r.get("ok", True):
+        raise RuntimeError(r.get("error") or "failed")
+    return "picture tools"
+
+
+def can_fill() -> bool:
+    """Remove / Paint over it yourself can work: the ComfyUI inpaint workflow is set and running, or the picture tools."""
+    try:
+        import comfyinpaint as CI
+        if CI.usable():
+            return True
+    except Exception:                                    # noqa: BLE001
+        pass
+    try:
+        import pictools
+        return pictools.ready()
+    except Exception:                                    # noqa: BLE001
+        return False
+
+
 def _back_to_original(root: Path, rp: str, e: dict) -> str | None:
     """Undo the current choice: the original picture back at its place. Returns an error or None."""
     here, orig = root / rp, original_of(root, rp)
@@ -809,7 +845,8 @@ def _back_to_original(root: Path, rp: str, e: dict) -> str | None:
 
 def apply_choice(dataset_root: Path, rp: str, e: dict, choice: str, mask: Path | None = None,
                  box: list | None = None) -> str | None:
-    """choice: "A" / "B" (crop), "R" (remove: paint over with the picture tools), "aside", "keep". The original is
+    """choice: "A" / "B" (crop), "R" (remove: filled in by your ComfyUI inpaint workflow or the picture tools),
+    "P" (your painted part filled in), "C" (your crop), "aside", "keep". The original is
     kept; returns an error or None."""
     root = Path(dataset_root)
     if choice not in ("P", "C") and ((e.get("choice") or "keep") == choice or (choice == "keep" and not e.get("choice"))):
@@ -839,7 +876,7 @@ def apply_choice(dataset_root: Path, rp: str, e: dict, choice: str, mask: Path |
             orig.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(here), str(orig))
             try:
-                pictools.inpaint(orig, here, [m["box"] for m in e.get("marks") or []])
+                e["filled_by"] = fill_in(orig, here, [m["box"] for m in e.get("marks") or []])
             except Exception as ex:                      # noqa: BLE001
                 shutil.move(str(orig), str(here))
                 return f"{rp}: could not paint over the marks ({ex})"
@@ -864,9 +901,7 @@ def apply_choice(dataset_root: Path, rp: str, e: dict, choice: str, mask: Path |
             orig.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(here), str(orig))
             try:
-                r = pictools.inpaint(orig, here, [], mask=mask)
-                if not r.get("ok", True):
-                    raise RuntimeError(r.get("error") or "failed")
+                e["filled_by"] = fill_in(orig, here, mask=mask)
             except Exception as ex:                      # noqa: BLE001
                 shutil.move(str(orig), str(here))
                 return f"{rp}: could not paint over it ({ex})"

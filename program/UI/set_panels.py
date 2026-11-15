@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.151126b"  # LoRA Studio version, see version.py
+__version__ = "1.151126f"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -591,6 +591,34 @@ def panel_comfy(page):
             .props("accept=.json flat bordered").classes("w-full")
         ui.radio(dict((v, lab) for lab, v in U.NOISE_CHOICES), value=us["noise"],
                  on_change=lambda e: (U.save_settings(noise=e.value), setattr(umsg, "content", "✔ Saved."))).props("inline")
+    import comfyinpaint as CI
+    with card():
+        ui.label("Inpaint workflow (removing watermarks)").classes("font-semibold")
+        note("Used by Datasets › Watermarks and size: Remove and Paint over it yourself fill in the marks with it "
+             "while ComfyUI runs (else the picture tools do it). It needs one Load Image node whose MASK output says "
+             "what to fill in, for example the SDXL / Illustrious workflow lorastudio_inpaint_sdxl.json. LoRA Studio "
+             "sends a window of about 1024 px around each mark, with the mark as the mask, and pastes back only the "
+             "filled-in part; the rest of the picture stays as it was.")
+        cs = CI.settings()
+        cinfo = ui.markdown(f"Workflow: `{cs['name']}` · {cs['note']}" if CI.ready() else "No inpaint workflow yet.")
+        cmsg = ui.markdown("")
+
+        async def cget(e):
+            path = await saved_upload(e)
+            try:
+                cmsg.content = await run.io_bound(CI.import_workflow, path)
+            except Exception as ex:                      # noqa: BLE001
+                cmsg.content = f"❌ Could not use that workflow: {ex}"
+                return
+            c2 = CI.settings()
+            cinfo.content = f"Workflow: `{c2['name']}` · {c2['note']}"
+
+        def cforget():
+            cmsg.content = CI.forget()
+            cinfo.content = "No inpaint workflow yet."
+        ui.upload(label="Your inpaint workflow (.json)", auto_upload=True, on_upload=cget) \
+            .props("accept=.json flat bordered").classes("w-full")
+        ui.button("Stop using it", on_click=cforget).props("flat dense no-caps color=negative")
 
 
 def _wf_summary(CT, fam) -> str:

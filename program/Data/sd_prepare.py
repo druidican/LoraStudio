@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.151126e"  # LoRA Studio version, see version.py
+__version__ = "1.151126f"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -307,11 +307,19 @@ WM_LABEL = {"A": "Crop A", "B": "Crop B", "R": "Removed", "P": "Painted over by 
 
 
 def _pictools_ready() -> bool:
+    """Something can fill in marks: the ComfyUI inpaint workflow (while ComfyUI runs) or the picture tools."""
     try:
-        import pictools
-        return pictools.ready()
+        return S.DC.can_fill()
     except Exception:                       # noqa: BLE001
         return False
+
+
+def _filler() -> str:
+    try:
+        import comfyinpaint as CI
+        return "your ComfyUI inpaint workflow" if CI.usable() else "the picture tools"
+    except Exception:                                    # noqa: BLE001
+        return "the picture tools"
 
 
 def _wm_paintable(e) -> bool:
@@ -368,8 +376,9 @@ def wm_render(ds):
         if not e.get("options"):
             opts.append(("", "<div class='wm-big'>✂︎</div>", "<b>No crop possible</b><span>the marks are too close to the subject</span>"))
         if _pictools_ready() and _wm_paintable(e):
-            opts.insert(0, ("R", "<div class='wm-big'>✎</div>", "<b>Remove</b><span>paint over the marks, keep the whole "
-                                                               "picture; the mark is saved in _originals/_watermarks/</span>"))
+            opts.insert(0, ("R", "<div class='wm-big'>✎</div>", "<b>Remove</b><span>fill in the marks (" + _filler() + "), "
+                                                               "keep the whole picture; the mark is saved in "
+                                                               "_originals/_watermarks/</span>"))
         opts.append(("aside", "<div class='wm-big'>⇥</div>", "<b>Set aside</b><span>not used for training (with its caption)</span>"))
         opts.append(("keep", "<div class='wm-big'>✓</div>", "<b>Keep as is</b><span>the mark may be learned</span>"))
         cells = []
@@ -464,7 +473,7 @@ def wm_tool_info(ds, rp) -> tuple:
 
 
 def wm_paint_mask(ds, rp, a) -> str:
-    """Fill in the painted part (a: the mask, an 'L' picture, white = painted) with the picture tools."""
+    """Fill in the painted part (a: the mask, an 'L' picture, white = painted): ComfyUI or the picture tools."""
     if S.RUN.running():
         return "A training run is using the GPU: paint over it when the run has finished."
     if a is None or not a.getbbox():
@@ -537,7 +546,7 @@ def wm_apply_steps(ds, choices_json, only_pending=False, prefer="remove"):
                 continue
         if c == (e.get("choice") or ""):
             continue
-        yield f"⏳ {WM_LABEL.get(c, c)}: {rp}" + (" (the picture tools paint over the marks)" if c == "R" else "")
+        yield f"⏳ {WM_LABEL.get(c, c)}: {rp}" + (f" ({_filler()} fills in the marks)" if c == "R" else "")
         err = S.DC.apply_choice(root, rp, e, c)
         if err and c == "R" and only_pending:          # removal did not work: the next best choice
             c = "A" if e.get("options") else "aside"

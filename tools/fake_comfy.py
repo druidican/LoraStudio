@@ -39,6 +39,15 @@ class H(BaseHTTPRequestHandler):
             (OUT / "input").mkdir(exist_ok=True); (OUT / "input" / name).write_bytes(body[:-2])
             return self._json({"name": name, "subfolder": "lorastudio", "type": "input"})
         d = json.loads(raw or b"{}")
+        if self.path == "/prompt" and any(v["class_type"] in ("InpaintModelConditioning", "VAEEncodeForInpaint",
+                                                              "SetLatentNoiseMask") for v in d["prompt"].values()):
+            g = d["prompt"]; pid = str(uuid.uuid4()); LOG.append(g)     # an inpaint workflow: the masked part turns teal
+            src = OUT / "input" / next(v["inputs"]["image"] for v in g.values() if v["class_type"] == "LoadImage").split("/")[-1]
+            im = Image.open(src).convert("RGBA"); a = im.getchannel("A")
+            fill = Image.new("RGB", im.size, (40, 160, 150)); out = Image.composite(im.convert("RGB"), fill, a)
+            fn = f"{pid[:8]}.png"; out.save(OUT / fn)
+            HIST[pid] = {"status": {"status_str": "success", "completed": True}, "outputs": {"9": {"images": [{"filename": fn, "subfolder": "", "type": "output"}]}}}
+            return self._json({"prompt_id": pid, "number": 1, "node_errors": {}})
         if self.path == "/prompt" and any(v["class_type"] == "LoadImage" for v in d["prompt"].values()):
             g = d["prompt"]; pid = str(uuid.uuid4()); LOG.append(g)     # an upscale workflow: resize the picture
             src = OUT / "input" / next(v["inputs"]["image"] for v in g.values() if v["class_type"] == "LoadImage").split("/")[-1]
