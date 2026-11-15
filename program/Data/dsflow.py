@@ -10,7 +10,7 @@
                   watermarks); groups of pictures that are too alike, duplicates, detail shots (kept), not good enough
   5 Select        a suggested size, picked by quality first and then by what each picture adds; the rest -> _reserve/
   6 Watermarks and size  keep the shape, scale down to a longest side; per picture: keep or crop; originals in _originals/
-  7 Captions      one caption set per caption style (IMG.txt, IMG.sentences.txt), consistency inside
+  7 Captions      one caption set per caption style (IMG.txt, IMG.sentences.txt)
   8 Review        the folder, the pictures and their captions, and checks
   9 Train         one launch script per LoRA type (sdgui's launch script page), then into the queue
 
@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.151126e"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1620,28 +1620,6 @@ def set_description(ds, text: str) -> str:
     return m["description"]
 
 
-def mirror_kept(ds, ext, url, model, trigger) -> str:
-    """Take the traits the consistency check took out of IMG.txt out of another caption set too."""
-    import consistency as CC
-    base = CC.load_result(ds) or {}
-    kept = set(base.get("kept") or [])
-    if not kept:
-        return "Nothing was taken out of the first set, so the other set stays as it is."
-    imgs = [p for p in images(ds) if read_set(p, ext)]
-    if not imgs:
-        return "The other set has no captions yet."
-    res = CC.scan(f"{ds}#{ext}", imgs, lambda p: read_set(p, ext), url, model, trigger or ds)
-    choices = {g["id"]: {"mode": "lora"} for g in res["groups"] if g["trait"] in kept}
-    if not choices:
-        return "The other set does not mention those traits."
-    backup, changed, _, skipped = CC.apply(res, choices, lambda p: read_set(p, ext), lambda p: set_file(p, ext),
-                                           url, model, trigger or ds)
-    if backup:
-        sg().record_change(f"consistency of {ds} {ext}", backup)
-    return (f"✔ Also taken out of `IMG{ext}`: {', '.join(sorted(kept))} ({len(changed)} captions changed)."
-            + (f" {len(skipped)} sentence(s) left as they were." if skipped else ""))
-
-
 # --------------------------------------------------------------------------- 8 Review
 def review(ds) -> dict:
     r = root(ds)
@@ -1800,8 +1778,7 @@ _SIG_CACHE: dict = {}
 
 
 def ds_sig(ds) -> tuple:
-    """A cheap fingerprint of a dataset: changes when pictures, captions, steps, watermarks or the consistency check
-    change (folder and file times only, no picture is opened). The lists above the steps are cached by it."""
+    """A cheap fingerprint of a dataset: changes when pictures, captions, steps or watermarks change (folder and file times only, no picture is opened). The lists above the steps are cached by it."""
     r = root(ds)
     parts = []
     try:
@@ -1824,13 +1801,6 @@ def ds_sig(ds) -> tuple:
         mk = r / DC.SET_ASIDE / DC.MARKS_FILE
         if mk.is_file():
             parts.append(("marks", mk.stat().st_mtime))
-        try:
-            import consistency as CC
-            cf = CC.result_path(ds)
-            if cf.is_file():
-                parts.append(("cc", cf.stat().st_mtime))
-        except Exception:                                # noqa: BLE001
-            pass
     except OSError:
         return (time.time(),)
     return tuple(parts)
@@ -1946,16 +1916,6 @@ def _improvements(ds) -> list[tuple[str, str]]:
             out.append(("captions", f"{t - c} pictures have no caption in IMG{s['ext']} (added after tagging)."))
         elif not c:
             out.append(("captions", "No captions yet." if s["ext"] == ".txt" else f"No captions in IMG{s['ext']} yet."))
-    try:
-        import consistency as CC
-        res = CC.load_result(ds)
-        if res and not res.get("applied"):
-            nc = sum(1 for g in res["groups"] if g["kind"] == "contradiction")
-            if nc:
-                out.append(("captions", f"{nc} trait{'s' if nc != 1 else ''} named in different ways in the captions "
-                                        "(consistency not decided yet)."))
-    except Exception:                                    # noqa: BLE001
-        pass
     found, pending = sg()._marks_counts(ds)
     if pending:
         out.append(("watermarks", f"{pending} picture{'s' if pending != 1 else ''} with a watermark not decided yet."))
@@ -1980,8 +1940,6 @@ BATCH_DEFAULTS = {
     "watermarks": "remove",        # remove (crop if that fails) · crop · aside · leave
     "upscale": True,               # upscale pictures a little too small (picture tools)
     "captions": "missing",         # missing: only pictures without a caption · all: write every caption again
-    "consistency": "ignore",       # ignore · check: run the consistency check
-    "cons_each": True,             # with check: answer every trait with "This picture only" (else you decide in step 7)
     "safety_pct": 50,              # move nothing when more than this % of the pictures look not usable
     "launch_script": False,        # write a launch script with the recommended settings at the end
 }
@@ -2021,9 +1979,6 @@ def batch_summary(b: dict | None = None) -> str:
             f"not usable) · 4 Sort · 5 Select: {keep}, the rest to `_reserve/` · 6 Watermarks and size"
             + (", small pictures upscaled" if b["upscale"] else "") + f", watermarks {wm} · 7 Captions: "
             + ("captions only for pictures without one" if b["captions"] == "missing" else "every caption written again")
-            + (("; the consistency check runs and every trait is answered with “This picture only”" if b["cons_each"]
-                else "; the consistency check runs and its findings wait for you in step 7") if b["consistency"] == "check"
-               else "; the consistency check is left out")
             + (" · 9 a launch script with the recommended settings." if b["launch_script"]
                else ". Review and Train are skipped."))
 
@@ -2073,7 +2028,7 @@ def _batch_one(ds, url, model, say) -> list[str]:
     rows = rank(ds, n, meta(ds).get("select_mode") or B["select_mode"])
     keep = [r["path"] for r in rows if r["keep"]]
     if keep:
-        msg = apply_select(ds, keep)
+        apply_select(ds, keep)
         done.append(f"select: {len(keep)} kept" + (f", {len(rows) - len(keep)} to {RESERVE}/" if len(rows) > len(keep) else ""))
     else:
         done.append("select: nothing to keep, skipped (" + msg_none(rows) + ")")
@@ -2115,25 +2070,6 @@ def _batch_one(ds, url, model, say) -> list[str]:
     m = meta(ds)
     m["steps"]["tags"] = {"at": time.strftime("%Y-%m-%d %H:%M"), "auto": True}
     meta_save(ds, m)
-    if B["consistency"] == "check" and m["purpose"] == "character" and not BATCH["stop"]:  # characters only
-        say("7 Captions · consistency check")
-        try:
-            msg = S.cc_find(ds, url, model, m.get("trigger") or ds, progress=lambda *a, **k: None)
-            import consistency as CC
-            res = CC.load_result(ds) or {}
-            groups = res.get("groups", [])
-            nc = sum(1 for g in groups if g["kind"] == "contradiction")
-            if res and groups and B["cons_each"]:        # "This picture only" for every trait: captions keep their own
-                S.cc_apply(ds, json.dumps({g["id"]: {"mode": "each", "fix": [], "own": [], "words": {}} for g in groups}),
-                           url, model, m.get("trigger") or ds, confirm=True, progress=lambda *a, **k: None)
-                done.append(f"consistency: {len(groups)} trait{'s' if len(groups) != 1 else ''} answered with "
-                            "“This picture only”")
-            else:
-                done.append(f"consistency: {nc} trait{'s' if nc != 1 else ''} to decide in step 7" if nc
-                            else "consistency: nothing to decide" if res
-                            else f"consistency: {str(msg[0] if isinstance(msg, tuple) else msg)[:80]}")
-        except Exception as e:                           # noqa: BLE001
-            done.append(f"consistency: not run ({e})")
     if B["launch_script"] and not BATCH["stop"]:
         say("9 Train")
         for t in m["types"]:

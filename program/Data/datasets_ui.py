@@ -3,11 +3,11 @@
 
 + New dataset starts at 1 Folder; the list shows every dataset with its next step and opens the steps from where the
 dataset is. Improvements fixes ticked datasets (its choices are folded on the page) and opens them one by one to check. The steps reuse sdgui's parts where they exist: the watermark choices (6), the caption writer
-and the consistency check (7), the repeat folder and the launch script page (9). What each step does to the folder
+(7), the repeat folder and the launch script page (9). What each step does to the folder
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.141126"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -474,16 +474,15 @@ def s7_sets_html(ds) -> str:
 REC_TEXT = {
     "character": ("Character", "The captions describe what <b>changes</b> from picture to picture: clothes, pose, place, light, "
                   "framing. <i>Never describe</i> holds what is always the person (face, hair and eye colour, body), so the "
-                  "trigger word learns it. Consistency below takes out traits that are the same in most pictures."),
+                  "trigger word learns it."),
     "style": ("Style", "The captions describe <b>everything in</b> the picture: who is shown with their hair, eyes and "
               "clothes, animals and objects, the place, the light and the composition. They never name the style "
               "itself (the art style, the medium, the technique, the artist): those words are in <i>Never describe</i>, "
-              "so the trigger word learns the style. Detail is set to Detailed or Everything. The character consistency "
-              "check is not used for a style."),
+              "so the trigger word learns the style. Detail is set to Detailed or Everything."),
     "object": ("Object", "The captions name the object with the trigger word and describe <b>everything around it</b>: "
                "who holds, wears or uses it, the clothes, the pose, the place, the light. They never describe the object "
                "itself (shape, colours, material, details): its words are in <i>Never describe</i>, so the trigger word "
-               "learns it. The character consistency check is not used."),
+               "learns it."),
     "worn": ("Worn item", "The captions start with the trigger word, then <b>which kind</b> of item it is and <b>where it "
              "is worn</b> (ring, on index finger; hair clip, in hair), then <b>the person in full</b>: hair, face, the "
              "other clothes, the pose, the place, the light. They never describe the item's own look (design, pattern, "
@@ -493,10 +492,9 @@ REC_TEXT = {
     "action": ("Action / pose", "The captions describe <b>the person and the scene</b>: hair, clothes, expression, what "
                "they hold, the place, the light, the camera angle. They never describe the pose or action itself (how the "
                "body, arms, legs and hands are placed): the trigger word learns it. The pictures should show many "
-               "different people and places. The character consistency check is not used."),
+               "different people and places."),
     "concept": ("Concept / effect", "The captions describe everything in the picture except the effect itself: its "
-                "words are in <i>Never describe</i>, so the trigger word learns it. The character consistency check is "
-                "not used."),
+                "words are in <i>Never describe</i>, so the trigger word learns it."),
 }
 
 

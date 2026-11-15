@@ -154,7 +154,7 @@ originals back* undoes the step.
 
 ## 7 · Captions
 
-![Step 7: captions and the consistency check](img/step7.jpg)
+![Step 7: captions](img/step7.jpg)
 
 **Write the captions** writes a caption for every picture; *Only pictures without a caption* fills the gaps; *Stop*
 stops. **Tags** (Illustrious, Pony, SDXL, Anima) come from the **WD tagger** (wd-eva02-large-tagger-v3, run by
@@ -195,12 +195,6 @@ pictures; add what is missing, then *Save*.
 **Caption settings** (the folded section): the length and detail of the captions, the **Never describe** list (what
 sentence captions leave out for a character), and **Try on 3 pictures** to see the result first. *Undo last change*
 puts the captions from before the last run back.
-
-**Consistency, checked while tagging**: the traits of the character that the captions mention (hair, eyes, build,
-skin, horns, tattoos, a signature object): the same in most pictures is taken out of the captions so the trigger word
-learns it; words that mean the same (athletic, fit, toned) become one word; **odd pictures** that say something else
-are shown so you can look. Clothes, places, poses, expressions and light stay. With two caption sets, *Apply to the
-other caption set too* takes the same traits out of the second one.
 
 ## 8 · Review
 

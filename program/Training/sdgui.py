@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.151126e"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
@@ -123,31 +123,6 @@ CSS = ('.ls-bar {gap: 8px !important; align-items: center !important; flex-wrap:
        '#wm_html .wm-opt .wm-big {height: 120px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; opacity: .6;} '
        '#wm_html .wm-opt.sel {border-color: #e8a33d; background: rgba(232,163,61,.12);} '
        '#wm_html .wm-opt b {font-size: .85rem;} #wm_html .wm-now {color: #4fb3a9; font-weight: 600;} '
-       '#cc_html input[type=radio] {appearance: auto; -webkit-appearance: radio; accent-color: #E8A33D; width: 14px; height: 14px; margin: 0 4px 0 0; vertical-align: -2px; opacity: 1;} '
-       '#cc_html label {cursor: pointer;} '
-       '#cc_html .cc-group {border: 1px solid var(--border-color-primary); border-radius: 10px; padding: 10px 12px; margin: 0 0 10px;} '
-       '#cc_html .cc-head {display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;} '
-       '#cc_html .cc-trait {font-weight: 700; font-size: 1rem;} '
-       '#cc_html .cc-cov {opacity: .7; font-size: .85rem;} '
-       '#cc_html .cc-kind {font-size: .72rem; font-weight: 600; padding: 1px 8px; border-radius: 99px;} '
-       '#cc_html .cc-lock {background: #262A31; color: #F4C06F;} '
-       '#cc_html .cc-exc {margin-top: 8px; font-size: .82rem; opacity: .8;} '
-       '#cc_html .cc-contra {background: #FBE9C8; color: #8F560B;} '
-       '#cc_html .cc-same {background: #21857C; color: #fff;} '
-       '#cc_html .cc-vals {display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0;} '
-       '#cc_html .cc-val {padding: 3px 10px; border-radius: 8px; border: 1px solid var(--border-color-primary); font-size: .88rem;} '
-       '#cc_html .cc-val.cc-main {border-color: #E8A33D;} #cc_html .cc-val small {opacity: .7;} '
-       '#cc_html .cc-word {font: inherit; font-weight: 600; background: transparent; color: inherit; border: 0; border-bottom: 1px dashed #E8A33D;} '
-       '#cc_html .cc-modes {display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: .9rem;} '
-       '#cc_html .cc-modes i {color: #21857C; font-style: normal; font-size: .78rem; margin-left: 4px;} '
-       '#cc_html .cc-oddhead {margin: 10px 0 6px; font-size: .85rem; opacity: .85;} '
-       '#cc_html .cc-odds {display: flex; gap: 10px; flex-wrap: wrap;} '
-       '#cc_html .cc-odd {display: flex; gap: 8px; width: 330px; padding: 6px; border: 2px solid var(--border-color-primary); border-radius: 8px;} '
-       '#cc_html .cc-odd.cc-sel {border-color: #E8A33D;} #cc_html .cc-look {all: unset; cursor: zoom-in;} '
-       '#cc_html .cc-look img {width: 96px; height: 96px; object-fit: cover; border-radius: 6px; display: block;} '
-       '#cc_html .cc-oddtxt {display: flex; flex-direction: column; gap: 3px; font-size: .82rem; min-width: 0;} '
-       '#cc_html .cc-name {font-weight: 600; word-break: break-all;} '
-       '#cc_view {position: sticky; top: 8px; align-self: flex-start;} '
        '#oc_ex .ocex {padding: 8px 12px; border-radius: 8px; background: rgba(128,128,128,.10);} '
        '#oc_ex .ochead {font-size: .82rem; opacity: .85; margin-bottom: 4px;} '
        '#oc_ex .octext {font-family: var(--font-mono, monospace); font-size: .9rem; line-height: 1.45;} '
@@ -1788,8 +1763,6 @@ from sd_script import (  # noqa: F401  (also used as sdgui.<name> by the other p
     with_virtual_row,
 )
 from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
-    CC_JS,
-    CC_OPEN_JS,
     OC_FAMILY,
     OC_STOP,
     _dc_cache_load,
@@ -1797,12 +1770,6 @@ from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other 
     _dc_min_side,
     _oc_check,
     _oc_family,
-    cc_apply,
-    cc_find,
-    cc_leave_out,
-    cc_open,
-    cc_render,
-    cc_stop,
     oc_example,
     oc_images,
     oc_preview,
@@ -1961,13 +1928,6 @@ ST_N = 4            # number of file slots in the Settings tab (set from the pre
 # --------------------------------------------------------------------------- UI
 # --------------------------------------------------------------------------- test pictures from LoRA files (Review tab)
 GEN_HELP_CACHE: dict = {}
-
-
-# --------------------------------------------------------------------------- Prepare > 5 Consistency
-try:
-    import consistency as CC
-except Exception:                           # noqa: BLE001
-    CC = None
 
 
 def script_saved_hook(ds) -> str:

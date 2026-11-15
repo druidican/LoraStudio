@@ -17,8 +17,7 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
 - `program/UI/`: the NiceGUI pages (`shell.py` header/tabs/strip/manual, `pg_home.py`, `pg_datasets.py` + `ds_steps.py`
   `ds_train.py` `ds_results.py` `ds_batch.py`, `pg_queue.py`, `pg_collection.py` + `lora_page.py`, `pg_settings.py` +
   `set_panels.py`, `setup_page.py`, `login.py`, `widgets.py`, `theme.css`). No logic in them.
-- `program/`: `Data/` (datasets, the nine steps: `dsflow.py`, `datasets_ui.py` (HTML renderers), `captioner.py`, `wdtagger.py`,
-  `consistency.py`), `Training/` (`sdgui.py` runner/queue, `sd_script.py` launch scripts, `Lora_Datatypes.py`
+- `program/`: `Data/` (datasets, the nine steps: `dsflow.py`, `datasets_ui.py` (HTML renderers), `captioner.py`, `wdtagger.py`), `Training/` (`sdgui.py` runner/queue, `sd_script.py` launch scripts, `Lora_Datatypes.py`
   presets per LoRA type, `Training_Recommendations.py` numbers per type and purpose), `Gallery/` (Collection,
   `lora_library.py`), `Settings/` (`settings_ui.py`, `ghupdate.py` updater), `Other/` (`gpusmi.py`, `lspaths.py` …),
   `manual/` (the built-in manual, Markdown + `img/`).

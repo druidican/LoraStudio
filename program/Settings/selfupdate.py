@@ -11,7 +11,7 @@
     5. Restart LoRA Studio (button) to use the new version. Roll back puts the files of before the last update back.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import ast
 import json
@@ -34,7 +34,8 @@ DIRS = ("program/manual", "program/logo")             # folders that are copied 
 STATE = {"busy": False}
 
 
-OBSOLETE = ("program/Other/ticker.py", "program/Other/loadjoin.py", "program/Other/livepoll.py")   # Gradio parts (1.131126c)
+OBSOLETE = ("program/Other/ticker.py", "program/Other/loadjoin.py", "program/Other/livepoll.py",   # Gradio parts (1.131126c)
+            "program/Data/consistency.py")                                                            # removed in 1.151126h
 
 
 def remove_obsolete(say=print) -> int:

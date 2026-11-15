@@ -9,7 +9,7 @@ hidden, and its places are greyed out with **(… missing)** so you can see what
 |---|---|---|
 | **sd-scripts** | trains SDXL, Illustrious, Pony, Anima, FLUX.1, SD 1.5, … | launch scripts are still made; you run them where sd-scripts is |
 | **musubi-tuner** | trains Z-Image Turbo and Base, Qwen-Image and FLUX.2 | the same, for those types |
-| **Ollama** | the detailed sort (pass 2), writing captions, the AI consistency check | the quick sort, captions you write yourself, the word-list consistency check |
+| **Ollama** | the detailed sort (pass 2), writing captions | the quick sort, captions you write yourself |
 
 `install.sh` asks about each one: **install it for me**, **I have it already** (it asks for the folder), or
 **none**. Ollama can be installed for you on Linux only; on Windows it is installed in Windows (see below).

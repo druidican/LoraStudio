@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.151126f"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -524,18 +524,6 @@ LEAVE_LABEL = {"character": "Never describe (always part of the person)",
                "action": "Never describe (the pose or action itself: the trigger word learns it)",
                "concept": "Never describe (the effect itself: the trigger word learns it)"}
 
-CC_PAGE_JS = """
-<script>
-window.ccOpen = function(btn){
-  var d = btn.closest('.cc-odd'); if (!d) return;
-  document.querySelectorAll('#cc_html .cc-odd.cc-sel').forEach(function(e){ e.classList.remove('cc-sel'); });
-  d.classList.add('cc-sel');
-  emitEvent('cc_open', d.dataset.p);
-};
-</script>
-"""
-
-
 def leave_default(ds) -> str:
     m = F.meta(ds)
     if m.get("leave_out") is not None:
@@ -561,7 +549,7 @@ def step7(page):
     head("Tag every picture",
          "Tags (Illustrious, Pony, SDXL anime, Anima) are written by the WD tagger (run by sd-scripts; the first time it "
          "downloads about 1.2 GB). Only general tags: no character names, so the trigger word stands for them; the Never "
-         "describe list and the consistency check apply as usual. Sentences (FLUX, Qwen-Image, Z-Image, …) are written by "
+         "describe list applies as usual. Sentences (FLUX, Qwen-Image, Z-Image, …) are written by "
          "Ollama.")
     if not FT.have("ollama"):
         note("Ollama is not installed: tag sets work, sentence captions do not. Write those yourself in 8 Review (click "
@@ -766,69 +754,6 @@ def step7(page):
             ui.button("Save", on_click=desc_save).props("unelevated dense no-caps color=primary")
             ui.button("Suggest from the tags", on_click=desc_suggest).props("outline dense no-caps")
     desc_card.set_visibility(is_char or worn)
-    # ---- consistency
-    with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
-        ui.label("Consistency, checked while tagging").classes("font-semibold")
-        note("The traits of the character itself that the captions mention (hair, eyes, build, skin, horns, tattoos, a "
-             "signature object): the same in most pictures is taken out of the captions so the trigger word learns it; "
-             "words that mean the same become one word; odd pictures that say something else are shown so you can look. "
-             "Clothes, places, poses, expressions and light stay in each caption.")
-        cc_sum = ui.markdown("")
-        with ui.row().classes("w-full no-wrap items-start gap-4"):
-            cc_html = ui.html("", sanitize=False).classes("grow basis-3/5 min-w-0").props('id="cc_html"')
-            with ui.column().classes("grow basis-2/5 gap-1"):
-                cc_img = ui.image("").classes("w-full rounded")
-                cc_img.set_visibility(False)
-                cc_cap = ui.markdown("Click a picture that says something else to look at it with its caption.")
-        cc_msg = ui.markdown("")
-        cc_ok = ui.checkbox("Replace the locked choices")
-        cc_ok.set_visibility(False)
-
-        def cc_draw():
-            cc_sum.content, cc_html.content = SP.cc_render(ds)
-
-        async def cc_check():
-            cc_msg.content = "Reading the captions …"
-            r = await run.io_bound(SP.cc_find, ds, url0, model0, trig.value, None)
-            cc_sum.content, cc_html.content = r
-            cc_msg.content = ""
-
-        async def cc_apply():
-            res = await ui.run_javascript("(" + SP.CC_JS + ")('', '', '', '', '', false)")
-            choices = res[1] if isinstance(res, list) and len(res) > 1 else "{}"
-            msg, upd = await run.io_bound(SP.cc_apply, ds, choices, url0, model0, trig.value, cc_ok.value, None)
-            cc_msg.content = msg
-            cc_ok.set_visibility(bool(upd))
-            if not upd:
-                cc_ok.value = False
-            cc_draw()
-            sets_html.content = V.s7_sets_html(ds)
-            lv = SP.cc_leave_out(ds, leave.value)
-            if lv:
-                leave.value = lv
-                keep_leave()
-
-        def cc_open(path):
-            img, cap = SP.cc_open(path)
-            if isinstance(img, str):
-                cc_img.set_source(pic_url(img, 900))
-                cc_img.set_visibility(True)
-                cc_cap.content = cap
-
-        def mirror():
-            sets = F.caption_sets(ds)
-            if len(sets) < 2:
-                cc_msg.content = "There is only one caption set."
-                return
-            cc_msg.content = "\n\n".join(F.mirror_kept(ds, x["ext"], url0, model0, trig.value) for x in sets[1:])
-        page.on_cc_open = cc_open
-        with ui.row().classes("items-center gap-2"):
-            ui.button("Check the captions", on_click=cc_check).props("outline dense no-caps")
-            ui.button("Stop", on_click=SP.cc_stop).props("flat dense no-caps color=negative")
-            ui.button("Apply choices", on_click=cc_apply).props("unelevated dense no-caps color=primary")
-            if len(F.caption_sets(ds)) > 1:
-                ui.button("Apply to the other caption set too", on_click=mirror).props("outline dense no-caps")
-        cc_draw()
     ui.button("Continue to Review →", on_click=lambda: page.go(step=8)).props("unelevated no-caps color=primary")
     if is_char or worn:
         mv_draw()

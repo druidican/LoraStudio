@@ -3,7 +3,6 @@ import json, re, sys
 # Test helper, not part of the program. Usage: fake_ollama.py <port> <LoRA Studio folder>
 from http.server import BaseHTTPRequestHandler, HTTPServer
 sys.path.insert(0, sys.argv[2]); sys.path.insert(0, sys.argv[2] + "/program"); import lspaths; lspaths.bootstrap()
-import consistency as C
 LOADED = {}
 MODELS = [{"name": "qwen2.5vl:7b", "size": 6000000000, "details": {"families": ["qwen25vl"]}},
           {"name": "llava:13b", "size": 8000000000, "details": {"families": ["llama", "clip"]}},
@@ -67,18 +66,6 @@ class H(BaseHTTPRequestHandler):
             if h % 6 == 0: ans[1]["a"] = "no"; ans[0]["a"] = "no"
             if h % 4 == 1: ans[-1]["a"] = "hidden"
             out = json.dumps({"answers": ans})
-        elif "List ONLY traits" in prompt:
-            cap = re.search(r'^"(.*)"$', prompt, re.M).group(1)
-            tr = C.lexicon_traits(cap) + [{"trait": "dress colour", "value": "red", "phrase": "red dress"}]
-            out = json.dumps({"traits": tr})
-        elif "Group the words" in prompt:
-            words = re.findall(r'"([^"]+)"', prompt.split("\n")[1])
-            out = json.dumps({"groups": [[w] for w in words]})
-        elif "Rewrite this picture caption" in prompt:
-            cap = prompt.split("Caption: ", 1)[1]
-            for r in re.findall(r'remove any mention of "([^"]+)"', prompt):
-                cap = C.remove_phrase(cap, r) or cap.replace(r, "")
-            out = cap
         elif "training captions" in " ".join(str(m.get("content", "")) for m in d["messages"]):
             import hashlib
             h = int(hashlib.md5(d["messages"][-1]["images"][0][:4000].encode()).hexdigest(), 16) if d["messages"][-1].get("images") else 0

@@ -6,15 +6,14 @@ It runs sd-scripts' own tagger (finetune/tag_images_by_wd14_tagger.py --onnx) in
 folder of links to the pictures, so nothing else in the dataset is touched. Only the general tags are kept: no
 character, copyright, artist, meta or rating tags, so the trigger word stands for the character, as usual. Each line
 then goes through the same cleaning as Ollama's tags (captioner.clean_tags): the trigger word first, the "Never
-describe" traits taken out, at most the tag count of the Length setting. The consistency check works on the result
-like on any caption set.
+describe" traits taken out, at most the tag count of the Length setting.
 
 Needs onnx + onnxruntime in the training venv: installed by itself the first time in the venv LoRA Studio made
 (onnxruntime-gpu on NVIDIA; on AMD it runs on the CPU, about a second or two per picture); for your own venv the
 command is shown. The model (about 1.2 GB) is downloaded the first time into userdata/wd_tagger/.
 """
 from __future__ import annotations
-__version__ = "1.051126"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import os
 import shutil

@@ -2,7 +2,7 @@
 """Datasets › Improvements: Fix the ticked datasets (dsflow.batch_start), its progress, Look at the fixed ones, and
 What Fix does (the batch settings, dsflow.batch_settings)."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import json
 
@@ -83,11 +83,6 @@ def settings(page):
     c["captions"] = ui.radio({v: k for k, v in SU.CAP_CHOICES}).props("dense")
     if not FT.have("ollama"):
         c["captions"].disable()
-    ui.label("Consistency check").classes("ls-note")
-    c["consistency"] = ui.radio({v: k for k, v in SU.CONS_CHOICES}).props("dense")
-    c["cons_each"] = ui.checkbox("Answer every trait with “This picture only” (each caption keeps its own; untick to "
-                                 "walk through them yourself later in step 7)")
-    c["cons_each"].bind_visibility_from(c["consistency"], "value", backward=lambda v: v == "check")
     c["launch_script"] = ui.checkbox("Write a launch script with the recommended settings at the end (step 9)")
     msg = ui.markdown("")
     summ = ui.markdown("").classes("ls-note")

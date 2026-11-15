@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.131126c
+# LoRA Studio version 1.151126h
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh
@@ -297,7 +297,7 @@ fi
 [ "$MU_MODE" = install ] && ok "musubi-tuner: installed into $TARGET/musubi-tuner"
 [ "$SD_MODE" = none ] && ok "sd-scripts: none (launch scripts are made, not run here)"
 [ "$MU_MODE" = none ] && ok "musubi-tuner: none"
-# Ollama (the detailed sort, captions, the consistency check)
+# Ollama (the detailed sort, captions)
 if [ -z "$OL_MODE" ]; then
     HAVE_OL=0; command -v ollama >/dev/null && HAVE_OL=1
     curl -s -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && HAVE_OL=1

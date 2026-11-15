@@ -9,7 +9,7 @@ Without the file (an older install) everything counts as present, as before. A c
 page is built once at start.
 """
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -20,7 +20,7 @@ import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 HERE = _LP.USER
 FILE = HERE / "features.json"
 PARTS = {"ollama": "Ollama", "sd_scripts": "sd-scripts", "musubi": "musubi-tuner"}
-WHAT = {"ollama": "the detailed sort (pass 2), writing captions and the consistency check",
+WHAT = {"ollama": "the detailed sort (pass 2) and writing captions",
         "sd_scripts": "training SDXL, Illustrious, Pony, Anima, FLUX.1, SD 1.5, … and the picture tools",
         "musubi": "training Z-Image Turbo, Qwen-Image and FLUX.2"}
 MUSUBI_TYPES = {"zimage", "zimagebase", "qwenimage", "flux2"}

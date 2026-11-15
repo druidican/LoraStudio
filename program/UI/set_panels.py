@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.151126f"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -637,8 +637,8 @@ def panel_ai(page):
     import sdgui as S
     oc = S.ollama_ctl()
     if not FT.have("ollama"):
-        note("Ollama is not installed (Settings › Start and network › What is installed): the detailed sort, writing "
-             f"captions and the consistency check by Ollama are hidden. Get it from {FT.ollama_guide()}, tick it there, "
+        note("Ollama is not installed (Settings › Start and network › What is installed): the detailed sort and writing "
+             f"captions by Ollama are hidden. Get it from {FT.ollama_guide()}, tick it there, "
              "restart.")
     url0, use0 = S.oc_settings()
     with card():

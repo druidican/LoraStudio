@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Preparing a dataset: captions with Ollama, the picture check, watermarks, the automatic preparation and the
-consistency check (Datasets › 6 and 7).
+"""Preparing a dataset: captions with Ollama, the picture check, watermarks and the automatic preparation
+(Datasets › 6 and 7).
 
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.151126f"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
-import copy
 import hashlib
 import html
 import json
@@ -160,22 +159,8 @@ def _oc_hint(old: str) -> str:
     return ", ".join(t for t in S.split_tags(old or "")[1:40]) if old else ""
 
 
-def _locked_leave_out(ds, leave_out):
-    """The leave-out list plus the traits locked as kept in the LoRA for this dataset (traits.txt)."""
-    if S.CC is None or not ds:
-        return leave_out
-    try:
-        kept = S.CC.kept_traits(S.lora_path(ds))
-    except Exception:                       # noqa: BLE001
-        return leave_out
-    have = {t.strip().lower() for t in (leave_out or "").split(",")}
-    add = [t for t in kept if t.lower() not in have]
-    return ", ".join([x for x in [leave_out] if x] + add)
-
-
 def oc_preview(ds, url, model, trigger, leave_out, hints, style="sentences", length=3, detail=3, n=3):
     """Caption a few images without writing anything."""
-    leave_out = _locked_leave_out(ds, leave_out)
     bad = _oc_check(ds, url, model, trigger)
     if bad:
         yield bad
@@ -204,8 +189,6 @@ def oc_preview(ds, url, model, trigger, leave_out, hints, style="sentences", len
         warn = f"  \n⚠️ still mentions: {', '.join(r['leaks'])}" if r["leaks"] else ""
         if r.get("dropped"):
             warn += f"  \n(left out tags about: {', '.join(r['dropped'])})"
-        if S.CC is not None:
-            r["caption"] = S.CC.lock_caption(S.lora_path(ds), im, r["caption"])
         out.append(f"**{im.parent.name}/{im.name}** ({time.time() - t0:.0f} s)  \n"
                    f"old: `{(old or '(none)')[:220]}`  \nnew: **{html.escape(r['caption'])}**{warn}\n")
         yield "\n".join(out) + (f"\n⏳ {pick[i].name} ..." if i < len(pick) else "")
@@ -216,7 +199,6 @@ def oc_preview(ds, url, model, trigger, leave_out, hints, style="sentences", len
 def oc_run(ds, url, model, trigger, leave_out, hints, unload_after, style="sentences", length=3, detail=3,
            only_missing=False):
     """Rewrite every caption of the dataset. Old captions: Undo button + safety copy in gui_logs/."""
-    leave_out = _locked_leave_out(ds, leave_out)
     bad = _oc_check(ds, url, model, trigger)
     if bad:
         yield bad
@@ -249,8 +231,7 @@ def oc_run(ds, url, model, trigger, leave_out, hints, unload_after, style="sente
             if "not reachable" in str(e):
                 break
             continue
-        cap = S.CC.lock_caption(S.lora_path(ds), im, r["caption"]) if S.CC is not None else r["caption"]
-        S.caption_file(im).write_text(cap + "\n", encoding="utf-8")
+        S.caption_file(im).write_text(r["caption"] + "\n", encoding="utf-8")
         done += 1
         if r["leaks"]:
             leaky.append(f"{im.parent.name}/{im.name}: {', '.join(r['leaks'])}")
@@ -579,275 +560,3 @@ def rv_undo():
     desc = S.LAST_CHANGE["desc"]
     S.LAST_CHANGE["files"] = {}
     return f"Undid '{desc}': restored {n} file(s)."
-
-
-CC_CORE = ("hair colour", "hair length", "eye colour", "skin tone", "build", "horns", "ears", "tail", "wings", "fur")
-
-
-def _cc_thumb(p: str, side: int = 150) -> str:
-    return S.DC.thumb_uri(Path(p), side) if S.DC is not None else ""
-
-
-def _cc_recommend(g, total) -> str:
-    if g["trait"] in CC_CORE or any(w in g["trait"] for w in ("hair", "eye", "skin", "build", "horn")):
-        return "lora"
-    return "lora" if total and g["mentioned"] >= 0.3 * total else "each"
-
-
-def _cc_explain(g, total, rec) -> tuple[str, dict]:
-    """(why this choice is recommended, {choice: what it means for the LoRA}) for one trait."""
-    trait = g["trait"]
-    vals = g["values"]
-    main = " / ".join(vals[0]["words"]) if vals else trait
-    n_main = len(vals[0]["pics"]) if vals else 0
-    men = max(1, g["mentioned"])
-    core = trait in CC_CORE or any(w in trait for w in ("hair", "eye", "skin", "build", "horn"))
-    if len(vals) < 2:
-        why = (f"Every caption that mentions it says <b>{html.escape(main)}</b> ({men} of {total}): it is always the same, "
-               "so it is part of the character.")
-    elif rec.startswith("lora") and n_main >= 0.7 * men:
-        share = round(100 * n_main / men)
-        why = (f"<b>{html.escape(main)}</b> in {n_main} of the {men} captions that mention it ({share}%)"
-               + (f"; {html.escape(trait)} is something the character always has" if core else "")
-               + ": most likely part of the character, and the others are mistakes or odd pictures.")
-    elif rec.startswith("lora"):
-        split = " / ".join(f"{html.escape(' / '.join(v['words']))} {len(v['pics'])}" for v in vals[:4])
-        why = (f"Split ({split}), but {html.escape(trait)} is something a character usually always has: one of them is "
-               "probably wrong. Look at the pictures below before you choose; pick <i>This picture only</i> if the "
-               "character really changes it.")
-    else:
-        split = ", ".join(f"{html.escape(' / '.join(v['words']))} {len(v['pics'])}" for v in vals[:4])
-        why = (f"Split ({split}): it changes between the pictures (an outfit, a wig, the light), so it is probably not "
-               "part of the character itself.")
-    means = {
-        "lora": (f"The trigger word always gives <b>{html.escape(main)}</b>, without writing it in a prompt. Asking for "
-                 f"another {html.escape(trait)} in a prompt works against the LoRA."),
-        "each": (f"{html.escape(trait.capitalize())} is not fixed in the LoRA: you write it in your prompt, and each of "
-                 "these values works."),
-        "skip": ("The captions stay as they are: the LoRA learns this trait half-way (sometimes in the trigger word, "
-                 "sometimes in the words)."),
-    }
-    return why, means
-
-
-def cc_render(ds):
-    """(summary markdown, review HTML) of the last consistency check of a dataset."""
-    if S.CC is None or not ds:
-        return "", ""
-    res = S.CC.load_result(ds)
-    if not res:
-        return ("Press **Check the captions** after the captions are written. Only traits of the character itself "
-                "are listed (hair, eyes, build, skin, horns, tattoos, ...), not clothes, places or poses."), ""
-    total = res["total"]
-    contra = [g for g in res["groups"] if g["kind"] == "contradiction"]
-    md = (f"Checked **{total} captions** ({res['at']}, {res['seconds']} s): **{len(contra)} trait"
-          f"{'s' if len(contra) != 1 else ''} with contradictions**, {len(res['groups']) - len(contra)} the same "
-          "wherever they are mentioned. For each trait pick **Keep in the LoRA** (removed from the captions so the trigger "
-          "word learns it) or **This picture only** (each caption keeps its own; words that mean the same are merged into "
-          "the word you pick). Pictures that say something else are left as they are until you look at them (click) and "
-          "choose **Fix**. Then press **Apply choices** (Undo in step 4 restores the captions).")
-    if res.get("lexicon"):
-        md += ("  \n⚠ Ollama could not be reached" + (f" ({html.escape(res['error'][:120])})" if res.get("error") else "")
-               + ": only the common traits were found with the built-in word list.")
-    if res.get("applied") and res.get("applied") == res.get("captions_after"):
-        md += f"  \n✓ Applied {res.get('applied_at', '')}."
-    imgs = oc_images(ds)
-    now = S.CC.captions_key({str(p): S.read_caption(p) for p in imgs if S.read_caption(p)})
-    if now not in (res.get("captions"), res.get("applied")):
-        md += "  \n⚠ The captions changed since this check: press **Check the captions** again."
-    if not res["groups"]:
-        return md, "<p class='cc-none'>No traits of the character were found in the captions. Nothing to decide.</p>"
-    root = S.lora_path(ds)
-    res = S.CC.with_locks(res, root)
-    nlock = sum(1 for g in res["groups"] if g.get("lock"))
-    if nlock and S.CC.LOCKS_ON:
-        md += (f"  \n🔒 **{nlock} trait{'s' if nlock != 1 else ''} locked** in `{S.CC.LOCK_NAME}` (in the dataset folder): "
-               "they come first, here and when new captions are written in step 4.")
-    out = []
-    for g in res["groups"]:
-        gid, lk = g["id"], g.get("lock")
-        rec = _cc_recommend(g, total)
-        sel = ("lora:0" if lk["mode"] == "keep" else "each") if lk else ("lora:0" if rec == "lora" else rec)
-        if lk and lk["mode"] == "keep" and not g.get("lock_found"):
-            sel = "skip"                    # the locked value is not in these captions: nothing is chosen for you
-        exc = set(g.get("exceptions") or [])
-        vals = []
-        for i, v in enumerate(g["values"]):
-            words = v["words"]
-            if len(words) > 1:
-                locked_w = next((w for w, o in ((lk or {}).get("use") or {}).items() if w in words), "")
-                opts = "".join(f"<option value='{html.escape(w)}'{' selected' if w == locked_w else ''}>"
-                               f"{html.escape(w)} ({v['count'][w]})</option>" for w in words)
-                word = (f"<select class='cc-word' data-g='{gid}' data-i='{i}' title='The word to use for all of these "
-                        f"(This picture only)'>{opts}</select>")
-            else:
-                word = f"<b>{html.escape(words[0])}</b>"
-            vals.append(f"<span class='cc-val{' cc-main' if i == 0 else ''}'>{word} <small>{len(v['pics'])} "
-                        f"picture{'s' if len(v['pics']) != 1 else ''}</small></span>")
-        kind = (f"<span class='cc-kind cc-contra'>{len(g['values'])} different</span>" if g["kind"] == "contradiction"
-                else "<span class='cc-kind cc-same'>the same</span>")
-        if lk:
-            kind += ("<span class='cc-kind cc-lock' title='Locked in traits.txt'>🔒 locked: "
-                     + (f"kept in the LoRA ({html.escape(lk.get('value', ''))})" if lk["mode"] == "keep" else "this picture only")
-                     + "</span>")
-        why, means = _cc_explain(g, total, sel)
-        radios = []
-        for i, v in enumerate(g["values"][:4]):
-            lab = f"Keep in the LoRA: <b>{html.escape(' / '.join(v['words']))}</b>"
-            if i == 0:
-                lab += " <small>(removed from the captions)</small>"
-            if i == 0:
-                lab += f"<span class='cc-means'>{means['lora']}</span>"
-            radios.append((f"lora:{i}", lab))
-        radios += [("each", "This picture only <small>(each caption keeps its own)</small>"
-                            f"<span class='cc-means'>{means['each']}</span>"),
-                   ("skip", f"Leave as it is<span class='cc-means'>{means['skip']}</span>")]
-        rad = []
-        for val, lab in radios:
-            tag = (" <i>locked</i>" if lk and val == sel else (" <i>recommended</i>" if not lk and val == sel else ""))
-            rad.append(f"<label><input type='radio' name='cc-m-{gid}' value='{val}'{' checked' if val == sel else ''} "
-                       f"onchange='window.ccMode && ccMode(this)'> {lab}{tag}</label>")
-        main_i = int(sel.split(":")[1]) if sel.startswith("lora:") else -1
-        odd = []
-        for vi, v in enumerate(g["values"]):
-            if len(g["values"]) < 2:
-                break
-            for p, phrase in v["pics"].items():
-                if p in exc or any(p in w["pics"] for j, w in enumerate(g["values"]) if j != vi and j < vi):
-                    continue
-                cap = html.escape(phrase or " / ".join(v["words"]))
-                nm = f"cc-o-{gid}-{abs(hash(p)) % 10**9}"
-                hide = " style='display:none'" if (main_i < 0 or vi == main_i) else ""
-                odd.append(f"<div class='cc-odd' data-p='{html.escape(p)}' data-v='{vi}'{hide}>"
-                           f"<button class='cc-look' title='Look at it' onclick=\"window.ccOpen && ccOpen(this)\">"
-                           f"<img src='{_cc_thumb(p)}'></button><div class='cc-oddtxt'><span class='cc-name'>"
-                           f"{html.escape(Path(p).name)}</span><span>says <b>{cap}</b></span>"
-                           f"<label><input type='radio' name='{nm}' value='fix'> Fix <small>(remove it too)</small></label>"
-                           f"<label><input type='radio' name='{nm}' value='own'> This picture only "
-                           f"<small>(locked as an exception)</small></label></div></div>")
-        hidden = "" if main_i >= 0 else " style='display:none'"
-        oddhtml = (f"<div class='cc-oddhead'{hidden}>Pictures that say something "
-                   f"else: look at each (click), then choose. Undecided ones are left as they are.</div>"
-                   f"<div class='cc-odds'>{''.join(odd)}</div>" if odd else "")
-        if exc:
-            oddhtml += (f"<div class='cc-exc'>🔒 {len(exc)} locked exception{'s' if len(exc) != 1 else ''} keep their own "
-                        f"value: {html.escape(', '.join(Path(p).name for p in sorted(exc)[:8]))}</div>")
-        out.append(f"<div class='cc-group' data-g='{gid}'><div class='cc-head'><span class='cc-trait'>"
-                   f"{html.escape(g['trait'].capitalize())}</span>{kind}<span class='cc-cov'>in {g['mentioned']} of "
-                   f"{total} captions</span></div><div class='cc-vals'>{''.join(vals)}</div>"
-                   f"<div class='cc-why'><b>Why this is recommended:</b> {why}</div>"
-                   f"<div class='cc-modes'>{''.join(rad)}</div>{oddhtml}</div>")
-    return md, "".join(out)
-
-
-CC_JS = ("(ds, x, u, m, t, ok) => { var o = {}; document.querySelectorAll('#cc_html .cc-group').forEach(function(g){ "
-         "var id = g.dataset.g; var m = g.querySelector('input[name=\"cc-m-' + id + '\"]:checked'); "
-         "var e = {mode: m ? m.value : 'skip', fix: [], own: [], words: {}}; "
-         "g.querySelectorAll('.cc-odd').forEach(function(d){ if (d.style.display === 'none') return; "
-         "var r = d.querySelector('input:checked'); if (r && r.value === 'fix') e.fix.push(d.dataset.p); "
-         "if (r && r.value === 'own') e.own.push(d.dataset.p); }); "
-         "g.querySelectorAll('select.cc-word').forEach(function(s){ e.words[s.dataset.i] = s.value; }); o[id] = e; }); "
-         "return [ds, JSON.stringify(o), u, m, t, ok]; }")
-
-
-CC_OPEN_JS = """
-if (!window.ccMode) {
-  window.ccMode = function(r){
-    var g = r.closest('.cc-group'); if (!g) return;
-    var m = /^lora:(\\d+)$/.exec(r.value), k = m ? m[1] : null;
-    g.querySelectorAll('.cc-odd').forEach(function(d){ d.style.display = (k !== null && d.dataset.v !== k) ? '' : 'none'; });
-    var h = g.querySelector('.cc-oddhead'); if (h) h.style.display = k !== null ? '' : 'none';
-  };
-}
-"""
-
-
-def cc_find(ds, url, model, trigger, progress=None):
-    if S.CC is None:
-        return "The consistency check is not available (consistency.py is missing).", ""
-    if not ds:
-        return "Pick a dataset first.", ""
-    imgs = oc_images(ds)
-    if not any(S.read_caption(p) for p in imgs):
-        return "This dataset has no captions yet: write them first (step 4).", ""
-    if not (url and model):
-        url, model = oc_settings()
-    S.CC.scan(ds, imgs, S.read_caption, url, model, trigger or ds, progress)
-    return cc_render(ds)
-
-
-def cc_apply(ds, choices_json, url, model, trigger, confirm=False, progress=None):
-    """(message, show the confirmation). The choices are locked in <dataset>/traits.txt first; a choice that clashes
-    with a lock is only written after the confirmation is ticked."""
-    hide = False
-    if S.CC is None or not ds:
-        return "Pick a dataset first.", hide
-    res = S.CC.load_result(ds)
-    if not res:
-        return "Press **Check the captions** first.", hide
-    try:
-        choices = json.loads(choices_json or "{}")
-    except json.JSONDecodeError:
-        return "Could not read the choices on the page.", hide
-    root = S.lora_path(ds)
-    base = res
-    res = S.CC.with_locks(copy.deepcopy(base), root)
-    locks, clashes = S.CC.lock_changes(res, choices, root)
-    if clashes and not confirm:
-        return ("**These choices clash with locked traits** in `" + S.CC.LOCK_NAME + "`:\n\n"
-                + "\n".join(f"- {c}" for c in clashes)
-                + "\n\nTick **Replace the locked choices** below and press **Apply choices** again, or change the "
-                  "choices back."), True
-    if not (url and model):
-        url, model = oc_settings()
-    try:
-        S.CC.locks_save(root, locks)
-    except OSError as e:
-        return f"Could not write `{S.CC.lock_file(root)}`: {e}", hide
-    backup, changed, kept, skipped = S.CC.apply(res, choices, S.read_caption, S.caption_file, url, model, trigger or ds, progress)
-    if backup:
-        record_change(f"consistency of {ds}", backup)
-    imgs = oc_images(ds)
-    base["applied"] = S.CC.captions_key({str(p): S.read_caption(p) for p in imgs if S.read_caption(p)})
-    base["applied_at"] = time.strftime("%Y-%m-%d %H:%M")
-    base["captions_after"] = base["applied"]
-    base["kept"] = kept
-    try:
-        S.CC.result_path(ds).write_text(json.dumps(base), encoding="utf-8")
-    except OSError:
-        pass
-    msg = (f"✔ Changed **{len(changed)} caption{'s' if len(changed) != 1 else ''}**" + (" (Undo restores them)." if changed else "."))
-    if kept:
-        msg += " Taken out of the captions (the trigger word learns them): " + ", ".join(kept) + "."
-    if skipped:
-        msg += (f" ⚠ {len(skipped)} sentence caption(s) were left unchanged: removing the trait would break the sentence "
-                "and Ollama could not rewrite it (" + ", ".join(Path(p).name for p in skipped[:5]) + ").")
-    for p, old, new in changed[:4]:
-        msg += f"\n\n`{Path(p).name}`  \n~~{html.escape(old[:160])}~~  \n{html.escape(new[:160])}"
-    return msg, hide
-
-
-def cc_leave_out(ds, leave):
-    """Kept-in-LoRA traits are added to the 'Never describe' list of the captioner, so new captions skip them too.
-    The new list, or None when nothing changes."""
-    res = S.CC.load_result(ds) if (S.CC and ds) else None
-    if not res or not res.get("applied"):
-        return None
-    kept = res.get("kept") or []
-    have = [t.strip().lower() for t in (leave or "").split(",") if t.strip()]
-    add = [t for t in kept if t.lower() not in have]
-    return ((leave + ", " if leave else "") + ", ".join(add)) if add else None
-
-
-def cc_open(v):
-    p = (v or "").rsplit("|", 1)[0]
-    if not p or not Path(p).is_file():
-        return None, ""
-    cap = S.read_caption(Path(p)) or ""
-    return p, f"**{Path(p).name}**  \n{html.escape(cap)}"
-
-
-def cc_stop():
-    if S.CC is not None:
-        S.CC.STOP.set()
-    return "Stopping after the current caption ... (what was read so far is remembered)"

@@ -40,15 +40,14 @@ contradiction in the captions, watermarks not decided, no launch script); nothin
 background, with "less is better" defaults: not usable pictures to `_reserve/` (unless that would be more than half of
 them: then nothing moves and the report says to look at step 2), the dataset's own LoRA type and purpose (else Anima +
 Character), the sort, the suggested selection at most 50 pictures (the rest to `_reserve/`), watermarks with the
-recommended crop, resize, and captions only for pictures without one. The consistency check, Review and Launch script
+recommended crop, resize, and captions only for pictures without one. Review and Launch script
 are left for you. A report per dataset shows what was done; *Stop* ends it after the current picture. It does not
 start while a training run uses the GPU.
 
 **Settings › Automatic improvement** changes these defaults (saved in `batch_settings.json`, part of the backup): how
 many pictures to keep (the suggestion at most N, or always N), the safety limit for step 2, the LoRA type and purpose
 for a dataset without one, what happens to watermarks (remove, crop, set aside, leave), upscaling on or off, captions
-(only missing, or all again), the consistency check (left out, or run: every trait answered with "This picture only", or the findings
-waiting for you in step 7) and a
+(only missing, or all again) and a
 launch script at the end. The Improvements page shows the current choices with a link to change them.
 
 The steps (the bar above them shows the dataset, its LoRA types and purpose; the step buttons go anywhere):
@@ -87,11 +86,7 @@ The steps (the bar above them shows the dataset, its LoRA types and purpose; the
    aside or keep.
 7. **Tags**: one caption set per caption style: `IMG.txt` for the first LoRA type's style, `IMG.sentences.txt` (or
    `IMG.tags.txt`) for the other. *Write the captions* writes all sets; the caption settings (length, detail, never
-   describe, try on 3 pictures) are in the fold-out. **Consistency** is checked right there: the character's own traits
-   (hair, eyes, build, skin, horns, a signature object) that are the same in most pictures are taken out of the
-   captions so the trigger word learns them, words that mean the same become one word, and odd pictures that say
-   something else are shown so you can look (fix, or this picture only). Clothes, places, poses, expressions and light
-   stay in each caption. *Apply to the other caption set too* takes the same traits out of the second set.
+   describe, try on 3 pictures) are in the fold-out.
    **Worn item** (purpose in step 3: clothes, equipment or jewelry): the WD tagger writes every tag; **Kinds and where
    they are worn** holds lines `name = other words` for the kinds (`hair clip = hairclip, hair ornament`) and the places
    (`on index finger`), saved in the dataset; *Make the words the same* rewrites every caption of `IMG.txt` (other
@@ -114,8 +109,7 @@ The steps (the bar above them shows the dataset, its LoRA types and purpose; the
    versions are read again by themselves when it changes; *Sync now* passes it on to LoRA Manager.
    **For a style LoRA** the captions describe everything *in* the picture (the people with their hair, eyes and
    clothes, objects, the place, the light, the composition) and never the style itself: *Never describe* holds the
-   art style, medium, technique and artist words, so the trigger word learns the style; the consistency check is
-   hidden. For a concept, write the concept itself in *Never describe*.
+   art style, medium, technique and artist words, so the trigger word learns the style. For a concept, write the concept itself in *Never describe*.
 8. **Review**: the folder, every picture with its caption(s) to edit, and checks (each picture has a caption, the
    trigger word first, no empty or very long captions, caption files without a picture, pictures outside the repeat
    folder).
@@ -423,7 +417,7 @@ One script sets up everything in one folder. It asks three questions first, one 
 |---|---|
 | **sd-scripts** (SDXL, Illustrious, Pony, Anima, FLUX.1, SD 1.5, ...) | install it for me · I have it already (give its folder and venv) · none |
 | **musubi-tuner** (Z-Image Turbo and Base, Qwen-Image, FLUX.2) | install it for me · I have it already · none |
-| **Ollama** (the detailed sort, captions, the consistency check) | install it for me (Linux only, with Ollama's own installer, then offers the vision model `qwen2.5vl:7b`) · it runs already, here or on another computer (give its address) · none |
+| **Ollama** (the detailed sort, captions) | install it for me (Linux only, with Ollama's own installer, then offers the vision model `qwen2.5vl:7b`) · it runs already, here or on another computer (give its address) · none |
 
 **None** means: LoRA Studio still makes the launch scripts and prepares datasets, but it cannot run a training with
 that trainer (or sort and caption with Ollama). The buttons for a missing part are **hidden**, so nothing can be

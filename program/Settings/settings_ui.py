@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126h"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -264,7 +264,6 @@ WM_CHOICES = [("Remove them (the picture tools paint over them; crop if that fai
               ("Crop them off (the recommended crop)", "crop"), ("Set those pictures aside", "aside"),
               ("Leave them (decide later in Datasets)", "leave")]
 CAP_CHOICES = [("Only pictures without a caption", "missing"), ("Write every caption again", "all")]
-CONS_CHOICES = [("Leave it out", "ignore"), ("Run it", "check")]
 
 
 # --------------------------------------------------------------------------- What is installed
