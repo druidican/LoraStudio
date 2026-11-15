@@ -78,14 +78,15 @@ subject. A picture that teaches almost nothing (the subject tiny, hidden or lost
 that shows a detail well (a tattoo, jewellery) ranks higher. For a character, a picture is also left out when clothes,
 pose or angle hide nearly everything about the character, when the figure is small and the face tiny, or when it shows
 only plain hands or feet (a tail, horns or a tattoo stay as detail shots). Sharpness only decides between pictures
-that show the character equally well. It takes about a second or two per picture. Without Ollama only pass 1 runs,
+that show the character equally well. Three pictures are asked at once (Ollama answers them together when it is set
+up for it, see Settings › AI helpers), about a second or two per picture. Without Ollama only pass 1 runs,
 and step 5 then picks by quality alone.
 
 **Detailed scan** (characters; tick it above *Sort*, it is remembered per dataset): after the sort, LoRA Studio
-looks at the dataset as a whole. It asks the Ollama model once more per picture (angle, pose, expression, light, where
-the face is and a detail worth a close-up) and counts framings, angles, poses, expressions, outfits, places and light
-over the pictures the sort keeps. What is missing or rare is a **gap** (*Angle: side (none)*). It takes about twice
-the time of the sort. It judges how well a picture shows things (visible, sharp, big enough, from which side), never
+looks at the dataset as a whole. Its questions (angle, pose, expression, light, where the face is and a detail worth
+a close-up) are asked together with the sort's, in one look at each picture, so it adds little time; only pictures
+the sort already knew from before are asked once more. It counts framings, angles, poses, expressions, outfits, places
+and light over the pictures the sort keeps. What is missing or rare is a **gap** (*Angle: side (none)*). It judges how well a picture shows things (visible, sharp, big enough, from which side), never
 whose face it is.
 
 ## 5 · Select

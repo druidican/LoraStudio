@@ -113,6 +113,17 @@ the memory, *Stop Ollama* stops all. *Get another model* downloads one by name (
 one. Starting a training run stops Ollama to free video memory; it is not started again by itself. The top bar always
 shows which model is running.
 
+**Faster sorting**: the sort and the detailed scan send Ollama **three pictures at once**. Ollama answers them together
+only when it is allowed to; on Ubuntu, once:
+
+```
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+printf '[Service]\nEnvironment="OLLAMA_NUM_PARALLEL=3"\nEnvironment="OLLAMA_FLASH_ATTENTION=1"\nEnvironment="OLLAMA_KV_CACHE_TYPE=q8_0"\n' | sudo tee /etc/systemd/system/ollama.service.d/speed.conf
+sudo systemctl daemon-reload && sudo systemctl restart ollama
+```
+
+Without it Ollama answers them one after the other, as fast as before.
+
 **Hugging Face token**: for gated models and the downloads above (a *Read* token is enough). It is kept readable only
 by you, written into launch scripts that download models, and masked in the run log.
 

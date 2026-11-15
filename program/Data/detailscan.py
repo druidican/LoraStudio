@@ -15,7 +15,7 @@
 It judges how well a picture shows things (visible, sharp, big enough, which angle), never whose face it is.
 """
 from __future__ import annotations
-__version__ = "1.151126d"  # LoRA Studio version, see version.py
+__version__ = "1.151126j"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -83,18 +83,45 @@ def ask(url: str, model: str, img: Path, timeout: float = 600.0) -> dict:
         d = json.loads(m.group(0)) if m else {}
     if not isinstance(d, dict):
         d = {}
+    return parse(d, W, H, w, h)
+
+
+def parse(d: dict, W: int, H: int, w: int, h: int) -> dict:
+    """The scan's answer from the model's JSON (boxes from the sent w×h copy to the picture's W×H)."""
     sx, sy = W / w, H / h
     out = {k: F._norm(d.get(k)) for k in ("angle", "pose", "expression", "lighting")}
     for k in ("face_box", "detail_box"):
         b = DC._box(d.get(k), w, h)
         out[k] = [round(b[0] * sx), round(b[1] * sy), round(b[2] * sx), round(b[3] * sy)] if b else None
-    out["detail"] = DC.unique_detail({"unique_detail": d.get("detail")})
+    out["detail"] = DC.unique_detail({"unique_detail": d.get("detail") if "detail" in d else d.get("unique_detail")})
     out["W"], out["H"] = W, H
     return out
 
 
 def _cache_file(ds) -> Path:
     return F.root(ds) / ".lsflow" / "detail_cache.json"
+
+
+def remember(ds, answers: dict, model: str):
+    """Answers the sort got in its own question (sort pass 2 with the scan on): {picture: model JSON}. Stored as the
+    scan's own answers, so the scan does not ask again."""
+    if not answers:
+        return
+    cache_p = _cache_file(ds)
+    try:
+        cache = json.loads(cache_p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        cache = {}
+    for p, d in answers.items():
+        pp = Path(p)
+        try:
+            st = pp.stat()
+            W, H, w, h = DC._sent_size(pp, DC.SENT_SIDE)
+        except OSError:
+            continue
+        cache[f"{pp.name}|{st.st_size}|{int(st.st_mtime)}|{model}"] = parse(d, W, H, w, h)
+    cache_p.parent.mkdir(parents=True, exist_ok=True)
+    cache_p.write_text(json.dumps(cache), encoding="utf-8")
 
 
 # --------------------------------------------------------------------------- the scan
@@ -220,21 +247,32 @@ def run(ds, url: str | None = None, model: str | None = None):
     t0, asked = time.time(), 0
     pics = {p: e for p, e in sr["pics"].items() if Path(p).is_file()}
     entries = {}
+
+    def key_of(p):
+        st = Path(p).stat()
+        return f"{Path(p).name}|{st.st_size}|{int(st.st_mtime)}|{model}"
+
+    def wanted(p, e):
+        return not (e.get("cat") == "out" and "small" not in (e.get("why") or ""))   # broken or blurry: nothing to win
+    todo = [p for p, e in pics.items() if wanted(p, e) and key_of(p) not in cache]
+    pool, futs = None, {}
+    if todo:                                              # several at once: Ollama answers them together
+        from concurrent.futures import ThreadPoolExecutor
+        pool = ThreadPoolExecutor(max_workers=DC.PARALLEL)
+        futs = {p: pool.submit(ask, url, model, Path(p)) for p in todo}
     for i, (p, e) in enumerate(pics.items(), 1):
         if F.STOP.is_set():
             yield "stopped"
             break
-        if e.get("cat") == "out" and "small" not in (e.get("why") or ""):
-            continue                                      # broken or blurry: nothing to win
-        pp = Path(p)
-        st = pp.stat()
-        key = f"{pp.name}|{st.st_size}|{int(st.st_mtime)}|{model}"
+        if not wanted(p, e):
+            continue
+        key = key_of(p)
         d = cache.get(key)
-        if d is None:
-            left = f", about {S.fmt((time.time() - t0) / max(asked, 1) * (len(pics) - i + 1))} left" if asked else ""
-            yield f"Detailed scan (Ollama): {i} of {len(pics)}{left}"
+        if d is None and p in futs:
+            left = f", about {S.fmt((time.time() - t0) / max(asked, 1) * (len(todo) - asked))} left" if asked else ""
+            yield f"Detailed scan (Ollama, {DC.PARALLEL} at once): {asked + 1} of {len(todo)}{left}"
             try:
-                d = ask(url, model, pp)
+                d = futs[p].result()
             except Exception as ex:                       # noqa: BLE001
                 yield f"Ollama stopped answering: {ex}"
                 break
@@ -242,10 +280,14 @@ def run(ds, url: str | None = None, model: str | None = None):
             asked += 1
             if asked % 5 == 0:
                 cache_p.write_text(json.dumps(cache), encoding="utf-8")
+        if d is None:
+            continue
         entries[p] = {**d, "framing": e.get("framing") or "", "outfit": e.get("outfit") or "",
                       "place": e.get("place") or "", "cat": e.get("cat"), "why": e.get("why") or "",
                       "w": e.get("w") or d.get("W"), "h": e.get("h") or d.get("H"), "warn": e.get("warn") or [],
                       "face": e.get("face") or "", "pin": F.pin_of(pins, p)}
+    if pool:
+        pool.shutdown(wait=False, cancel_futures=True)
     cache_p.write_text(json.dumps(cache), encoding="utf-8")
     kept = [x for p, x in entries.items() if (x["cat"] in KEPT or x["pin"] == "keep") and x["pin"] != "never"]
     counts, gaps, want = coverage(kept)

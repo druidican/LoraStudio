@@ -15,7 +15,7 @@ trained on its own pictures learns its own mistakes harder. The prompts only nam
 outfit and place, never anything about the person's body or looks.
 """
 from __future__ import annotations
-__version__ = "1.151126g"  # LoRA Studio version, see version.py
+__version__ = "1.151126j"  # LoRA Studio version, see version.py
 
 import json
 import random
@@ -175,11 +175,11 @@ def candidates(ds) -> list[dict]:
 def _what(url, model, p: Path, purpose: str) -> dict:
     """What a picture shows, in the words of the sort and the detailed scan; {"bad": reason} when it is not usable."""
     import datacheck as DC
-    d = DC.content(url, model, p)
+    d = DC.content(url, model, p, detail=True)          # the sort's and the detailed scan's questions in one go
     bad = [t for s_, t in DC.content_issues(d, purpose) if s_ == DC.BAD]
     if bad:
         return {"bad": bad[0]}
-    x = DSC.ask(url, model, p)
+    x = DSC.parse(d, *DC._sent_size(p, DC.SENT_SIDE))
     return {"framing": F._norm(d.get("framing")), "outfit": F._norm(d.get("outfit")), "place": F._norm(d.get("place")),
             **{k: x.get(k) or "" for k in ("angle", "pose", "expression", "lighting")}}
 

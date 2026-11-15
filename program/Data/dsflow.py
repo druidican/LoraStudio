@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.151126i"  # LoRA Studio version, see version.py
+__version__ = "1.151126j"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -696,26 +696,41 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
         pics[str(p)]["wm"] = True
         marks[rp] = {"W": W, "H": H, "marks": allm, "subject": subj, "sig": sig, "choice": "", "border": border,
                      "v": 2, "options": DC.options_with_border(W, H, allm, subj, crop_min, border)}
+    pool = None
     if ai:
         cache = S._dc_cache_load()
+        import detailscan as DSC
+        with_detail = DSC.enabled(ds)                    # the detailed scan's questions in the same go
+        fresh = {}
+
+        def needs(p):
+            d0, _ = _content_cached(p, model, cache)
+            return d0 is None or "features_visible" not in d0   # none yet, or from before the usefulness check
+        todo = [p for p in rest if needs(p)]
+        if todo:                                         # several pictures at once: Ollama answers them together
+            from concurrent.futures import ThreadPoolExecutor
+            pool = ThreadPoolExecutor(max_workers=DC.PARALLEL)
+            futs = {str(p): pool.submit(DC.content, url, model, p, 600.0, with_detail) for p in todo}
+        t2 = time.time()
         for i, p in enumerate(rest, 1):
             if STOP.is_set():
                 note = "stopped"
                 break
             d, key = _content_cached(p, model, cache)
-            if d is not None and "features_visible" not in d:   # an answer from before the usefulness check: ask again
-                d = None
-            if d is None:
-                eta = f", about {S.fmt((time.time() - t0) / max(done, 1) * (len(rest) - i + 1))} left" if done else ""
-                yield f"Pass 2 · detailed (Ollama): {i} of {len(rest)}{eta}"
+            if str(p) in (futs if pool else {}):
+                eta = (f", about {S.fmt((time.time() - t2) / max(done, 1) * (len(todo) - done))} left"
+                       if done else "")
+                yield f"Pass 2 · detailed (Ollama, {DC.PARALLEL} at once): {done + 1} of {len(todo)}{eta}"
                 try:
-                    d = DC.content(url, model, p)
+                    d = futs[str(p)].result()
                 except Exception as e:                   # noqa: BLE001
                     S._dc_cache_save(cache)
                     note = f"Ollama stopped answering: {e}"
                     break
                 cache[key] = d
                 done += 1
+                if with_detail:
+                    fresh[str(p)] = d
                 if done % 5 == 0:
                     S._dc_cache_save(cache)
             e = pics[str(p)]
@@ -756,7 +771,14 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                         pass
                 else:
                     seen_marks.add(str(p))
+        if pool:
+            pool.shutdown(wait=False, cancel_futures=True)
         S._dc_cache_save(cache)
+        if fresh:
+            try:
+                DSC.remember(ds, fresh, model)
+            except Exception:                            # noqa: BLE001
+                pass
     if not wm_removed:                                   # the detector and frames also without Ollama's word
         for p in rest:
             if str(p) not in seen_marks and (det.get(str(p)) or str(p) in borders or DC.rel(root_, p) in marks):

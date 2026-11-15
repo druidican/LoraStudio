@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.151126i"
-VERSION = "1.151126i"
+__version__ = "1.151126j"
+VERSION = "1.151126j"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.151126i",
+    "version.py": "1.151126j",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.131126c",
     "program/Data/sd_prepare.py": "1.151126h",
     "program/Training/sd_settings.py": "1.131126c",
     "program/Data/datasets_ui.py": "1.151126h",
-    "program/Data/dsflow.py": "1.151126i",
+    "program/Data/dsflow.py": "1.151126j",
     "program/Training/training_ui.py": "1.151126b",
     "program/Settings/settings_ui.py": "1.151126h",
     "program/Gallery/lora_library.py": "1.131126c",
@@ -35,13 +35,13 @@ RELEASE: dict = {
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
     "program/Training/comfyinpaint.py": "1.151126f",
-    "program/Data/detailscan.py": "1.151126d",
+    "program/Data/detailscan.py": "1.151126j",
     "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.151126h",
     "program/Settings/ghupdate.py": "1.011126",
     "program/Settings/hfdownload.py": "1.131126c",
     "program/Settings/ollamactl.py": "1.011126",
-    "program/Data/datacheck.py": "1.151126f",
+    "program/Data/datacheck.py": "1.151126j",
     "program/Data/pictools.py": "1.151126e",
     "program/Data/pictools_worker.py": "1.151126e",
     "program/Gallery/picgallery.py": "1.011126",
@@ -72,7 +72,7 @@ RELEASE: dict = {
     "program/Other/notify.py": "1.131126c",
     "program/Gallery/delete.py": "1.141126b",
     "program/UI/delete_dialog.py": "1.141126b",
-    "program/Data/gapfill.py": "1.151126g",
+    "program/Data/gapfill.py": "1.151126j",
     "program/UI/ds_gapfill.py": "1.151126g",
     "program/Other/statusbar.py": "1.151126c",
     "program/Other/home.py": "1.141126b",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.151126j", "Faster Ollama scans: the sort and the detailed scan ask one question per picture, three pictures at once."),
     ("1.151126i", "Improvements: the outfit / place note only when the captions do not name it; Show the pictures under each note; Fix looks through your own LoRA pictures for the gaps (waiting for your pick in step 5)."),
     ("1.151126h", "The caption consistency check is removed (step 7 and Automatic improvement)."),
     ("1.151126g", "Fill the gaps looks through your own ComfyUI pictures made with the dataset's LoRA alone first (Ollama says what each shows) and makes only what is still missing; a warning when more than a quarter of the dataset is LoRA-made."),

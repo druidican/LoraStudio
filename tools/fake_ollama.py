@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-import json, re, sys
+import json, re, sys, time
 # Test helper, not part of the program. Usage: fake_ollama.py <port> <LoRA Studio folder>
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, sys.argv[2]); sys.path.insert(0, sys.argv[2] + "/program"); import lspaths; lspaths.bootstrap()
 LOADED = {}
 MODELS = [{"name": "qwen2.5vl:7b", "size": 6000000000, "details": {"families": ["qwen25vl"]}},
@@ -45,6 +45,17 @@ class H(BaseHTTPRequestHandler):
                               "collage_or_screenshot": False, "framing": fr,
                               "outfit": ["red dress", "red dress", "jeans and t-shirt", "armor"][h % 4],
                               "place": ["forest", "forest", "city street", "studio"][(h >> 3) % 4], "note": "", "teaches": [1, 3, 4, 5, 5][(h >> 5) % 5], "face_size": ["tiny", "small", "medium", "large"][(h >> 7) % 4], "features_visible": (h >> 9) % 6 != 0, "part_only": "feet" if h % 13 == 0 else "", "unique_detail": "a red scarf" if h % 7 == 0 else ""})
+            if '"angle"' in prompt:                      # the detailed scan's questions in the same go
+                w, hh = [int(x) for x in re.search(r"(\d+)x(\d+) pixels", prompt).groups()]
+                o = json.loads(out)
+                o.update({"angle": ["front", "front", "three-quarter", "side", "back"][h % 5],
+                          "pose": ["standing", "standing", "sitting", "walking"][(h >> 3) % 4],
+                          "expression": ["neutral", "smiling", "neutral", "laughing"][(h >> 5) % 4],
+                          "lighting": ["daylight", "daylight", "indoor"][(h >> 7) % 3],
+                          "face_box": [w * 0.45, hh * 0.1, w * 0.53, hh * 0.18] if h % 3 == 0 else None,
+                          "detail_box": None})
+                out = json.dumps(o)
+            time.sleep(0.4)                              # like a real model: shows what asking several at once wins
         elif prompt.startswith("Look at this picture of a character"):   # the detailed scan
             import hashlib
             h = int(hashlib.md5(d["messages"][-1]["images"][0][:4000].encode()).hexdigest(), 16)
@@ -77,4 +88,4 @@ class H(BaseHTTPRequestHandler):
         else:
             out = "{}"
         self._send({"message": {"content": out}})
-HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
+ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()

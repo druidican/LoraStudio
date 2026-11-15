@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.151126f"  # LoRA Studio version, see version.py
+__version__ = "1.151126j"  # LoRA Studio version, see version.py
 
 import lspaths
 import base64
@@ -172,13 +172,31 @@ CONTENT_PROMPT = """Look at this photo for an image-model training set and answe
  "note": "<anything else that makes it a poor training picture, '' if none>"}"""
 
 
-def content(url: str, model: str, img: Path, timeout: float = 600.0) -> dict:
-    """One image through the Ollama vision model; a dict with the fields above (missing ones absent)."""
+# the detailed scan's questions, asked in the same go when it is on (one look at the picture instead of two)
+DETAIL_FIELDS = """,
+ "angle": "<front | three-quarter | side | back | from above | from below>: how the main subject faces the camera",
+ "pose": "<standing | sitting | lying | kneeling | walking | running | action | other>",
+ "expression": "<neutral | smiling | laughing | serious | surprised | sad | angry | other | not visible>",
+ "lighting": "<daylight | indoor | studio | night | low light | dramatic | other>",
+ "face_box": <[x1, y1, x2, y2] in pixels around the main subject's face, or null when no face is visible>,
+ "detail_box": <[x1, y1, x2, y2] in pixels around the unique_detail above, or null>}"""
+SENT_SIDE = 896                                     # the long side of the copy the vision model sees
+PARALLEL = 3                                        # pictures asked at once (Ollama: OLLAMA_NUM_PARALLEL)
+
+
+def content(url: str, model: str, img: Path, timeout: float = 600.0, detail: bool = False) -> dict:
+    """One image through the Ollama vision model; a dict with the fields above (missing ones absent). detail=True
+    also asks the detailed scan's questions (angle, pose, expression, light, face and detail boxes)."""
     import captioner as CAP                        # same connection and image handling as Recaption
+    prompt = CONTENT_PROMPT
+    if detail:
+        _, _, w, h = _sent_size(img, SENT_SIDE)
+        prompt = (CONTENT_PROMPT.rstrip().rstrip("}") + DETAIL_FIELDS
+                  + f"\nThe picture is {w}x{h} pixels.")
     r = CAP._req(url, "/api/chat", {
         "model": model, "stream": False, "format": "json", "keep_alive": "5m",
-        "options": {"temperature": 0.0, "num_predict": 420},
-        "messages": [{"role": "user", "content": CONTENT_PROMPT, "images": [CAP.image_b64(img, 896)]}],
+        "options": {"temperature": 0.0, "num_predict": 560 if detail else 420},
+        "messages": [{"role": "user", "content": prompt, "images": [CAP.image_b64(img, SENT_SIDE)]}],
     }, timeout=timeout)
     txt = ((r.get("message") or {}).get("content") or r.get("response") or "").strip()
     txt = re.sub(r"^```(json)?|```$", "", txt).strip()
