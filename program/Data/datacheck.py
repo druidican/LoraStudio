@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.141126"  # LoRA Studio version, see version.py
+__version__ = "1.151126e"  # LoRA Studio version, see version.py
 
 import lspaths
 import base64
@@ -544,6 +544,103 @@ def find_marks(url: str, model: str, img: Path, timeout: float = 600.0) -> dict:
     return {"W": W, "H": H, "marks": marks[:MAX_MARKS], "subject": up(subject)}
 
 
+# ---- marks from the detector, frames and bars (no Ollama needed)
+
+EDGE_BAND = 0.18          # a detector box this close to an edge counts as a watermark / logo there
+SURE = 0.35               # a box anywhere else needs at least this score (text in the scene is no watermark)
+
+
+def detector_marks(det: dict | None, subject=None) -> list[dict]:
+    """The detector's boxes that are most likely added marks: small, and near an edge (corner watermarks, logos,
+    site names) or very certain. Text in the middle of the scene (signs, shirts) is left out unless certain."""
+    if not det or not det.get("W"):
+        return []
+    W, H = det["W"], det["H"]
+    out = []
+    for m in det.get("marks") or []:
+        x0, y0, x1, y1 = m["box"]
+        area = (x1 - x0) * (y1 - y0) / (W * H)
+        if area > 0.12 or area < 0.0004:
+            continue
+        near_edge = (x0 < EDGE_BAND * W or x1 > (1 - EDGE_BAND) * W) and (y0 < EDGE_BAND * H or y1 > (1 - EDGE_BAND) * H) \
+            or y0 < 0.08 * H or y1 > 0.92 * H or x0 < 0.05 * W or x1 > 0.95 * W
+        need = 0.12 if near_edge else SURE
+        if m.get("label") == "text" and not near_edge:
+            need = max(need, 0.45)
+        if subject and not near_edge:                    # on the subject itself: only when very certain
+            need = max(need, 0.5)
+        if m["score"] >= need:
+            out.append({"kind": (m.get("label") or "mark").removeprefix("a "), "text": "", "box": [int(v) for v in m["box"]],
+                        "score": m["score"], "by": "detector"})
+    return out
+
+
+def merge_marks(*lists) -> list[dict]:
+    """One list of marks: boxes that overlap are joined into one."""
+    out: list[dict] = []
+    for m in (m for lst in lists for m in (lst or [])):
+        b = list(m["box"])
+        for o in out:
+            ob = o["box"]
+            ix = max(0, min(b[2], ob[2]) - max(b[0], ob[0]))
+            iy = max(0, min(b[3], ob[3]) - max(b[1], ob[1]))
+            small = min((b[2] - b[0]) * (b[3] - b[1]), (ob[2] - ob[0]) * (ob[3] - ob[1])) or 1
+            if ix * iy / small > 0.3:
+                o["box"] = [min(b[0], ob[0]), min(b[1], ob[1]), max(b[2], ob[2]), max(b[3], ob[3])]
+                if m.get("text") and not o.get("text"):
+                    o["text"] = m["text"]
+                break
+        else:
+            out.append(dict(m, box=b))
+    return out[:MAX_MARKS + 2]
+
+
+def border_box(img: Path) -> dict | None:
+    """Frames, black bars and flat bars of an app or screenshot along the edges: {"box": the picture without them,
+    "what"} or None. A row (column) belongs to the bar when nearly all its pixels have one colour, the same as the
+    edge's; small icons in a status bar are allowed."""
+    import numpy as np
+    try:
+        with Image.open(img) as im:
+            im = ImageOps.exif_transpose(im).convert("RGB")
+            W, H = im.size
+            f = min(1.0, 600 / max(W, H))
+            a = np.asarray(im.resize((max(1, int(W * f)), max(1, int(H * f))))).astype("int16")
+    except Exception:                                    # noqa: BLE001
+        return None
+    h, w = a.shape[:2]
+
+    def run(lines) -> int:
+        """How many lines from the edge are one flat colour, ending in a straight edge. A plain background (a white
+        wall, a sky) also starts flat, but it ends where the subject begins, in only part of the line: not a bar."""
+        ref = np.median(lines[0].reshape(-1, 3), axis=0)
+
+        def near(ln) -> float:
+            return float((np.abs(ln.reshape(-1, 3) - ref).max(axis=1) <= 14).mean())
+        n = 0
+        for ln in lines:
+            if near(ln) < 0.94:
+                break
+            n += 1
+        if n == 0 or n >= len(lines) - 2:
+            return 0
+        return n if min(near(lines[n]), near(lines[n + 1])) < 0.5 else 0
+    cut = {"top": run(a), "bottom": run(a[::-1]), "left": run(a.transpose(1, 0, 2)),
+           "right": run(a.transpose(1, 0, 2)[::-1])}
+    lim = {"top": h, "bottom": h, "left": w, "right": w}
+    cut = {k: v for k, v in cut.items() if v >= max(3, 0.012 * lim[k]) and v <= 0.35 * lim[k]}
+    if not cut:
+        return None
+    x0, y0 = cut.get("left", 0) / f, cut.get("top", 0) / f
+    x1, y1 = W - cut.get("right", 0) / f, H - cut.get("bottom", 0) / f
+    pad = 1 / f                                          # one more line of the small copy, so no edge stays
+    box = [int(min(W, x0 + pad if "left" in cut else 0)), int(min(H, y0 + pad if "top" in cut else 0)),
+           int(max(0, x1 - pad if "right" in cut else W)), int(max(0, y1 - pad if "bottom" in cut else H))]
+    if (box[2] - box[0]) < 0.5 * W or (box[3] - box[1]) < 0.5 * H:
+        return None
+    return {"box": box, "what": "frame / bars: " + ", ".join(cut)}
+
+
 def _describe_cut(W, H, r) -> str:
     parts = []
     for name, cut, full in (("left", r[0], W), ("top", r[1], H), ("right", W - r[2], W), ("bottom", H - r[3], H)):
@@ -605,6 +702,28 @@ def crop_options(W: int, H: int, marks: list, subject, min_side: int = 512) -> l
         out.append(min(rest, key=lambda c: (abs((c[1][2] - c[1][0]) / (c[1][3] - c[1][1]) - shape), -c[0])))
     return [{"id": "AB"[i], "box": list(r), "keep": round(100 * a), "what": _describe_cut(W, H, r),
              "size": f"{r[2] - r[0]}x{r[3] - r[1]}"} for i, (a, r) in enumerate(out)]
+
+
+def options_with_border(W: int, H: int, marks: list, subject, min_side: int, border: dict | None) -> list[dict]:
+    """crop_options inside the picture without its frame / bars (when it has them); only the frame: one crop."""
+    if not border:
+        return crop_options(W, H, marks, subject, min_side)
+    bx = border["box"]
+    if not marks:
+        r = bx
+        return [{"id": "A", "box": list(r), "keep": round(100 * (r[2] - r[0]) * (r[3] - r[1]) / (W * H)),
+                 "what": f"cuts the {border['what'].split(':')[0]} ({_describe_cut(W, H, r)[5:]})",
+                 "size": f"{r[2] - r[0]}x{r[3] - r[1]}"}]
+    inner = [dict(m, box=[m["box"][0] - bx[0], m["box"][1] - bx[1], m["box"][2] - bx[0], m["box"][3] - bx[1]])
+             for m in marks]
+    sub = [subject[0] - bx[0], subject[1] - bx[1], subject[2] - bx[0], subject[3] - bx[1]] if subject else None
+    opts = crop_options(bx[2] - bx[0], bx[3] - bx[1], inner, sub, min_side)
+    for o in opts:
+        b = o["box"]
+        o["box"] = [b[0] + bx[0], b[1] + bx[1], b[2] + bx[0], b[3] + bx[1]]
+        o["keep"] = round(100 * (o["box"][2] - o["box"][0]) * (o["box"][3] - o["box"][1]) / (W * H))
+        o["what"] = _describe_cut(W, H, o["box"]) + " (frame / bars too)"
+    return opts
 
 
 def _iou(a, b) -> float:
@@ -777,7 +896,8 @@ def marked_preview(img: Path, e: dict, side: int = 260) -> str:
     """Thumbnail with the marks in red and the subject in green, as a data URI."""
     from PIL import ImageDraw
     try:
-        key = _sigkey(img, "marked", side, json.dumps([e.get("subject"), [m.get("box") for m in e.get("marks") or []]]))
+        key = _sigkey(img, "marked", side, json.dumps([e.get("subject"), [m.get("box") for m in e.get("marks") or []],
+                                                                  (e.get("border") or {}).get("box")]))
         hit = _cached_url(key)
         if hit:
             return hit
@@ -787,6 +907,8 @@ def marked_preview(img: Path, e: dict, side: int = 260) -> str:
             im.thumbnail((side, side))
             f = im.size[0] / W
             d = ImageDraw.Draw(im)
+            if (e.get("border") or {}).get("box"):
+                d.rectangle([v * f for v in e["border"]["box"]], outline=(240, 200, 40), width=3)
             if e.get("subject"):
                 d.rectangle([v * f for v in e["subject"]], outline=(60, 200, 120), width=2)
             for m in e.get("marks") or []:

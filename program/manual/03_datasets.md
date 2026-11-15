@@ -134,7 +134,11 @@ sort and count in the automatic improvement too; click a pin again to remove it.
 ![Step 6: watermarks first, then the size of each picture](img/step6.jpg)
 
 **Watermarks** found by the sort: remove them (the picture tools paint over them), crop them off, set the picture
-aside or keep it. *Recommended for the undecided* fills in the ones you have not chosen; *Apply the watermark choices*
+aside or keep it. The sort finds them three ways: a watermark detector in the picture tools (logos, signatures, site
+names and text near the edges; marked *(detector)*; the first use downloads it, about 0.6 GB), the Ollama question in
+pass 2, and a check of the edges for **frames, black or white bars and app bars** (a status bar, a screenshot's
+frame). A frame is drawn in yellow and the recommended crop cuts it off; a flat background that ends at the person is
+not taken for a bar. *Recommended for the undecided* fills in the ones you have not chosen; *Apply the watermark choices*
 does it. Click a picture to paint over a watermark yourself (*Remove what I painted*).
 
 **Size, per picture**: what will happen to each picture, in the *Do* column (scale down, crop, keep). Pictures bigger

@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.151126d"
-VERSION = "1.151126d"
+__version__ = "1.151126e"
+VERSION = "1.151126e"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.151126d",
+    "version.py": "1.151126e",
     "program/lspaths.py": "1.131126c",
-    "program/Training/sdgui.py": "1.151126b",
+    "program/Training/sdgui.py": "1.151126e",
     "program/Training/sd_script.py": "1.131126c",
-    "program/Data/sd_prepare.py": "1.141126",
+    "program/Data/sd_prepare.py": "1.151126e",
     "program/Training/sd_settings.py": "1.131126c",
     "program/Data/datasets_ui.py": "1.141126",
-    "program/Data/dsflow.py": "1.151126d",
+    "program/Data/dsflow.py": "1.151126e",
     "program/Training/training_ui.py": "1.151126b",
     "program/Settings/settings_ui.py": "1.131126c",
     "program/Gallery/lora_library.py": "1.131126c",
@@ -40,10 +40,10 @@ RELEASE: dict = {
     "program/Settings/ghupdate.py": "1.011126",
     "program/Settings/hfdownload.py": "1.131126c",
     "program/Settings/ollamactl.py": "1.011126",
-    "program/Data/datacheck.py": "1.141126",
+    "program/Data/datacheck.py": "1.151126e",
     "program/Data/consistency.py": "1.011126",
-    "program/Data/pictools.py": "1.151126",
-    "program/Data/pictools_worker.py": "1.141126",
+    "program/Data/pictools.py": "1.151126e",
+    "program/Data/pictools_worker.py": "1.151126e",
     "program/Gallery/picgallery.py": "1.011126",
     "program/Data/trim.py": "1.111126g",
     "program/Data/housekeeping.py": "1.011126",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.151126e", "Step 6 finds more watermarks: a watermark and logo detector (OWLv2) in the picture tools, and frames, black or white bars and app bars at the edges, which the recommended crop cuts off."),
     ("1.151126d", "Improvements judge only the pictures in the repeat folder (what trains): framing, balance, alike pictures and the detailed scan's gaps were counted over every picture the sort had seen, including those Select had moved to _reserve. Pictures in _reserve are now only named as where to find what is missing; pictures added after the sort are listed as not checked. Fill the gaps (step 5) counts the repeat folder too."),
     ("1.151126c", "While the test pictures of a finished run are made, before the next run starts, the Queue page shows a card with what is made and a progress bar, and the top bar says so on every page, so the queue no longer looks stopped."),
     ("1.151126b", "Test pictures are made right after each run, before the next one in the queue starts (the save point to try first and the final file); then ComfyUI's memory is freed and the LoRA card gets the first test picture as its preview. Results opens a run with what was made: one row of test pictures per save point and Keep this one, which makes that save point the run's final file and moves the other save points to the Trash."),

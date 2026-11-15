@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.151126b"  # LoRA Studio version, see version.py
+__version__ = "1.151126e"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
@@ -2040,7 +2040,7 @@ def _marks_counts(ds) -> tuple[int, int]:
         marks = DC.reconcile(root, DC.marks_load(root))
     except Exception:                       # noqa: BLE001
         return 0, 0
-    found = [e for e in marks.values() if e.get("marks")]
+    found = [e for e in marks.values() if e.get("marks") or e.get("border")]
     return len(found), sum(1 for e in found if not e.get("choice"))
 
 

@@ -7,13 +7,15 @@ until the worker is told to quit (LoRA Studio quits it before a training run and
   ping                                  device and what is installed
   analyze   paths                       per picture: quality score (LAION aesthetic predictor on CLIP ViT-L/14),
                                         photo / drawing, CLIP embedding (for look-alikes), person boxes
+  marks     paths                       per picture: boxes of watermarks, logos, signatures and text (OWLv2, an
+                                        open-vocabulary detector; much more exact than a chat model's boxes)
   inpaint   src dst boxes               paint over boxes with LaMa (big-lama), the rest of the picture untouched
   upscale   src dst target_short kind   Real-ESRGAN (x2 for photos, anime 6B for drawings), then down to target
 
 Model files are downloaded on first use into the models folder given as the first argument.
 """
 from __future__ import annotations
-__version__ = "1.141126"  # LoRA Studio version, see version.py
+__version__ = "1.151126e"  # LoRA Studio version, see version.py
 
 import base64
 import json
@@ -31,6 +33,8 @@ URLS = {
     "RealESRGAN_x4plus_anime_6B.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
 }
 CLIP_ID = "openai/clip-vit-large-patch14"
+OWL_ID = "google/owlv2-base-patch16-ensemble"
+MARK_TEXT = ["a watermark", "a logo", "a signature", "text", "a website address"]
 KIND_TEXT = {"photo": ["a photo", "a photograph of a person", "a photo taken with a phone"],
              "drawing": ["a drawing", "an anime illustration", "a digital painting", "a cartoon", "a 3D render"]}
 M: dict = {}
@@ -116,6 +120,45 @@ def detector():
         m = torchvision.models.detection.fasterrcnn_resnet50_fpn_v2(weights=w, box_score_thresh=0.6)
         M["det"] = m.to(torch_dev()).eval()
     return M["det"]
+
+
+def owl():
+    if "owl" not in M:
+        from transformers import Owlv2ForObjectDetection, Owlv2Processor
+        proc = Owlv2Processor.from_pretrained(OWL_ID)
+        model = Owlv2ForObjectDetection.from_pretrained(OWL_ID).to(torch_dev()).eval()   # float32: small model
+        M["owl"] = (model, proc)
+    return M["owl"]
+
+
+def marks(paths, threshold=0.1):
+    """{path: [{"box": [x0, y0, x1, y1], "score", "label"}]} in the picture's own pixels (upright)."""
+    import torch
+    model, proc = owl()
+    dev = torch_dev()
+    post = getattr(proc, "post_process_grounded_object_detection", None) or proc.post_process_object_detection
+    out = {}
+    for p in paths:
+        try:
+            im = load_rgb(p)
+            W, H = im.size
+            S = max(W, H)                                 # OWLv2 pads to a square (right and bottom)
+            inp = proc(text=[MARK_TEXT], images=im, return_tensors="pt")
+            inp = {k: v.to(dev) for k, v in inp.items()}
+            with torch.no_grad():
+                o = model(**inp)
+            r = post(outputs=o, threshold=threshold, target_sizes=torch.tensor([[S, S]], device=dev))[0]
+            found = []
+            for box, score, lab in zip(r["boxes"].tolist(), r["scores"].tolist(), r["labels"].tolist()):
+                x0, y0, x1, y1 = max(0, box[0]), max(0, box[1]), min(W, box[2]), min(H, box[3])
+                if x1 - x0 >= 4 and y1 - y0 >= 4:
+                    found.append({"box": [round(x0), round(y0), round(x1), round(y1)], "score": round(score, 3),
+                                  "label": MARK_TEXT[int(lab)].replace("a ", "", 1)})
+            found.sort(key=lambda m: -m["score"])
+            out[str(p)] = {"W": W, "H": H, "marks": found[:30]}
+        except Exception as e:                           # noqa: BLE001
+            out[str(p)] = {"error": f"{type(e).__name__}: {e}"}
+    return out
 
 
 def load_rgb(path):
@@ -304,6 +347,8 @@ def main():
                      "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else ""})
             elif cmd == "analyze":
                 say({"ok": True, "result": analyze(c["paths"])})
+            elif cmd == "marks":
+                say({"ok": True, "result": marks(c["paths"])})
             elif cmd == "inpaint":
                 say(inpaint(c["src"], c["dst"], c.get("boxes") or [], mask_path=c.get("mask")))
             elif cmd == "upscale":

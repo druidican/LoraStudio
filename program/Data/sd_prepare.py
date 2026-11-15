@@ -5,7 +5,7 @@ consistency check (Datasets › 6 and 7).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.141126"  # LoRA Studio version, see version.py
+__version__ = "1.151126e"  # LoRA Studio version, see version.py
 
 import copy
 import hashlib
@@ -315,12 +315,16 @@ def _pictools_ready() -> bool:
 
 
 def _wm_paintable(e) -> bool:
+    if not e.get("marks"):
+        return False                        # a frame / bars only: nothing to paint over, crop it off
     W, H = e.get("W") or 1, e.get("H") or 1
     area = sum((m["box"][2] - m["box"][0]) * (m["box"][3] - m["box"][1]) for m in e.get("marks") or [])
     return area <= 0.2 * W * H
 
 
 def _wm_recommended(e) -> str:
+    if e.get("border") and e.get("options"):
+        return "A"                          # a frame or bars: cut them off (the crop also leaves the marks out)
     if _pictools_ready() and _wm_paintable(e):
         return "R"                          # remove the mark, keep the whole picture
     return "A" if e.get("options") else "aside"
@@ -332,13 +336,13 @@ def wm_render(ds):
         return "", ""
     root = S.lora_path(ds)
     marks = S.DC.reconcile(root, S.DC.marks_load(root))
-    rows = [(rp, e) for rp, e in sorted(marks.items()) if e.get("marks")]
+    rows = [(rp, e) for rp, e in sorted(marks.items()) if e.get("marks") or e.get("border")]
     if not rows:
         return "", ""
     pending = sum(1 for _, e in rows if not e.get("choice"))
     done = Counter(e.get("choice") for _, e in rows if e.get("choice"))
-    md = (f"**{len(rows)} picture{'s' if len(rows) != 1 else ''} with watermarks, stamps or site names.** Red = what was "
-          "found, green = the subject that must stay. Click an option per picture, then press **Apply choices** "
+    md = (f"**{len(rows)} picture{'s' if len(rows) != 1 else ''} with watermarks, logos, site names or a frame.** Red = what "
+          "was found, yellow = the picture inside a frame or bars, green = the subject that must stay. Click an option per picture, then press **Apply choices** "
           "(originals are kept in `_set_aside/originals/`, so you can change your mind later). "
           + (f"**{pending} not decided yet** (the recommended option is selected). " if pending else "")
           + (("Applied: " + ", ".join(f"{WM_LABEL.get(k, k)} {v}" for k, v in done.items()) + ".") if done else ""))
@@ -353,7 +357,10 @@ def wm_render(ds):
             continue
         cur = e.get("choice") or ""
         sel = cur or _wm_recommended(e)
-        kinds = "; ".join(f"{m['kind']}" + (f" “{html.escape(m['text'])}”" if m.get("text") else "") for m in e["marks"])
+        kinds = "; ".join(f"{m['kind']}" + (f" “{html.escape(m['text'])}”" if m.get("text") else "")
+                          + (" <i>(detector)</i>" if m.get("by") == "detector" else "") for m in e.get("marks") or [])
+        if e.get("border"):
+            kinds = "; ".join(x for x in (kinds, html.escape(e["border"].get("what") or "frame")) if x)
         opts = []
         for o in e.get("options") or []:
             opts.append((o["id"], f"<img src='{S.DC.crop_preview(src, o['box'])}'>", f"<b>Crop {o['id']}</b>"
@@ -514,7 +521,7 @@ def wm_apply_steps(ds, choices_json, only_pending=False, prefer="remove"):
         want = {}
     count, errs = Counter(), []
     for rp, e in marks.items():
-        if not e.get("marks"):
+        if not e.get("marks") and not e.get("border"):
             continue
         if only_pending:
             if e.get("choice"):

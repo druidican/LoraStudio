@@ -7,7 +7,7 @@ Settings › Trainers and GPU shows whether the tools are ready; "Install the pi
 the venv lacks (spandrel, for the upscalers) without touching PyTorch.
 """
 from __future__ import annotations
-__version__ = "1.151126"  # LoRA Studio version, see version.py
+__version__ = "1.151126e"  # LoRA Studio version, see version.py
 
 import base64
 import json
@@ -219,6 +219,35 @@ def analyze(paths, say=None, chunk: int = 8) -> dict:
             if e and "error" not in e:
                 c[_sig(p)] = e
                 out[str(p)] = e
+        _cache_save()
+    return out
+
+
+def find_marks(paths, say=None, chunk: int = 8) -> dict:
+    """{path: {"W", "H", "marks": [{"box", "score", "label"}]}} from the OWLv2 detector; remembered like analyze."""
+    c = _cache()
+    out, todo = {}, []
+    for p in map(Path, paths):
+        try:
+            k = "marks|" + _sig(p)
+        except OSError:
+            continue
+        if k in c:
+            out[str(p)] = c[k]
+        else:
+            todo.append(p)
+    for i in range(0, len(todo), chunk):
+        part = todo[i:i + chunk]
+        if say:
+            say(f"{i + len(part)} of {len(todo)}")
+        r = call({"cmd": "marks", "paths": [str(p) for p in part]})["result"]
+        for p in part:
+            e = r.get(str(p))
+            if e and "error" not in e:
+                c["marks|" + _sig(p)] = e
+                out[str(p)] = e
+            elif e:
+                raise RuntimeError(e["error"])
         _cache_save()
     return out
 

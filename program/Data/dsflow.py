@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.151126d"  # LoRA Studio version, see version.py
+__version__ = "1.151126e"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -482,7 +482,7 @@ def wm_done(ds) -> str:
     marks = DC.reconcile(r, DC.marks_load(r))
     n = 0
     for e in marks.values():
-        if e.get("marks") and not e.get("choice"):
+        if (e.get("marks") or e.get("border")) and not e.get("choice"):
             e["choice"] = "keep"
             n += 1
     DC.marks_save(r, marks)
@@ -613,6 +613,16 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
     rest = [Path(p) for p, e in pics.items() if e["cat"] != "out"]
     # the picture tools (sd-scripts venv): a quality score, photo or drawing, person boxes, and look-alikes
     tools_note = ""
+    det: dict = {}                                       # the detector's boxes per picture
+    borders = {}                                         # frames, black or white bars around the picture
+    for i, p in enumerate([] if wm_removed else rest):
+        if STOP.is_set():
+            break
+        if i % 20 == 0:
+            yield f"Pass 1 · looking for frames and bars: {i + 1} of {len(rest)}"
+        b = DC.border_box(p)
+        if b:
+            borders[str(p)] = b
     if tools:
         import pictools
         A = {}
@@ -627,6 +637,15 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
         for p, a in A.items():
             if p in pics:
                 pics[p].update(aes=a["aes"], kind=a["kind"], persons=a.get("persons") or [])
+        if not wm_removed and tools:                     # watermarks and logos: an exact detector (OWLv2)
+            try:
+                for i in range(0, len(rest), 16):
+                    if STOP.is_set():
+                        break
+                    yield f"Pass 1 · looking for watermarks and logos: {min(i + 16, len(rest))} of {len(rest)}"
+                    det.update(pictools.find_marks(rest[i:i + 16]))
+            except Exception as e:                       # noqa: BLE001
+                tools_note = (tools_note + "; " if tools_note else "") + f"watermark finder: {e}"
         good = {p: A[p] for p in A if p in pics and pics[p]["cat"] == "good"}
         for a, b, sim in sorted(pictools.lookalikes(good, 0.95) if tools else [], key=lambda t: -t[2]):
             ea, eb = pics[a], pics[b]
@@ -643,9 +662,40 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                           "no Ollama model chosen (Settings › AI helpers)" if not model else
                           "a training run is active" if S.RUN.running() else "Ollama is not available")
     root_ = root(ds)
-    marks = DC.reconcile(root_, DC.marks_load(root_)) if ai and not wm_removed else {}
+    marks = DC.reconcile(root_, DC.marks_load(root_)) if not wm_removed else {}
     crop_min = side or 512
     done = 0
+    seen_marks: set = set()
+
+    def put_marks(p: Path, found: dict | None = None):
+        """The marks entry of a picture: Ollama's marks (when it was asked), the detector's and a frame / bars."""
+        rp = DC.rel(root_, p)
+        ent = marks.get(rp)
+        st = p.stat()
+        sig = f"{st.st_size}|{int(st.st_mtime)}"
+        if ent and ent.get("choice"):                     # you decided already (the file changed by your choice)
+            return
+        if ent and ent.get("sig") == sig and found is None and ent.get("v") == 2:
+            return
+        if found is None and ent and ent.get("sig") == sig:      # Ollama's marks from an earlier sort stay
+            found = {"W": ent.get("W"), "H": ent.get("H"), "subject": ent.get("subject"),
+                     "marks": [m for m in ent.get("marks") or [] if m.get("by") != "detector"]}
+        W, H = (found["W"], found["H"]) if found and found.get("W") else DC.shown_size(p)
+        subj = main_person(pics[str(p)].get("persons"), W, H) or (found or {}).get("subject")
+        allm = DC.merge_marks((found or {}).get("marks") or [], DC.detector_marks(det.get(str(p)), subj))
+        border = borders.get(str(p))
+        if border and subj:                              # a 'bar' that cuts into the person is a plain background
+            b, sb = border["box"], subj
+            inside = max(0, min(b[2], sb[2]) - max(b[0], sb[0])) * max(0, min(b[3], sb[3]) - max(b[1], sb[1]))
+            if inside < 0.97 * max(1, (sb[2] - sb[0]) * (sb[3] - sb[1])):
+                border = None
+        if not allm and not border:
+            if ent and not ent.get("choice"):
+                marks.pop(rp, None)
+            return
+        pics[str(p)]["wm"] = True
+        marks[rp] = {"W": W, "H": H, "marks": allm, "subject": subj, "sig": sig, "choice": "", "border": border,
+                     "v": 2, "options": DC.options_with_border(W, H, allm, subj, crop_min, border)}
     if ai:
         cache = S._dc_cache_load()
         for i, p in enumerate(rest, 1):
@@ -697,20 +747,24 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                 st = p.stat()
                 sig = f"{st.st_size}|{int(st.st_mtime)}"
                 # a picture you already decided on is left alone (its file changed because of your choice)
-                if not (ent and ent.get("choice")) and (not ent or ent.get("sig") != sig):
+                if not (ent and ent.get("choice")) and (not ent or ent.get("sig") != sig or ent.get("v") != 2):
                     yield f"Pass 2 · where are the watermarks in {p.name}?"
                     try:
-                        f = DC.find_marks(url, model, p)
-                        person = main_person(e.get("persons"), f["W"], f["H"])
-                        if person:                      # the person finder is more exact than the vision model
-                            f["subject"] = person
-                        marks[rp] = {**f, "sig": sig, "choice": "",
-                                     "options": DC.crop_options(f["W"], f["H"], f["marks"], f["subject"], crop_min)}
+                        put_marks(p, DC.find_marks(url, model, p))
+                        seen_marks.add(str(p))
                     except Exception:                   # noqa: BLE001
                         pass
+                else:
+                    seen_marks.add(str(p))
         S._dc_cache_save(cache)
-        if marks:
-            DC.marks_save(root_, marks)
+    if not wm_removed:                                   # the detector and frames also without Ollama's word
+        for p in rest:
+            if str(p) not in seen_marks and (det.get(str(p)) or str(p) in borders or DC.rel(root_, p) in marks):
+                try:
+                    put_marks(p)
+                except OSError:
+                    pass
+        DC.marks_save(root_, marks)
     # quality: sharpness rank in this dataset, size against what the type needs, minus warnings
     order = sorted(pics.values(), key=lambda e: e["sharp"])
     for i, e in enumerate(order):
