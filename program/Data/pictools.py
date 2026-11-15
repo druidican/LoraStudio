@@ -7,7 +7,7 @@ Settings › Trainers and GPU shows whether the tools are ready; "Install the pi
 the venv lacks (spandrel, for the upscalers) without touching PyTorch.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.151126"  # LoRA Studio version, see version.py
 
 import base64
 import json
@@ -232,10 +232,10 @@ def cached(p) -> dict | None:
 
 
 def emb(e) -> list:
-    import array
-    a = array.array("e")
-    a.frombytes(base64.b64decode(e["emb"]))
-    return list(a)
+    """The CLIP embedding (stored as float16 bytes). array('e') exists only from Python 3.13; struct reads it on 3.12."""
+    import struct
+    raw = base64.b64decode(e["emb"])
+    return list(struct.unpack(f"<{len(raw) // 2}e", raw))
 
 
 def cos(a, b) -> float:

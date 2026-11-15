@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.141126b"
-VERSION = "1.141126b"
+__version__ = "1.151126"
+VERSION = "1.151126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.141126b",
+    "version.py": "1.151126",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.131126c",
     "program/Training/sd_script.py": "1.131126c",
@@ -42,7 +42,7 @@ RELEASE: dict = {
     "program/Settings/ollamactl.py": "1.011126",
     "program/Data/datacheck.py": "1.141126",
     "program/Data/consistency.py": "1.011126",
-    "program/Data/pictools.py": "1.011126",
+    "program/Data/pictools.py": "1.151126",
     "program/Data/pictools_worker.py": "1.141126",
     "program/Gallery/picgallery.py": "1.011126",
     "program/Data/trim.py": "1.111126g",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.151126", "Step 4 Sort no longer stops with 'bad typecode': the look-alike check read the picture tools' results in a way that needs Python 3.13; it now works on the 3.12 LoRA Studio uses."),
     ("1.141126b", "Collection: Delete… (Browse › Select, and the LoRA page) moves a LoRA's versions, its LoRA Manager files, save points, runs, test pictures, launch scripts and, if you tick it, its dataset to the Trash. Step 5: after a detailed scan, Fill the gaps with your LoRA makes the missing kinds of pictures (close-ups, back views, other places …) with the dataset's own LoRA through ComfyUI; you pick the good ones. Too many of one framing can be set aside."),
     ("1.141126", "Going from Sort to Select no longer drops the connection: step 5 builds its picture list in the background and no longer reads the whole dataset once per picture. Step 6 opens at once (picture sizes are read from the file header instead of decoding every picture). The picture tools work with transformers 5 (the AttributeError in step 4's quick pass)."),
     ("1.131126c", "Beta: LoRA Studio on NiceGUI. The same pages, much faster; after training, Home's Just trained card leads straight to the test pictures (one LoRA: its best save point and the final file; a queue: the final file of each). The ? button opens the manual with pictures. Add pictures from a folder works again."),
