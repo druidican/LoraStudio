@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.141126"  # LoRA Studio version, see version.py
+__version__ = "1.151126d"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -1814,7 +1814,36 @@ def improvements(ds) -> list[tuple[str, str]]:
     return _cached("improvements", ds, lambda: _improvements(ds))
 
 
+def active_sort(ds) -> tuple[dict, list[Path]]:
+    """The sort's entries of the pictures that are in the repeat folder now ({path: entry}), and the pictures there
+    that the sort never saw (added later). The sort result itself describes the pictures it was run on, which after
+    Select (the rest went to _reserve/) or Add pictures is not the folder that will be trained."""
+    so = sort_result(ds) or {}
+    find = sort_lookup(so.get("pics") or {})
+    act, unsorted = {}, []
+    for p in images(ds):
+        e = find(p)
+        if e is not None:
+            act[str(p)] = e
+        else:
+            unsorted.append(p)
+    return act, unsorted
+
+
+def reserve_with(ds, key: str, value: str, act: dict | None = None) -> int:
+    """How many usable pictures outside the repeat folder (the sort saw them, e.g. in _reserve/) show key=value: the
+    first place to look when the repeat folder lacks them."""
+    so = sort_result(ds) or {}
+    act = act if act is not None else active_sort(ds)[0]
+    names = {Path(p).name for p in act}
+    return sum(1 for p, e in (so.get("pics") or {}).items()
+               if e.get(key) == value and e.get("cat") in ("good", "detail", "alike") and Path(p).name not in names
+               and Path(p).is_file())
+
+
 def _improvements(ds) -> list[tuple[str, str]]:
+    """Judged on the repeat folder only: that is what trains. Pictures elsewhere (_reserve/ and so on) are only named
+    as the place to find what is missing."""
     out = []
     m = meta(ds)
     imgs = images(ds)
@@ -1826,16 +1855,35 @@ def _improvements(ds) -> list[tuple[str, str]]:
         if not sg()._checked_count(imgs):
             out.append(("not checked", "The pictures were never sorted: sizes, duplicates and framings are unknown."))
     else:
-        alike = sum(1 for e in so["pics"].values() if e["cat"] == "alike")
+        act, unsorted = active_sort(ds)
+        if unsorted:
+            out.append(("not checked", f"{len(unsorted)} picture{'s' if len(unsorted) != 1 else ''} in the repeat "
+                                       "folder came after the sort and are not checked yet: sort again (step 4)."))
+        alike = sum(1 for e in act.values() if e["cat"] == "alike")
         if m["purpose"] == "character" and n > 60:
             sug, _, _ = suggest_size(ds, so)
             out.append(("too many pictures", f"{n} pictures" + (f", {alike} of them alike" if alike else "")
                         + f". About {sug} would train faster with the same result."))
-        if m["purpose"] == "character" and so.get("ai") and not so["framing"].get("full body"):
-            out.append(("framing", "No full-body pictures: the LoRA will struggle with whole outfits and poses. Add 4–6."))
-        for note in so.get("notes") or []:
-            if "full-body" not in note:
-                out.append(("balance", note))
+        if so.get("ai") and act:
+            fr = Counter(e.get("framing") for e in act.values() if e.get("framing") and e["cat"] != "out")
+            if m["purpose"] == "character" and not fr.get("full body"):
+                k = reserve_with(ds, "framing", "full body", act)
+                out.append(("framing", "No full-body pictures in the repeat folder: the LoRA will struggle with whole "
+                                       "outfits and poses. " + (f"{k} are in _reserve: put them back in step 5 (📌)."
+                                                                if k else "Add 4–6.")))
+            notes = DC.balance({Path(p): {"content": {"framing": e.get("framing"), "outfit": e.get("outfit"),
+                                                      "place": e.get("place"), "people": 1}}
+                                for p, e in act.items() if e.get("framing") and e["cat"] != "out"}, m["purpose"])
+            for note in notes:
+                if "full-body" not in note:
+                    out.append(("balance", note))
+        try:
+            import detailscan as DSC
+            if DSC.enabled(ds):
+                for g in DSC.active(ds)[1]:
+                    out.append(("coverage", g))
+        except Exception:                                # noqa: BLE001
+            pass
     if m["purpose"] == "character" and 0 < n < 15:
         out.append(("few pictures", f"Only {n} pictures: 20 or more give a steadier likeness."))
     for s in caption_sets(ds):

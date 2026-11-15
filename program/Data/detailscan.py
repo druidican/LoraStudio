@@ -15,7 +15,7 @@
 It judges how well a picture shows things (visible, sharp, big enough, which angle), never whose face it is.
 """
 from __future__ import annotations
-__version__ = "1.101126b"  # LoRA Studio version, see version.py
+__version__ = "1.151126d"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -166,6 +166,37 @@ def coverage(entries: list[dict]) -> tuple[dict, list[str], dict]:
             want.setdefault(d, ["*new*"])
             gaps.append(f"{label}: only {len(c)} different ({', '.join(c) or 'none'})")
     return counts, gaps, want
+
+
+def active(ds) -> tuple[dict, list[str], dict, int]:
+    """coverage() of the pictures in the repeat folder now (answers from the scan's cache, nothing is asked): the
+    scan itself judged the pictures it was run on, before Select moved some to _reserve/ or pictures were added.
+    (counts, gaps, want, pictures with an answer)."""
+    try:
+        cache = json.loads(_cache_file(ds).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, [], {}, 0
+    by = {}
+    for k, v in cache.items():
+        by.setdefault(k.rsplit("|", 1)[0], v)            # name|size|mtime (any model)
+    act, _ = F.active_sort(ds)
+    pins = F.pins(ds)
+    entries = []
+    for p, e in act.items():
+        pp = Path(p)
+        try:
+            st = pp.stat()
+        except OSError:
+            continue
+        d = by.get(f"{pp.name}|{st.st_size}|{int(st.st_mtime)}")
+        if d is None or F.pin_of(pins, p) == "never":
+            continue
+        entries.append({**d, "framing": e.get("framing") or "", "outfit": e.get("outfit") or "",
+                        "place": e.get("place") or ""})
+    if not entries:
+        return {}, [], {}, 0
+    counts, gaps, want = coverage(entries)
+    return counts, gaps, want, len(entries)
 
 
 def run(ds, url: str | None = None, model: str | None = None):

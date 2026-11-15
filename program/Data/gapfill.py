@@ -11,7 +11,7 @@ with an 'always keep' pin; the rest go to the Trash. The prompts only name frami
 outfit and place, never anything about the person's body or looks.
 """
 from __future__ import annotations
-__version__ = "1.141126b"  # LoRA Studio version, see version.py
+__version__ = "1.151126d"  # LoRA Studio version, see version.py
 
 import json
 import random
@@ -70,10 +70,13 @@ def _save_state(ds, st: dict):
 
 # --------------------------------------------------------------------------- what is missing, what is too much
 def analyse(ds) -> dict:
-    """{"few": [(dim, value, count)], "many": [(dim, value, count, total)], "kept": n} from the detailed scan."""
-    r = DSC.result(ds) or {}
-    counts = {d: Counter(c) for d, c in (r.get("counts") or {}).items()}
-    kept = int(r.get("kept") or 0)
+    """{"few": [(dim, value, count)], "many": [(dim, value, count, total)], "kept": n}: the detailed scan's answers
+    for the pictures in the repeat folder now (what trains), not for every picture the scan looked at."""
+    counts, _, _, kept = DSC.active(ds)
+    if not kept:                                         # no answers for the folder yet: the scan's own numbers
+        r = DSC.result(ds) or {}
+        counts, kept = r.get("counts") or {}, int(r.get("kept") or 0)
+    counts = {d: Counter(c) for d, c in counts.items()}
     few, many = [], []
     for d, (label, wanted) in DSC.DIMS.items():
         c = counts.get(d) or Counter()

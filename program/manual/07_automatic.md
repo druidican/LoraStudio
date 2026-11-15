@@ -1,7 +1,11 @@
 # Automatic improvement
 
 **Datasets › Improvements** lists what could be better in each dataset, from what is known already (nothing is
-scanned there): too many pictures, no full-body pictures, missing captions, watermarks not decided, no launch script.
+scanned there): too many pictures, no full-body pictures, the balance of outfits and places, the detailed scan's gaps,
+missing captions, watermarks not decided, no launch script. It judges **only the pictures in the repeat folder**
+(`10_<name>/`): that is what trains. Pictures in `_reserve/` and other folders are not counted; they are only named as
+the place to find what is missing ("2 are in _reserve: put them back in step 5"). Pictures added to the repeat
+folder after the sort are listed as not checked yet.
 
 ![Datasets › Improvements](img/ds_improve.jpg)
 

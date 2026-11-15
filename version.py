@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.151126c"
-VERSION = "1.151126c"
+__version__ = "1.151126d"
+VERSION = "1.151126d"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.151126c",
+    "version.py": "1.151126d",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126b",
     "program/Training/sd_script.py": "1.131126c",
     "program/Data/sd_prepare.py": "1.141126",
     "program/Training/sd_settings.py": "1.131126c",
     "program/Data/datasets_ui.py": "1.141126",
-    "program/Data/dsflow.py": "1.141126",
+    "program/Data/dsflow.py": "1.151126d",
     "program/Training/training_ui.py": "1.151126b",
     "program/Settings/settings_ui.py": "1.131126c",
     "program/Gallery/lora_library.py": "1.131126c",
@@ -34,7 +34,7 @@ RELEASE: dict = {
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
-    "program/Data/detailscan.py": "1.101126b",
+    "program/Data/detailscan.py": "1.151126d",
     "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.051126",
     "program/Settings/ghupdate.py": "1.011126",
@@ -72,7 +72,7 @@ RELEASE: dict = {
     "program/Other/notify.py": "1.131126c",
     "program/Gallery/delete.py": "1.141126b",
     "program/UI/delete_dialog.py": "1.141126b",
-    "program/Data/gapfill.py": "1.141126b",
+    "program/Data/gapfill.py": "1.151126d",
     "program/UI/ds_gapfill.py": "1.141126b",
     "program/Other/statusbar.py": "1.151126c",
     "program/Other/home.py": "1.141126b",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.151126d", "Improvements judge only the pictures in the repeat folder (what trains): framing, balance, alike pictures and the detailed scan's gaps were counted over every picture the sort had seen, including those Select had moved to _reserve. Pictures in _reserve are now only named as where to find what is missing; pictures added after the sort are listed as not checked. Fill the gaps (step 5) counts the repeat folder too."),
     ("1.151126c", "While the test pictures of a finished run are made, before the next run starts, the Queue page shows a card with what is made and a progress bar, and the top bar says so on every page, so the queue no longer looks stopped."),
     ("1.151126b", "Test pictures are made right after each run, before the next one in the queue starts (the save point to try first and the final file); then ComfyUI's memory is freed and the LoRA card gets the first test picture as its preview. Results opens a run with what was made: one row of test pictures per save point and Keep this one, which makes that save point the run's final file and moves the other save points to the Trash."),
     ("1.151126", "Step 4 Sort no longer stops with 'bad typecode': the look-alike check read the picture tools' results in a way that needs Python 3.13; it now works on the 3.12 LoRA Studio uses."),
