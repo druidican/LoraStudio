@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.151126b"  # LoRA Studio version, see version.py
+__version__ = "1.151126c"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -565,17 +565,43 @@ def free_memory(url=None):
         pass
 
 
+NOW: dict = {}      # what is being made right now (the Queue page and the status strip show it)
+
+
+def now_text() -> str:
+    """'Making test pictures for pipSDXLV3: picture 3 of 8' while _finish runs, else ''."""
+    if not NOW:
+        return ""
+    return f"Making test pictures for {NOW.get('name', '')}" + (f": {NOW['text']}" if NOW.get("text") else " …")
+
+
 def _finish(logname: str, say=None) -> str:
     """After a run: its test pictures (the save point to try first and the final file), ComfyUI's memory freed, and
     the LoRA card (LoRA Manager data, the first test picture as preview)."""
-    msg = make(logname, say)
-    free_memory()
+    import re
+    name = re.sub(r"^\d{8}_\d{6}_|\.log$", "", logname)
+    NOW.clear()
+    NOW.update(log=logname, name=name, text="", done=0, total=0, t=time.time())
+
+    def tell(t: str):
+        m = re.search(r"\((\d+) of (\d+)\)", t)
+        if m:
+            NOW.update(done=int(m.group(1)), total=int(m.group(2)), text=f"picture {m.group(1)} of {m.group(2)}")
+        if say:
+            say(t)
     try:
-        import lorapage
-        msg += " " + lorapage.write_card_for_run(logname)
-    except Exception as e:                               # noqa: BLE001
-        msg += f" (LoRA card: {e})"
-    return msg
+        msg = make(logname, tell)
+        NOW.update(text="freeing ComfyUI's memory")
+        free_memory()
+        NOW.update(text="writing the LoRA card")
+        try:
+            import lorapage
+            msg += " " + lorapage.write_card_for_run(logname)
+        except Exception as e:                           # noqa: BLE001
+            msg += f" (LoRA card: {e})"
+        return msg
+    finally:
+        NOW.clear()
 
 
 def after_run(logname: str, say=None) -> str:

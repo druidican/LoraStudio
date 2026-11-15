@@ -6,7 +6,7 @@ ls_tr_box events (lsSend) that tr_action handles. Two timers keep the queue and 
 changes what changed.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126c"  # LoRA Studio version, see version.py
 
 import json
 
@@ -49,6 +49,15 @@ class Queue:
 
     def tick(self):
         self.set_html(self.queue, "queue", T.queue_html())
+        import comfytest as CT
+        now = dict(CT.NOW)
+        self.pics.set_visibility(bool(now))
+        if now:
+            self.pics_lbl.text = "🖼 " + CT.now_text()
+            self.pics_bar.value = (now["done"] / now["total"]) if now.get("total") else None
+            w = sum(1 for it in sg.QUEUE["items"] if it.get("state") == "queued")
+            self.pics_note.text = (f"The next run ({w} waiting) starts when the pictures are done and ComfyUI's memory is "
+                                   "freed." if w else "The queue is done after these pictures.")
         run = sg.RUN
         self.live.set_visibility(bool(run.name))
         if not run.name:
@@ -107,6 +116,11 @@ class Queue:
                     note("Starting the queue stops Ollama to free video memory. It is not started again by itself.")
                     self.msg = note("")
                 qcol.set_visibility(trains)
+            with ui.card().props("flat bordered").classes("ls-card w-full gap-1") as self.pics:
+                self.pics_lbl = ui.label("").classes("font-semibold")
+                self.pics_bar = ui.linear_progress(value=None, show_value=False).props("rounded color=amber-8")
+                self.pics_note = ui.label("").classes("ls-note")
+            self.pics.set_visibility(False)
             with ui.card().props("flat bordered").classes("ls-card w-full gap-2") as self.live:
                 with ui.row().classes("w-full items-center gap-3"):
                     self.head = ui.html("", sanitize=False).classes("grow")

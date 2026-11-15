@@ -5,7 +5,7 @@ GPU: amd-smi or rocm-smi (AMD, see gpusmi.py) or nvidia-smi (NVIDIA); CPU and RA
 two seconds, so many open pages share one reading. A missing tool just leaves that part out.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.151126c"  # LoRA Studio version, see version.py
 
 import html
 import re
@@ -134,6 +134,12 @@ def run_html() -> tuple[str, str]:
         waiting = _waiting(sg)
         more = f" · {waiting} more in the queue" if waiting else ""
         return f"● Training {html.escape(run.name)}{step}{loss}{left}{nan}{more}", "run"
+    ct = sys.modules.get("comfytest")
+    pics = ct.now_text() if ct is not None else ""
+    if pics:
+        waiting = _waiting(sg)
+        more = f" · then {waiting} more in the queue" if waiting else ""
+        return f"🖼 {html.escape(pics)}{more}", "run"
     bits, state = [], "idle"
     recent = DONE_EVENTS and time.time() - DONE_EVENTS[-1]["t"] < 12 * 3600
     if recent:

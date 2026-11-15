@@ -25,6 +25,10 @@ the **loss** curve and the save points written so far, the next item in the queu
 **Stop after this run** lets the running LoRA finish and then stops the queue; **Stop now** stops it at once (a
 saved state, if the script writes them, lets you resume later). The top bar shows the same on every page.
 
+After each run that ends well, its **test pictures** are made before the next run starts (Settings › Test pictures).
+Meanwhile a card above the run says *🖼 Making test pictures for …: picture 3 of 8*, with a progress bar and when the
+next run starts, and the top bar shows the same on every page, so the queue is not stopped, only waiting for ComfyUI.
+
 ## When a run fails
 
 The end of a trainer log is long and hard to read. LoRA Studio reads it for you and says in a few words what went
