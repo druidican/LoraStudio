@@ -8,7 +8,7 @@ Pictures, grids and lists are drawn as HTML by datasets_ui's renderers; their cl
 (route). What each step does to the dataset folder is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.151126i"  # LoRA Studio version, see version.py
+__version__ = "1.161126"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -151,9 +151,16 @@ class Datasets:
         self.e_head.content = (f'<div class="ds-ehead"><b>{V.esc(ds)}</b> · '
                                f'{V.esc(" + ".join(labels.get(t, t) for t in m["types"]) or "type not set")} · '
                                f'{V.esc(F.PURPOSE_LABEL.get(m["purpose"], m["purpose"]))} · {len(F.images(ds))} pictures</div>')
+        try:
+            made = F.ensure_folders(ds)                   # step 1's folders, made when missing
+        except OSError as e:
+            made = [f"could not: {e}"]
         sts = F.step_states(ds)
         nxt = F.next_step(ds)
-        rows = []
+        rows = [f'<div class="ds-srow"><span class="ds-snum">1</span><b>Folder</b>'
+                f'<span class="ls-chip ok">{V.esc(F.folder_text(ds))}</span>'
+                + (f'<span class="ls-note">made now: {V.esc(", ".join(made))}</span>' if made else "")
+                + '<span class="ds-sp"></span></div>']
         for n, key, label in F.STEPS[1:]:
             st, text = sts.get(key, ("todo", ""))
             chip = {"done": "ok", "warn": "warn", "optional": ""}.get(st, "")

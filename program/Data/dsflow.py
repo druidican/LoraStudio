@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.151126j"  # LoRA Studio version, see version.py
+__version__ = "1.161126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -441,6 +441,37 @@ def create(source: str, name: str, repeats: int, outside: str = "") -> tuple[str
     m["steps"]["folder"] = {"at": m["created"]}
     meta_save(name, m)
     return name, f"✔ Dataset **{name}** made: {n} pictures in `{rep.name}/`, untouched copies in `{ORIGINALS}/`."
+
+
+def ensure_folders(ds) -> list[str]:
+    """Step 1's folders for a dataset that already exists: model/, log/ and _originals/<repeat folder>/ with an
+    untouched copy of every picture are made when they are missing (a dataset made by hand, or folders deleted).
+    Returns what was made."""
+    r = root(ds)
+    rows = sg().dataset_stats(ds)["rows"]
+    if not r.is_dir() or not rows:
+        return []
+    made = []
+    for sub in ("model", "log"):
+        if not (r / sub).is_dir():
+            (r / sub).mkdir(exist_ok=True)
+            made.append(f"{sub}/")
+    for row in rows:
+        rep = Path(row["folder"])
+        orig = r / ORIGINALS / rep.name
+        if not orig.is_dir():
+            orig.mkdir(parents=True, exist_ok=True)
+            n = ensure_originals(ds, sg().list_images(rep))
+            made.append(f"{ORIGINALS}/{rep.name}/ ({n} copies)")
+    return made
+
+
+def folder_text(ds) -> str:
+    """The folders of step 1, for the step list: '10_name · _originals · model · log'."""
+    r = root(ds)
+    reps = [Path(x["folder"]).name for x in sg().dataset_stats(ds)["rows"]]
+    have = [n for n in (ORIGINALS, "model", "log") if (r / n).is_dir()]
+    return " · ".join(reps + have) or "no repeat folder"
 
 
 def ensure_originals(ds, paths) -> int:

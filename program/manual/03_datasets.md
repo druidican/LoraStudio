@@ -22,7 +22,10 @@ count and check, so they never give false warnings.
 Pick a folder in your dataset folder. A folder with only pictures becomes a new dataset: LoRA Studio makes the repeat
 folder and moves the pictures in (*Create and continue*). Folders that already are datasets are in the dataset list.
 
-The **dataset list** shows your datasets with their next step; open one to see every step and its state.
+The **dataset list** shows your datasets with their next step; open one to see every step and its state. Its first
+row, **1 Folder**, shows the dataset's folders (`10_name`, `_originals`, `model`, `log`). When one is missing (a
+dataset made by hand, or a folder deleted), it is made as soon as you open the dataset, and the row says what was
+made; a new `_originals/` then holds copies of the pictures as they are now.
 
 ![Datasets › pip: the state of each step](img/ds_steps.jpg)
 
