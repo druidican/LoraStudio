@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.171126d"  # LoRA Studio version, see version.py
+__version__ = "1.171126e"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -878,36 +878,50 @@ def panel_models(page):
     def files_of(d):
         return SSET.list_model_files(d, rec.value)
 
-    def load(tkey):
+    def gather(tkey, recursive):
+        """Everything load() shows, read from disk (slow on big model folders: runs in a thread)."""
+        saved = SSET.read_settings().get(tkey, {})
+        kn = HD.known(tkey)
+        rows = []
+        for key, default in SSET.type_slots(tkey):
+            path = saved.get(key) or default
+            d = SSET._slot_dir(path, saved.get(key + ".dir"))
+            opts = SSET.list_model_files(d, recursive)
+            if path and path not in opts:
+                opts = [path] + opts
+            rows.append((key, path, d, opts, key in kn and HD.is_missing(path or "")))
+        return saved, rows, SSET.settings_path().is_file()
+
+    async def load(tkey):
         st["tkey"] = tkey
         st["slots"].clear()
         st["flags"] = []
+        st["gen"] = st.get("gen", 0) + 1
+        gen = st["gen"]
         slots_box.clear()
         if not tkey:
             return
-        saved = SSET.read_settings().get(tkey, {})
-        kn = HD.known(tkey)
         with slots_box:
-            for key, default in SSET.type_slots(tkey):
-                path = saved.get(key) or default
-                d = SSET._slot_dir(path, saved.get(key + ".dir"))
+            note("Reading the model folders …")
+        saved, rows, have = await run.io_bound(gather, tkey, rec.value)
+        if gen != st["gen"]:
+            return                                       # another type was picked meanwhile
+        slots_box.clear()
+        with slots_box:
+            for key, path, d, opts, missing in rows:
                 lab = SSET.slot_label(key)
                 with ui.row().classes("w-full items-end gap-2 no-wrap"):
                     din = ui.input(f"{lab}: folder", value=d).props("outlined dense").classes("w-80")
-                    opts = files_of(d)
-                    if path and path not in opts:
-                        opts = [path] + opts
                     fsel = ui.select(opts, value=path or None, label=f"{lab}: file (--{key})", with_input=True,
                                      new_value_mode="add-unique").props("outlined dense").classes("grow")
                     b = ui.button("⬇ From Hugging Face").props("outline dense no-caps")
-                    b.set_visibility(key in kn and HD.is_missing(path or ""))
+                    b.set_visibility(missing)
                 slot = {"key": key, "dir": din, "file": fsel, "btn": b}
                 din.on("keydown.enter", lambda _, s=slot: relist(s))
                 din.on("blur", lambda _, s=slot: relist(s))
                 b.on_click(lambda _, s=slot: download_one(s))
                 st["slots"].append(slot)
                 st["flags"].append(key)
-        have = SSET.settings_path().is_file()
         info.content = (f"Settings for this type are read from {SSET.settings_path()}." if saved else
                         "No saved settings for this type yet: showing the defaults from your preset. Save writes them"
                         + (" (the file is created)." if not have else "."))
@@ -915,17 +929,17 @@ def panel_models(page):
         link_slot.options = {s["key"]: SSET.slot_label(s["key"]) for s in st["slots"]}
         link_slot.value = st["flags"][0] if st["flags"] else None
         link_slot.update()
-        suggest()
+        await suggest()
 
-    def relist(s):
+    async def relist(s):
         cur = s["file"].value
-        opts = files_of(s["dir"].value)
+        opts = await run.io_bound(SSET.list_model_files, s["dir"].value, rec.value)
         s["file"].options = ([cur] if cur and cur not in opts else []) + opts
         s["file"].update()
 
-    def refresh_lists():
-        for s in st["slots"]:
-            relist(s)
+    async def refresh_lists():
+        for s in list(st["slots"]):
+            await relist(s)
 
     def set_slot(key, path):
         s = next((x for x in st["slots"] if x["key"] == key), None)
@@ -933,7 +947,6 @@ def panel_models(page):
             return
         p = Path(path)
         s["dir"].value = str(p.parent.parent if HD.GENERIC.match(p.name) else p.parent)
-        relist(s)
         s["file"].options = list(dict.fromkeys([str(p)] + list(s["file"].options)))
         s["file"].value = str(p)
         s["file"].update()
@@ -1006,14 +1019,17 @@ def panel_models(page):
         all_ = ui.checkbox("Also replace files that already fit")
         online_md = ui.markdown("")
 
-        def suggest():
+        async def suggest():
             args = [s["dir"].value for s in st["slots"]] + [s["file"].value for s in st["slots"]]
             n = len(st["slots"])
             S.ST_N = max(S.ST_N, n)
             pad = S.ST_N - n
-            md, picks = SSET.st_suggest(st["tkey"], st["flags"] + [""] * pad, *(args[:n] + [""] * pad),
-                                        *(args[n:] + [""] * pad))
-            sug_md.content, sug["picks"] = md, picks
+            gen = st.get("gen", 0)
+            sug_md.content = "Reading the file headers …"
+            md, picks = await run.io_bound(SSET.st_suggest, st["tkey"], st["flags"] + [""] * pad,
+                                           *(args[:n] + [""] * pad), *(args[n:] + [""] * pad))
+            if gen == st.get("gen", 0):
+                sug_md.content, sug["picks"] = md, picks
 
         def apply():
             req = S.GUIDE.requirements_for(st["tkey"], SSET._type_base(st["tkey"])) if S.GUIDE else {}
@@ -1071,7 +1087,9 @@ def panel_models(page):
     with ui.expansion(f"{Path(S.settings_path()).name} as it is on disk").classes("w-full ls-card"):
         raw = ui.textarea(value=SSET.st_raw()).props("readonly outlined rows=14 input-style='font-family:monospace'") \
             .classes("w-full")
-    load(st["tkey"])
+    async def first():
+        await load(st["tkey"])
+    ui.timer(0, first, once=True)
 
 
 # --------------------------------------------------------------------------- Speed test

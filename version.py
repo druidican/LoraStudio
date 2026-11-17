@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.171126d"
-VERSION = "1.171126d"
+__version__ = "1.171126e"
+VERSION = "1.171126e"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.171126d",
+    "version.py": "1.171126e",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.171126",
@@ -66,7 +66,7 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.141126b",
     "program/UI/lora_page.py": "1.141126b",
     "program/UI/pg_settings.py": "1.131126c",
-    "program/UI/set_panels.py": "1.171126d",
+    "program/UI/set_panels.py": "1.171126e",
     "program/Gallery/lorapage.py": "1.151126b",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.171126e", "Settings › Model files: reading the model folders and file headers no longer freezes the page, so the LoRA type list answers at once."),
     ("1.171126d", "Test pictures: SDXL, Illustrious and Pony have their own ComfyUI workflows too (until set, they use your SDXL one); Use LoRA Studio's workflow sets each up with its model card's advice (quality words, negative prompt, sampler, CFG, steps, CLIP skip)."),
     ("1.171126c", "Updates also install the NoobAI workflows (the Training/workflows folder is copied as a whole)."),
     ("1.171126b", "NoobAI-XL test pictures: own workflows for EPS and V-pred with NoobAI's prompt words, negative prompt, sampler, CFG and size (Use LoRA Studio's NoobAI workflow); V-pred test pictures always use v-prediction; NoobAI's negative prompt and 832x1216 in sample prompts."),
