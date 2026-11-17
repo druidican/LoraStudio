@@ -226,15 +226,23 @@ script text** shows the script itself.
 
 **Quality words**: a **Pony** LoRA type (a subtype with Pony in its name) trains with `score_9, score_8_up,
 score_7_up, source_anime` in front of every caption, an **Illustrious** one with `masterpiece, best quality` behind
-it. The launch script adds them while training (`--caption_prefix` / `--caption_suffix`, the caption files stay as
-they are; for Pony `--keep_tokens` keeps them and the trigger word in front), and new sample prompts get them too
+it, a **NoobAI-XL** one (EPS or V-pred) with `masterpiece, best quality, newest, absurdres, highres` in front of it.
+The launch script adds them while training (`--caption_prefix` / `--caption_suffix`, the caption files stay as
+they are; for Pony and NoobAI `--keep_tokens` keeps them and the trigger word in front), and new sample prompts get them too
 (an existing prompts file is kept as you wrote it).
+
+**NoobAI-XL** comes as two LoRA types. **NoobAI-XL EPS** is a normal SDXL model and trains like Illustrious.
+**NoobAI-XL V-pred** is a v-prediction model: its launch scripts get `--v_parameterization --zero_terminal_snr`
+(without them the LoRA learns the wrong thing), no `--noise_offset` (zero terminal SNR already covers very dark and
+very bright pictures) and the Euler sampler for the sample pictures. Use each only with its own checkpoint
+(Settings › Training › model files). Test pictures of a V-pred LoRA need a V-pred workflow (*NoobAI V-pred* in
+Settings › Test pictures, with Model Sampling Discrete set to v_prediction and zsnr).
 
 **Character defaults per model** (since 1.091126; *Why these settings* explains each):
 
 | LoRA type | Rank / alpha | Learning rate | Steps | Also |
 |---|---|---|---|---|
-| SDXL, Illustrious, Pony | 32 / 32 | 1e-4, text encoders 5e-5 | 1600–3000 | the text encoders learn the trigger word too; batch at most 4 |
+| SDXL, Illustrious, Pony, NoobAI-XL | 32 / 32 | 1e-4, text encoders 5e-5 | 1600–3000 | the text encoders learn the trigger word too; batch at most 4 |
 | Anima | 16 / 16 | 1e-4 | 1200–2200 | |
 | FLUX.1, Chroma | 32 / 32 | 1e-4 | 1600–3000 | without `--fp8_base` and with block swapping if results stay blurry |
 | Z-Image Turbo | 32 / 32 | 1e-4 | 1600–3000 | with the training adapter; try *Discrete flow shift* 3.0 for weak likeness |

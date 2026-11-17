@@ -14,23 +14,23 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.161126"
-VERSION = "1.161126"
+__version__ = "1.171126"
+VERSION = "1.171126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.161126",
+    "version.py": "1.171126",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
-    "program/Training/sd_script.py": "1.131126c",
+    "program/Training/sd_script.py": "1.171126",
     "program/Data/sd_prepare.py": "1.151126h",
-    "program/Training/sd_settings.py": "1.131126c",
+    "program/Training/sd_settings.py": "1.171126",
     "program/Data/datasets_ui.py": "1.151126h",
     "program/Data/dsflow.py": "1.161126",
     "program/Training/training_ui.py": "1.151126b",
     "program/Settings/settings_ui.py": "1.151126h",
-    "program/Gallery/lora_library.py": "1.131126c",
-    "program/Training/comfytest.py": "1.151126c",
+    "program/Gallery/lora_library.py": "1.171126",
+    "program/Training/comfytest.py": "1.171126",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
@@ -39,7 +39,7 @@ RELEASE: dict = {
     "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.151126h",
     "program/Settings/ghupdate.py": "1.011126",
-    "program/Settings/hfdownload.py": "1.131126c",
+    "program/Settings/hfdownload.py": "1.171126",
     "program/Settings/ollamactl.py": "1.011126",
     "program/Data/datacheck.py": "1.151126j",
     "program/Data/pictools.py": "1.151126e",
@@ -48,7 +48,7 @@ RELEASE: dict = {
     "program/Data/trim.py": "1.111126g",
     "program/Data/housekeeping.py": "1.011126",
     "program/Gallery/completed.py": "1.131126b",
-    "program/Gallery/model_guide.py": "1.091126",
+    "program/Gallery/model_guide.py": "1.171126",
     "program/Gallery/trainingcard.py": "1.131126c",
     "program/Gallery/insights.py": "1.131126b",
     "program/UI/shell.py": "1.131126c",
@@ -83,7 +83,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.131126c",
-    "selftest.py": "1.131126c",
+    "selftest.py": "1.171126",
     "program/Settings/machinecheck.py": "1.131126c",
     "program/Settings/selfupdate.py": "1.151126h",
     "program/Training/failcodes.py": "1.131126b",
@@ -93,14 +93,15 @@ RELEASE: dict = {
     "program/Settings/venvcheck.py": "1.011126",
     "program/Settings/features.py": "1.151126h",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.111126h",
-    "program/Training/Training_Recommendations.py": "1.091126",
+    "program/Training/Lora_Datatypes.py": "1.171126",
+    "program/Training/Training_Recommendations.py": "1.171126",
     "program/Other/lora_studio.css": "1.151126i",
     "install.sh": "1.151126h",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.171126", "NoobAI-XL is its own LoRA type: EPS (like Illustrious) and V-pred (--v_parameterization --zero_terminal_snr, no noise offset, Euler samples), with NoobAI's quality words; its own ComfyUI workflow slot for V-pred."),
     ("1.161126", "Step 1 is back in a dataset's step list: it shows the folders and makes model/, log/ and _originals/ when they are missing."),
     ("1.151126j", "Faster Ollama scans: the sort and the detailed scan ask one question per picture, three pictures at once."),
     ("1.151126i", "Improvements: the outfit / place note only when the captions do not name it; Show the pictures under each note; Fix looks through your own LoRA pictures for the gaps (waiting for your pick in step 5)."),

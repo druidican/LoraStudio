@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.171126"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -48,7 +48,7 @@ def builtin_presets():
 
 
 SUBTYPE_BASES = {"sdxl": "SDXL", "anima": "Anima"}
-RESERVED_TYPES = {"general", "sdxl", "anima", "illustrious"}   # never treated as a user subtype, even if Lora_Datatypes.py is missing
+RESERVED_TYPES = {"general", "sdxl", "anima", "illustrious", "noobai", "noobai_vpred"}   # never treated as a user subtype, even if Lora_Datatypes.py is missing
 META_KEYS = ("base", "label", "tag")        # keys of a subtype section in settings.txt that are not model files
 
 
@@ -74,13 +74,16 @@ def custom_subtypes() -> dict:
 
 # Quality words of a model family: put in front of (Pony) or behind (Illustrious) every caption while training (with
 # sd-scripts' --caption_prefix / --caption_suffix, so the caption files stay as they are) and every sample prompt.
-QUALITY_PREFIX = {"pony": "score_9, score_8_up, score_7_up, source_anime"}
+QUALITY_PREFIX = {"pony": "score_9, score_8_up, score_7_up, source_anime",
+                  "noobai": "masterpiece, best quality, newest, absurdres, highres"}
 QUALITY_SUFFIX = {"illustrious": "masterpiece, best quality"}
 
 
 def quality_family(key: str, preset: dict) -> str:
-    """'pony', 'illustrious' or '' for a LoRA type (a subtype counts by its name: Pony, PonyXL, …)."""
+    """'pony', 'noobai', 'illustrious' or '' for a LoRA type (a subtype counts by its name: Pony, PonyXL, …)."""
     words = f"{key} {preset.get('label', '')} {preset.get('suffix', '')}".lower()
+    if key.startswith("noobai") or "noobai" in words:
+        return "noobai"
     if "pony" in words:
         return "pony"
     if key == "illustrious" or "illustrious" in words:

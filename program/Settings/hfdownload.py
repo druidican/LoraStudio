@@ -15,7 +15,7 @@ Gated repos (FLUX.1-dev, FLUX.2-dev, SD 3.5): accept the licence once on the rep
 huggingface.co, with the account the token belongs to.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.171126"  # LoRA Studio version, see version.py
 
 import os
 import re
@@ -44,6 +44,10 @@ KNOWN: dict[str, dict[str, tuple]] = {
     "illustrious": {"pretrained_model_name_or_path": ("OnomaAIResearch/Illustrious-xl-early-release-v0",
                                                       "Illustrious-XL-v0.1.safetensors", 1),
                     "vae": _SDXL_VAE},
+    "noobai": {"pretrained_model_name_or_path": ("Laxhar/noobai-XL-1.1", "NoobAI-XL-v1.1.safetensors", 1),
+               "vae": _SDXL_VAE},
+    "noobai_vpred": {"pretrained_model_name_or_path": ("Laxhar/noobai-XL-Vpred-1.0", "NoobAI-XL-Vpred-v1.0.safetensors", 1),
+                     "vae": _SDXL_VAE},
     "sd15": {"pretrained_model_name_or_path": ("stable-diffusion-v1-5/stable-diffusion-v1-5",
                                                "v1-5-pruned-emaonly.safetensors", 1)},
     "sd3": {"pretrained_model_name_or_path": ("stabilityai/stable-diffusion-3.5-medium", "sd3.5_medium.safetensors", 1),
@@ -85,7 +89,7 @@ KNOWN: dict[str, dict[str, tuple]] = {
 KIND = {"vae": "vae", "ae": "vae", "clip_l": "text_encoders", "clip_g": "text_encoders", "t5xxl": "text_encoders",
         "qwen3": "text_encoders", "gemma2": "text_encoders", "text_encoder": "text_encoders", "byt5": "text_encoders",
         "base_weights": "loras", "dit": "diffusion_models"}
-CHECKPOINT_TYPES = {"sdxl", "illustrious", "sd15", "sd3"}
+CHECKPOINT_TYPES = {"sdxl", "illustrious", "noobai", "noobai_vpred", "sd15", "sd3"}
 GENERIC = re.compile(r"^(ae|model|diffusion_pytorch_model)([-.]|$)", re.I)    # names that need their own subfolder
 
 
@@ -408,7 +412,7 @@ def missing(tkey: str, include_optional=False) -> list[str]:
     for flag, p in cur.items():
         if flag not in k or not is_missing(p):
             continue
-        if flag == "vae" and not p and not include_optional and _base_of(tkey) in ("sdxl", "illustrious", "sd15"):
+        if flag == "vae" and not p and not include_optional and _base_of(tkey) in ("sdxl", "illustrious", "noobai", "noobai_vpred", "sd15"):
             continue                                    # the optional external VAE of the SDXL family
         out.append(flag)
     return out

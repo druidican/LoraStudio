@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.171126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -156,6 +156,16 @@ def _plans():
         need(G.training_command(t), f"{tkey}: no training command found")
         done.append(tkey)
     return ", ".join(done)
+
+
+@check("NoobAI: EPS like Illustrious, V-pred with v_parameterization and zero terminal SNR, no noise offset")
+def _noobai():
+    eps, vp = G.make_plan(DS, "noobai")["script_text"], G.make_plan(DS, "noobai_vpred")["script_text"]
+    need("--v_parameterization" not in eps and "--noise_offset" in eps, "EPS script has V-pred flags")
+    need("--v_parameterization" in vp and "--zero_terminal_snr" in vp and "--noise_offset" not in vp, "V-pred flags")
+    need("masterpiece, best quality, newest" in vp and "--sample_sampler euler" in vp, "V-pred quality words / sampler")
+    need(G.script_type("a.sh", vp) == "noobai_vpred" and G.script_type("b.sh", eps) == "noobai", "types not recognised")
+    return "EPS and V-pred scripts as expected"
 
 
 @check("character defaults: SDXL text encoders, FLUX/Chroma rank 32, Z-Image Base without the adapter")

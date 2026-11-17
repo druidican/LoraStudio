@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.111126h"  # LoRA Studio version, see version.py
+__version__ = "1.171126"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -218,6 +218,53 @@ PRESETS["illustrious"] = {
         "Illustrious is booru-tag based: keep captions as comma-separated tags with the trigger "
         "word first (--keep_tokens 1 pins it).",
         "Same LR guidance as SDXL: 1e-4 with AdamW8bit; NaN mid-run -> retry with --lr 5e-5.",
+    ],
+}
+
+# NoobAI-XL = SDXL architecture trained on top of Illustrious (danbooru + e621 tags), in two kinds:
+#   EPS     (epsilon prediction, like every other SDXL model): the SDXL / Illustrious settings as they are;
+#   V-pred  (v-prediction with zero terminal SNR): needs --v_parameterization --zero_terminal_snr, or the LoRA comes
+#           out wrong; no noise offset (zero terminal SNR already teaches very dark and very bright pictures), and
+#           the Euler sampler for the sample pictures (NoobAI: "other samplers will not work properly").
+# Quality words: NoobAI's own (masterpiece, best quality, newest, absurdres, highres) in front of every caption while
+# training, as --caption_prefix (sd_script.QUALITY_PREFIX), and in new sample prompts.
+PRESETS["noobai"] = {
+    **PRESETS["sdxl"],
+    "label": "NoobAI-XL EPS (SDXL)",
+    "suffix": "NOOB",
+    "model_args": [
+        ("--pretrained_model_name_or_path",
+         "/PATH/TO/NoobAI-XL-v1.1.safetensors"),
+    ],
+    "sample_args": "--w 1024 --h 1024 --s 28 --l 5",
+    "prompts_name": "NOOBprompts.txt",
+    "script_name": "{name}NOOBtraining.sh",
+    "notes": [
+        "NoobAI-XL EPS trains like Illustrious: booru tags, trigger word first, 1e-4 with AdamW8bit.",
+        "Its quality words (masterpiece, best quality, newest, absurdres, highres) are put in front of every caption "
+        "while training (--caption_prefix); --keep_tokens covers them and the trigger word.",
+    ],
+}
+PRESETS["noobai_vpred"] = {
+    **PRESETS["noobai"],
+    "label": "NoobAI-XL V-pred (SDXL)",
+    "suffix": "NOOBVP",
+    "detect": r"--v_parameterization",          # same trainer as SDXL: a V-pred script is known by this flag
+    "model_args": [
+        ("--pretrained_model_name_or_path",
+         "/PATH/TO/NoobAI-XL-Vpred-v1.0.safetensors"),
+    ],
+    "prompts_name": "NOOBVPprompts.txt",
+    "script_name": "{name}NOOBVPtraining.sh",
+    "flags": [f for f in PRESETS["sdxl"]["flags"] if not f.startswith("--noise_offset")]
+             + ["--v_parameterization --zero_terminal_snr"],
+    "sample_extra": "--sample_sampler euler",
+    "notes": [
+        "V-prediction model: --v_parameterization --zero_terminal_snr are needed, or the LoRA learns the wrong "
+        "thing (grey, washed-out or burnt pictures). Only use it with a V-pred checkpoint.",
+        "No --noise_offset: zero terminal SNR already lets the model make very dark and very bright pictures.",
+        "Sample pictures and ComfyUI need the Euler sampler and v-prediction (in ComfyUI: Model Sampling Discrete, "
+        "v_prediction, zsnr on), CFG 4-5.",
     ],
 }
 

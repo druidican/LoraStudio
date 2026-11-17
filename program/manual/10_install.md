@@ -7,7 +7,7 @@ hidden, and its places are greyed out with **(… missing)** so you can see what
 
 | Part | What it does | Without it |
 |---|---|---|
-| **sd-scripts** | trains SDXL, Illustrious, Pony, Anima, FLUX.1, SD 1.5, … | launch scripts are still made; you run them where sd-scripts is |
+| **sd-scripts** | trains SDXL, Illustrious, Pony, NoobAI-XL, Anima, FLUX.1, SD 1.5, … | launch scripts are still made; you run them where sd-scripts is |
 | **musubi-tuner** | trains Z-Image Turbo and Base, Qwen-Image and FLUX.2 | the same, for those types |
 | **Ollama** | the detailed sort (pass 2), writing captions | the quick sort, captions you write yourself |
 

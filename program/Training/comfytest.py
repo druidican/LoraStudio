@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.151126c"  # LoRA Studio version, see version.py
+__version__ = "1.171126"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -33,10 +33,11 @@ APP_DIR = _LP.USER
 FILE = APP_DIR / "comfy_settings.json"
 WF_DIR = APP_DIR / "comfy_workflows"
 TEST_DIR = "_lorastudio_test"
-FAMILIES = {"sdxl": "SDXL / Illustrious / Pony", "anima": "Anima"}
-FAMILY_OF = {"illustrious": "sdxl", "sdxl": "sdxl", "pony": "sdxl", "noobai": "sdxl", "anima": "anima"}
+FAMILIES = {"sdxl": "SDXL / Illustrious / Pony / NoobAI EPS", "vpred": "NoobAI V-pred", "anima": "Anima"}
+FAMILY_OF = {"illustrious": "sdxl", "sdxl": "sdxl", "pony": "sdxl", "noobai_vpred": "vpred", "noobai": "sdxl",
+             "anima": "anima"}
 DEFAULTS = {"url": "http://127.0.0.1:8188", "lora_dir": "", "prompts": 8, "auto": True, "around": 2,
-            "fixed": {"sdxl": "", "anima": ""}, "families": {}}
+            "fixed": {"sdxl": "", "vpred": "", "anima": ""}, "families": {}}
 JOBS: dict = {}            # log name -> {"state", "text", "done", "total"}
 WHICH: dict = {}           # log name -> which save points the next pictures use (pick_epochs `which`)
 BATCH_FILE = APP_DIR / "last_batch.json"      # the runs of the last finished queue (Home › Just trained)

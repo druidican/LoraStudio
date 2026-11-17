@@ -24,7 +24,7 @@ Run it on its own to print the table:  python Training_Recommendations.py
 """
 
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.171126"  # LoRA Studio version, see version.py
 
 import os
 import re
@@ -52,7 +52,7 @@ PURPOSES = {"character": "Character / person", "style": "Art style", "concept": 
 PRIORITIES = {"balanced": "Balanced", "quality": "Best quality", "fast": "Fastest"}
 
 # LoRA type -> family (subtypes such as Pony use their base type)
-FAMILY = {"sdxl": "sdxl", "illustrious": "sdxl", "sd15": "sd15", "flux": "flux", "chroma": "chroma",
+FAMILY = {"sdxl": "sdxl", "illustrious": "sdxl", "noobai": "sdxl", "noobai_vpred": "sdxl", "sd15": "sd15", "flux": "flux", "chroma": "chroma",
           "anima": "anima", "sd3": "sd3", "lumina": "lumina", "hunyuan": "hunyuan", "zimage": "zimage", "zimagebase": "zimagebase",
           "qwenimage": "qwenimage", "flux2": "flux2"}
 

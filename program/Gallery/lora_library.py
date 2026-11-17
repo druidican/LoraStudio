@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.171126"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -134,7 +134,9 @@ def _yes(values: list[str], default: bool) -> bool:
 
 
 DEFAULT_BASES = [
-    ("Illustrious", "illustrious, noobai, nova"),
+    ("NoobAI V-pred", "noobvp, noobai_vpred, noobai-vpred, noob_vpred"),   # before NoobAI (EPS): "noobvp" holds "noob"
+    ("NoobAI", "noobai, noob"),                 # before Illustrious: NoobAI is trained on top of it
+    ("Illustrious", "illustrious, nova"),
     ("Pony", "pony"),
     ("Anima", "anima"),
     ("Chroma", "chroma"),        # before Flux: Chroma LoRAs are trained with networks.lora_flux
@@ -307,6 +309,15 @@ def load_settings() -> dict:
         # settings from before this type existed: add it in front of Flux (saved with the next Settings save)
         if bases and not any(n.lower() == new_name.lower() for n, _ in bases):
             at = next((i for i, (n, kws) in enumerate(bases) if "flux" in kws or n.lower() == "flux"), len(bases))
+            bases.insert(at, (new_name, kw))
+    for new_name, kw in (("NoobAI V-pred", ["noobvp", "noobai_vpred", "noobai-vpred", "noob_vpred"]),
+                         ("NoobAI", ["noobai", "noob"])):
+        # settings from before NoobAI was its own type: in front of Illustrious, which no longer claims "noobai"
+        if bases and not any(n.lower() == new_name.lower() for n, _ in bases):
+            bases = [(n, [k for k in kws if not k.startswith("noob")]) if n.lower() == "illustrious" else (n, kws)
+                     for n, kws in bases]
+            at = next((i for i, (n, kws) in enumerate(bases)
+                       if n.lower() in ("noobai", "illustrious") or "illustrious" in kws), len(bases))
             bases.insert(at, (new_name, kw))
     display = sec.get("display", {})
     expected = [b.strip() for b in ",".join(display.get("expected_bases", [])).split(",") if b.strip()]
@@ -705,7 +716,7 @@ def main_file(files: list) -> tuple[Path, bool, list]:
 
 
 def strip_base_suffix(name: str, bases: list[str]) -> str:
-    tokens = ["sdxl", "ill", "illustrious", "ani", "anima", "pony", "flux", "zit", "zib", "zimage", "qwi", "f2k",
+    tokens = ["sdxl", "ill", "illustrious", "noob", "noobvp", "noobai", "ani", "anima", "pony", "flux", "zit", "zib", "zimage", "qwi", "f2k",
               "lora", "xl"] + [b.lower().replace("-", "") for b in bases]
     s = name
     changed = True
@@ -1662,7 +1673,7 @@ def render_dataset_only(ds: Dataset) -> str:
             f'<span class="ll-warn-text">No trained LoRA found</span></div>')
 
 
-BASE_ABBR = {"illustrious": "ILL", "pony": "PO", "anima": "ANI", "flux": "F1", "chroma": "CHR", "zimage": "ZI", "zimagebase": "ZIB", "qwenimage": "QWI", "flux2": "F2", "sdxl": "XL",
+BASE_ABBR = {"illustrious": "ILL", "noobai": "NOOB", "noobaivpred": "NOOBVP", "pony": "PO", "anima": "ANI", "flux": "F1", "chroma": "CHR", "zimage": "ZI", "zimagebase": "ZIB", "qwenimage": "QWI", "flux2": "F2", "sdxl": "XL",
              "sd15": "15", "sd3": "SD3", "lumina": "LUM", "hunyuan": "HY", "hunyuanimage": "HY", "unknown": "?"}
 
 

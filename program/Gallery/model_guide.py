@@ -15,7 +15,7 @@ Results of identify() are cached in model_ids.json (keyed by path, size and modi
 """
 
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.171126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -52,6 +52,8 @@ KIND_LABEL = {
 REQUIREMENTS = {
     "sdxl": {"pretrained_model_name_or_path": ["sdxl_ckpt"], "vae": ["sd_vae"]},
     "illustrious": {"pretrained_model_name_or_path": ["sdxl_ckpt"], "vae": ["sd_vae"]},
+    "noobai": {"pretrained_model_name_or_path": ["sdxl_ckpt"], "vae": ["sd_vae"]},
+    "noobai_vpred": {"pretrained_model_name_or_path": ["sdxl_ckpt"], "vae": ["sd_vae"]},
     "sd15": {"pretrained_model_name_or_path": ["sd15_ckpt", "sd2_ckpt"], "vae": ["sd_vae"]},
     "sd3": {"pretrained_model_name_or_path": ["sd3"], "clip_l": ["clip_l"], "clip_g": ["clip_g"], "t5xxl": ["t5xxl"]},
     "flux": {"pretrained_model_name_or_path": ["flux_dev", "flux_schnell"], "clip_l": ["clip_l"],
@@ -92,6 +94,8 @@ SD_SCRIPTS_DOCS = {
     "lumina": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/lumina_train_network.md",
     "sdxl": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/train_network.md",
     "illustrious": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/train_network.md",
+    "noobai": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/train_network.md",
+    "noobai_vpred": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/train_network.md",
     "sd15": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/train_network.md",
     "hunyuan": "https://github.com/kohya-ss/sd-scripts/blob/main/docs/hunyuan_image_train_network.md",
     "zimage": "https://github.com/kohya-ss/musubi-tuner/blob/main/docs/zimage.md",
