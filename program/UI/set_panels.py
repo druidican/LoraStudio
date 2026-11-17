@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.171126e"  # LoRA Studio version, see version.py
+__version__ = "1.171126f"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -855,6 +855,24 @@ def panel_trainers(page):
 
 
 # --------------------------------------------------------------------------- Model files
+def _file_opts(files, current=None, old=None) -> dict:
+    """{full path: 'name (size)'} for a file picker: the value is always the path, never the (label, path) pair."""
+    out = {}
+    if current:
+        out[str(current)] = next((lab for lab, f in files if f == str(current)), Path(str(current)).name)
+    out.update({f: lab for lab, f in files})
+    if isinstance(old, dict):
+        out.update({k: v for k, v in old.items() if k not in out})
+    return out
+
+
+def _path(v) -> str:
+    """A picker's value as a path (also an old (label, path) pair)."""
+    if isinstance(v, (list, tuple)):
+        v = v[-1] if v else ""
+    return str(v or "")
+
+
 def panel_models(page):
     import sd_settings as SSET
     import sdgui as S
@@ -886,9 +904,7 @@ def panel_models(page):
         for key, default in SSET.type_slots(tkey):
             path = saved.get(key) or default
             d = SSET._slot_dir(path, saved.get(key + ".dir"))
-            opts = SSET.list_model_files(d, recursive)
-            if path and path not in opts:
-                opts = [path] + opts
+            opts = _file_opts(SSET.list_model_files(d, recursive), path)
             rows.append((key, path, d, opts, key in kn and HD.is_missing(path or "")))
         return saved, rows, SSET.settings_path().is_file()
 
@@ -932,9 +948,9 @@ def panel_models(page):
         await suggest()
 
     async def relist(s):
-        cur = s["file"].value
-        opts = await run.io_bound(SSET.list_model_files, s["dir"].value, rec.value)
-        s["file"].options = ([cur] if cur and cur not in opts else []) + opts
+        cur = _path(s["file"].value)
+        files = await run.io_bound(SSET.list_model_files, s["dir"].value, rec.value)
+        s["file"].options = _file_opts(files, cur)
         s["file"].update()
 
     async def refresh_lists():
@@ -947,7 +963,7 @@ def panel_models(page):
             return
         p = Path(path)
         s["dir"].value = str(p.parent.parent if HD.GENERIC.match(p.name) else p.parent)
-        s["file"].options = list(dict.fromkeys([str(p)] + list(s["file"].options)))
+        s["file"].options = _file_opts([], str(p), s["file"].options)
         s["file"].value = str(p)
         s["file"].update()
         s["btn"].set_visibility(False)
@@ -980,7 +996,7 @@ def panel_models(page):
         dl_md.content = "\n\n".join(log + [f"**{n} of {len(todo)} files downloaded.**"])
 
     def save():
-        args = [s["dir"].value for s in st["slots"]] + [s["file"].value for s in st["slots"]]
+        args = [s["dir"].value for s in st["slots"]] + [_path(s["file"].value) for s in st["slots"]]
         n = len(st["slots"])
         S.ST_N = max(S.ST_N, n)
         pad = S.ST_N - n
@@ -1020,7 +1036,7 @@ def panel_models(page):
         online_md = ui.markdown("")
 
         async def suggest():
-            args = [s["dir"].value for s in st["slots"]] + [s["file"].value for s in st["slots"]]
+            args = [s["dir"].value for s in st["slots"]] + [_path(s["file"].value) for s in st["slots"]]
             n = len(st["slots"])
             S.ST_N = max(S.ST_N, n)
             pad = S.ST_N - n
@@ -1035,7 +1051,7 @@ def panel_models(page):
             req = S.GUIDE.requirements_for(st["tkey"], SSET._type_base(st["tkey"])) if S.GUIDE else {}
             changed = []
             for s in st["slots"]:
-                cur = os.path.expanduser((s["file"].value or "").strip())
+                cur = os.path.expanduser(_path(s["file"].value).strip())
                 new = (sug["picks"] or {}).get(s["key"])
                 fits = bool(cur) and "/PATH/TO" not in cur and Path(cur).is_file() and S.GUIDE is not None \
                     and not S.GUIDE.problems(S.GUIDE.identify(cur), s["key"], req.get(s["key"], []))
@@ -1046,7 +1062,7 @@ def panel_models(page):
                 "Nothing to change: the slots already hold fitting files."
 
         async def online():
-            base = st["slots"][0]["file"].value if st["slots"] else ""
+            base = _path(st["slots"][0]["file"].value) if st["slots"] else ""
             online_md.content = "Asking Hugging Face and Civitai …"
             online_md.content = await run.io_bound(SSET.st_online, st["tkey"], base, lambda *a, **k: None)
         with ui.row().classes("gap-2"):
