@@ -132,8 +132,14 @@ by you, written into launch scripts that download models, and masked in the run 
 ![Settings › Test pictures](img/set_comfy.jpg)
 
 The ComfyUI address (*Test* checks it) and your LoRA folder as ComfyUI sees it. Import your own ComfyUI workflow per
-model family once (Workflow › Save in ComfyUI): SDXL / Illustrious / Pony / NoobAI EPS share one, NoobAI V-pred
-has its own (a v-prediction workflow), Anima its own. LoRA Studio then makes test pictures with every save point of a run,
+model family once (Workflow › Save in ComfyUI): SDXL / Illustrious / Pony share one; NoobAI-XL EPS, NoobAI-XL
+V-pred and Anima have their own. For the two NoobAI families **Use LoRA Studio's NoobAI workflow** sets one up with
+NoobAI's own advice: `masterpiece, best quality, newest, absurdres, highres, safe` in front of every test prompt, its
+negative prompt (`worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated
+hands`), 28 steps, 832×1216, Euler a at CFG 5.5 (EPS) or Euler at CFG 5 with v-prediction and zero terminal SNR
+(V-pred), and the checkpoint set for that LoRA type in Settings › Training. The same files are in
+`program/Training/workflows/` to open in ComfyUI. A V-pred LoRA's test pictures always use v-prediction, also with
+a workflow of your own. LoRA Studio then makes test pictures with every save point of a run,
 with the same model, sampler and size as your workflow: how many prompts, and whether they are made by themselves.
 When they are, they are made **right after each run, before the next one in the queue starts**: for the save point
 to try first and the final file. Then ComfyUI is told to unload its models, so the next training gets the whole GPU,

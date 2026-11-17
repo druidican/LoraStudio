@@ -235,8 +235,8 @@ they are; for Pony and NoobAI `--keep_tokens` keeps them and the trigger word in
 **NoobAI-XL V-pred** is a v-prediction model: its launch scripts get `--v_parameterization --zero_terminal_snr`
 (without them the LoRA learns the wrong thing), no `--noise_offset` (zero terminal SNR already covers very dark and
 very bright pictures) and the Euler sampler for the sample pictures. Use each only with its own checkpoint
-(Settings › Training › model files). Test pictures of a V-pred LoRA need a V-pred workflow (*NoobAI V-pred* in
-Settings › Test pictures, with Model Sampling Discrete set to v_prediction and zsnr).
+(Settings › Training › model files). Both get NoobAI's negative prompt and picture size (832×1216, 28 steps, CFG 5.5 / 5) in
+their sample prompts. Their test pictures have their own workflows in Settings › Test pictures.
 
 **Character defaults per model** (since 1.091126; *Why these settings* explains each):
 

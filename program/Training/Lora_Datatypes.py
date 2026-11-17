@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.171126"  # LoRA Studio version, see version.py
+__version__ = "1.171126b"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -236,7 +236,9 @@ PRESETS["noobai"] = {
         ("--pretrained_model_name_or_path",
          "/PATH/TO/NoobAI-XL-v1.1.safetensors"),
     ],
-    "sample_args": "--w 1024 --h 1024 --s 28 --l 5",
+    # NoobAI's advice for pictures: Euler a, CFG 5-6, 25-30 steps, about 1024x1024 in area (832x1216 for a portrait)
+    "sample_args": "--w 832 --h 1216 --s 28 --l 5.5",
+    "negative": "worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands",
     "prompts_name": "NOOBprompts.txt",
     "script_name": "{name}NOOBtraining.sh",
     "notes": [
@@ -254,6 +256,7 @@ PRESETS["noobai_vpred"] = {
         ("--pretrained_model_name_or_path",
          "/PATH/TO/NoobAI-XL-Vpred-v1.0.safetensors"),
     ],
+    "sample_args": "--w 832 --h 1216 --s 28 --l 5",
     "prompts_name": "NOOBVPprompts.txt",
     "script_name": "{name}NOOBVPtraining.sh",
     "flags": [f for f in PRESETS["sdxl"]["flags"] if not f.startswith("--noise_offset")]

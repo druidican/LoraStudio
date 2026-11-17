@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.171126"  # LoRA Studio version, see version.py
+__version__ = "1.171126b"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -33,11 +33,16 @@ APP_DIR = _LP.USER
 FILE = APP_DIR / "comfy_settings.json"
 WF_DIR = APP_DIR / "comfy_workflows"
 TEST_DIR = "_lorastudio_test"
-FAMILIES = {"sdxl": "SDXL / Illustrious / Pony / NoobAI EPS", "vpred": "NoobAI V-pred", "anima": "Anima"}
-FAMILY_OF = {"illustrious": "sdxl", "sdxl": "sdxl", "pony": "sdxl", "noobai_vpred": "vpred", "noobai": "sdxl",
+# NoobAI-XL's own advice for pictures (model card): these words in front of every prompt, and this negative prompt
+NOOB_POSITIVE = "masterpiece, best quality, newest, absurdres, highres, safe"
+NOOB_NEGATIVE = ("worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, "
+                 "mutated hands")
+BUILTIN = {"noobai": "noobai_eps.json", "vpred": "noobai_vpred.json"}   # in Training/workflows/, made by LoRA Studio
+FAMILIES = {"sdxl": "SDXL / Illustrious / Pony", "noobai": "NoobAI-XL EPS", "vpred": "NoobAI-XL V-pred", "anima": "Anima"}
+FAMILY_OF = {"illustrious": "sdxl", "sdxl": "sdxl", "pony": "sdxl", "noobai_vpred": "vpred", "noobai": "noobai",
              "anima": "anima"}
 DEFAULTS = {"url": "http://127.0.0.1:8188", "lora_dir": "", "prompts": 8, "auto": True, "around": 2,
-            "fixed": {"sdxl": "", "vpred": "", "anima": ""}, "families": {}}
+            "fixed": {"sdxl": "", "noobai": NOOB_POSITIVE, "vpred": NOOB_POSITIVE, "anima": ""}, "families": {}}
 JOBS: dict = {}            # log name -> {"state", "text", "done", "total"}
 WHICH: dict = {}           # log name -> which save points the next pictures use (pick_epochs `which`)
 BATCH_FILE = APP_DIR / "last_batch.json"      # the runs of the last finished queue (Home › Just trained)
@@ -144,7 +149,7 @@ def read_workflow(d: dict) -> dict:
             links[ln[0]] = ln                               # [id, from node, from slot, to node, to slot, type]
     out = {"kind": "", "ckpt": "", "unet": "", "clip": "", "clip_type": "stable_diffusion", "vae": "", "clip_skip": 0,
            "steps": 20, "cfg": 6.0, "sampler": "euler", "scheduler": "normal", "width": 1024, "height": 1024,
-           "negative": "", "fixed": ""}
+           "negative": "", "fixed": "", "vpred": False, "zsnr": False}
     for n in nodes.values():
         t, w = n.get("type", ""), _named(n)
         if n.get("mode") in (2, 4):                         # muted / bypassed
@@ -157,6 +162,8 @@ def read_workflow(d: dict) -> dict:
             out["clip"], out["clip_type"] = w["clip_name"], w.get("type") or "stable_diffusion"
         if t == "VAELoader" and w.get("vae_name"):
             out["vae"] = w["vae_name"]
+        if t == "ModelSamplingDiscrete" and str(w.get("sampling") or "").startswith("v_pred"):
+            out["vpred"], out["zsnr"] = True, bool(w.get("zsnr"))
         if t == "CLIPSetLastLayer":
             out["clip_skip"] = int(w.get("stop_at_clip_layer") or 0)
         if isinstance(w.get("resolution_ui"), dict):
@@ -217,6 +224,36 @@ def import_workflow(fam: str, path) -> tuple[dict, str]:
                 + (f", text encoder `{wf['clip']}`, VAE `{wf['vae']}`" if wf["kind"] == "unet" else "") + ".")
 
 
+def use_builtin(fam: str) -> tuple[dict, str]:
+    """LoRA Studio's own NoobAI workflow for a family (NoobAI's advice: prompt words, negative prompt, sampler, CFG; V-pred
+    with Model Sampling Discrete v_prediction + zsnr), with the checkpoint of the LoRA type from Settings › Training
+    when one is set there (only its file name: ComfyUI knows its models by name)."""
+    src = Path(__file__).with_name("workflows") / BUILTIN[fam]
+    d = json.loads(src.read_text(encoding="utf-8"))
+    try:
+        import sd_settings as SS
+        base = (SS.settings_models("noobai_vpred" if fam == "vpred" else "noobai") or {}).get(
+            "pretrained_model_name_or_path") or ""
+    except Exception:                                    # noqa: BLE001
+        base = ""
+    if base:
+        for n in d["nodes"]:
+            if n.get("type") == "CheckpointLoaderSimple":
+                n["widgets_values"][0] = n["widgets_values_named"]["ckpt_name"] = Path(base).name
+    tmp = WF_DIR / f"_{BUILTIN[fam]}"
+    WF_DIR.mkdir(exist_ok=True)
+    tmp.write_text(json.dumps(d, indent=1), encoding="utf-8")
+    try:
+        wf, note = import_workflow(fam, tmp)
+    finally:
+        tmp.unlink(missing_ok=True)
+    s = settings()
+    s["fixed"][fam] = NOOB_POSITIVE
+    save_settings(fixed=s["fixed"])
+    return wf, note + ("" if base else " The checkpoint name is NoobAI's own file name: if yours is called "
+                                       "differently, set it in Settings › Training first and press the button again.")
+
+
 # --------------------------------------------------------------------------- talking to ComfyUI
 def _req(url, path, data=None, timeout=30):
     full = url.rstrip("/") + path
@@ -258,6 +295,10 @@ def graph(wf: dict, lora_name: str, positive: str, seed: int, prefix: str) -> di
         if wf.get("vae"):
             g["3"] = {"class_type": "VAELoader", "inputs": {"vae_name": wf["vae"]}}
             vae = ["3", 0]
+    if wf.get("vpred"):                                 # a v-prediction model (NoobAI-XL V-pred): tell the sampler
+        g["2v"] = {"class_type": "ModelSamplingDiscrete", "inputs": {"model": model, "sampling": "v_prediction",
+                                                                     "zsnr": bool(wf.get("zsnr", True))}}
+        model = ["2v", 0]
     if wf.get("clip_skip"):
         g["4"] = {"class_type": "CLIPSetLastLayer", "inputs": {"clip": clip, "stop_at_clip_layer": int(wf["clip_skip"])}}
         clip = ["4", 0]
@@ -458,6 +499,8 @@ def make(logname: str, say=None) -> str:
         return "❌ This run has no LoRA files."
     prompts = prompts_for(info, int(cfg.get("prompts") or 8))
     fixed = (cfg["fixed"].get(fam) or "").strip().rstrip(",")
+    if fam == "vpred" and not wf.get("vpred"):          # a V-pred LoRA is always shown as v-prediction
+        wf = {**wf, "vpred": True, "zsnr": True}
     d = compare_dir(info)
     grid = {"labels": [lab for lab, _ in eps], "files": {lab: str(f) for lab, f in eps},
             "prompts": prompts, "pics": {lab: [None] * len(prompts) for lab, _ in eps}, "at": time.strftime("%Y-%m-%d %H:%M")}

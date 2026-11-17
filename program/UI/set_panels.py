@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.171126b"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -559,6 +559,23 @@ def panel_comfy(page):
                 wmsg.content = note_
             ui.upload(label="Your workflow (ComfyUI › Workflow › Save / Export, the .json file)", auto_upload=True,
                       on_upload=got).props("accept=.json flat bordered").classes("w-full")
+            if fam in CT.BUILTIN:
+                def builtin(fam=fam, info=info, wmsg=wmsg, fixed=fixed):
+                    try:
+                        _, note_ = CT.use_builtin(fam)
+                    except Exception as ex:              # noqa: BLE001
+                        wmsg.content = f"❌ {ex}"
+                        return
+                    info.content = _wf_summary(CT, fam)
+                    fixed.value = CT.settings()["fixed"].get(fam, "")
+                    wmsg.content = note_
+                with ui.row().classes("items-center gap-2"):
+                    ui.button("Use LoRA Studio's NoobAI workflow", on_click=builtin) \
+                        .props("outline dense no-caps color=primary")
+                    note("NoobAI's own advice: its words in front of every prompt, its negative prompt, "
+                         + ("Euler, CFG 5, v-prediction with zero terminal SNR" if fam == "vpred" else "Euler a, CFG 5.5")
+                         + ", 28 steps, 832×1216. The file is also in LoRA Studio's Training/workflows/ folder "
+                         "to open in ComfyUI.")
             fams[fam] = fixed
     msg = ui.markdown("")
 
@@ -627,7 +644,8 @@ def _wf_summary(CT, fam) -> str:
         return "No workflow yet."
     model = wf["ckpt"] or wf["unet"]
     return (f"Model {model} · {wf['sampler']} / {wf['scheduler']} · {wf['steps']} steps · CFG {wf['cfg']} · "
-            f"{wf['width']}×{wf['height']}" + (f" · CLIP skip {abs(wf['clip_skip'])}" if wf.get("clip_skip") else ""))
+            f"{wf['width']}×{wf['height']}" + (f" · CLIP skip {abs(wf['clip_skip'])}" if wf.get("clip_skip") else "")
+            + (" · v-prediction" if wf.get("vpred") else ""))
 
 
 # --------------------------------------------------------------------------- AI helpers (Ollama, Hugging Face token)

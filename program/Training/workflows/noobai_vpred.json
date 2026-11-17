@@ -1,0 +1,454 @@
+{
+ "last_node_id": 8,
+ "last_link_id": 10,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "CheckpointLoaderSimple",
+   "pos": [
+    40,
+    60
+   ],
+   "size": [
+    380,
+    100
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      3
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      1,
+      2
+     ],
+     "slot_index": 1
+    },
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      9
+     ],
+     "slot_index": 2
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CheckpointLoaderSimple"
+   },
+   "widgets_values": [
+    "NoobAI-XL-Vpred-v1.0.safetensors"
+   ],
+   "title": "Model (NoobAI-XL V-pred)",
+   "widgets_values_named": {
+    "ckpt_name": "NoobAI-XL-Vpred-v1.0.safetensors"
+   }
+  },
+  {
+   "id": 2,
+   "type": "ModelSamplingDiscrete",
+   "pos": [
+    40,
+    220
+   ],
+   "size": [
+    320,
+    90
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      4
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ModelSamplingDiscrete"
+   },
+   "widgets_values": [
+    "v_prediction",
+    true
+   ],
+   "title": "V-prediction, zero terminal SNR",
+   "widgets_values_named": {
+    "sampling": "v_prediction",
+    "zsnr": true
+   }
+  },
+  {
+   "id": 3,
+   "type": "CLIPTextEncode",
+   "pos": [
+    460,
+    40
+   ],
+   "size": [
+    420,
+    160
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      5
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "masterpiece, best quality, newest, absurdres, highres, safe,\n\n1girl, solo, looking at viewer, upper body, simple background"
+   ],
+   "title": "Positive (NoobAI's prefix first)",
+   "widgets_values_named": {
+    "text": "masterpiece, best quality, newest, absurdres, highres, safe,\n\n1girl, solo, looking at viewer, upper body, simple background"
+   }
+  },
+  {
+   "id": 4,
+   "type": "CLIPTextEncode",
+   "pos": [
+    460,
+    240
+   ],
+   "size": [
+    420,
+    140
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      6
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands"
+   ],
+   "title": "Negative (NoobAI's advice)",
+   "widgets_values_named": {
+    "text": "worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands"
+   }
+  },
+  {
+   "id": 5,
+   "type": "EmptyLatentImage",
+   "pos": [
+    460,
+    420
+   ],
+   "size": [
+    300,
+    110
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      7
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "EmptyLatentImage"
+   },
+   "widgets_values": [
+    832,
+    1216,
+    1
+   ],
+   "widgets_values_named": {
+    "width": 832,
+    "height": 1216,
+    "batch_size": 1
+   }
+  },
+  {
+   "id": 6,
+   "type": "KSampler",
+   "pos": [
+    940,
+    60
+   ],
+   "size": [
+    320,
+    270
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 4
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 5
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 6
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 7
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      8
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    123456,
+    "randomize",
+    28,
+    5.0,
+    "euler",
+    "normal",
+    1.0
+   ],
+   "widgets_values_named": {
+    "seed": 123456,
+    "control_after_generate": "randomize",
+    "steps": 28,
+    "cfg": 5.0,
+    "sampler_name": "euler",
+    "scheduler": "normal",
+    "denoise": 1.0
+   }
+  },
+  {
+   "id": 7,
+   "type": "VAEDecode",
+   "pos": [
+    1300,
+    60
+   ],
+   "size": [
+    220,
+    50
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 8
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 9
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      10
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": [],
+   "widgets_values_named": {}
+  },
+  {
+   "id": 8,
+   "type": "SaveImage",
+   "pos": [
+    1560,
+    60
+   ],
+   "size": [
+    420,
+    600
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 10
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "SaveImage"
+   },
+   "widgets_values": [
+    "noobai/test"
+   ],
+   "widgets_values_named": {
+    "filename_prefix": "noobai/test"
+   }
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   1,
+   3,
+   0,
+   "CLIP"
+  ],
+  [
+   2,
+   1,
+   1,
+   4,
+   0,
+   "CLIP"
+  ],
+  [
+   3,
+   1,
+   0,
+   2,
+   0,
+   "MODEL"
+  ],
+  [
+   4,
+   2,
+   0,
+   6,
+   0,
+   "MODEL"
+  ],
+  [
+   5,
+   3,
+   0,
+   6,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   6,
+   4,
+   0,
+   6,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   7,
+   5,
+   0,
+   6,
+   3,
+   "LATENT"
+  ],
+  [
+   8,
+   6,
+   0,
+   7,
+   0,
+   "LATENT"
+  ],
+  [
+   9,
+   1,
+   2,
+   7,
+   1,
+   "VAE"
+  ],
+  [
+   10,
+   7,
+   0,
+   8,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {},
+ "version": 0.4
+}
