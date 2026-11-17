@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.171126b"  # LoRA Studio version, see version.py
+__version__ = "1.171126d"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -33,16 +33,38 @@ APP_DIR = _LP.USER
 FILE = APP_DIR / "comfy_settings.json"
 WF_DIR = APP_DIR / "comfy_workflows"
 TEST_DIR = "_lorastudio_test"
-# NoobAI-XL's own advice for pictures (model card): these words in front of every prompt, and this negative prompt
-NOOB_POSITIVE = "masterpiece, best quality, newest, absurdres, highres, safe"
-NOOB_NEGATIVE = ("worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, "
-                 "mutated hands")
-BUILTIN = {"noobai": "noobai_eps.json", "vpred": "noobai_vpred.json"}   # in Training/workflows/, made by LoRA Studio
-FAMILIES = {"sdxl": "SDXL / Illustrious / Pony", "noobai": "NoobAI-XL EPS", "vpred": "NoobAI-XL V-pred", "anima": "Anima"}
-FAMILY_OF = {"illustrious": "sdxl", "sdxl": "sdxl", "pony": "sdxl", "noobai_vpred": "vpred", "noobai": "noobai",
+# Each model family's own advice for pictures (from the model cards; Training/workflows/ holds LoRA Studio's workflow
+# with these settings, tools/make_workflows.py writes them): words in front of every test prompt and the negative
+# prompt are in those files; POSITIVE is what Settings › Test pictures starts the "fixed tags" with.
+POSITIVE = {
+    "sdxl": "",
+    "illustrious": "masterpiece, best quality",
+    "pony": "score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up, source_anime",
+    "noobai": "masterpiece, best quality, newest, absurdres, highres, safe",
+    "vpred": "masterpiece, best quality, newest, absurdres, highres, safe",
+}
+NOOB_POSITIVE = POSITIVE["noobai"]
+BUILTIN = {"sdxl": "sdxl.json", "illustrious": "illustrious.json", "pony": "pony.json",
+           "noobai": "noobai_eps.json", "vpred": "noobai_vpred.json"}
+BUILTIN_NOTE = {
+    "sdxl": "SDXL 1.0: no quality words, negative 'worst quality, low quality, blurry', DPM++ 2M Karras, CFG 7, "
+            "28 steps",
+    "illustrious": "Illustrious-XL: masterpiece, best quality in front, its own negative prompt, Euler a, CFG 6, 28 steps",
+    "pony": "Pony Diffusion V6 XL: the score_ words in front, no negative prompt (the model card: not needed), "
+            "Euler a, CFG 7, 25 steps, CLIP skip 2",
+    "noobai": "NoobAI-XL EPS: its words in front, its negative prompt, Euler a, CFG 5.5, 28 steps",
+    "vpred": "NoobAI-XL V-pred: its words in front, its negative prompt, Euler, CFG 5, 28 steps, v-prediction with "
+             "zero terminal SNR",
+}
+TYPE_OF = {"sdxl": "sdxl", "illustrious": "illustrious", "pony": "", "noobai": "noobai", "vpred": "noobai_vpred"}
+FAMILIES = {"sdxl": "SDXL", "illustrious": "Illustrious", "pony": "Pony", "noobai": "NoobAI-XL EPS",
+            "vpred": "NoobAI-XL V-pred", "anima": "Anima"}
+FAMILY_OF = {"illustrious": "illustrious", "sdxl": "sdxl", "pony": "pony", "noobai_vpred": "vpred", "noobai": "noobai",
              "anima": "anima"}
+# a family without a workflow of its own uses this one's (before 1.171126d SDXL, Illustrious, Pony and NoobAI shared one)
+FALLBACK = {"illustrious": "sdxl", "pony": "sdxl", "noobai": "sdxl"}
 DEFAULTS = {"url": "http://127.0.0.1:8188", "lora_dir": "", "prompts": 8, "auto": True, "around": 2,
-            "fixed": {"sdxl": "", "noobai": NOOB_POSITIVE, "vpred": NOOB_POSITIVE, "anima": ""}, "families": {}}
+            "fixed": {**POSITIVE, "anima": ""}, "families": {}}
 JOBS: dict = {}            # log name -> {"state", "text", "done", "total"}
 WHICH: dict = {}           # log name -> which save points the next pictures use (pick_epochs `which`)
 BATCH_FILE = APP_DIR / "last_batch.json"      # the runs of the last finished queue (Home › Just trained)
@@ -73,6 +95,18 @@ def save_settings(**kw) -> dict:
             s[k] = v
     FILE.write_text(json.dumps(s, indent=1), encoding="utf-8")
     return s
+
+
+def workflow(cfg: dict, fam: str | None) -> tuple[dict | None, str]:
+    """(the workflow settings for a family, the family whose fixed tags go with them): its own, else the one it used
+    to share (a Pony LoRA keeps using your SDXL workflow until Pony has one of its own)."""
+    fams = cfg.get("families") or {}
+    if fam and fams.get(fam):
+        return fams[fam], fam
+    fb = FALLBACK.get(fam or "")
+    if fb and fams.get(fb):
+        return fams[fb], fb
+    return None, fam or ""
 
 
 def family(tkey: str) -> str | None:
@@ -232,8 +266,8 @@ def use_builtin(fam: str) -> tuple[dict, str]:
     d = json.loads(src.read_text(encoding="utf-8"))
     try:
         import sd_settings as SS
-        base = (SS.settings_models("noobai_vpred" if fam == "vpred" else "noobai") or {}).get(
-            "pretrained_model_name_or_path") or ""
+        keys = [TYPE_OF[fam]] if fam != "pony" else [k for k in SS.read_settings() if "pony" in k.lower()]
+        base = next((v for k in keys if (v := (SS.settings_models(k) or {}).get("pretrained_model_name_or_path"))), "")
     except Exception:                                    # noqa: BLE001
         base = ""
     if base:
@@ -248,9 +282,9 @@ def use_builtin(fam: str) -> tuple[dict, str]:
     finally:
         tmp.unlink(missing_ok=True)
     s = settings()
-    s["fixed"][fam] = NOOB_POSITIVE
+    s["fixed"][fam] = POSITIVE[fam]
     save_settings(fixed=s["fixed"])
-    return wf, note + ("" if base else " The checkpoint name is NoobAI's own file name: if yours is called "
+    return wf, note + ("" if base else " The checkpoint name is the model's usual file name: if yours is called "
                                        "differently, set it in Settings › Training first and press the button again.")
 
 
@@ -481,7 +515,7 @@ def make(logname: str, say=None) -> str:
     info = facts["info"]
     fam = family(info["tkey"])
     cfg = settings()
-    wf = cfg["families"].get(fam or "")
+    wf, ffam = workflow(cfg, fam)
     if not fam or not wf:
         return (f"❌ No workflow for {info['type']} yet: add one in Settings › Test pictures."
                 if fam else f"❌ Test pictures are not made for {info['type']} yet (SDXL, Illustrious, Pony, Anima).")
@@ -498,7 +532,7 @@ def make(logname: str, say=None) -> str:
     if not eps:
         return "❌ This run has no LoRA files."
     prompts = prompts_for(info, int(cfg.get("prompts") or 8))
-    fixed = (cfg["fixed"].get(fam) or "").strip().rstrip(",")
+    fixed = (cfg["fixed"].get(ffam) or "").strip().rstrip(",")
     if fam == "vpred" and not wf.get("vpred"):          # a V-pred LoRA is always shown as v-prediction
         wf = {**wf, "vpred": True, "zsnr": True}
     d = compare_dir(info)

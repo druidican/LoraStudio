@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.171126b"  # LoRA Studio version, see version.py
+__version__ = "1.171126d"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -570,12 +570,10 @@ def panel_comfy(page):
                     fixed.value = CT.settings()["fixed"].get(fam, "")
                     wmsg.content = note_
                 with ui.row().classes("items-center gap-2"):
-                    ui.button("Use LoRA Studio's NoobAI workflow", on_click=builtin) \
+                    ui.button("Use LoRA Studio's workflow", on_click=builtin) \
                         .props("outline dense no-caps color=primary")
-                    note("NoobAI's own advice: its words in front of every prompt, its negative prompt, "
-                         + ("Euler, CFG 5, v-prediction with zero terminal SNR" if fam == "vpred" else "Euler a, CFG 5.5")
-                         + ", 28 steps, 832×1216. The file is also in LoRA Studio's Training/workflows/ folder "
-                         "to open in ComfyUI.")
+                    note(CT.BUILTIN_NOTE[fam] + ", 832×1216 (the model card's advice). The file is also in LoRA "
+                         "Studio's Training/workflows/ folder to open in ComfyUI.")
             fams[fam] = fixed
     msg = ui.markdown("")
 
@@ -639,11 +637,15 @@ def panel_comfy(page):
 
 
 def _wf_summary(CT, fam) -> str:
-    wf = CT.settings()["families"].get(fam)
+    cfg = CT.settings()
+    wf, ffam = CT.workflow(cfg, fam)
     if not wf:
         return "No workflow yet."
+    if ffam != fam:
+        return (f"No workflow of its own yet: uses your {CT.FAMILIES[ffam]} workflow (and its fixed tags) until you add "
+                "one here.")
     model = wf["ckpt"] or wf["unet"]
-    return (f"Model {model} · {wf['sampler']} / {wf['scheduler']} · {wf['steps']} steps · CFG {wf['cfg']} · "
+    return (f"Model `{model}` · `{wf['sampler']}` / {wf['scheduler']} · {wf['steps']} steps · CFG {wf['cfg']} · "
             f"{wf['width']}×{wf['height']}" + (f" · CLIP skip {abs(wf['clip_skip'])}" if wf.get("clip_skip") else "")
             + (" · v-prediction" if wf.get("vpred") else ""))
 

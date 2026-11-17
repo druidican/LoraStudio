@@ -132,14 +132,21 @@ by you, written into launch scripts that download models, and masked in the run 
 ![Settings › Test pictures](img/set_comfy.jpg)
 
 The ComfyUI address (*Test* checks it) and your LoRA folder as ComfyUI sees it. Import your own ComfyUI workflow per
-model family once (Workflow › Save in ComfyUI): SDXL / Illustrious / Pony share one; NoobAI-XL EPS, NoobAI-XL
-V-pred and Anima have their own. For the two NoobAI families **Use LoRA Studio's NoobAI workflow** sets one up with
-NoobAI's own advice: `masterpiece, best quality, newest, absurdres, highres, safe` in front of every test prompt, its
-negative prompt (`worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated
-hands`), 28 steps, 832×1216, Euler a at CFG 5.5 (EPS) or Euler at CFG 5 with v-prediction and zero terminal SNR
-(V-pred), and the checkpoint set for that LoRA type in Settings › Training. The same files are in
-`program/Training/workflows/` to open in ComfyUI. A V-pred LoRA's test pictures always use v-prediction, also with
-a workflow of your own. LoRA Studio then makes test pictures with every save point of a run,
+model family once (Workflow › Save in ComfyUI): SDXL, Illustrious, Pony, NoobAI-XL EPS, NoobAI-XL V-pred and Anima
+each have their own. A family without one uses your SDXL workflow (and its fixed tags), as before. **Use LoRA
+Studio's workflow** sets one up with the model card's advice, at 832×1216, with the checkpoint set for that LoRA
+type in Settings › Training:
+
+| Family | In front of every test prompt | Negative prompt | Sampler, CFG, steps |
+|---|---|---|---|
+| SDXL 1.0 | – | worst quality, low quality, blurry | DPM++ 2M Karras, 7, 28 |
+| Illustrious-XL | masterpiece, best quality | worst quality, comic, multiple views, bad quality, low quality, lowres, displeasing, very displeasing, bad anatomy, bad hands, monochrome, extra digits, fewer digits | Euler a, 6, 28 |
+| Pony Diffusion V6 XL | score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up, source_anime | – (not needed, says the model card) | Euler a, 7, 25, CLIP skip 2 |
+| NoobAI-XL EPS | masterpiece, best quality, newest, absurdres, highres, safe | worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands | Euler a, 5.5, 28 |
+| NoobAI-XL V-pred | as EPS | as EPS | Euler, 5, 28, v-prediction with zero terminal SNR |
+
+The same files are in `program/Training/workflows/` to open in ComfyUI. A V-pred LoRA's test pictures always use
+v-prediction, also with a workflow of your own. LoRA Studio then makes test pictures with every save point of a run,
 with the same model, sampler and size as your workflow: how many prompts, and whether they are made by themselves.
 When they are, they are made **right after each run, before the next one in the queue starts**: for the save point
 to try first and the final file. Then ComfyUI is told to unload its models, so the next training gets the whole GPU,

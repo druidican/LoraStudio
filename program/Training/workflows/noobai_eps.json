@@ -50,10 +50,10 @@
    "widgets_values": [
     "NoobAI-XL-v1.1.safetensors"
    ],
-   "title": "Model (NoobAI-XL EPS)",
    "widgets_values_named": {
     "ckpt_name": "NoobAI-XL-v1.1.safetensors"
-   }
+   },
+   "title": "Model (NoobAI-XL EPS)"
   },
   {
    "id": 3,
@@ -92,10 +92,10 @@
    "widgets_values": [
     "masterpiece, best quality, newest, absurdres, highres, safe,\n\n1girl, solo, looking at viewer, upper body, simple background"
    ],
-   "title": "Positive (NoobAI's prefix first)",
    "widgets_values_named": {
     "text": "masterpiece, best quality, newest, absurdres, highres, safe,\n\n1girl, solo, looking at viewer, upper body, simple background"
-   }
+   },
+   "title": "Positive (the model's own words first)"
   },
   {
    "id": 4,
@@ -134,10 +134,10 @@
    "widgets_values": [
     "worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands"
    ],
-   "title": "Negative (NoobAI's advice)",
    "widgets_values_named": {
     "text": "worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands"
-   }
+   },
+   "title": "Negative"
   },
   {
    "id": 5,
@@ -314,10 +314,10 @@
     "Node name for S&R": "SaveImage"
    },
    "widgets_values": [
-    "noobai/test"
+    "lorastudio/test"
    ],
    "widgets_values_named": {
-    "filename_prefix": "noobai/test"
+    "filename_prefix": "lorastudio/test"
    }
   }
  ],

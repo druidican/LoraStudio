@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.151126b"  # LoRA Studio version, see version.py
+__version__ = "1.171126d"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -865,8 +865,8 @@ def compare_html(st: dict) -> str:
     elif st["log"] in CT.PENDING:
         head = '<div class="ls-note">Waiting for ComfyUI: the test pictures are made as soon as it answers.</div>'
     if not fam:
-        return head + '<p class="ls-empty">Test pictures are made for SDXL, Illustrious, Pony and Anima LoRAs.</p>'
-    if not cfg["families"].get(fam):
+        return head + '<p class="ls-empty">Test pictures are made for SDXL, Illustrious, Pony, NoobAI-XL and Anima LoRAs.</p>'
+    if not CT.workflow(cfg, fam)[0]:
         return head + (f'<p class="ls-empty">No ComfyUI workflow for {_esc(CT.FAMILIES[fam])} yet: add it in '
                        '<a href="#" onclick="lsSetNav(\'comfy\'); return false;">Settings › Test pictures</a>.</p>')
     grid = CT.results(info)

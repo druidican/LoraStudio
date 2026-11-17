@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.171126c"
-VERSION = "1.171126c"
+__version__ = "1.171126d"
+VERSION = "1.171126d"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.171126c",
+    "version.py": "1.171126d",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.171126",
@@ -27,10 +27,10 @@ RELEASE: dict = {
     "program/Training/sd_settings.py": "1.171126",
     "program/Data/datasets_ui.py": "1.151126h",
     "program/Data/dsflow.py": "1.161126",
-    "program/Training/training_ui.py": "1.151126b",
+    "program/Training/training_ui.py": "1.171126d",
     "program/Settings/settings_ui.py": "1.151126h",
     "program/Gallery/lora_library.py": "1.171126",
-    "program/Training/comfytest.py": "1.171126b",
+    "program/Training/comfytest.py": "1.171126d",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
@@ -66,13 +66,13 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.141126b",
     "program/UI/lora_page.py": "1.141126b",
     "program/UI/pg_settings.py": "1.131126c",
-    "program/UI/set_panels.py": "1.171126b",
+    "program/UI/set_panels.py": "1.171126d",
     "program/Gallery/lorapage.py": "1.151126b",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
     "program/Gallery/delete.py": "1.141126b",
     "program/UI/delete_dialog.py": "1.141126b",
-    "program/Data/gapfill.py": "1.151126j",
+    "program/Data/gapfill.py": "1.171126d",
     "program/UI/ds_gapfill.py": "1.151126g",
     "program/Other/statusbar.py": "1.151126c",
     "program/Other/home.py": "1.141126b",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.171126d", "Test pictures: SDXL, Illustrious and Pony have their own ComfyUI workflows too (until set, they use your SDXL one); Use LoRA Studio's workflow sets each up with its model card's advice (quality words, negative prompt, sampler, CFG, steps, CLIP skip)."),
     ("1.171126c", "Updates also install the NoobAI workflows (the Training/workflows folder is copied as a whole)."),
     ("1.171126b", "NoobAI-XL test pictures: own workflows for EPS and V-pred with NoobAI's prompt words, negative prompt, sampler, CFG and size (Use LoRA Studio's NoobAI workflow); V-pred test pictures always use v-prediction; NoobAI's negative prompt and 832x1216 in sample prompts."),
     ("1.171126", "NoobAI-XL is its own LoRA type: EPS (like Illustrious) and V-pred (--v_parameterization --zero_terminal_snr, no noise offset, Euler samples), with NoobAI's quality words; its own ComfyUI workflow slot for V-pred."),

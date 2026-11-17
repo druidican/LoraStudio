@@ -15,7 +15,7 @@ trained on its own pictures learns its own mistakes harder. The prompts only nam
 outfit and place, never anything about the person's body or looks.
 """
 from __future__ import annotations
-__version__ = "1.151126j"  # LoRA Studio version, see version.py
+__version__ = "1.171126d"  # LoRA Studio version, see version.py
 
 import json
 import random
@@ -125,7 +125,7 @@ def lora_for(ds) -> dict | None:
                 tkey = info["tkey"]
                 break
         fam = CT.family(tkey)
-        if not fam or not cfg["families"].get(fam):
+        if not fam or not CT.workflow(cfg, fam)[0]:
             continue
         cand = {"file": str(f), "name": lo.stem, "tkey": tkey, "fam": fam, "label": f"{lo.stem} ({lo.vlabel})",
                 "t": Path(f).stat().st_mtime}
@@ -319,8 +319,10 @@ def make(ds, jobs: list[tuple[str, str, int]], say=None) -> str:
         U._free_ollama()                                 # Ollama (the search) and the image model share the GPU
     except Exception:                                    # noqa: BLE001
         pass
-    wf = cfg["families"][lo["fam"]]
-    fixed = (cfg["fixed"].get(lo["fam"]) or "").strip().rstrip(",")
+    wf, ffam = CT.workflow(cfg, lo["fam"])
+    if lo["fam"] == "vpred" and not wf.get("vpred"):
+        wf = {**wf, "vpred": True, "zsnr": True}
+    fixed = (cfg["fixed"].get(ffam) or "").strip().rstrip(",")
     st = state(ds)
     out = _dir(ds)
     out.mkdir(parents=True, exist_ok=True)
