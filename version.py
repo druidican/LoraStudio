@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.171126b"
-VERSION = "1.171126b"
+__version__ = "1.171126c"
+VERSION = "1.171126c"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.171126b",
+    "version.py": "1.171126c",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.171126",
@@ -35,8 +35,6 @@ RELEASE: dict = {
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
     "program/Training/comfyinpaint.py": "1.151126f",
-    "program/Training/workflows/noobai_eps.json": "1.171126b",
-    "program/Training/workflows/noobai_vpred.json": "1.171126b",
     "program/Data/detailscan.py": "1.151126j",
     "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.151126h",
@@ -87,7 +85,7 @@ RELEASE: dict = {
     "program/Settings/backup.py": "1.131126c",
     "selftest.py": "1.171126",
     "program/Settings/machinecheck.py": "1.131126c",
-    "program/Settings/selfupdate.py": "1.151126h",
+    "program/Settings/selfupdate.py": "1.171126c",
     "program/Training/failcodes.py": "1.131126b",
     "program/Other/report.py": "1.131126c",
     "program/Other/manual.py": "1.131126c",
@@ -103,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.171126c", "Updates also install the NoobAI workflows (the Training/workflows folder is copied as a whole)."),
     ("1.171126b", "NoobAI-XL test pictures: own workflows for EPS and V-pred with NoobAI's prompt words, negative prompt, sampler, CFG and size (Use LoRA Studio's NoobAI workflow); V-pred test pictures always use v-prediction; NoobAI's negative prompt and 832x1216 in sample prompts."),
     ("1.171126", "NoobAI-XL is its own LoRA type: EPS (like Illustrious) and V-pred (--v_parameterization --zero_terminal_snr, no noise offset, Euler samples), with NoobAI's quality words; its own ComfyUI workflow slot for V-pred."),
     ("1.161126", "Step 1 is back in a dataset's step list: it shows the folders and makes model/, log/ and _originals/ when they are missing."),
@@ -167,8 +166,6 @@ PARTS = [
     ("program/Training/speedjobs.py", "speed tests per LoRA type (Settings › Speed test)"),
     ("program/Training/comfyupscale.py", "upscale and sharpen pictures with your ComfyUI workflow"),
     ("program/Training/comfyinpaint.py", "remove watermarks with your ComfyUI inpaint workflow"),
-    ("program/Training/workflows/noobai_eps.json", "NoobAI-XL EPS test-picture workflow"),
-    ("program/Training/workflows/noobai_vpred.json", "NoobAI-XL V-pred test-picture workflow"),
     ("program/Data/detailscan.py", "the detailed scan: gaps and per-picture suggestions"),
     ("program/Data/captioner.py", "captions with Ollama"),
     ("program/Data/wdtagger.py", "tags with the WD tagger (wd-eva02-large-tagger-v3) for the tag-style caption sets"),

@@ -11,7 +11,7 @@
     5. Restart LoRA Studio (button) to use the new version. Roll back puts the files of before the last update back.
 """
 from __future__ import annotations
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.171126c"  # LoRA Studio version, see version.py
 
 import ast
 import json
@@ -30,7 +30,7 @@ HERE = _LP.ROOT                      # the files of a zip are placed relative to
 BACKUPS = _LP.USER / "update_backups"
 PREFIX = "lorastudio_"
 EXTRA_FILES = ("requirements.txt", "README.md", "INSTALL.md", "REFERENCE.md", "LICENSE", "NOTICE")       # copied too, not in the parts list
-DIRS = ("program/manual", "program/logo")             # folders that are copied as a whole (the manual, the logo)
+DIRS = ("program/manual", "program/logo", "program/Training/workflows")   # copied as a whole (manual, logo, workflows)
 STATE = {"busy": False}
 
 
