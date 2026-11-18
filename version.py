@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.181126b"
-VERSION = "1.181126b"
+__version__ = "1.181126c"
+VERSION = "1.181126c"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.181126b",
+    "version.py": "1.181126c",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.171126",
@@ -29,7 +29,7 @@ RELEASE: dict = {
     "program/Data/dsflow.py": "1.161126",
     "program/Training/training_ui.py": "1.171126d",
     "program/Settings/settings_ui.py": "1.151126h",
-    "program/Gallery/lora_library.py": "1.181126b",
+    "program/Gallery/lora_library.py": "1.181126c",
     "program/Training/comfytest.py": "1.181126",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
@@ -63,7 +63,7 @@ RELEASE: dict = {
     "program/UI/ds_results.py": "1.151126b",
     "program/UI/ds_batch.py": "1.151126h",
     "program/UI/pg_queue.py": "1.151126c",
-    "program/UI/pg_collection.py": "1.141126b",
+    "program/UI/pg_collection.py": "1.181126c",
     "program/UI/lora_page.py": "1.181126b",
     "program/UI/pg_settings.py": "1.131126c",
     "program/UI/set_panels.py": "1.171126f",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.181126c", "The Collection takes in LoRA Manager changes by itself when it opens (at most once a minute): a preview you set in LoRA Manager becomes the LoRA's main picture on its tile and page."),
     ("1.181126b", "A LoRA's page takes in LoRA Manager changes when it opens (a new preview, also an older picture you picked, notes, example pictures); changed pictures get new links, so the browser no longer shows the old one."),
     ("1.181126", "NoobAI test pictures: LoRA Studio's NoobAI workflow is used when NoobAI has none of its own (no longer the SDXL one), and the checkpoint is found under the name ComfyUI knows it by (with its subfolder)."),
     ("1.171126f", "Settings › Model files: picking a file works again (the picker held the file's label together with its path, so Save and Apply failed)."),

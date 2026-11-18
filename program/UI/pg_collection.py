@@ -7,7 +7,7 @@ that send an event back here (emitEvent): a tile opens its dataset page, a type 
 Select mode is kept in the browser (picked cards get the class ll-picked) and read when a button needs it.
 """
 from __future__ import annotations
-__version__ = "1.141126b"  # LoRA Studio version, see version.py
+__version__ = "1.181126c"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -180,6 +180,15 @@ class Collection:
             self.lora.show(key)
 
     def on_show(self, **kw):
+        async def lm_check():                            # LoRA Manager changes (a preview you set there) come in
+            try:
+                n = await run.io_bound(LL.quick_sync, LIB)
+            except Exception:                            # noqa: BLE001
+                return
+            if n:
+                self.redraw()
+                ui.notify(f"{n} LoRA card(s) updated from LoRA Manager.")
+        ui.timer(0.2, lm_check, once=True)
         if kw.get("look"):
             self.tabs.value = "browse"
             self.look.value = kw["look"]

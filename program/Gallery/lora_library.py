@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.181126b"  # LoRA Studio version, see version.py
+__version__ = "1.181126c"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -2567,6 +2567,48 @@ def sync_lora(lib: Library, lora) -> bool:
                     _LISTINGS.clear()
                     return changed
     return False
+
+
+_QUICK = {"t": 0.0}
+
+
+def quick_sync(lib: Library, every: float = 60.0) -> int:
+    """What LoRA Manager changed since the last look (a preview you set, notes, example pictures), for all your
+    LoRAs, when the Collection opens: the LoRA folder is listed once and copies are matched by name and size only (the
+    full Personal sync also finds renamed copies by their hash). At most once a minute. Returns how many changed."""
+    if time.time() - _QUICK["t"] < every:
+        return 0
+    _QUICK["t"] = time.time()
+    lib.ensure_loaded()
+    want = {}
+    for l in lib.loras.values():
+        if l.dataset is not None and l.dataset_path is not None:
+            want.setdefault(l.dataset_path.name.lower(), []).append(l)
+    if not want:
+        return 0
+    ds_roots = {str(ds.root.resolve()) for ds in lib.datasets.values()}
+    stats = {"new": 0, "updated": 0, "same": 0, "errors": []}
+    changed = 0
+    _LISTINGS.clear()
+    for root in lib.settings["lora_dirs"]:
+        for d, dns, fns in walk(root):
+            if str(d.resolve()) in ds_roots:
+                dns[:] = []
+                continue
+            for fn in fns:
+                for lora in want.get(fn.lower(), []):
+                    f = d / fn
+                    try:
+                        if f.stat().st_size != lora.dataset_path.stat().st_size:
+                            continue
+                    except OSError:
+                        continue
+                    if _sync_pair(lib, f, lora, stats):
+                        changed += 1
+    _LISTINGS.clear()
+    if changed:
+        lib.scan()
+    return changed
 
 
 def personal_sync(lib: Library, progress=None) -> str:
