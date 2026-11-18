@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.171126"  # LoRA Studio version, see version.py
+__version__ = "1.181126b"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -2278,13 +2278,18 @@ def write_sidecar(path: Path, data: dict):
 # --------------------------------------------------------------------------- #
 
 
-def _sync_one(src: Path, dst: Path, stats: dict) -> None:
-    """Copy when missing, or when the LoRA folder's file is newer (an edit made in the dataset copy is kept)."""
+def _sync_one(src: Path, dst: Path, stats: dict, same_if_equal: bool = False) -> None:
+    """Copy when missing, or when the LoRA folder's file is newer (an edit made in the dataset copy is kept).
+    same_if_equal (the preview): copied whenever it is another picture, also an older one you picked in LoRA Manager."""
     try:
         s = src.stat()
         if dst.exists():
             d = dst.stat()
-            if s.st_mtime <= d.st_mtime + 1:
+            if same_if_equal:
+                if s.st_size == d.st_size and abs(s.st_mtime - d.st_mtime) <= 1:
+                    stats["same"] += 1
+                    return
+            elif s.st_mtime <= d.st_mtime + 1:
                 stats["same"] += 1
                 return
             if dst.suffix == ".json":
@@ -2483,6 +2488,87 @@ def orphans_list(lib: Library):
     return md, choices, [c[1] for c in choices]
 
 
+def _sync_pair(lib: Library, f: Path, lora, stats: dict) -> bool:
+    """Copy one LoRA's LoRA Manager files (f: its copy in the LoRA folder) into its dataset's LoraManager/ folder.
+    True when something was copied or changed."""
+    src_dir, old, new = f.parent, f.stem, lora.stem
+    dst_dir = lora.dataset.archive_dir
+    before = stats["new"] + stats["updated"]
+    sc_path = f.with_name(old + ".metadata.json")
+    sidecar = _load_json(sc_path, None) if sc_path.exists() else None
+    ls_path = dst_dir / (new + ".metadata.json")
+    if sc_path.exists():
+        _sync_meta(sc_path, ls_path, stats)
+        try:                        # the training card into LoRA Studio's copy, then what it adds to LoRA Manager
+            import trainingcard as TC
+            sc_new = _load_json(ls_path, None)
+            lora.sidecar, lora.sidecar_path = (sc_new if isinstance(sc_new, dict) else None), ls_path
+            if TC.scan_one(lib, lora) == "scanned":
+                _sync_meta(sc_path, ls_path, {"new": 0, "updated": 0, "same": 0, "errors": stats["errors"]})
+        except Exception as e:      # noqa: BLE001
+            stats["errors"].append(f"{new} training card: {e}")
+    preview = find_preview(src_dir, old, sidecar if isinstance(sidecar, dict) else None)
+    if preview:                     # the preview LoRA Manager's card shows: the LoRA page shows the same one
+        target = dst_dir / f"{new}.preview{preview.suffix.lower()}"
+        for ext in PREVIEW_EXT:
+            other = dst_dir / f"{new}.preview{ext}"
+            if other != target and other.exists() and preview.stat().st_mtime > other.stat().st_mtime:
+                try:
+                    other.unlink()
+                except OSError:
+                    pass
+        _sync_one(preview, target, stats, same_if_equal=True)
+    sha = (((sidecar or {}) if isinstance(sidecar, dict) else {}).get("sha256") or "").lower()
+    exs = [str(x) for x in find_examples(src_dir, old, sha, preview, list(lib.settings["lora_dirs"]) + lm_example_roots(lib))]
+    if exs or ls_path.exists():                     # LoRA Manager's example pictures: linked, not copied
+        cur = _load_json(ls_path, None) if ls_path.exists() else None
+        cur = cur if isinstance(cur, dict) else {"file_name": new}
+        lsd = dict(cur.get("lorastudio") or {})
+        if (lsd.get("examples") or []) != exs:
+            lsd["examples"] = exs
+            cur["lorastudio"] = lsd
+            try:
+                write_sidecar(ls_path, cur)
+                stats["linked"] = stats.get("linked", 0) + len(exs)
+                stats["updated"] += 1
+            except OSError as e:
+                stats["errors"].append(f"{ls_path.name}: {e}")
+    return stats["new"] + stats["updated"] > before
+
+
+def sync_lora(lib: Library, lora) -> bool:
+    """The Personal sync for one LoRA, when its page opens: its copy in the LoRA folder is found by name and size
+    (no hashing), and the LoRA Manager files are copied when they are newer. True when something changed."""
+    p = lora.dataset_path
+    if lora.dataset is None or p is None:
+        return False
+    try:
+        size = p.stat().st_size
+    except OSError:
+        return False
+    want = p.name.lower()
+    ds_roots = {str(ds.root.resolve()) for ds in lib.datasets.values()}
+    for root in lib.settings["lora_dirs"]:
+        for d, dns, fns in walk(root):
+            if str(d.resolve()) in ds_roots:
+                dns[:] = []
+                continue
+            for fn in fns:
+                if fn.lower() == want:
+                    f = d / fn
+                    try:
+                        if f.stat().st_size != size:
+                            continue
+                    except OSError:
+                        continue
+                    _LISTINGS.clear()
+                    stats = {"new": 0, "updated": 0, "same": 0, "errors": []}
+                    changed = _sync_pair(lib, f, lora, stats)
+                    _LISTINGS.clear()
+                    return changed
+    return False
+
+
 def personal_sync(lib: Library, progress=None) -> str:
     """Read the LoRA folder(s) once and copy the LoRA Manager files of your own LoRAs (.metadata.json, preview
     and example images) into each dataset's LoraManager/ folder, named after the dataset's model file.
@@ -2530,50 +2616,8 @@ def personal_sync(lib: Library, progress=None) -> str:
         if lora is None:
             continue
         matched += 1
-        src_dir, old, new = f.parent, f.stem, lora.stem
-        dst_dir = lora.dataset.archive_dir
-        before = stats["new"] + stats["updated"]
-        sc_path = f.with_name(old + ".metadata.json")
-        sidecar = _load_json(sc_path, None) if sc_path.exists() else None
-        ls_path = dst_dir / (new + ".metadata.json")
-        if sc_path.exists():
-            _sync_meta(sc_path, ls_path, stats)
-            try:                        # the training card into LoRA Studio's copy, then what it adds to LoRA Manager
-                import trainingcard as TC
-                sc_new = _load_json(ls_path, None)
-                lora.sidecar, lora.sidecar_path = (sc_new if isinstance(sc_new, dict) else None), ls_path
-                if TC.scan_one(lib, lora) == "scanned":
-                    _sync_meta(sc_path, ls_path, {"new": 0, "updated": 0, "same": 0, "errors": stats["errors"]})
-            except Exception as e:      # noqa: BLE001
-                stats["errors"].append(f"{new} training card: {e}")
-        preview = find_preview(src_dir, old, sidecar if isinstance(sidecar, dict) else None)
-        if preview:                     # the preview LoRA Manager's card shows: the LoRA page shows the same one
-            target = dst_dir / f"{new}.preview{preview.suffix.lower()}"
-            for ext in PREVIEW_EXT:
-                other = dst_dir / f"{new}.preview{ext}"
-                if other != target and other.exists() and preview.stat().st_mtime > other.stat().st_mtime:
-                    try:
-                        other.unlink()
-                    except OSError:
-                        pass
-            _sync_one(preview, target, stats)
-        sha = (((sidecar or {}) if isinstance(sidecar, dict) else {}).get("sha256") or "").lower()
-        exs = [str(x) for x in find_examples(src_dir, old, sha, preview, list(lib.settings["lora_dirs"]) + lm_example_roots(lib))]
-        if exs or ls_path.exists():                     # LoRA Manager's example pictures: linked, not copied
-            cur = _load_json(ls_path, None) if ls_path.exists() else None
-            cur = cur if isinstance(cur, dict) else {"file_name": new}
-            lsd = dict(cur.get("lorastudio") or {})
-            if (lsd.get("examples") or []) != exs:
-                lsd["examples"] = exs
-                cur["lorastudio"] = lsd
-                try:
-                    write_sidecar(ls_path, cur)
-                    stats["linked"] = stats.get("linked", 0) + len(exs)
-                    stats["updated"] += 1
-                except OSError as e:
-                    stats["errors"].append(f"{ls_path.name}: {e}")
-        if stats["new"] + stats["updated"] > before:
-            done_loras.append(f"{lora.dataset.name} · {new}")
+        if _sync_pair(lib, f, lora, stats):
+            done_loras.append(f"{lora.dataset.name} · {lora.stem}")
     _LISTINGS.clear()
     lib.save_hash_cache()
     lib.scan()          # pick up the copied files

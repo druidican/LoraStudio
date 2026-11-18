@@ -2,7 +2,7 @@
 """Collection › LoRA page: one LoRA (all its versions) in four parts: Overview, Pictures (made with it), Training and
 Edit. The data and the actions are in Gallery/lorapage.py; this file only draws them."""
 from __future__ import annotations
-__version__ = "1.141126b"  # LoRA Studio version, see version.py
+__version__ = "1.181126b"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -44,6 +44,24 @@ class LoraPage:
         self.fill_training()
         self.fill_edit()
         self.fill_pictures()
+        async def later(k=key):
+            await self.lm_refresh(k)
+        ui.timer(0.1, later, once=True)
+
+    async def lm_refresh(self, key: str):
+        """LoRA Manager changes (a new preview, notes, example pictures) are copied in when the page opens."""
+        lora = LIB.loras.get(key)
+        if lora is None:
+            return
+        try:
+            changed = await run.io_bound(LL.sync_lora, LIB, lora)
+        except Exception:                                # noqa: BLE001
+            return
+        if changed:
+            await run.io_bound(LIB.scan)
+            if self.key == key:
+                self.show(key)
+                ui.notify("Updated from LoRA Manager (preview and card).")
 
     def fill_overview(self):
         d = self.d

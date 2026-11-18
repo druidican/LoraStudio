@@ -7,7 +7,7 @@ the Collection's cached thumbnail (lora_library.thumb_file, made when the browse
 only (allowed_roots).
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.181126b"  # LoRA Studio version, see version.py
 
 import hashlib
 from pathlib import Path
@@ -31,7 +31,11 @@ def pic_url(p: Path | str | None, width: int = 360) -> str:
     """A link to a thumbnail of the picture (made once, cached in userdata/.thumbs)."""
     if not p:
         return ""
-    return f"/pic/{_token(Path(p))}?w={int(width)}"
+    try:
+        v = Path(p).stat().st_mtime_ns                   # a changed picture gets a new link (the browser keeps old ones)
+    except OSError:
+        v = 0
+    return f"/pic/{_token(Path(p))}?w={int(width)}&v={v}"
 
 
 @app.get("/pic/{tok}")
