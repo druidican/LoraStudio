@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.171126d"  # LoRA Studio version, see version.py
+__version__ = "1.181126"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -62,7 +62,9 @@ FAMILIES = {"sdxl": "SDXL", "illustrious": "Illustrious", "pony": "Pony", "nooba
 FAMILY_OF = {"illustrious": "illustrious", "sdxl": "sdxl", "pony": "pony", "noobai_vpred": "vpred", "noobai": "noobai",
              "anima": "anima"}
 # a family without a workflow of its own uses this one's (before 1.171126d SDXL, Illustrious, Pony and NoobAI shared one)
-FALLBACK = {"illustrious": "sdxl", "pony": "sdxl", "noobai": "sdxl"}
+FALLBACK = {"illustrious": "sdxl", "pony": "sdxl"}
+# NoobAI has no fallback: its model and its advice differ too much; without a workflow of its own LoRA Studio's is set
+# up the first time a NoobAI LoRA needs test pictures (workflow())
 DEFAULTS = {"url": "http://127.0.0.1:8188", "lora_dir": "", "prompts": 8, "auto": True, "around": 2,
             "fixed": {**POSITIVE, "anima": ""}, "families": {}}
 JOBS: dict = {}            # log name -> {"state", "text", "done", "total"}
@@ -103,6 +105,12 @@ def workflow(cfg: dict, fam: str | None) -> tuple[dict | None, str]:
     fams = cfg.get("families") or {}
     if fam and fams.get(fam):
         return fams[fam], fam
+    if fam in ("noobai", "vpred"):
+        try:
+            wf, _ = use_builtin(fam)
+            return wf, fam
+        except Exception:                                # noqa: BLE001
+            return None, fam
     fb = FALLBACK.get(fam or "")
     if fb and fams.get(fb):
         return fams[fb], fb
@@ -270,10 +278,10 @@ def use_builtin(fam: str) -> tuple[dict, str]:
         base = next((v for k in keys if (v := (SS.settings_models(k) or {}).get("pretrained_model_name_or_path"))), "")
     except Exception:                                    # noqa: BLE001
         base = ""
-    if base:
-        for n in d["nodes"]:
-            if n.get("type") == "CheckpointLoaderSimple":
-                n["widgets_values"][0] = n["widgets_values_named"]["ckpt_name"] = Path(base).name
+    for n in d["nodes"]:
+        if n.get("type") == "CheckpointLoaderSimple":
+            want = Path(base).name if base else n["widgets_values"][0]
+            n["widgets_values"][0] = n["widgets_values_named"]["ckpt_name"] = comfy_name(want)
     tmp = WF_DIR / f"_{BUILTIN[fam]}"
     WF_DIR.mkdir(exist_ok=True)
     tmp.write_text(json.dumps(d, indent=1), encoding="utf-8")
@@ -312,6 +320,24 @@ def lora_names(url) -> list[str]:
         return list(d["LoraLoader"]["input"]["required"]["lora_name"][0])
     except Exception:                                    # noqa: BLE001
         return []
+
+
+def ckpt_names(url) -> list[str]:
+    """The checkpoint names ComfyUI knows (with their subfolders, e.g. NoobAI/NoobAI-XL-v1.1.safetensors)."""
+    try:
+        d = json.loads(_req(url, "/object_info/CheckpointLoaderSimple", timeout=20))
+        return list(d["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0])
+    except Exception:                                    # noqa: BLE001
+        return []
+
+
+def comfy_name(want: str, url=None) -> str:
+    """ComfyUI's own name for a checkpoint file: the same file name in whatever subfolder ComfyUI has it; else as is."""
+    names = ckpt_names(url or settings()["url"])
+    if not want or want in names:
+        return want
+    base = Path(want).name.lower()
+    return next((n for n in names if Path(n.replace("\\", "/")).name.lower() == base), want)
 
 
 def graph(wf: dict, lora_name: str, positive: str, seed: int, prefix: str) -> dict:

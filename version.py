@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.171126f"
-VERSION = "1.171126f"
+__version__ = "1.181126"
+VERSION = "1.181126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.171126f",
+    "version.py": "1.181126",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.171126",
@@ -30,7 +30,7 @@ RELEASE: dict = {
     "program/Training/training_ui.py": "1.171126d",
     "program/Settings/settings_ui.py": "1.151126h",
     "program/Gallery/lora_library.py": "1.171126",
-    "program/Training/comfytest.py": "1.171126d",
+    "program/Training/comfytest.py": "1.181126",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.181126", "NoobAI test pictures: LoRA Studio's NoobAI workflow is used when NoobAI has none of its own (no longer the SDXL one), and the checkpoint is found under the name ComfyUI knows it by (with its subfolder)."),
     ("1.171126f", "Settings › Model files: picking a file works again (the picker held the file's label together with its path, so Save and Apply failed)."),
     ("1.171126e", "Settings › Model files: reading the model folders and file headers no longer freezes the page, so the LoRA type list answers at once."),
     ("1.171126d", "Test pictures: SDXL, Illustrious and Pony have their own ComfyUI workflows too (until set, they use your SDXL one); Use LoRA Studio's workflow sets each up with its model card's advice (quality words, negative prompt, sampler, CFG, steps, CLIP skip)."),
