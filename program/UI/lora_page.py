@@ -2,7 +2,7 @@
 """Collection › LoRA page: one LoRA (all its versions) in four parts: Overview, Pictures (made with it), Training and
 Edit. The data and the actions are in Gallery/lorapage.py; this file only draws them."""
 from __future__ import annotations
-__version__ = "1.181126b"  # LoRA Studio version, see version.py
+__version__ = "1.191126f"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -80,6 +80,8 @@ class LoraPage:
         self.done.set_enabled(d["done"]["can"])
         self.done_msg.text = ""
         self.head.content = d["head"]
+        self.look.text = ("How to use it: " + d["look"]) if d.get("look") else ""
+        self.look.set_visibility(bool(d.get("look")))
         self.accept_msg.text = ""
         dest, n = LP.copy_info(self.key)
         self.cp_dest.value, self.cp_note.text, self.cp_msg.text = dest, n, ""
@@ -215,6 +217,7 @@ class LoraPage:
                 self.done = ui.checkbox("Completed", on_change=lambda e: self.toggle_done(e.value))
                 self.done_msg = note("")
                 self.head = ui.html("", sanitize=False)
+                self.look = ui.label("").classes("ls-note")    # how to use it (the look of the result)
                 with ui.row().classes("items-center gap-3"):
                     ui.button("Accept the warnings",
                               on_click=lambda: (setattr(self.accept_msg, "text", LP.accept_warnings(self.key)),

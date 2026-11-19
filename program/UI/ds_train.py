@@ -3,7 +3,7 @@
 saving and the queue. The script logic is sd_script.py (cs_* return what changed as a dict); the plan and the
 settings table are datasets_ui (calc, apply_settings, SETTINGS)."""
 from __future__ import annotations
-__version__ = "1.191126e"  # LoRA Studio version, see version.py
+__version__ = "1.191126f"  # LoRA Studio version, see version.py
 
 from pathlib import Path
 
@@ -175,7 +175,8 @@ class Train:
         with self.w_look:
             ds_steps.lean_row(self.ds, self.tkey, "Look of the result", after=self.look_changed)
             with ui.row().classes("items-center gap-2") as self.w_look_fix:
-                ui.label("This launch script trains with other style words than chosen.").classes("ls-note")
+                ui.label("This launch script does not follow the chosen look yet (style words, text encoders or "
+                         "the note for the LoRA page).").classes("ls-note")
                 ui.button("Use the chosen look in this script", on_click=self.look_use).props("outline dense no-caps")
             self.w_look_fix.set_visibility(L.differs(self.ds, self.tkey, self.text))
 
@@ -191,7 +192,7 @@ class Train:
         if self.text.strip():
             new = L.rewrite(self.ds, self.tkey, self.text)
             if new != self.text:
-                self.apply({"text": new, "status": "The style words are changed in the script text: **Save** keeps them. "
+                self.apply({"text": new, "status": "The script text now follows the chosen look: **Save** keeps it. "
                                                    "Sample prompts already saved stay as they are."})
         self.w_look_fix.set_visibility(L.differs(self.ds, self.tkey, self.text))
 

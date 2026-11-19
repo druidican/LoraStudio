@@ -186,9 +186,16 @@ model (Illustrious, NoobAI, Pony, Anima) that look fights the model: strange hal
   negative prompt, Photo in the prompt (Pony: `source_anime` or `source_cartoon` in the prompt). Do the same when
   you make pictures with the LoRA.
 
+**Text encoders**: when the pictures are of another kind than the result should look like (photos, and the model's
+own style wanted), a new launch script trains the image model only (`--network_train_unet_only`, even for a
+character). Training the text encoders would tie the look of the photos to the trigger word itself; step 9's
+recommendations say so. Choose *Photo* and they are trained as before.
+
 9 Train shows the same choice for its type. A launch script saved before (or with other words) gets a note there:
-**Use the chosen look in this script** puts the right words in (Save keeps them; its sample prompts stay as they
-are).
+**Use the chosen look in this script** puts the right words in, freezes the text encoders where needed and adds the
+note for the LoRA page (Save keeps it; its sample prompts stay as they are). The **LoRA page** in the Collection then
+says under *How to use it* what the LoRA was made from and which words to put in the prompt or the negative prompt
+(also on its Training card).
 
 **Write the captions** writes a caption for every picture; *Only pictures without a caption* fills the gaps; *Stop*
 stops. **Tags** (Illustrious, Pony, SDXL, Anima) come from the **WD tagger** (wd-eva02-large-tagger-v3, run by

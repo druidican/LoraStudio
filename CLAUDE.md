@@ -113,6 +113,9 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   (`--caption_suffix`, musubi `CAPTION_SUF`; Pony photos lose `source_anime`); per LoRA type a lean (step 7 card, step 9
   row, meta `lean`) puts those words in the negative (own style) or the prompt (Photo) of test and sample pictures.
   Words from the model cards (Danbooru tags; Pony V6 has no photo source; Anima does not do realism).
+  1.191126f: kind ≠ lean on Illustrious/NoobAI/Pony/Anima → `--network_train_unet_only` (`lean.freeze_te`); scripts
+  carry `# lorastudio-look: {json}` (`lean.mark`), read by the training card (`look`, CARD_VERSION 3) → LoRA page
+  *How to use it*. Step 9's *Use the chosen look* (`lean.rewrite`) does words, text encoders and the comment.
 - **Quality words:** Pony trains with `score_9, score_8_up, score_7_up, source_anime` as `--caption_prefix`
   (keep_tokens raised to cover them), Illustrious with `masterpiece, best quality` as `--caption_suffix`; caption
   files stay untouched; new sample prompts get them too.

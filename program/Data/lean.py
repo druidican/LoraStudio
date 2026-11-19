@@ -13,7 +13,7 @@ The words come from the models' own pages (Danbooru tags for Illustrious, NoobAI
 which have none for photos).
 """
 from __future__ import annotations
-__version__ = "1.191126e"  # LoRA Studio version, see version.py
+__version__ = "1.191126f"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -294,6 +294,70 @@ def _n(words_: str) -> int:
     return len([x for x in words_.split(",") if x.strip()])
 
 
+def freeze_te(ds, tkey: str, w: dict | None = None) -> bool:
+    """Train the image model only: the pictures are of another kind than the result should look like (photos, and
+    the model's own style wanted). Training the text encoders ties the pictures' look to the trigger word itself."""
+    w = w or words(ds, tkey)
+    return group(tkey) in ("booru", "pony", "anima") and bool(w["medium"]) and w["medium"] != LEAN_MEDIUM[w["lean"]]
+
+
+TE_NOTE = ("Text encoders not trained (--network_train_unet_only): the pictures are {kind} and the result should "
+           "look like {look}, so the trigger word must not learn the look of the pictures (The look of the result, "
+           "Datasets › 7).")
+MARK = "# lorastudio-look: "
+_MARK = re.compile(r"^# lorastudio-look: (.*)$", re.M)
+
+
+def mark_line(ds, tkey: str, w: dict | None = None) -> str:
+    """The comment a launch script carries, so the LoRA page can say later how to use the LoRA."""
+    w = w or words(ds, tkey)
+    d = {"medium": w["medium"], "lean": w["lean"], "look": choices(tkey).get(w["lean"], w["lean"]),
+         "pos": w["pos"], "neg": w["neg"]}
+    return MARK + json.dumps(d, ensure_ascii=False)
+
+
+def mark(ds, tkey: str, text: str, w: dict | None = None) -> str:
+    """The launch script text with its look comment (put after the first line, or replaced)."""
+    line = mark_line(ds, tkey, w)
+    if _MARK.search(text or ""):
+        return _MARK.sub(lambda m: line, text, count=1)
+    head, sep, rest = (text or "").partition("\n")
+    return f"{head}\n{line}\n{rest}" if sep else f"{line}\n{text}"
+
+
+def look_of(text: str) -> dict:
+    """The look comment of a launch script ({} when none)."""
+    m = _MARK.search(text or "")
+    try:
+        return json.loads(m.group(1)) if m else {}
+    except ValueError:
+        return {}
+
+
+def how_to_use(look: dict) -> str:
+    """One sentence for the LoRA page from a look comment."""
+    if not look or not look.get("medium"):
+        return ""
+    kind = MEDIA.get(look["medium"], look["medium"])
+    out = f"Made from {kind}, meant to look like: {look.get('look') or look.get('lean')}."
+    if look.get("pos"):
+        out += f" Put `{look['pos']}` in the prompt."
+    if look.get("neg"):
+        out += f" Put `{look['neg']}` in the negative prompt."
+    return out
+
+
+def _te_flags(flags: list) -> tuple[list, bool]:
+    """Flags with the text encoders frozen; True when something changed."""
+    if not any(re.search(r"--text_encoder_lr\b", f) for f in flags):
+        return flags, False
+    out = [re.sub(r"\s*--text_encoder_lr[ =]\S+", "", f).strip() for f in flags]
+    out = [f for f in out if f]
+    if not any(re.search(r"--network_train_unet_only\b", f) for f in out):
+        out.append("--network_train_unet_only")
+    return out, True
+
+
 def apply_cfg(ds, tkey: str, cfg: dict) -> dict:
     """A new launch script's settings with the words (sd_script.make_plan): --caption_prefix / --caption_suffix
     (--keep_tokens follows the words in front), the musubi CAPTION_SUF, and the sample prompts' words."""
@@ -315,7 +379,14 @@ def apply_cfg(ds, tkey: str, cfg: dict) -> dict:
             flags.append(f'--caption_prefix "{pre},"')
         if suf:
             flags.append(f'--caption_suffix ", {suf}"')
-    cfg = {**cfg, "flags": flags, "caption_add": ", " + w["train"] if w["train"] else ""}
+    notes = list(cfg.get("rec_notes") or [])
+    if freeze_te(ds, tkey, w):
+        flags, changed = _te_flags(flags)
+        if changed:
+            notes = [n for n in notes if not n.startswith("Text encoders trained too")]
+            notes.append(TE_NOTE.format(kind=MEDIA.get(w["medium"], w["medium"]),
+                                        look=choices(tkey).get(w["lean"], w["lean"]).lower()))
+    cfg = {**cfg, "flags": flags, "caption_add": ", " + w["train"] if w["train"] else "", "rec_notes": notes}
     s_pre = w["pony_prefix"] and _join(PONY_SCORE) or q_pre            # sample prompts: score words, then the lean's
     cfg["quality_words"] = (_join(s_pre, w["pos"] if fam == "pony" else ""), _join("" if fam == "pony" else w["pos"], q_suf))
     cfg["lean_negative"] = w["neg"]
@@ -345,11 +416,20 @@ def wanted(ds, tkey: str, text: str) -> tuple[str, str]:
     return (w["pony_prefix"] or SS.QUALITY_PREFIX.get(fam, "")), _join(w["train"], SS.QUALITY_SUFFIX.get(fam, ""))
 
 
+def _te_trained(text: str) -> bool:
+    return bool(re.search(r"--text_encoder_lr[ =]\S+", text or "")) and "--network_train_unet_only" not in (text or "")
+
+
 def differs(ds, tkey: str, text: str) -> bool:
+    """The launch script does not follow the chosen look: other words, text encoders trained where they should not
+    be, or no (or another) look comment."""
     have = in_text(text)
     if have is None or not (text or "").strip():
         return False
-    return tuple(_join(x) for x in have) != tuple(_join(x) for x in wanted(ds, tkey, text))
+    w = words(ds, tkey)
+    return (tuple(_join(x) for x in have) != tuple(_join(x) for x in wanted(ds, tkey, text))
+            or (freeze_te(ds, tkey, w) and _te_trained(text))
+            or look_of(text) != json.loads(mark_line(ds, tkey, w)[len(MARK):]))
 
 
 def rewrite(ds, tkey: str, text: str) -> str:
@@ -359,7 +439,7 @@ def rewrite(ds, tkey: str, text: str) -> str:
         return text
     pre, suf = wanted(ds, tkey, text)
     if "CAPTION_EXT=" in text:
-        return _MSUF.sub(lambda m: f'CAPTION_SUF="{", " + suf if suf else ""}"', text)
+        return mark(ds, tkey, _MSUF.sub(lambda m: f'CAPTION_SUF="{", " + suf if suf else ""}"', text))
     delta = _n(pre) - _n(have[0])
     if delta:
         text = re.sub(r"--keep_tokens\s+(\d+)", lambda m: f"--keep_tokens {max(0, int(m.group(1)) + delta)}", text)
@@ -373,7 +453,13 @@ def rewrite(ds, tkey: str, text: str) -> str:
         elif val:                                        # add it after --caption_extension (or the trainer's .py)
             at = r'(--caption_extension "[^"]*")' if "--caption_extension" in text else r'(accelerate launch[^\n]*?\.py)'
             text = re.sub(at, lambda m: f'{m.group(1)} \\\n  {flag} "{val}"', text, count=1)
-    return text
+    if freeze_te(ds, tkey) and _te_trained(text):       # the image model only (see freeze_te)
+        text = re.sub(r'[ \t]*--text_encoder_lr[ =]\S+[ \t]*\\\n', "", text, count=1)
+        text = re.sub(r'[ \t]*--text_encoder_lr[ =]\S+', "", text, count=1)
+        if "--network_train_unet_only" not in text:
+            at = r'(--caption_extension "[^"]*")' if "--caption_extension" in text else r'(accelerate launch[^\n]*?\.py)'
+            text = re.sub(at, lambda m: f'{m.group(1)} \\\n  --network_train_unet_only', text, count=1)
+    return mark(ds, tkey, text)
 
 
 def prompt_words(ds, tkey: str) -> tuple[str, str]:

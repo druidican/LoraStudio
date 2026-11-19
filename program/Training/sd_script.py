@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.191126e"  # LoRA Studio version, see version.py
+__version__ = "1.191126f"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -850,6 +850,12 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
     if kinds:
         text = text.replace('# Training code and venv live in sd-scripts\n', kinds + '\n# Training code and venv live in sd-scripts\n', 1)
         text = text.replace('--train_data_dir "${TRAIN_DIR}"', '--train_data_dir "${KINDS_VIEW}"', 1)
+    if ds:                                             # the look comment (the LoRA page says how to use the LoRA)
+        try:
+            import lean
+            text = lean.mark(ds, tkey, text)
+        except Exception as e:                         # noqa: BLE001
+            print(f"[lean] {e}")
     if not musubi:
         text = add_logging(text)
     if hf:

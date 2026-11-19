@@ -18,7 +18,7 @@ model when empty and the clip skip (usage_tips; 1 when nothing says otherwise). 
 sync: LoRA Manager's when LoRA Studio has none, the dataset's trigger word when neither has any.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126f"  # LoRA Studio version, see version.py
 
 import copy
 import json
@@ -28,7 +28,7 @@ import sys
 import time
 from pathlib import Path
 
-CARD_VERSION = 2                       # raise when the fields change: every card is filled again once
+CARD_VERSION = 3                       # raise when the fields change: every card is filled again once
 
 GROUPS = ("Dataset", "Schedule", "Network and optimizer", "Result")
 FIELDS = [   # (group, key, label)
@@ -47,6 +47,7 @@ FIELDS = [   # (group, key, label)
     ("Network and optimizer", "seed", "Seed"),
     ("Result", "trained_on", "Trained on"), ("Result", "duration", "Training time"),
     ("Result", "final_loss", "Final loss"), ("Result", "best_epoch", "Save point to try first"), ("Result", "gpu", "GPU"),
+    ("Result", "look", "How to use it"),
 ]
 OLD_RUNS = "_old_runs"
 REPEAT_RE = re.compile(r"^(\d+)_(.+)$")
@@ -367,6 +368,12 @@ def build(lib, lora) -> dict:
             adv = savepoint.advice(md, ld, lora.output_name or lora.stem)
             if adv:
                 c["best_epoch"] = adv["short"][:1].upper() + adv["short"][1:]
+        except Exception:                              # noqa: BLE001
+            pass
+    if text:                                           # the look of the result (Datasets › 7), from the script
+        try:
+            import lean
+            c["look"] = lean.how_to_use(lean.look_of(text)).replace("`", '"')
         except Exception:                              # noqa: BLE001
             pass
     if script is not None:

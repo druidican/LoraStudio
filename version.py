@@ -14,15 +14,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.191126e"
-VERSION = "1.191126e"
+__version__ = "1.191126f"
+VERSION = "1.191126f"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.191126e",
+    "version.py": "1.191126f",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
-    "program/Training/sd_script.py": "1.191126e",
+    "program/Training/sd_script.py": "1.191126f",
     "program/Data/sd_prepare.py": "1.151126h",
     "program/Training/sd_settings.py": "1.171126",
     "program/Data/datasets_ui.py": "1.151126h",
@@ -36,7 +36,7 @@ RELEASE: dict = {
     "program/Training/comfyupscale.py": "1.101126",
     "program/Training/comfyinpaint.py": "1.151126f",
     "program/Settings/scanner.py": "1.191126d",
-    "program/Data/lean.py": "1.191126e",
+    "program/Data/lean.py": "1.191126f",
     "program/UI/scan_panel.py": "1.191126d",
     "program/Data/detailscan.py": "1.151126j",
     "program/Data/captioner.py": "1.091126",
@@ -52,7 +52,7 @@ RELEASE: dict = {
     "program/Data/housekeeping.py": "1.011126",
     "program/Gallery/completed.py": "1.131126b",
     "program/Gallery/model_guide.py": "1.191126d",
-    "program/Gallery/trainingcard.py": "1.131126c",
+    "program/Gallery/trainingcard.py": "1.191126f",
     "program/Gallery/insights.py": "1.131126b",
     "program/UI/shell.py": "1.131126c",
     "program/UI/widgets.py": "1.181126b",
@@ -62,15 +62,15 @@ RELEASE: dict = {
     "program/UI/pg_home.py": "1.131126c",
     "program/UI/pg_datasets.py": "1.161126",
     "program/UI/ds_steps.py": "1.191126e",
-    "program/UI/ds_train.py": "1.191126e",
+    "program/UI/ds_train.py": "1.191126f",
     "program/UI/ds_results.py": "1.151126b",
     "program/UI/ds_batch.py": "1.151126h",
     "program/UI/pg_queue.py": "1.151126c",
     "program/UI/pg_collection.py": "1.181126c",
-    "program/UI/lora_page.py": "1.181126b",
+    "program/UI/lora_page.py": "1.191126f",
     "program/UI/pg_settings.py": "1.131126c",
     "program/UI/set_panels.py": "1.191126c",
-    "program/Gallery/lorapage.py": "1.151126b",
+    "program/Gallery/lorapage.py": "1.191126f",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
     "program/Gallery/delete.py": "1.141126b",
@@ -104,6 +104,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.191126f", "The look of the result, part 2: when the pictures are photos and the result should be the model's own style (Illustrious, NoobAI, Pony, Anima), the text encoders are no longer trained, so the photo look does not stick to the trigger word. The LoRA page says under How to use it what the LoRA was made from and which words go in the prompt or the negative prompt. Step 9's Use the chosen look updates scripts saved before."),
     ("1.191126e", "The look of the result (step 7 and 9): Ollama tells per picture whether it is a photo, a drawing, a 3D render or a painting, and training adds words for that kind behind every caption (Pony photos no longer get source_anime), so a LoRA made from photos no longer ties the photo look to its trigger word. Per LoRA type you choose what the result should look like (its own style, Photo, 3D; Pony: Anime, Western cartoon, Photo), with a default per type; the test and sample pictures follow it. Check picture kinds for datasets sorted before."),
     ("1.191126d", "Find on this computer: a model file whose name does not say whether it is SDXL, Illustrious, Pony or NoobAI is now recognised by the label inside it (title, v-prediction), when it has one."),
     ("1.191126c", "Find on this computer (Settings, and the setup page): searches the folders you name for the trainers, ComfyUI, your LoRAs, datasets and model files, and suggests what to use; nothing changes until you tick and press Use."),

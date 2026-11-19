@@ -5,7 +5,7 @@ fields, Completed, accepting warnings, copying to the LoRA folder, reading the t
 (head, training card, versions, picture grid) come from lora_library.
 """
 from __future__ import annotations
-__version__ = "1.151126b"  # LoRA Studio version, see version.py
+__version__ = "1.191126f"  # LoRA Studio version, see version.py
 
 import copy
 import json
@@ -91,7 +91,7 @@ def details(key: str) -> dict | None:
         "examples": list(lora.examples[:40]), "head": head, "settings": settings, "loss": pts,
         "versions": [(label, k) for label, k in LL.version_choices(lora)], "versions_html": LL.versions_html(lora),
         "types": siblings(lora), "title": lora.character or lora.display_name, "subtitle": lora.display_name,
-        "done": done,
+        "done": done, "look": TC.stored(lora.sidecar).get("look") or "",
         "edit": {"name": lora.display_name, "character": char, "trigger": trig,
                  "notes": TC.strip_auto_notes(sc.get("notes") or ""), "strength": strength, "clip": clip_s,
                  "nsfw": level if level in (0, 1, 2, 4, 8, 16) else 0, "favorite": bool(sc.get("favorite")),
