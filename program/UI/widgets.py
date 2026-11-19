@@ -125,8 +125,15 @@ async def confirm(question: str, yes: str = "Yes", no: str = "Cancel") -> bool:
 
 async def stream(gen, show):
     """Run a generator of progress lines in a thread; show(line) for each line (on the page). Returns the
-    generator's return value (StopIteration.value)."""
+    generator's return value (StopIteration.value).
+
+    If that part of the page is taken away while it runs (another step opened, the page reloaded), the work goes on
+    to the end but the lines are no longer shown: there is nothing left to show them in."""
     from nicegui import run as _run
+    try:
+        owner = ui.context.slot.parent                   # the part of the page the pressed button sits in
+    except Exception:                                    # noqa: BLE001
+        owner = None
     it = iter(gen)
     done = object()
 
@@ -139,7 +146,8 @@ async def stream(gen, show):
         r = await _run.io_bound(step)
         if isinstance(r, tuple) and len(r) == 2 and r[0] is done:
             return r[1]
-        show(r)
+        if owner is None or not getattr(owner, "is_deleted", False):
+            show(r)
 
 
 class CropPanel:

@@ -584,7 +584,8 @@ def look_card(ds, types):
 
         async def check(everything=False):
             await stream(L.check_run(ds, url0, model0, everything), lambda line: setattr(prog, "content", line))
-            redraw()
+            if not prog.is_deleted:                      # the step was left while it ran: nothing to redraw
+                redraw()
         with ui.row().classes("items-center gap-2"):
             b1 = ui.button("Check picture kinds", on_click=lambda: check(False)).props("outline dense no-caps")
             b2 = ui.button("Check them all again", on_click=lambda: check(True)).props("flat dense no-caps")

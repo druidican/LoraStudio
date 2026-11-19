@@ -147,6 +147,11 @@ are gone. Keep it that way: build a step's controls when it is opened, redraw HT
 
 ## Open
 
+- **Not released yet (2026-11-19):** `widgets.stream` stops showing progress lines once the part of the page that
+  started it is gone (a step left or the page reloaded mid-job; it warned "element has been deleted"), and step 7's
+  *Check picture kinds* skips its redraw then. Committed after 1.191126f without a release: make the next release with
+  `BASE=c7b5ab4 tools/release.sh …` so these two files are stamped too, then remove this note.
+
 - **NiceGUI (owner decided 2026-11-13):** done as a complete redo. 1.131126c tested by the owner on real hardware
   (training, ComfyUI test pictures, amd-smi values, update and install all fine) and published as the normal
   release. The Gradio version is kept on the branch `old`. Plan and decisions: `docs/NICEGUI_PLAN.md`.
