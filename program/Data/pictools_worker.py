@@ -15,7 +15,7 @@ until the worker is told to quit (LoRA Studio quits it before a training run and
 Model files are downloaded on first use into the models folder given as the first argument.
 """
 from __future__ import annotations
-__version__ = "1.151126e"  # LoRA Studio version, see version.py
+__version__ = "1.191126b"  # LoRA Studio version, see version.py
 
 import base64
 import json
@@ -131,9 +131,11 @@ def owl():
     return M["owl"]
 
 
-def marks(paths, threshold=0.1):
-    """{path: [{"box": [x0, y0, x1, y1], "score", "label"}]} in the picture's own pixels (upright)."""
+def marks(paths, threshold=0.1, queries=None):
+    """{path: [{"box": [x0, y0, x1, y1], "score", "label"}]} in the picture's own pixels (upright). queries: other
+    things to look for than watermarks ("a ring", "a necklace" for a worn item); labels are the queries without 'a '."""
     import torch
+    texts = list(queries) if queries else MARK_TEXT
     model, proc = owl()
     dev = torch_dev()
     post = getattr(proc, "post_process_grounded_object_detection", None) or proc.post_process_object_detection
@@ -143,7 +145,7 @@ def marks(paths, threshold=0.1):
             im = load_rgb(p)
             W, H = im.size
             S = max(W, H)                                 # OWLv2 pads to a square (right and bottom)
-            inp = proc(text=[MARK_TEXT], images=im, return_tensors="pt")
+            inp = proc(text=[texts], images=im, return_tensors="pt")
             inp = {k: v.to(dev) for k, v in inp.items()}
             with torch.no_grad():
                 o = model(**inp)
@@ -153,7 +155,7 @@ def marks(paths, threshold=0.1):
                 x0, y0, x1, y1 = max(0, box[0]), max(0, box[1]), min(W, box[2]), min(H, box[3])
                 if x1 - x0 >= 4 and y1 - y0 >= 4:
                     found.append({"box": [round(x0), round(y0), round(x1), round(y1)], "score": round(score, 3),
-                                  "label": MARK_TEXT[int(lab)].replace("a ", "", 1)})
+                                  "label": texts[int(lab)].replace("a ", "", 1)})
             found.sort(key=lambda m: -m["score"])
             out[str(p)] = {"W": W, "H": H, "marks": found[:30]}
         except Exception as e:                           # noqa: BLE001
@@ -348,7 +350,8 @@ def main():
             elif cmd == "analyze":
                 say({"ok": True, "result": analyze(c["paths"])})
             elif cmd == "marks":
-                say({"ok": True, "result": marks(c["paths"])})
+                say({"ok": True, "result": marks(c["paths"], queries=c.get("queries"),
+                                                 threshold=float(c.get("threshold") or 0.1))})
             elif cmd == "inpaint":
                 say(inpaint(c["src"], c["dst"], c.get("boxes") or [], mask_path=c.get("mask")))
             elif cmd == "upscale":

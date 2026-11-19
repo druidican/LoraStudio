@@ -54,6 +54,11 @@ pictures beat many similar ones. For a style: 30–80 pictures in that style wit
 - **Purpose**: character, style, object, **worn item**, action or concept. It decides how the captions are written
   and how the pictures are judged. A **worn item** is clothes, equipment or jewelry that people wear (a collection of
   rings and hair clips, a jacket, an armour); pick which of the three, so step 7 knows which tags describe the item.
+  For a worn item the sort (with the picture tools) also **looks for the item** with the kind words (step 7's kinds,
+  else the usual ones for the three): a picture where it is not found is set aside (*the worn item was not found*;
+  pin it 📌 to keep it), and where it covers less than 2 % of the picture, Select adds a **close-up** around it as a
+  new picture (`closeup_<name>.png`, the picture itself stays; not when the item is too small to give 384 pixels a
+  side).
 - **Trigger word**: the first word of every caption, the word you put in a prompt to call the LoRA (`pip`).
 - **Class word** (character): what the trigger word is, in one general word (`robot`, `person`, `cat`). Sentence
   captions (FLUX, Chroma, Z-Image …) then begin `pip, a robot, …`, so the text encoder knows what kind of thing the
@@ -186,8 +191,13 @@ kind in it (*gold ring*) leaves the kind (*ring*) when it moves. Above it, **Kin
 - **Make the words the same** turns the other words into the kind's name in every caption, adds the name where a
   tag mentions it (*gold ring* also gets *ring*), and puts the trigger word, the kinds and the places first. It counts
   the pictures per kind and warns when a kind is in fewer than a third of them (step 5 shows the same count): then
-  the trigger word mostly means the others, so add pictures of it or give them more repeats in their own repeat
-  folder.
+  the trigger word mostly means the others, so add pictures of it or turn on **Weight per kind**.
+- **Weight per kind**: with it on, the launch script gives each kind its own repeat folder, so a kind with few
+  pictures is trained more often (its weight × the repeats) and every kind counts about the same. Each picture counts
+  for the rarest kind its caption names; pictures that name no kind keep weight 1. The weights are worked out from the
+  captions (at most 5) and can be changed; *Save the weights*, then make the launch script again in step 9. Nothing is
+  moved: the script links the pictures into `.lsflow/kinds_view/` at every run (the folders are listed at the start
+  of the run), and the plan line says how many pictures the dataset counts as.
 - The person in the pictures is described in full (hair, face, the other clothes, pose, place), so the LoRA learns
   only the item. In ComfyUI you then write `lsjc, ring, on ring finger, …`.
 

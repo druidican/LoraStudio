@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.161126"  # LoRA Studio version, see version.py
+__version__ = "1.191126b"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -677,6 +677,18 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                     det.update(pictools.find_marks(rest[i:i + 16]))
             except Exception as e:                       # noqa: BLE001
                 tools_note = (tools_note + "; " if tools_note else "") + f"watermark finder: {e}"
+        if purpose == "worn" and tools:                  # a worn item: where is it, and how big?
+            words = worn_names(ds)[0] or KIND_WORDS.get(meta(ds).get("worn_kind") or "jewelry", [])
+            try:
+                for i in range(0, len(rest), 16):
+                    if STOP.is_set():
+                        break
+                    yield f"Pass 1 · looking for the worn item: {min(i + 16, len(rest))} of {len(rest)}"
+                    for k, e in pictools.find_items(rest[i:i + 16], words).items():
+                        if k in pics:
+                            pics[k]["item"] = item_judge(e)
+            except Exception as e:                       # noqa: BLE001
+                tools_note = (tools_note + "; " if tools_note else "") + f"item finder: {e}"
         good = {p: A[p] for p in A if p in pics and pics[p]["cat"] == "good"}
         for a, b, sim in sorted(pictools.lookalikes(good, 0.95) if tools else [], key=lambda t: -t[2]):
             ea, eb = pics[a], pics[b]
@@ -850,6 +862,15 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                     pics[x]["why"] = f"one of {len(ps)} alike: {' · '.join(v for v in c if v)}"
             groups.append({"label": " · ".join(v for v in c if v), "n": len(ps)})
     groups.sort(key=lambda g: -g["n"])
+    if purpose == "worn":                                # the item not found: set aside (pin it 📌 to keep it anyway)
+        for e in pics.values():
+            it = e.get("item")
+            if it and not it.get("seen") and e["cat"] in ("good", "detail", "alike"):
+                e["cat"], e["why"] = "poor", "the worn item was not found in it (item finder)"
+            elif it and it.get("small"):
+                e["warn"] = (e.get("warn") or []) + [
+                    "the item is small in it: Select adds a close-up of it" if it.get("crop") else
+                    "the item is small in it, and too small for a close-up"]
     usable = [e for e in pics.values() if e["cat"] in ("good", "detail", "alike")]
     fr = Counter(e.get("framing", "") for e in usable if e.get("framing"))
     outfits = len({e["outfit"] for e in usable if e.get("outfit")})
@@ -1009,16 +1030,20 @@ def mix_text(rows) -> str:
 
 def apply_select(ds, keep_paths) -> str:
     keep = {str(Path(p)) for p in keep_paths}
+    stems = {Path(p).stem for p in keep}               # a close-up stays with the picture it was made from
+    keep |= {str(p) for p in images(ds) if p.name.startswith("closeup_") and p.stem[8:] in stems}
     drop = [p for p in images(ds) if str(p) not in keep]
     n, err = move_to_reserve(ds, drop) if drop else (0, [])
     joined = [p for p in extra_pictures(ds) if str(p) in keep] if include_extra(ds) else []
     j, jerr = join_repeat_folder(ds, joined) if joined else (0, [])
     err += jerr
+    close = add_closeups(ds, images(ds)) if meta(ds).get("purpose") == "worn" else []
     kept = [str(p) for p in images(ds)]
     mark_step(ds, "select", {"kept": len(kept), "reserve": reserve_count(ds)})
     _save(ds, "select.json", {"at": time.strftime("%Y-%m-%d %H:%M"), "kept": sorted(kept)})
     return (f"✔ {len(kept)} pictures in the repeat folder; {n} moved to `{RESERVE}/` (not deleted, with their captions)"
-            + (f"; {j} from outside it joined" if j else "") + "."
+            + (f"; {j} from outside it joined" if j else "")
+            + (f"; {len(close)} close-up(s) of the worn item added (closeup_*.png)" if close else "") + "."
             + (f" Could not move: {'; '.join(err[:3])}" if err else ""))
 
 
@@ -1471,6 +1496,59 @@ PLACE_WORDS = {
 }
 
 
+ITEM_SMALL = 0.02                                        # the item covers less than 2 % of the picture: small
+ITEM_SURE = 0.12                                         # detector score from which the item counts as seen
+CLOSEUP_MIN = 384                                        # a close-up needs at least this many pixels a side
+
+
+def item_judge(e: dict) -> dict:
+    """{"seen", "kind", "box", "frac", "small", "crop"} from the item finder's boxes for one picture."""
+    W, H = e.get("W") or 0, e.get("H") or 0
+    best = max((m for m in e.get("marks") or [] if m.get("score", 0) >= ITEM_SURE), key=lambda m: m["score"],
+               default=None)
+    if not best or not W or not H:
+        return {"seen": False}
+    x0, y0, x1, y1 = best["box"]
+    frac = (x1 - x0) * (y1 - y0) / (W * H)
+    out = {"seen": True, "kind": best.get("label", ""), "box": best["box"], "frac": round(frac, 4),
+           "small": frac < ITEM_SMALL}
+    if out["small"]:
+        side = min(W, H, max(int(max(x1 - x0, y1 - y0) * 3), 512))
+        if side >= CLOSEUP_MIN:
+            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+            l = int(min(max(0, cx - side / 2), W - side))
+            t = int(min(max(0, cy - side / 2), H - side))
+            out["crop"] = [l, t, l + side, t + side]
+    return out
+
+
+def add_closeups(ds, paths) -> list[Path]:
+    """Select, a worn item: a close-up around the item as a new picture next to each kept picture where it is small
+    (closeup_<name>.png; the picture itself stays). Made once: an existing close-up is left alone."""
+    from PIL import Image, ImageOps
+    res = sort_result(ds) or {}
+    find = sort_lookup(res.get("pics") or {})
+    made = []
+    for p in map(Path, paths):
+        if p.name.startswith("closeup_"):
+            continue
+        it = (find(p) or {}).get("item") or {}
+        if not it.get("crop"):
+            continue
+        dest = p.with_name(f"closeup_{p.stem}.png")
+        if dest.exists():
+            continue
+        try:
+            with Image.open(p) as im:
+                ImageOps.exif_transpose(im).convert("RGB").crop(tuple(it["crop"])).save(dest)
+            made.append(dest)
+        except OSError:
+            continue
+    if made:
+        ensure_originals(ds, made)
+    return made
+
+
 def _rules(text):
     """'ring = rings, band' lines -> [(name, [other words])]."""
     out = []
@@ -1560,8 +1638,8 @@ def balance_text(count, n, none=()):
     out = f"Pictures per kind: {parts} (of {n})."
     if low:
         out += (f" ⚠ {', '.join(low)} {'is' if len(low) == 1 else 'are'} in fewer than a third of the pictures: the "
-                "trigger word will mostly mean the others. Add pictures of it, or give its pictures more repeats in "
-                "their own repeat folder.")
+                "trigger word will mostly mean the others. Add pictures of it, or turn on **Weight per kind** (step 7), "
+                "which gives its pictures more repeats.")
     if none:
         out += f" {len(none)} caption(s) name no kind ({', '.join(none[:4])}{' …' if len(none) > 4 else ''})."
     return out
@@ -1581,6 +1659,99 @@ def worn_balance(ds, ext=".txt"):
             if re.search(rf"\b{re.escape(k)}\b", t):
                 count[k] += 1
     return balance_text(count, n)
+
+
+# ---- worn items: weight per kind (each kind its own repeat folder in the training view)
+MAX_WEIGHT = 5
+
+
+def _kind_of(text: str, order) -> str:
+    """The kind a caption names, rarest kind first (the same rule as the launch script's grep -iwF)."""
+    t = (text or "").lower()
+    for k in order:
+        if re.search(rf"(?<![\w]){re.escape(k)}(?![\w])", t):
+            return k
+    return ""
+
+
+def kind_weights(ds, ext=".txt") -> dict:
+    """{"on", "order": [kinds, rarest first], "rows": [(kind, pictures, weight, auto weight)], "none": pictures naming
+    no kind, "n", "n_eff"}: each picture counts for one kind (the rarest it names); a kind with fewer pictures gets a
+    weight (more repeats) so that every kind counts about the same, at most MAX_WEIGHT; your own numbers win."""
+    kinds, _ = worn_names(ds)
+    m = meta(ds).get("worn_weights") or {}
+    caps = [read_set(p, ext) or "" for p in images(ds)]
+    raw = {k: sum(1 for c in caps if re.search(rf"(?<![\w]){re.escape(k)}(?![\w])", c.lower())) for k in kinds}
+    order = sorted(kinds, key=lambda k: (raw[k], kinds.index(k)))
+    count = {k: 0 for k in kinds}
+    none = 0
+    for c in caps:
+        k = _kind_of(c, order)
+        if k:
+            count[k] += 1
+        else:
+            none += 1
+    top = max(count.values(), default=0)
+    rows, n_eff = [], none
+    for k in order:
+        auto = min(MAX_WEIGHT, max(1, round(top / count[k]))) if count[k] else 1
+        w = int((m.get("w") or {}).get(k) or auto)
+        rows.append((k, count[k], w, auto))
+        n_eff += count[k] * w
+    return {"on": bool(m.get("on")) and bool(kinds), "order": order, "rows": rows, "none": none, "n": len(caps),
+            "n_eff": n_eff}
+
+
+def set_kind_weights(ds, on: bool, weights: dict) -> str:
+    m = meta(ds)
+    m["worn_weights"] = {"on": bool(on), "w": {k: max(1, min(20, int(v or 1))) for k, v in (weights or {}).items()}}
+    meta_save(ds, m)
+    kw = kind_weights(ds)
+    if not kw["on"]:
+        return "✔ Saved. New launch scripts train every picture with its repeat folder's repeats, as before."
+    return ("✔ Saved. New launch scripts (step 9) give each kind its own repeat folder: "
+            + " · ".join(f"**{k}** {n} × {w}" for k, n, w, _ in kw["rows"])
+            + (f" · no kind {kw['none']} × 1" if kw["none"] else "")
+            + f" (counts as {kw['n_eff']} pictures instead of {kw['n']}). Make the launch script again in step 9.")
+
+
+def kinds_block(ds, ext: str) -> str:
+    """The launch script's part that builds the view: links to the pictures (nothing is moved), one repeat folder per
+    kind with the repeats × weight, made fresh at every run. '' when weights are off."""
+    kw = kind_weights(ds, ext)
+    if not kw["on"]:
+        return ""
+    def q(x):
+        return x.replace('"', "").replace("$", "").replace("`", "").replace("|", "")
+    entries = " ".join(f'"{q(k)}|{w}|{q(k)}"' for k, _, w, _ in kw["rows"])
+    return "\n".join([
+        "# Weight per kind (worn item, LoRA Studio › step 7): every kind gets its own repeat folder in a view made",
+        "# fresh at every run, with links to the pictures (nothing is moved). kind|weight|word, rarest kind first.",
+        'KINDS_VIEW="${TRAIN_DIR}/.lsflow/kinds_view"',
+        f"KINDS=({entries})",
+        'rm -rf "${KINDS_VIEW}" && mkdir -p "${KINDS_VIEW}"',
+        'for d in "${TRAIN_DIR}"/[0-9]*_*/; do',
+        '  rep="$(basename "$d")"; rep="${rep%%_*}"',
+        '  for f in "$d"*; do',
+        '    case "${f,,}" in *.png|*.jpg|*.jpeg|*.webp|*.bmp) ;; *) continue ;; esac',
+        '    base="${f%.*}"; dest="other"; w=1',
+        f'    if [ -f "${{base}}{ext}" ]; then',
+        '      for k in "${KINDS[@]}"; do',
+        '        IFS="|" read -r kn kw kword <<< "$k"',
+        f'        if grep -qiwF -- "$kword" "${{base}}{ext}"; then dest="$kn"; w="$kw"; break; fi',
+        '      done',
+        '    fi',
+        '    sub="${KINDS_VIEW}/$((rep * w))_${dest// /-}"',
+        '    mkdir -p "$sub"',
+        '    ln -s "$f" "$sub/"',
+        '    for c in "${base}".*txt "${base}".caption; do',
+        '      if [ -f "$c" ]; then ln -s "$c" "$sub/"; fi',
+        '    done',
+        '  done',
+        'done',
+        'echo "Weight per kind: $(ls "${KINDS_VIEW}" | tr \'\\n\' \' \')"',
+        "",
+    ])
 
 
 def moved_tags(ds, ext=".txt") -> list[str]:

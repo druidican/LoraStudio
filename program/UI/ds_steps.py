@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.191126b"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -669,10 +669,50 @@ def step7(page):
             F.set_worn_setup(ds, kinds.value, places.value)
             kind_msg.content = F.same_words(ds, ".txt", trig.value or ds)
             mv_draw()
+            w_draw()
         with ui.row().classes("gap-2"):
             ui.button("Suggest from the tags", on_click=kind_suggest).props("outline dense no-caps")
             ui.button("Save", on_click=kind_save).props("flat dense no-caps")
             ui.button("Make the words the same", on_click=kind_go).props("unelevated dense no-caps color=primary")
+        # ---- weight per kind
+        ui.label("Weight per kind").classes("font-semibold mt-2")
+        note("A kind with few pictures is learned weakly next to a kind with many. With this on, the launch script "
+             "gives each kind its own repeat folder: the kind's pictures are trained weight × the repeats, so every kind "
+             "counts about the same. Each picture counts for the rarest kind its caption names. Nothing is moved: the "
+             "script links the pictures into a view (.lsflow/kinds_view/) at every run. The weights are worked out from "
+             "the captions (at most 5); change them if you like, then make the launch script again in step 9.")
+        w_on = ui.checkbox("Give each kind its own repeat folder in new launch scripts")
+        w_box = ui.row().classes("w-full gap-x-6 gap-y-1")
+        w_msg = ui.markdown("")
+        w_nums = {}
+
+        def w_draw():
+            kw = F.kind_weights(ds)
+            w_on.value = kw["on"]
+            w_box.clear()
+            w_nums.clear()
+            with w_box:
+                if not kw["rows"]:
+                    note("Write the kinds above and press Make the words the same first.")
+                for k, n, w, auto in kw["rows"]:
+                    with ui.row().classes("items-center gap-2 no-wrap"):
+                        w_nums[k] = ui.number(value=w, min=1, max=20, precision=0).props("outlined dense").classes("w-16")
+                        ui.label(f"× {k} ({n} pictures; worked out: {auto})")
+                if kw["none"]:
+                    ui.label(f"no kind named: {kw['none']} pictures (weight 1)").classes("ls-note")
+
+        def w_save():
+            w_msg.content = F.set_kind_weights(ds, w_on.value, {k: int(x.value or 1) for k, x in w_nums.items()})
+
+        def w_auto():
+            F.set_kind_weights(ds, w_on.value, {})
+            w_draw()
+            w_msg.content = "Weights worked out again from the captions."
+        with ui.row().classes("gap-2"):
+            ui.button("Save the weights", on_click=w_save).props("unelevated dense no-caps color=primary")
+            ui.button("Work them out again", on_click=w_auto).props("flat dense no-caps")
+        if worn:
+            w_draw()
     kind_card.set_visibility(worn)
     # ---- tags -> trigger words
     with ui.card().props("flat bordered").classes("ls-card w-full gap-2") as mv_card:

@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.171126"  # LoRA Studio version, see version.py
+__version__ = "1.191126b"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -807,7 +807,18 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
                          "or press **Create missing folders now** in the Repeat folders panel to set up the folders first.")
     if not stats["total"]:
         raise ValueError("Repeat folders found, but no images inside them.")
-    rec = recommend_numbers(sc, cfg, stats, use_sug_rep)
+    kinds = ""
+    if not musubi and not virtual and len(stats["rows"]) == 1:   # worn item: weight per kind (step 7)
+        try:
+            import dsflow as F
+            if F.meta(ds).get("purpose") == "worn":
+                kinds = F.kinds_block(ds, cfg["caption_ext"])
+                if kinds:
+                    n_eff = F.kind_weights(ds, cfg["caption_ext"])["n_eff"]
+                    stats_w = {**stats, "total": n_eff, "rows": [{**stats["rows"][0], "n": n_eff}]}
+        except Exception:                                # noqa: BLE001
+            kinds = ""
+    rec = recommend_numbers(sc, cfg, stats_w if kinds else stats, use_sug_rep)
     lora = stats["lora"]
     train_dir = lora if virtual else sorted({r["folder"].parent for r in stats["rows"]})[0]
     if samples:
@@ -822,13 +833,17 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
                            rec["epochs"], cfg.get("save_every", 1), cfg["lr"], "${PROMPTS_FILE}" if samples else None)
     if not cmd:
         raise ValueError("This LoRA type has no launch template (no 'script' in its preset).")
-    plan_line = (f"Output {out_name}. Plan: {stats['total']} images x {'/'.join(str(x) for x in rec['repeats'])} "
-                 f"repeats, batch {rec['bs']} x accum {rec['ga']}, ~{rec['spe']} steps/epoch, {rec['epochs']} epochs "
+    plan_line = (f"Output {out_name}. Plan: {stats['total']} images"
+                 + (f" (weighted per kind: counts as {stats_w['total']})" if kinds else "")
+                 + f" x {'/'.join(str(x) for x in rec['repeats'])} repeats, batch {rec['bs']} x accum {rec['ga']}, ~{rec['spe']} steps/epoch, {rec['epochs']} epochs "
                  f"= ~{rec['total_steps']} steps (target {rec['main_target']})")
     extra = {"cfg": run_cfg, "bs": rec["bs"]} if musubi else {}
     text = sc.render_training_script(sc.under(S.trainer_root(cfg), S.HOME, "${HOME}"), sc.under(train_dir, lora, "${SCRIPT_DIR}"),
                                      sc.under(prompts_path, lora, "${SCRIPT_DIR}") if samples else None, plan_line, cmd,
                                      S.vendor_env({**sc.ROCM_ENV, **cfg.get("env", {}), **S.env_saved()}), **extra)
+    if kinds:
+        text = text.replace('# Training code and venv live in sd-scripts\n', kinds + '\n# Training code and venv live in sd-scripts\n', 1)
+        text = text.replace('--train_data_dir "${TRAIN_DIR}"', '--train_data_dir "${KINDS_VIEW}"', 1)
     if not musubi:
         text = add_logging(text)
     if hf:

@@ -7,10 +7,11 @@ Settings › Trainers and GPU shows whether the tools are ready; "Install the pi
 the venv lacks (spandrel, for the upscalers) without touching PyTorch.
 """
 from __future__ import annotations
-__version__ = "1.151126e"  # LoRA Studio version, see version.py
+__version__ = "1.191126b"  # LoRA Studio version, see version.py
 
 import base64
 import json
+import re
 import os
 import subprocess
 import sys
@@ -245,6 +246,43 @@ def find_marks(paths, say=None, chunk: int = 8) -> dict:
             e = r.get(str(p))
             if e and "error" not in e:
                 c["marks|" + _sig(p)] = e
+                out[str(p)] = e
+            elif e:
+                raise RuntimeError(e["error"])
+        _cache_save()
+    return out
+
+
+def find_items(paths, words, say=None, chunk: int = 8) -> dict:
+    """{path: {"W", "H", "marks": [{"box", "score", "label"}]}}: where the detector sees these things ("ring",
+    "necklace" ... of a worn item); remembered per picture and word list."""
+    words = [w for w in dict.fromkeys(x.strip().lower() for x in words) if w]
+    if not words:
+        return {}
+    queries = [("an " if w[0] in "aeiou" else "a ") + w for w in words]
+    tag = "items|" + "|".join(words) + "|"
+    c = _cache()
+    out, todo = {}, []
+    for p in map(Path, paths):
+        try:
+            k = tag + _sig(p)
+        except OSError:
+            continue
+        if k in c:
+            out[str(p)] = c[k]
+        else:
+            todo.append(p)
+    for i in range(0, len(todo), chunk):
+        part = todo[i:i + chunk]
+        if say:
+            say(f"{i + len(part)} of {len(todo)}")
+        r = call({"cmd": "marks", "paths": [str(p) for p in part], "queries": queries, "threshold": 0.08})["result"]
+        for p in part:
+            e = r.get(str(p))
+            if e and "error" not in e:
+                for m in e.get("marks") or []:
+                    m["label"] = re.sub(r"^an? ", "", m["label"])   # "an earring" → "earring"
+                c[tag + _sig(p)] = e
                 out[str(p)] = e
             elif e:
                 raise RuntimeError(e["error"])
