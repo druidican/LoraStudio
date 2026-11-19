@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """The login page (--auth user:password, or Settings › Start and network) and the key that signs its cookie."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126h"  # LoRA Studio version, see version.py
 
 import hmac
 import secrets
@@ -22,16 +22,34 @@ def storage_secret() -> str:
         return k
 
 
+ON = {"auth": False}
+
+
+def allowed() -> bool:
+    """The browser asking may see the program: no login is set, or it has logged in (also for plain routes)."""
+    if not ON["auth"]:
+        return True
+    from nicegui import app
+    try:
+        return bool(app.storage.user.get("ok"))
+    except Exception:                                    # noqa: BLE001
+        return False
+
+
 def install(user: str, pw: str):
-    """A login page at /login; the browser keeps a signed cookie, so a reload does not ask again."""
+    """A login page at /login; the browser keeps a signed cookie, so a reload does not ask again. /login?next=/m
+    goes back to the phone page after the login."""
     from nicegui import app, ui
+    ON["auth"] = True
 
     @ui.page("/login")
-    def login():
+    def login(next: str = "/"):                         # noqa: A002 (the query parameter's name)
+        back = next if next.startswith("/") and not next.startswith("//") else "/"
+
         def check():
             if hmac.compare_digest(u.value, user) and hmac.compare_digest(p.value, pw):
                 app.storage.user["ok"] = True
-                ui.navigate.to("/")
+                ui.navigate.to(back)
             else:
                 msg.text = "Wrong user name or password."
         ui.query("body").style("background:#1C1F24")

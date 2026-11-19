@@ -34,6 +34,16 @@ the painted logo:
 *Save and restart* uses it at once; `./start.sh` and the desktop starter use it from then on (an option typed on the
 command line still wins). The same page has **What is installed**: see [Installing](#install).
 
+
+**The phone page** (`/m`): with *Reachable on the network* and a login, open `http://<this computer>:<port>/m` on
+your phone on the same Wi-Fi (this card shows the exact address); add it to the home screen to open it like an app.
+It shows what is training, a progress bar with the percentage and the time left, step, epoch, loss and running time;
+when a run failed, LoRA Studio's explanation and the last lines of the error; the newest sample picture; the queue.
+**Stop now** and **Stop after this run** (while training) and **Start the queue** (when something waits) ask first.
+The page is small and asks for about 1 KB every 10 s while training, once a minute otherwise, and not at all while
+the phone's screen is off; the picture is fetched only when a new one appears. Light or dark follows the phone.
+Pictures and files of the program are only shown to a browser that has logged in.
+
 ## Find on this computer
 
 Write the folders to search, one per line (for example `/mnt/Backup` and `~/AI`); only these and their subfolders

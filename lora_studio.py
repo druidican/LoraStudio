@@ -9,7 +9,7 @@ LoRA Studio: train LoRAs with sd-scripts and musubi-tuner, make the datasets, ke
 Run:  python lora_studio.py [--port 7860] [--host 127.0.0.1] [--auth user:password] [--no-browser]
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126h"  # LoRA Studio version, see version.py
 
 import argparse
 import os
@@ -152,6 +152,7 @@ def main():
         if not sep or not user or not pw:
             ap.error("--auth must look like user:password")
         login.install(user, pw)
+    import mobile_page  # noqa: F401  the phone page, /m (behind the same login)
 
     @ui.page("/")
     def index():

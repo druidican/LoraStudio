@@ -7,7 +7,7 @@ the Collection's cached thumbnail (lora_library.thumb_file, made when the browse
 only (allowed_roots).
 """
 from __future__ import annotations
-__version__ = "1.191126g"  # LoRA Studio version, see version.py
+__version__ = "1.191126h"  # LoRA Studio version, see version.py
 
 import hashlib
 from pathlib import Path
@@ -41,6 +41,9 @@ def pic_url(p: Path | str | None, width: int = 360) -> str:
 @app.get("/pic/{tok}")
 def _pic(tok: str, w: int = 360):
     import lora_library as LL
+    import login
+    if not login.allowed():                              # pictures only for a logged-in browser
+        return Response(status_code=404)
     p = _PICS.get(tok)
     tp = LL.thumb_file(p, max(64, min(w, 1600))) if p else None
     if not tp:
@@ -80,6 +83,9 @@ def allowed_roots() -> list[Path]:
 
 @app.get(lspaths.FILE_ROUTE + "{path:path}")
 def _lsfile(path: str):
+    import login
+    if not login.allowed():                              # files only for a logged-in browser
+        return Response(status_code=404)
     p = Path("/" + path.lstrip("/")) if not path.startswith("/") else Path(path)
     try:
         rp = p.resolve()

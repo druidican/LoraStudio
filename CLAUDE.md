@@ -69,6 +69,10 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   `venvcheck.rocm_notice` warns (Health check, Home) when `/opt/rocm*` is newer than the training ROCm.
   install.sh: a new install takes the NEWEST stable build (`pick_amd_torch`; `--torch`, `--tested-torch`, fallback
   to the tested pins); a re-run keeps a working ROCm build.
+- **Phone page** (1.191126h): `/m` is plain HTML (`UI/mobile_page.py`, no NiceGUI/websocket) polling `/m/status`
+  (ETag, 10 s running / 60 s idle, paused when hidden), `/m/sample` (newest sample, 640 px JPEG), POST stop / after /
+  start; data in `Other/mobile.py`. Behind `login.allowed()` (also guards `/pic` and the file route now);
+  `/login?next=/m` returns there. Address shown in Settings › Start and network (`mobile.phone_text`).
 - **Updater** (`ghupdate.py`): channel *Releases only* (default) or *Betas too*; the token is never sent along a
   redirect to another host (codeload); *Test token* explains each failure.
 - **WD tagger writes every tag** for characters and worn items; step 7's *tags → trigger words* card moves the

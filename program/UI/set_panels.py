@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.191126g"  # LoRA Studio version, see version.py
+__version__ = "1.191126h"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -68,6 +68,8 @@ def panel_start(page):
             upd = ui.checkbox("Check for trainer updates at start (only looks)", value=v["check_updates"])
             resume = ui.checkbox("Resume the queue after a restart", value=v["resume_queue"])
             notify_ = ui.checkbox("Notice when a run finishes (a browser notification)", value=v["notify"])
+        import mobile
+        ui.markdown(mobile.phone_text(v)).classes("ls-note")
         msg = ui.markdown("")
 
         def collect():
