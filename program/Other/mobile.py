@@ -3,7 +3,7 @@
 last lines of its log), the queue and the newest sample picture. Small on purpose: the phone asks for it every few
 seconds while a run is going and every minute when nothing runs."""
 from __future__ import annotations
-__version__ = "1.191126h"  # LoRA Studio version, see version.py
+__version__ = "1.191126i"  # LoRA Studio version, see version.py
 
 import re
 import sys
@@ -78,12 +78,22 @@ def status() -> dict:
             out["line"] = re.sub(r"^steps:\s*", "", prog)
     elif out["pics"]:
         out["state"] = "pics"
+    sj = sys.modules.get("speedjobs")                    # Settings › Speed test
+    if sj is not None and sj.JOB["running"] and not run.running():
+        st = sj.status()
+        if st.get("running"):
+            out.update(state="speed", name="Speed test: " + st["type"], pct=st["pct"], eta=st["eta"],
+                       step=st["step"], total=st["steps"], elapsed=st["elapsed"], line=st["line"][:160],
+                       speed={"n": st["n"], "of": st["of"], "variant": st["variant"], "phase": st["phase"],
+                              "s_per_step": st["s_per_step"], "gpu": st["gpu"],
+                              "vram": round(st["vram"] / 2 ** 30, 1) if st["vram"] else None,
+                              "types": f"{st['types_n']} of {st['types_of']}" if st["types_of"] > 1 else ""})
     import statusbar as SB
     if SB.DONE_EVENTS:
         ev = SB.DONE_EVENTS[-1]
         out["last"] = {"name": re.sub(r"\.sh$", "", ev["name"]), "ok": bool(ev["ok"]), "when": time.strftime("%H:%M", time.localtime(ev["t"])),
                        "day": time.strftime("%d %b", time.localtime(ev["t"])), "advice": ev.get("advice") or ""}
-        if out["state"] == "idle" and time.time() - ev["t"] < 12 * 3600:
+        if out["state"] == "idle" and SB.DONE_EVENTS and time.time() - SB.DONE_EVENTS[-1]["t"] < 12 * 3600:
             out["state"] = "done" if ev["ok"] else "fail"
     if out["state"] == "fail" and run.proc is not None and not run.running():
         with run.lock:
@@ -108,6 +118,9 @@ def sample_file() -> Path | None:
 
 def stop_now() -> str:
     sg = _sg()
+    sj = sys.modules.get("speedjobs")
+    if sj is not None and sj.JOB["running"] and not (sg is not None and sg.RUN.running()):
+        return sj.stop()
     if sg is None or not sg.RUN.running():
         return "Nothing is running."
     sg.stop_run()

@@ -13,7 +13,7 @@
 Nothing runs while a training run is active, and the training queue does not start while a speed test runs.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126i"  # LoRA Studio version, see version.py
 
 import json
 import shlex
@@ -254,6 +254,56 @@ def report_of(tkey: str) -> tuple[str, bool]:
     except OSError:
         text = "The report file is gone."
     return text, bool(r.get("changes") or r.get("env"))
+
+
+_GPU = {}
+
+
+def _fmt(sec: float) -> str:
+    sec = int(max(0, sec))
+    return f"{sec // 3600}:{sec // 60 % 60:02d}:{sec % 60:02d}" if sec >= 3600 else f"{sec // 60}:{sec % 60:02d}"
+
+
+def status() -> dict:
+    """What the speed test does right now (Settings › Speed test and the phone page):
+    {running, type, types_n, types_of, n, of, variant, why, phase, line, step, steps, s_per_step, elapsed (this
+    variant), eta (the rest of this type, rough), pct (this type), gpu (% busy or None), vram, vram_total, log}."""
+    import speedtest as ST
+    if not JOB["running"]:
+        return {"running": False}
+    if "v" not in _GPU:
+        _GPU["v"] = ST.VRAM()
+    v, now = _GPU["v"], dict(ST.NOW)
+    labels = {t["key"]: t["label"] for t in types()}
+    cur = next((k for k in JOB["todo"] if k not in JOB["done"]), "")
+    n, of = int(now.get("n") or 0), int(now.get("of") or 0)
+    took = now.get("took") or []
+    el = time.time() - (now.get("t0") or time.time())
+    avg = (sum(took) / len(took)) if took else None
+    eta = ""
+    if avg and of:
+        eta = _fmt(max(0.0, avg - el) + avg * max(0, of - n))
+    frac = (now.get("step") or 0) / (now.get("steps") or 1) if now.get("steps") else 0
+    pct = round(100.0 * (max(0, n - 1) + min(1.0, frac)) / of, 1) if of else 0.0
+    return {"running": True, "type": labels.get(cur, cur), "types_n": len(JOB["done"]) + 1, "types_of": len(JOB["todo"]),
+            "n": n, "of": of, "variant": now.get("variant") or "", "why": now.get("why") or "",
+            "phase": now.get("phase") or "", "line": now.get("line") or "", "step": now.get("step") or 0,
+            "steps": now.get("steps") or 0, "s_per_step": now.get("s_per_step"), "elapsed": _fmt(el), "eta": eta,
+            "pct": pct, "gpu": v.busy(), "vram": v.used(), "vram_total": v.total, "log": now.get("log") or ""}
+
+
+def log_tail(path: str, n: int = 40) -> str:
+    """The last lines of the running variant's trainer output (progress bars folded to their last state)."""
+    import speedtest as ST
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 60000))
+            text = f.read().decode("utf-8", "replace")
+    except OSError:
+        return ""
+    lines = [x.split("\r")[-1].rstrip() for x in ST.ANSI.sub("", text).split("\n")]
+    return "\n".join([x[:300] for x in lines if x.strip()][-n:])
 
 
 def live_text() -> str:

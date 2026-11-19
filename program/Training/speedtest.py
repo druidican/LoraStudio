@@ -21,7 +21,7 @@ reported as such. Close ComfyUI and stop Ollama first, so the video memory is fr
 is loaded again for every variant (about 1-3 minutes each, plus the steps).
 """
 from __future__ import annotations
-__version__ = "1.111126b"  # LoRA Studio version, see version.py
+__version__ = "1.191126i"  # LoRA Studio version, see version.py
 
 import argparse
 import glob
@@ -53,6 +53,38 @@ DROP_ALWAYS = ["save_every_n_epochs", "save_every_n_steps", "save_last_n_epochs"
                "resume", "network_weights"]
 
 
+# What runs right now, for LoRA Studio's Settings › Speed test and the phone page (speedjobs.status()).
+NOW: dict = {}
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+PHASES = [
+    (re.compile(r"compil|inductor|dynamo|triton", re.I),
+     "compiling (torch.compile: the CPU works, the GPU waits; can take several minutes)"),
+    (re.compile(r"tunableop|tuning", re.I), "tuning the GPU kernels (TunableOp; the first steps are slow)"),
+    (re.compile(r"cach\w* (the )?latents|latents? cach|caching|encod\w* (the )?prompts|text encoder output", re.I),
+     "caching latents / text encoder outputs"),
+    (re.compile(r"load\w*.*(model|checkpoint|unet|dit|vae|text.?encoder|state.?dict|weights|safetensors)|"
+                r"building|instantiat", re.I), "loading the model (the GPU waits for the disk)"),
+    (re.compile(r"prepar\w* (the )?(optimizer|accelerator|network)|create LoRA|enable LoRA|running training", re.I),
+     "starting the training"),
+]
+
+
+def last_line(text: str) -> str:
+    """The last line of a chunk of trainer output that says something (no progress bar)."""
+    for ln in reversed(re.split(r"[\r\n]+", ANSI.sub("", text))):
+        ln = ln.strip()
+        if ln and not re.search(r"\d+%\|", ln):
+            return ln[:200]
+    return ""
+
+
+def phase_of(line: str, old: str) -> str:
+    for rx, name in PHASES:
+        if rx.search(line):
+            return name
+    return old
+
+
 # --------------------------------------------------------------------------- 1. capture the training command
 def capture(script: Path, work: Path) -> dict:
     """Run the launch script with `accelerate` replaced by a recorder (a bash function wins over the venv's PATH)."""
@@ -63,9 +95,19 @@ def capture(script: Path, work: Path) -> dict:
             f'env -0 > {shlex.quote(str(envf))}; echo "[speedtest] training command recorded"; exit 0; }}; '
             f'export -f accelerate; exec bash {shlex.quote(str(script))}')
     print(f"[speedtest] preparing: running {script.name} up to its training command (no training) ...")
-    p = subprocess.run(["bash", "-c", shim], cwd=script.parent, text=True, stdout=subprocess.PIPE,
-                       stderr=subprocess.STDOUT)
-    log = p.stdout or ""
+    NOW.update(phase="preparing: the launch script runs up to its training command", line="", t0=time.time(),
+               variant="", step=0, steps=0, log="")
+    p = subprocess.Popen(["bash", "-c", shim], cwd=script.parent, text=True, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, env={**os.environ, "PYTHONUNBUFFERED": "1"})
+    lines = []
+    for ln in p.stdout:                                  # shown while it runs (musubi caches latents here)
+        lines.append(ln)
+        t = last_line(ln)
+        if t:
+            NOW["line"] = t
+            NOW["phase"] = "preparing: " + phase_of(t, "the launch script runs up to its training command")
+    p.wait()
+    log = "".join(lines)
     if not out.is_file():
         tail = "\n".join(log.splitlines()[-25:])
         sys.exit(f"[speedtest] the launch script stopped before its training command:\n{tail}")
@@ -257,6 +299,13 @@ class VRAM:
         self._stop.set()
         return self.peak
 
+    def busy(self) -> int | None:
+        """How busy the GPU is now, in percent (AMD sysfs; None elsewhere)."""
+        try:
+            return int(Path(self.amd, "gpu_busy_percent").read_text()) if self.amd else None
+        except (OSError, ValueError):
+            return None
+
 
 STEP = re.compile(r"(?:steps|it)?[: ]*\d+%\|[^|]*\|\s*(\d+)/(\d+)")
 OOM = re.compile(r"out of memory|OutOfMemoryError|HIP error: out of memory|CUBLAS_STATUS_ALLOC_FAILED", re.I)
@@ -270,12 +319,14 @@ def run_variant(cap, var, steps, warm, out_dir, timeout, vram: VRAM, logdir: Pat
     args = setopt(args, "max_train_steps", steps)
     args = setopt(args, "output_dir", out_dir)
     args = setopt(args, "output_name", "lsspeedtest")
-    env = {**cap["env"], **var["env"]}
+    env = {**cap["env"], **var["env"], "PYTHONUNBUFFERED": "1"}      # trainer output arrives as it is written
     acc = shutil.which("accelerate", path=env.get("PATH")) or "accelerate"
     cmd = [acc, "launch", *cap["launch"], cap["train"], *args]
     log = logdir / f"{var['name']}.log"
     times, last, status, buf = [], -1, "ok", ""
     t0 = time.time()
+    NOW.update(variant=var["name"], why=var["why"], t0=t0, phase="starting the trainer", line="", step=0,
+               steps=steps, log=str(log), s_per_step=None)
     vram.start()
     with open(log, "w", encoding="utf-8") as lf:
         lf.write("$ " + " ".join(shlex.quote(c) for c in cmd) + "\n\n")
@@ -288,12 +339,21 @@ def run_variant(cap, var, steps, warm, out_dir, timeout, vram: VRAM, logdir: Pat
                     break
                 text = chunk.decode("utf-8", "replace")
                 lf.write(text)
+                lf.flush()                               # Settings › Speed test shows this file while it runs
                 buf = (buf + text)[-4000:]
+                ln = last_line(text)
+                if ln:
+                    NOW["line"] = ln
+                    if not times:
+                        NOW["phase"] = phase_of(ln, NOW.get("phase", ""))
                 for m in STEP.finditer(text):
                     n = int(m.group(1))
                     if n > last:
                         times.append((n, time.time()))
                         last = n
+                        NOW.update(step=n, phase="training (measuring)" if n >= warm else "training (warming up)")
+                        if len(times) >= 2 and times[-1][0] > times[0][0]:
+                            NOW["s_per_step"] = round((times[-1][1] - times[0][1]) / (times[-1][0] - times[0][0]), 2)
                         say(f"  {var['name']}: step {n}/{steps}", True)
                 if OOM.search(text):
                     status = "out of memory"
@@ -406,9 +466,14 @@ def test_script(script: Path, depth: str = "quick", steps: int = 15, warm: int =
     results = []
     out_dir = work / "out"
 
+    NOW.update(script=script.name, n=0, of=len(vs), took=[])
+
     def one(v):
         out_dir.mkdir(exist_ok=True)
+        NOW["n"] = NOW.get("n", 0) + 1
+        NOW["of"] = max(NOW.get("of", 0), NOW["n"])
         r = run_variant(cap, v, steps, warm, out_dir, timeout, vram, work, say, stop)
+        NOW.setdefault("took", []).append(r["seconds"])
         shutil.rmtree(out_dir, ignore_errors=True)
         say(f"  -> {r['s_per_step'] or '-'} s/step, peak {gb(r['vram'])}, {r['status']}")
         results.append(r)

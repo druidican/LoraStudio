@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.191126h"  # LoRA Studio version, see version.py
+__version__ = "1.191126i"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -1192,6 +1192,13 @@ def panel_speed(page):
                 list(pick.value or []), depth.value or "quick")), follow())).props("unelevated dense no-caps")
             ui.button("Stop", on_click=lambda: setattr(msg, "content", SJ.stop())) \
                 .props("outline dense no-caps color=negative")
+        with ui.column().classes("w-full gap-1") as now_box:      # what runs right now
+            now_md = ui.markdown("")
+            now_bar = ui.linear_progress(value=0, show_value=False).props("rounded size=10px")
+            now_line = ui.label("").classes("ls-note")
+            with ui.expansion("The trainer's output (the running variant)").classes("w-full") as now_exp:
+                now_log = log_box("Last 40 lines", 16)
+        now_box.set_visibility(SJ.JOB["running"])
         live = log_box("Progress", 12)
         live.set_visibility(bool(SJ.JOB["lines"]))
     with card():
@@ -1225,9 +1232,37 @@ def panel_speed(page):
     use.on_value_change(use_changed)
     show(which.value)
 
+    def draw_now():
+        st = SJ.status()
+        now_box.set_visibility(st["running"])
+        if not st["running"]:
+            return
+        gpu = []
+        if st["gpu"] is not None:
+            gpu.append(f"GPU **{st['gpu']} %** busy")
+        if st["vram_total"]:
+            gpu.append(f"{st['vram'] / 2 ** 30:.1f} of {st['vram_total'] / 2 ** 30:.0f} GB video memory")
+        step = (f" · step {st['step']}/{st['steps']}" + (f", {st['s_per_step']} s/step" if st["s_per_step"] else "")
+                if st["step"] else "")
+        def e(x):                                        # markdown: names like no_checkpointing stay as they are
+            return str(x).replace("_", "\\_").replace("*", "\\*")
+        st = {**st, **{k: e(st[k]) for k in ("type", "variant", "why", "phase")}}
+        now_md.content = (
+            f"**{st['type']}**" + (f" (type {st['types_n']} of {st['types_of']})" if st["types_of"] > 1 else "")
+            + (f" · variant **{st['n']} of {st['of']}**: {st['variant']}" if st["n"] else "")
+            + (f" ({st['why']})" if st["why"] else "")
+            + f"\n\n**{st['phase'] or '…'}**{step} · {st['elapsed']}"
+            + (f" · about {st['eta']} left for this type" if st["eta"] else "")
+            + ("\n\n" + " · ".join(gpu) if gpu else ""))
+        now_bar.value = st["pct"] / 100
+        now_line.text = ("Last line: " + st["line"]) if st["line"] else ""
+        if now_exp.value and st["log"]:
+            now_log.value = SJ.log_tail(st["log"])
+
     def follow():
         if not (SJ.JOB["running"] or SJ.JOB["done"] or SJ.JOB["lines"]):
             return
+        draw_now()
         live.set_visibility(True)
         live.value = SJ.live_text()
         table.content = SJ.table_html()

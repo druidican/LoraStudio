@@ -37,7 +37,8 @@ command line still wins). The same page has **What is installed**: see [Installi
 
 **The phone page** (`/m`): with *Reachable on the network* and a login, open `http://<this computer>:<port>/m` on
 your phone on the same Wi-Fi (this card shows the exact address); add it to the home screen to open it like an app.
-It shows what is training, a progress bar with the percentage and the time left, step, epoch, loss and running time;
+It shows what is training (or a running speed test: the variant, what it does, the GPU), a progress bar with the
+percentage and the time left, step, epoch, loss and running time;
 when a run failed, LoRA Studio's explanation and the last lines of the error; the newest sample picture; the queue.
 **Stop now** and **Stop after this run** (while training) and **Start the queue** (when something waits) ask first.
 The page is small and asks for about 1 KB every 10 s while training, once a minute otherwise, and not at all while
@@ -131,6 +132,12 @@ was found) and whether the faster settings are in use.
   video memory). Tick **Use the faster settings for new launch scripts of this type** to make every new launch
   script of that type use the fastest result; your existing scripts stay as they are (make a new version in step 9).
   Untick to go back. A later test of the same type updates the settings in use.
+- **While it runs** the card shows the type, which variant of how many and what it changes, **what it does right
+  now** (preparing, loading the model, caching latents, compiling, warming up, measuring), the step and seconds per
+  step, how long the variant has run, about how long the type still takes, how busy the GPU is and its video memory,
+  and the trainer's last line; *The trainer's output* shows its last 40 lines. Every variant loads the model again,
+  so the GPU waits (near 0 %) for a minute or more per variant while it loads; torch.compile keeps it waiting while
+  the CPU compiles. The status strip and the phone page show the speed test too.
 - Close ComfyUI before a test; Ollama is stopped by itself. The training queue does not start while a test runs,
   and a test does not start during a training run. *Stop* ends it after the running step.
 

@@ -110,6 +110,9 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
 - **Speed test**: `Training/speedtest.py` (terminal, one launch script) and `Training/speedjobs.py` (Settings ›
   Speed test, per LoRA type, invented dataset in `userdata/speedtest/`, results.json, use.json applied in
   `sd_script.make_plan` via `_speed`). The launch script is run up to `accelerate` with a bash function recording it.
+  1.191126i: `speedtest.NOW` (variant, phase from the trainer's lines `PHASES`, step, s/step, log) →
+  `speedjobs.status()` / `log_tail()` → the Speed test card, the status strip and the phone page; trainer output is
+  unbuffered (`PYTHONUNBUFFERED`) and each variant's log flushed.
 - **Worn item** purpose (clothes / equipment / jewelry): kinds and places, *Make the words the same*, balance check;
   the sort finds the item with OWLv2 (`pictools.find_items`, kind words), Select adds `closeup_*.png` where it is
   small (`dsflow.add_closeups`), *Weight per kind* links the pictures into `.lsflow/kinds_view/<rep×w>_<kind>` in the

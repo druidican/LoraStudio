@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """The phone page, /m: one small HTML page (no NiceGUI, no websocket) that asks /m/status for a few hundred bytes of
 JSON every 10 s while training runs and every 60 s otherwise, and not at all while the phone's screen or tab is off.
-It shows the run, its progress and time left, a failure with the last log lines, the queue and the newest sample
-picture (/m/sample, a small JPEG), with Stop now, Stop after this run and Start the queue. Behind the normal login
+It shows the run (or a speed test: variant, what it does, GPU), its progress and time left, a failure with the last
+log lines, the queue and the newest sample picture (/m/sample, a small JPEG), with Stop now, Stop after this run and Start the queue. Behind the normal login
 (login.allowed); open it at http://<this computer>:<port>/m with Settings › Start and network › Reachable on the
 network. The data comes from Other/mobile.py."""
 from __future__ import annotations
-__version__ = "1.191126h"  # LoRA Studio version, see version.py
+__version__ = "1.191126i"  # LoRA Studio version, see version.py
 
 import hashlib
 import io
@@ -67,7 +67,7 @@ button.bad{border-color:var(--bad);color:var(--bad)}button.go{background:var(--a
   <div id="nan" class="warn" hidden>⚠ The loss is NaN: this run is not learning anymore.</div>
   <pre id="err" hidden></pre>
   <div class="btns" id="runbtns" hidden>
-   <button class="bad" onclick="act('stop','Stop the training now?')">Stop now</button>
+   <button class="bad" onclick="act('stop',last&&last.state==='speed'?'Stop the speed test (after the running variant)?':'Stop the training now?')">Stop now</button>
    <button id="after" onclick="act('after','Stop the queue after this run?')">Stop after this run</button>
   </div>
  </section>
@@ -88,22 +88,25 @@ button.bad{border-color:var(--bad);color:var(--bad)}button.go{background:var(--a
 const $=id=>document.getElementById(id);let last=null,etag="",timer=null,got=0;
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function show(d){
- const st={run:"Training",pics:"Making test pictures",done:"Finished",fail:"Failed",idle:"Idle"}[d.state]||d.state;
- $("state").textContent=st;$("state").className="state "+d.state;
+ const st={run:"Training",speed:"Speed test",pics:"Making test pictures",done:"Finished",fail:"Failed",idle:"Idle"}[d.state]||d.state;
+ $("state").textContent=st;$("state").className="state "+(d.state==="speed"?"run":d.state);
  const L=d.last;
- $("name").textContent=d.state==="run"?d.name:(d.state==="pics"?d.pics:(L&&d.state!=="idle"?L.name:"Nothing is training"));
- const run=d.state==="run";$("prog").hidden=!(run&&d.total);$("runbtns").hidden=!run;
- if(run&&d.total){$("fill").style.width=d.pct+"%";$("pct").textContent=Math.floor(d.pct)+" %";$("left").textContent=d.eta?d.eta+" left":""}
- $("line").textContent=run?(d.stage||d.line||""):(d.state==="idle"&&L?("Last: "+L.name+(L.ok?" finished ":" failed ")+L.day+" "+L.when):"");
+ $("name").textContent=(d.state==="run"||d.state==="speed")?d.name:(d.state==="pics"?d.pics:(L&&d.state!=="idle"?L.name:"Nothing is training"));
+ const sp=d.state==="speed",run=d.state==="run"||sp;$("prog").hidden=!(run&&(d.total||sp));$("runbtns").hidden=!run;
+ if(run&&(d.total||sp)){$("fill").style.width=d.pct+"%";$("pct").textContent=Math.floor(d.pct)+" %";$("left").textContent=d.eta?d.eta+" left":""}
+ $("line").textContent=sp?("Last line: "+(d.line||"…")):run?(d.stage||d.line||""):(d.state==="idle"&&L?("Last: "+L.name+(L.ok?" finished ":" failed ")+L.day+" "+L.when):"");
  let f=[];
- if(run){if(d.total)f.push(["Step",d.step.toLocaleString()+" / "+d.total.toLocaleString()]);
+ if(sp){const s=d.speed;if(s.types)f.push(["LoRA type",s.types]);f.push(["Variant",s.n+" / "+s.of+" · "+s.variant]);
+  f.push(["Doing",s.phase||"…"]);if(d.step)f.push(["Step",d.step+" / "+d.total+(s.s_per_step?" · "+s.s_per_step+" s/step":"")]);
+  if(s.gpu!==null)f.push(["GPU",s.gpu+" % busy"+(s.vram?" · "+s.vram+" GB":"")]);f.push(["This variant",d.elapsed])}
+ else if(run){if(d.total)f.push(["Step",d.step.toLocaleString()+" / "+d.total.toLocaleString()]);
   if(d.epochs)f.push(["Epoch",d.epoch+" / "+d.epochs]);if(d.loss!==null)f.push(["Loss",d.loss]);
   if(d.elapsed)f.push(["Running for",d.elapsed])}
  else if(L&&(d.state==="done"||d.state==="fail")){f.push([L.ok?"Finished":"Failed",L.day+" "+L.when]);if(L.advice)f.push(["Note",L.advice])}
  $("facts").innerHTML=f.map(x=>"<dt>"+esc(x[0])+"</dt><dd>"+esc(x[1])+"</dd>").join("");
  $("nan").hidden=!(run&&d.nan);
  $("err").hidden=!(d.error&&d.error.length);$("err").textContent=(d.error||[]).join("\n");
- $("after").hidden=!d.queue.running||d.queue.stop_after;
+ $("after").hidden=sp||!d.queue.running||d.queue.stop_after;
  const q=d.queue;$("queue").textContent=(q.waiting?q.waiting+" waiting":"Nothing waiting")+(q.running?(q.stop_after?" · stops after this run":" · running"):"");
  $("next").innerHTML=q.next.map(n=>"<li>"+esc(n)+"</li>").join("");
  $("start").hidden=!(q.waiting&&!q.running&&!run);
@@ -118,7 +121,7 @@ async function poll(){
   if(r.status===200){etag=r.headers.get("ETag")||"";show(await r.json())}
   got=Date.now();$("msg").textContent=""}
  catch(e){$("msg").textContent="LoRA Studio does not answer (is the computer on, and on this network?)"}
- timer=setTimeout(poll,last&&(last.state==="run"||last.state==="pics")?10000:60000)}
+ timer=setTimeout(poll,last&&["run","pics","speed"].includes(last.state)?10000:60000)}
 setInterval(()=>{if(got){const s=Math.round((Date.now()-got)/1000);$("ago").textContent=s<5?"just now":s+" s ago"}},1000);
 async function act(a,q){if(!confirm(q))return;
  const r=await fetch("/m/"+a,{method:"POST"});const j=await r.json().catch(()=>({msg:"?"}));$("msg").textContent=j.msg;etag="";setTimeout(poll,800)}
