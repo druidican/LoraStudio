@@ -15,7 +15,7 @@ Results of identify() are cached in model_ids.json (keyed by path, size and modi
 """
 
 from __future__ import annotations
-__version__ = "1.171126"  # LoRA Studio version, see version.py
+__version__ = "1.191126d"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -28,7 +28,7 @@ from pathlib import Path
 
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 CACHE_FILE = _LP.USER / "model_ids.json"
-IDENT_VERSION = 5      # bump when identify() learns new kinds, so cached answers for old files are redone
+IDENT_VERSION = 6      # bump when identify() learns new kinds, so cached answers for old files are redone
 _CACHE: dict | None = None
 
 # What each kind is called in the UI
@@ -143,11 +143,27 @@ def _shape(head, key):
     return v.get("shape") if isinstance(v, dict) else None
 
 
+ABOUT_KEYS = ("modelspec.title", "modelspec.architecture", "modelspec.implementation", "modelspec.prediction_type",
+              "ss_sd_model_name", "ss_base_model_version", "name", "title", "model_name")
+
+
+def about_text(meta: dict, keys) -> str:
+    """The short labels some downloads carry in their header (title, architecture, prediction type), lower case; with
+    'vpred' when the file says it predicts v (modelspec.prediction_type, or the v_pred key some tools add). Not the
+    long descriptions: those often name other models ("trained on SDXL, unlike Pony …")."""
+    bits = [str(meta.get(k) or "") for k in ABOUT_KEYS]
+    pt = str(meta.get("modelspec.prediction_type") or "").lower()
+    if pt in ("v", "v_prediction", "v-prediction", "vpred") or "v_pred" in keys:
+        bits.append("vpred")
+    return " ".join(b for b in bits if b).lower()[:300]
+
+
 def _identify_head(head: dict, name: str) -> dict:
     keys = [k for k in head if k != "__metadata__"]
     meta = head.get("__metadata__") or {}
     out = {"kind": "unknown", "dtype": _dtype_summary(head), "scaled": False, "bundle": [], "note": ""}
     out["scaled"] = any(k.endswith((".scale_weight", ".scale_input")) or k == "scaled_fp8" for k in keys)
+    out["about"] = about_text(meta, keys)
     parts = []
     if any(k.startswith(("model.diffusion_model.", "diffusion_model.")) for k in keys):
         parts.append("diffusion model")

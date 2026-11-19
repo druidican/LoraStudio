@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.191126c"
-VERSION = "1.191126c"
+__version__ = "1.191126d"
+VERSION = "1.191126d"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.191126c",
+    "version.py": "1.191126d",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.191126b",
@@ -35,8 +35,8 @@ RELEASE: dict = {
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
     "program/Training/comfyinpaint.py": "1.151126f",
-    "program/Settings/scanner.py": "1.191126c",
-    "program/UI/scan_panel.py": "1.191126c",
+    "program/Settings/scanner.py": "1.191126d",
+    "program/UI/scan_panel.py": "1.191126d",
     "program/Data/detailscan.py": "1.151126j",
     "program/Data/captioner.py": "1.091126",
     "program/Data/wdtagger.py": "1.151126h",
@@ -50,7 +50,7 @@ RELEASE: dict = {
     "program/Data/trim.py": "1.111126g",
     "program/Data/housekeeping.py": "1.011126",
     "program/Gallery/completed.py": "1.131126b",
-    "program/Gallery/model_guide.py": "1.171126",
+    "program/Gallery/model_guide.py": "1.191126d",
     "program/Gallery/trainingcard.py": "1.131126c",
     "program/Gallery/insights.py": "1.131126b",
     "program/UI/shell.py": "1.131126c",
@@ -103,6 +103,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.191126d", "Find on this computer: a model file whose name does not say whether it is SDXL, Illustrious, Pony or NoobAI is now recognised by the label inside it (title, v-prediction), when it has one."),
     ("1.191126c", "Find on this computer (Settings, and the setup page): searches the folders you name for the trainers, ComfyUI, your LoRAs, datasets and model files, and suggests what to use; nothing changes until you tick and press Use."),
     ("1.191126b", "Worn items: the sort looks for the item (sets aside pictures without it), Select adds a close-up where it is small, and Weight per kind (step 7) gives each kind its own repeat folder in the launch script."),
     ("1.191126", "Settings › Updates: Go back to the PyTorch from before the last upgrade, in one click (GPU test, the versions of now kept so it can be undone)."),

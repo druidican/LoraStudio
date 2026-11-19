@@ -47,7 +47,8 @@ Write the folders to search, one per line (for example `/mnt/Backup` and `~/AI`)
 - every model file: its header is read (once; a second search is quick) to know what it is, and for each LoRA type
   the fitting files are listed per slot, best first. SDXL, Illustrious, Pony and NoobAI files look the same inside,
   so for their base model the file name decides (`Illustrious-XL…` for Illustrious, `NoobAI…` for NoobAI, `…vpred…`
-  for V-pred); a file whose name does not say it stays unticked.
+  for V-pred). When the name says nothing, the short label some downloads carry inside (title, prediction type) is
+  read instead; a file where neither says it stays unticked (rename it, and search again).
 
 Each suggestion has a tick and a list with the other finds; it is ticked when nothing usable is set now (empty, not
 there, or the preset's `/PATH/TO`). **Use the ticked** saves only the ticked ones: a found dataset or LoRA folder is

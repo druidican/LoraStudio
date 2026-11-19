@@ -2,7 +2,7 @@
 """Find on this computer (Settings › Find files, and the setup page): the folders to look through, the search, and
 the suggestions with ticks. The search and the saving are in Settings/scanner.py."""
 from __future__ import annotations
-__version__ = "1.191126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126d"  # LoRA Studio version, see version.py
 
 import os
 import threading
@@ -95,7 +95,8 @@ def build(with_files: bool = True, on_use=None, only=None):
                     ui.label("Model files per LoRA type").classes("font-semibold mt-2")
                     note("Ticked where nothing usable is set now. The best match is chosen; the list has the others. "
                          "SDXL, Illustrious, Pony and NoobAI files look the same inside, so their base models are "
-                         "matched by the file name; a file whose name does not say which it is stays unticked.")
+                         "matched by the file name, or the label some files carry inside; a file where neither says which it "
+                         "is stays unticked.")
                     import sdgui as S
                     _, presets = S.merged_presets()
                     for tkey, slots in mp.items():

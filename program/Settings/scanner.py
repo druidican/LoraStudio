@@ -12,7 +12,7 @@ needs and suggests what to use. Nothing is changed until you tick and press Use.
 The search skips hidden folders, venvs, caches and system folders, and goes at most 8 folders deep.
 """
 from __future__ import annotations
-__version__ = "1.191126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126d"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -188,8 +188,13 @@ def model_picks(models) -> dict:
                                              if tkey not in presets or presets[tkey].get("base") else [])
             avoid = AVOID.get(tkey, [])
 
+            about = {str(p): i.get("about", "") for p, i in ok}
+
             def fit(p):                                  # an SDXL slot fits SDXL, Illustrious and Pony files alike:
-                n = p.name.lower().replace("-", "").replace("_", "")      # the type's name in the file name first
+                n = p.name.lower()                       # the type's name in the file name, or in the labels some
+                if not any(w in n.replace("-", "").replace("_", "") for w in words + avoid):     # files carry
+                    n = f"{n} {about.get(str(p), '')}"
+                n = n.replace("-", "").replace("_", "").replace(" ", "")
                 return (0 if any(w in n for w in words) else 1) + (2 if any(w in n for w in avoid) else 0)
             if flag in G.BASE_FLAGS and tkey in NAME_HINTS and tkey != "sdxl":
                 ok = [(p, i) for p, i in ok if fit(p) == 0]     # its header looks like any SDXL: go by the name
