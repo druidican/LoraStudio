@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.191126"  # LoRA Studio version, see version.py
+__version__ = "1.191126c"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -873,6 +873,12 @@ def panel_trainers(page):
         msg.content = m
         facts.content = S.trainer_facts_html()
     ui.button("Save", on_click=save).props("unelevated no-caps color=primary")
+
+
+# --------------------------------------------------------------------------- Find on this computer
+def panel_find(page):
+    import scan_panel
+    scan_panel.build(with_files=True)
 
 
 # --------------------------------------------------------------------------- Model files

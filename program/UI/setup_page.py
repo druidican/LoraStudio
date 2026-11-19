@@ -2,7 +2,7 @@
 """The setup page (first start, or ./start.sh --setup) and the notice shown once before anything else.
 The questions and what is written are in firstrun.py; this file only draws them."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126c"  # LoRA Studio version, see version.py
 
 import time
 
@@ -93,6 +93,18 @@ def build(hint: dict):
                                             "reloads by itself."
                     ui.run_javascript(RELOAD_JS)
                 ui.button("Import this backup and start LoRA Studio", on_click=do_import).props("unelevated no-caps")
+
+            with ui.expansion("Find on this computer: search folders you name and fill in the steps",
+                              icon="search").classes("w-full"):
+                import scan_panel
+
+                def found(folders):
+                    for k, fk in (("sd", "sd"), ("mu", "mu"), ("datasets", "datasets"), ("models", "models"),
+                                  ("loras", "loras"), ("pictures", "pictures")):
+                        if folders.get(k):
+                            v[fk].value = tilde(folders[k])
+                scan_panel.build(with_files=False, on_use=found,
+                                 only=["sd", "mu", "datasets", "models", "loras", "pictures"])
 
         with step_col():                                 # 1 trainers
             ui.markdown("### 1. Trainers\nThe training programs. `install.sh` puts both in the LoRA Studio folder; "

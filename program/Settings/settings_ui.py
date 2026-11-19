@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.191126c"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -23,7 +23,7 @@ from pathlib import Path
 
 NAV = [                                       # grouped like the work: start, datasets, training, results, collection
     ("", [("health", "Health check")]),
-    ("START", [("start", "Start and network"), ("folders", "Folders")]),
+    ("START", [("start", "Start and network"), ("folders", "Folders"), ("find", "Find on this computer")]),
     ("DATASETS", [("ai", "AI helpers")]),
     ("TRAINING", [("trainers", "Trainers and GPU"), ("models", "Model files"), ("speed", "Speed test")]),
     ("RESULTS", [("comfy", "Test pictures (ComfyUI)")]),

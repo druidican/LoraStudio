@@ -9,7 +9,9 @@ Then the **setup page** asks seven things, one at a time: the trainers, your dat
 ComfyUI (the LoRA folder and the picture folder; installs it finds are offered), a Hugging Face token (*Test the
 token* checks it), Ollama (*Look for models* lists the ones you have) and the backup folder. **Every step can be
 skipped** and changed later in Settings. Moving from another computer? Open **Import from a backup** at the top and
-pick a backup zip: your settings come back and LoRA Studio starts. *Settings › Health check › Run the setup page again*
+pick a backup zip: your settings come back and LoRA Studio starts. **Find on this computer** (on the first page)
+searches folders you name and fills in the steps with what it finds (see below); you still go through them and press
+Finish. *Settings › Health check › Run the setup page again*
 shows it again later (or `./start.sh --setup`).
 
 ## Settings
@@ -31,6 +33,26 @@ the painted logo:
 
 *Save and restart* uses it at once; `./start.sh` and the desktop starter use it from then on (an option typed on the
 command line still wins). The same page has **What is installed**: see [Installing](#install).
+
+## Find on this computer
+
+Write the folders to search, one per line (for example `/mnt/Backup` and `~/AI`); only these and their subfolders
+(at most 8 deep) are searched, and the list is remembered. **Search** looks for:
+
+- the trainers: sd-scripts (a folder with `sdxl_train_network.py`) and musubi-tuner (`src/musubi_tuner`);
+- ComfyUI (`main.py` with `comfy/`): its `output` folder for the pictures, its `models` and `models/loras` folders, and
+  LoRA Manager's example pictures folder (from LoRA Manager's own settings);
+- your LoRA folder (where LoRA files are, not the `model/` folders of datasets) and the folder that holds your
+  datasets (a dataset is a folder with an `<N>_name` repeat folder of pictures);
+- every model file: its header is read (once; a second search is quick) to know what it is, and for each LoRA type
+  the fitting files are listed per slot, best first. SDXL, Illustrious, Pony and NoobAI files look the same inside,
+  so for their base model the file name decides (`Illustrious-XL…` for Illustrious, `NoobAI…` for NoobAI, `…vpred…`
+  for V-pred); a file whose name does not say it stays unticked.
+
+Each suggestion has a tick and a list with the other finds; it is ticked when nothing usable is set now (empty, not
+there, or the preset's `/PATH/TO`). **Use the ticked** saves only the ticked ones: a found dataset or LoRA folder is
+added in front of the ones you have; model files go to that LoRA type's section, as in Model files. Hidden folders,
+venvs, caches, `_reserve`, `_originals` and system folders are skipped.
 
 ## Folders
 
