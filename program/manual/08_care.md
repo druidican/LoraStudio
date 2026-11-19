@@ -51,7 +51,10 @@ trainings with *Memory access fault by GPU*). It is checked at every start and a
 anything; **Fix the training venv** puts the parts that do not fit back and renews the locks in `constraints.txt`.
 **A newer PyTorch / ROCm**: *Look for a newer PyTorch* asks AMD's server (ROCm) or PyPI (CUDA) which stable builds
 exist; *Upgrade* installs it, keeps the old versions in `update_backups/`, tests the GPU and puts them back when the
-test fails. A venv of your own is never changed: LoRA Studio shows the commands.
+test fails. **Go back to torch …** (shown when `update_backups/` holds an earlier PyTorch) puts the versions from
+before the last upgrade back, for when a training breaks later: it tests the GPU, keeps the versions of now in
+`update_backups/` (so going back can be undone the same way) and writes the locks again. A venv of your own is never
+changed: LoRA Studio shows the commands.
 
 **The trainers**: updates for sd-scripts and musubi-tuner from their GitHub pages (the branch each one is on), checked
 quietly at start; *Update now* installs them, tested before and after, rolled back when a test fails. PyTorch is never

@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.181126c"
-VERSION = "1.181126c"
+__version__ = "1.191126"
+VERSION = "1.191126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.181126c",
+    "version.py": "1.191126",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.171126",
@@ -66,7 +66,7 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.181126c",
     "program/UI/lora_page.py": "1.181126b",
     "program/UI/pg_settings.py": "1.131126c",
-    "program/UI/set_panels.py": "1.171126f",
+    "program/UI/set_panels.py": "1.191126",
     "program/Gallery/lorapage.py": "1.151126b",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -90,7 +90,7 @@ RELEASE: dict = {
     "program/Other/report.py": "1.131126c",
     "program/Other/manual.py": "1.131126c",
     "program/Settings/notice.py": "1.131126c",
-    "program/Settings/venvcheck.py": "1.011126",
+    "program/Settings/venvcheck.py": "1.191126",
     "program/Settings/features.py": "1.151126h",
     "program/Other/studio_css.py": "1.011126",
     "program/Training/Lora_Datatypes.py": "1.171126b",
@@ -101,6 +101,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.191126", "Settings › Updates: Go back to the PyTorch from before the last upgrade, in one click (GPU test, the versions of now kept so it can be undone)."),
     ("1.181126c", "The Collection takes in LoRA Manager changes by itself when it opens (at most once a minute): a preview you set in LoRA Manager becomes the LoRA's main picture on its tile and page."),
     ("1.181126b", "A LoRA's page takes in LoRA Manager changes when it opens (a new preview, also an older picture you picked, notes, example pictures); changed pictures get new links, so the browser no longer shows the old one."),
     ("1.181126", "NoobAI test pictures: LoRA Studio's NoobAI workflow is used when NoobAI has none of its own (no longer the SDXL one), and the checkpoint is found under the name ComfyUI knows it by (with its subfolder)."),

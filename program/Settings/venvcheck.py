@@ -12,7 +12,7 @@ inspect() is quick (it reads the installed versions, PyTorch is not started) and
 your own venv only gets the commands to run.
 """
 from __future__ import annotations
-__version__ = "1.011126"  # LoRA Studio version, see version.py
+__version__ = "1.191126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -425,6 +425,93 @@ def upgrade(target: str):
         after = inspect()
         log.append("\n== " + ("✔ " if after["ok"] else "! ") + after["text"])
         log.append("   New trainings use the new PyTorch. Restart LoRA Studio if the picture tools were open.")
+        NEWER.clear()
+        yield "\n".join(log)
+    finally:
+        U.LOCK.release()
+
+
+def last_backup() -> dict | None:
+    """The newest update_backups/venv_before_*.txt whose PyTorch differs from the installed one:
+    {"file", "torch", "pk": {name: version}} or None."""
+    bdir = _LP.USER / "update_backups"
+    have = (LAST or inspect()).get("torch", "")
+    for f in sorted(bdir.glob("venv_before_*.txt"), reverse=True) if bdir.is_dir() else []:
+        pk = {}
+        for line in f.read_text(encoding="utf-8").splitlines():
+            n, _, v = line.strip().partition("==")
+            if n and v:
+                pk[n] = v
+        t = next((v for n, v in pk.items() if _norm(n) == "torch"), "")
+        if t and t != have:
+            return {"file": f, "torch": t, "pk": pk}
+    return None
+
+
+def go_back():
+    """Generator: put back the PyTorch / ROCm versions from before the last upgrade (update_backups/), test the GPU,
+    then the locks and the requirements, as an upgrade does. The versions of now are kept in update_backups/ too, so
+    going back can itself be undone with Upgrade."""
+    import time as _t
+    import updater as U
+    log: list[str] = []
+    r = inspect()
+    b = last_backup()
+    if not b:
+        yield "No earlier PyTorch in update_backups/ to go back to."
+        return
+    if not r.get("managed"):
+        yield ("This is your own venv: LoRA Studio does not change it. To go back yourself:\n\n"
+               + " ".join([str(r.get("py") or "python"), "-m", "pip", "install", "--no-deps", "--force-reinstall"]
+                          + (["--index-url", ROCM_INDEX, "--extra-index-url", "https://pypi.org/simple"]
+                             if r["kind"] == "rocm" else [])
+                          + [f"{n}=={v}" for n, v in sorted(b["pk"].items())]))
+        return
+    if U.training_running():
+        yield "A training is running: go back after it."
+        return
+    if not U.LOCK.acquire(blocking=False):
+        yield "An update of the trainers is running: try again when it has finished."
+        return
+    try:
+        py = Path(r["py"])
+        snap = json.loads(subprocess.run([str(py), "-c", _PROBE], capture_output=True, text=True,
+                                         timeout=60).stdout or "{}").get("pk", {})
+        now = {n: v for n, v in snap.items() if LOCK_RE.fullmatch(n) and n != "rocm-bootstrap"}
+        bdir = _LP.USER / "update_backups"
+        nfile = bdir / f"venv_before_{_t.strftime('%Y%m%d_%H%M%S')}.txt"
+        nfile.write_text("\n".join(f"{n}=={v}" for n, v in sorted(now.items())) + "\n", encoding="utf-8")
+        log.append(f"== Going back from PyTorch {r['torch']} to {b['torch']} ({b['file'].name})")
+        log.append(f"   the versions of now are kept in update_backups/{nfile.name}")
+        back = [py, "-m", "pip", "install", "--no-deps", "--force-reinstall"]
+        if r["kind"] == "rocm":
+            back += ["--index-url", ROCM_INDEX, "--extra-index-url", "https://pypi.org/simple"]
+        back += [f"{n}=={v}" for n, v in sorted(b["pk"].items())]
+        rc = yield from _stream(U.run_stream(back, None, log), log)
+        log.append("\n== Testing the GPU")
+        yield "\n".join(log)
+        if rc != 0 or not _gpu_ok(py, log):
+            log.append("\n❌ The earlier PyTorch did not work: the versions of now go back")
+            again = [py, "-m", "pip", "install", "--no-deps", "--force-reinstall"]
+            if r["kind"] == "rocm":
+                again += ["--index-url", ROCM_INDEX, "--extra-index-url", "https://pypi.org/simple"]
+            again += [f"{n}=={v}" for n, v in sorted(now.items())]
+            yield from _stream(U.run_stream(again, None, log), log)
+            log.append("   " + ("the GPU works again" if _gpu_ok(py, log) else
+                                 "the GPU test still fails: run ./install.sh --reinstall-torch"))
+            yield "\n".join(log)
+            return
+        log.append("\n== Writing the locks again")
+        _write_locks(py, log)
+        log.append("\n== Installing the requirements again within the locks")
+        req = HERE / "requirements.txt"
+        if req.is_file():
+            yield from _stream(U.run_stream([py, "-m", "pip", "install", "-r", req, "-c", CONSTRAINTS], None, log), log)
+        for c, cwd in U._install_cmds(py, dict(U.repos()), CONSTRAINTS, dry=False):
+            yield from _stream(U.run_stream(c, cwd, log), log)
+        after = inspect()
+        log.append("\n== " + ("✔ " if after["ok"] else "! ") + after["text"])
+        log.append("   New trainings use this PyTorch. Restart LoRA Studio if the picture tools were open.")
         NEWER.clear()
         yield "\n".join(log)
     finally:

@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.171126f"  # LoRA Studio version, see version.py
+__version__ = "1.191126"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -502,10 +502,31 @@ def venv_card():
             vlog.set_visibility(True)
             await stream(VC.upgrade(tgt), lambda t: setattr(vlog, "value", t))
             st.content = SU.venv_html()
+            await show_back()
+        async def go_back():
+            bk = await run.io_bound(VC.last_backup)
+            if not bk or not await confirm(f"Go back to PyTorch {bk['torch']} (several GB; no training until it has "
+                                           "finished)?", "Go back"):
+                return
+            vlog.set_visibility(True)
+            await stream(VC.go_back(), lambda t: setattr(vlog, "value", t))
+            st.content = SU.venv_html()
+            await show_back()
+
+        async def show_back():
+            bk = await run.io_bound(VC.last_backup)
+            back.set_visibility(bool(bk))
+            if bk:
+                back.text = f"Go back to torch {bk['torch']}"
         with ui.row().classes("gap-2"):
             ui.button("Look for a newer PyTorch", on_click=look).props("outline dense no-caps")
             up = ui.button("Upgrade", on_click=upgrade).props("unelevated dense no-caps color=primary")
             up.set_visibility(False)
+            back = ui.button("Go back", on_click=go_back).props("outline dense no-caps color=negative")
+            back.set_visibility(False)
+        note("Go back puts the PyTorch and ROCm versions from before the last upgrade back (from update_backups/), "
+             "tests the GPU and keeps the versions of now, so it can be undone too.")
+        ui.timer(0.5, show_back, once=True)
 
 
 # --------------------------------------------------------------------------- Test pictures (ComfyUI)
