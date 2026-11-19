@@ -101,7 +101,13 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
 - **Speed test**: `Training/speedtest.py` (terminal, one launch script) and `Training/speedjobs.py` (Settings ›
   Speed test, per LoRA type, invented dataset in `userdata/speedtest/`, results.json, use.json applied in
   `sd_script.make_plan` via `_speed`). The launch script is run up to `accelerate` with a bash function recording it.
-- **Worn item** purpose (clothes / equipment / jewelry): kinds and places, *Make the words the same*, balance check.
+- **Worn item** purpose (clothes / equipment / jewelry): kinds and places, *Make the words the same*, balance check;
+  the sort finds the item with OWLv2 (`pictools.find_items`, kind words), Select adds `closeup_*.png` where it is
+  small (`dsflow.add_closeups`), *Weight per kind* links the pictures into `.lsflow/kinds_view/<rep×w>_<kind>` in the
+  launch script (`dsflow.kinds_block`, plan counts `n_eff`).
+- **Test-picture workflows** per family (`comfytest.FAMILIES`: sdxl, illustrious, pony, noobai, vpred, anima;
+  Illustrious/Pony fall back to the SDXL one; built-ins in `Training/workflows/`, written by `tools/make_workflows.py`).
+  NoobAI-XL types `noobai` (EPS) and `noobai_vpred`. The caption consistency check was removed (1.151126h).
 - **Quality words:** Pony trains with `score_9, score_8_up, score_7_up, source_anime` as `--caption_prefix`
   (keep_tokens raised to cover them), Illustrious with `masterpiece, best quality` as `--caption_suffix`; caption
   files stay untouched; new sample prompts get them too.
@@ -141,7 +147,6 @@ are gone. Keep it that way: build a step's controls when it is opened, redraw HT
   no loops). The plan and the task walk-throughs are in the owner's walkthrough document (Usability tab) and the
   "LoRA Studio flow" whiteboard.
 
-- Worn items, later (owner deferred): sort and crop around the item; weight per kind.
 - amd-smi: values that stay empty on real hardware need the owner's `amd-smi metric --json` output.
 - WD tagger on Ubuntu 26.10: if it still fails, the error text it now shows is needed.
 - RPGAssistant (separate repo `druidican/rpgassistant`): 8 changes on branch `wip-8-changes`, built and
