@@ -7,7 +7,7 @@ the Collection's cached thumbnail (lora_library.thumb_file, made when the browse
 only (allowed_roots).
 """
 from __future__ import annotations
-__version__ = "1.181126b"  # LoRA Studio version, see version.py
+__version__ = "1.191126g"  # LoRA Studio version, see version.py
 
 import hashlib
 from pathlib import Path

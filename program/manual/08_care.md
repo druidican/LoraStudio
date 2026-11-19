@@ -49,9 +49,14 @@ message says which step (reading the newest release, version.py or the download)
 **The training venv**: every ROCm or CUDA part must be the version PyTorch is built for (a newer part crashes
 trainings with *Memory access fault by GPU*). It is checked at every start and after an update, without downloading
 anything; **Fix the training venv** puts the parts that do not fit back and renews the locks in `constraints.txt`.
-**A newer PyTorch / ROCm**: *Look for a newer PyTorch* asks AMD's server (ROCm) or PyPI (CUDA) which stable builds
-exist; *Upgrade* installs it, keeps the old versions in `update_backups/`, tests the GPU and puts them back when the
-test fails. **Go back to torch …** (shown when `update_backups/` holds an earlier PyTorch) puts the versions from
+**Another PyTorch / ROCm**: *Show the PyTorch builds* asks AMD's server (ROCm) or PyPI (CUDA) which stable builds
+exist and lists them, newest first (the installed one and the newest are marked). A build is PyTorch made for one ROCm
+version, so choosing one moves training to that ROCm, newer or older. *Install torch …* keeps the old versions in
+`update_backups/`, installs the build with every ROCm part at its version, tests the GPU and puts the old versions back
+when the test fails. **ROCm on the system is newer** (here, in the Health check and on Home): the ROCm you installed
+with apt is newer than the one training uses. Trainings keep working (training brings its own ROCm); the note points
+to the list, and *Keep ROCm … for training* puts it away until the system gets another ROCm. **Go back to torch …**
+(shown when `update_backups/` holds an earlier PyTorch) puts the versions from
 before the last upgrade back, for when a training breaks later: it tests the GPU, keeps the versions of now in
 `update_backups/` (so going back can be undone the same way) and writes the locks again. A venv of your own is never
 changed: LoRA Studio shows the commands.

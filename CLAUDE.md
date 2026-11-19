@@ -64,6 +64,11 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   huggingface_hub).
 - **GPU status:** `gpusmi.py` uses amd-smi on ROCm ≥ 10 (rocm-smi is gone there), rocm-smi before; install.sh
   writes the choice to `features.json` `gpu_tool`. amd-smi's JSON differs between versions: keys matched loosely.
+- **PyTorch / ROCm builds** (1.191126g, owner's choice): Settings › Updates lists every stable build on AMD's index
+  (`venvcheck.look` → `builds`), any one can be installed (`venvcheck.upgrade`, GPU test, undo, Go back);
+  `venvcheck.rocm_notice` warns (Health check, Home) when `/opt/rocm*` is newer than the training ROCm.
+  install.sh: a new install takes the NEWEST stable build (`pick_amd_torch`; `--torch`, `--tested-torch`, fallback
+  to the tested pins); a re-run keeps a working ROCm build.
 - **Updater** (`ghupdate.py`): channel *Releases only* (default) or *Betas too*; the token is never sent along a
   redirect to another host (codeload); *Test token* explains each failure.
 - **WD tagger writes every tag** for characters and worn items; step 7's *tags → trigger words* card moves the
@@ -146,11 +151,6 @@ are gone. Keep it that way: build a step's controls when it is opened, redraw HT
   your own shell command; it kills the shell. Use `fuser -k <port>/tcp` or `ps … | awk` with a precise pattern.
 
 ## Open
-
-- **Not released yet (2026-11-19):** `widgets.stream` stops showing progress lines once the part of the page that
-  started it is gone (a step left or the page reloaded mid-job; it warned "element has been deleted"), and step 7's
-  *Check picture kinds* skips its redraw then. Committed after 1.191126f without a release: make the next release with
-  `BASE=c7b5ab4 tools/release.sh …` so these two files are stamped too, then remove this note.
 
 - **NiceGUI (owner decided 2026-11-13):** done as a complete redo. 1.131126c tested by the owner on real hardware
   (training, ComfyUI test pictures, amd-smi values, update and install all fine) and published as the normal

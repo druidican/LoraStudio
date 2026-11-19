@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.191126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126g"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -478,9 +478,20 @@ def venv_card():
         with ui.row().classes("gap-2"):
             ui.button("Check again", on_click=again).props("outline dense no-caps")
             ui.button("Fix the training venv", on_click=fix).props("unelevated dense no-caps color=primary")
-        ui.label("A newer PyTorch / ROCm").classes("font-semibold mt-2")
-        note("Asks AMD's server (ROCm) or PyPI (CUDA) which PyTorch builds exist; only stable releases count. The "
-             "upgrade keeps the old versions in update_backups/, tests the GPU and puts them back when the test fails.")
+        ui.label("Another PyTorch / ROCm").classes("font-semibold mt-2")
+        note("Asks AMD's server (ROCm) or PyPI (CUDA) which PyTorch builds exist (stable releases only) and lists "
+             "them, newest first: a build is PyTorch made for one ROCm version, so choosing one moves training to "
+             "that ROCm. Installing keeps the old versions in update_backups/, puts every ROCm part to the build's "
+             "version, tests the GPU and puts the old ones back when the test fails.")
+        rn = VC.rocm_notice(VC.LAST or None)
+        if rn["show"]:
+            with ui.row().classes("items-center gap-2") as rrow:
+                ui.markdown("**ROCm on the system is newer:** " + rn["text"] + ".").classes("ls-note")
+
+                def keep():
+                    VC.remember_rocm(rn["system"])
+                    rrow.set_visibility(False)
+                ui.button(f"Keep ROCm {rn['training']} for training", on_click=keep).props("flat dense no-caps")
         nmd = ui.markdown("")
 
         async def look():
@@ -491,13 +502,31 @@ def venv_card():
                 md += ("\n\nYour own venv: LoRA Studio shows the command, it does not change it:\n\n```\n"
                        + VC._upgrade_cmd(VC.LAST, n["newest"]) + "\n```")
             nmd.content = md
-            up.set_visibility(n["newer"] and n["managed"])
-            up.text = f"Upgrade to torch {n['newest']}"
+            opts = {}
+            for b in n.get("builds") or []:
+                t, _, rv = b.partition("+rocm")
+                lab = f"torch {t}" + (f" · ROCm {rv}" if rv else "")
+                if b == n["have"]:
+                    lab += "  (installed)"
+                elif b == n["newest"]:
+                    lab += "  (newest)"
+                opts[b] = lab
+            pick.options = opts
+            pick.value = n["newest"] if n["newest"] in opts else None
+            pick.update()
+            pick.set_visibility(bool(opts) and n["managed"])
+            up.set_visibility(bool(opts) and n["managed"])
+            chosen()
+
+        def chosen(*_):
+            v = pick.value
+            up.text = f"Install torch {v}" if v else "Install"
+            up.set_enabled(bool(v) and v != VC.NEWER.get("have"))
 
         async def upgrade():
-            tgt = VC.NEWER.get("newest")
-            if not tgt or not await confirm("Upgrade PyTorch (several GB; no training until it has finished)?",
-                                            "Upgrade"):
+            tgt = pick.value
+            if not tgt or not await confirm(f"Install PyTorch {tgt} and its ROCm (several GB; no training until it has "
+                                            "finished)?", "Install"):
                 return
             vlog.set_visibility(True)
             await stream(VC.upgrade(tgt), lambda t: setattr(vlog, "value", t))
@@ -519,8 +548,10 @@ def venv_card():
             if bk:
                 back.text = f"Go back to torch {bk['torch']}"
         with ui.row().classes("gap-2"):
-            ui.button("Look for a newer PyTorch", on_click=look).props("outline dense no-caps")
-            up = ui.button("Upgrade", on_click=upgrade).props("unelevated dense no-caps color=primary")
+            ui.button("Show the PyTorch builds", on_click=look).props("outline dense no-caps")
+            pick = ui.select({}, label="Build", on_change=chosen).props("outlined dense").classes("w-80")
+            pick.set_visibility(False)
+            up = ui.button("Install", on_click=upgrade).props("unelevated dense no-caps color=primary")
             up.set_visibility(False)
             back = ui.button("Go back", on_click=go_back).props("outline dense no-caps color=negative")
             back.set_visibility(False)

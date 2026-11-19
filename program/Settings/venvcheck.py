@@ -12,7 +12,7 @@ inspect() is quick (it reads the installed versions, PyTorch is not started) and
 your own venv only gets the commands to run.
 """
 from __future__ import annotations
-__version__ = "1.191126"  # LoRA Studio version, see version.py
+__version__ = "1.191126g"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -320,11 +320,56 @@ def _index_versions(py: Path, name: str, index: str | None) -> list[str]:
     return [v.strip() for v in m.group(1).split(",") if v.strip()]
 
 
+def system_rocm() -> str:
+    """The newest ROCm installed on the system (/opt/rocm*/.info/version: '10.2.0'), '' when there is none."""
+    import glob
+    found = []
+    for f in glob.glob("/opt/rocm*/.info/version"):
+        try:
+            m = re.match(r"\s*(\d+(?:\.\d+)*)", Path(f).read_text())
+        except OSError:
+            continue
+        if m:
+            found.append(m.group(1))
+    return max(found, key=lambda v: tuple(int(x) for x in v.split("."))) if found else ""
+
+
+def _rv(v: str) -> tuple:
+    return tuple(int(x) for x in re.findall(r"\d+", v or "")[:3])
+
+
+DISMISS = _LP.USER / "rocm_notice.json"
+
+
+def rocm_notice(r: dict | None = None) -> dict:
+    """{"show", "system", "training", "text"}: the system's ROCm is newer than the one the training venv uses (and the
+    note was not put away for this system ROCm with remember_rocm())."""
+    r = r or LAST or {}
+    sysv, trv = system_rocm(), (r.get("want") if r.get("kind") == "rocm" else "")
+    out = {"show": False, "system": sysv, "training": trv, "text": ""}
+    if not sysv or not trv or _rv(sysv) <= _rv(trv):
+        return out
+    try:
+        if json.loads(DISMISS.read_text(encoding="utf-8")).get("system") == sysv:
+            return out
+    except (OSError, ValueError):
+        pass
+    out.update(show=True, text=f"the system has ROCm {sysv}, training uses ROCm {trv} (torch {r.get('torch')}). "
+                               "Trainings keep working; Settings › Updates shows the builds for a newer ROCm")
+    return out
+
+
+def remember_rocm(sysv: str):
+    """Put the note away until the system gets another ROCm."""
+    DISMISS.write_text(json.dumps({"system": sysv}), encoding="utf-8")
+
+
 def look() -> dict:
-    """{ok, have, newest, newer, kind, text} · asks AMD's index (ROCm) or PyPI (CUDA) which PyTorch builds exist."""
+    """{ok, have, newest, newer, kind, builds, text} · asks AMD's index (ROCm) or PyPI (CUDA) which PyTorch builds
+    exist; builds: every stable one, newest first."""
     r = inspect()
     res = {"ok": False, "have": r.get("torch", ""), "newest": "", "newer": False, "kind": r.get("kind", ""),
-           "managed": r.get("managed", False), "text": ""}
+           "managed": r.get("managed", False), "builds": [], "text": ""}
     if not r.get("torch") or r["kind"] not in ("rocm", "cuda"):
         res["text"] = "no GPU build of PyTorch in the training venv"
     else:
@@ -336,7 +381,7 @@ def look() -> dict:
                 vers = [v for v in vers if "+rocm" not in v]
             vers = [v for v in vers if not re.search(r"(a|b|rc|dev)\d", v.partition("+")[0])]   # stable only
             newest = max(vers, key=_vkey) if vers else ""
-            res.update(ok=True, newest=newest)
+            res.update(ok=True, newest=newest, builds=sorted(set(vers), key=_vkey, reverse=True)[:40])
             have = r["torch"] if r["kind"] == "rocm" else r["torch"].partition("+")[0]
             res["newer"] = bool(newest) and _vkey(newest) > _vkey(have)
             res["text"] = (f"newer: torch {newest} (installed {r['torch']})" if res["newer"] else
@@ -384,7 +429,7 @@ def upgrade(target: str):
         bdir.mkdir(exist_ok=True)
         bfile = bdir / f"venv_before_{_t.strftime('%Y%m%d_%H%M%S')}.txt"
         bfile.write_text("\n".join(f"{n}=={v}" for n, v in sorted(old.items())) + "\n", encoding="utf-8")
-        log.append(f"== Upgrading PyTorch {r['torch']} → {target}")
+        log.append(f"== PyTorch {r['torch']} → {target}")
         log.append(f"   the versions before are kept in update_backups/{bfile.name}")
         cmd = _upgrade_list(r, target, py)
         rc = yield from _stream(U.run_stream(cmd, None, log), log)
@@ -404,7 +449,7 @@ def upgrade(target: str):
             yield "\n".join(log)
             ok = _gpu_ok(py, log)
         if not ok:
-            log.append("\n❌ The new PyTorch did not work: the old versions go back")
+            log.append("\n❌ The chosen PyTorch did not work: the old versions go back")
             back = [py, "-m", "pip", "install", "--no-deps", "--force-reinstall"]
             if r["kind"] == "rocm":
                 back += ["--index-url", ROCM_INDEX, "--extra-index-url", "https://pypi.org/simple"]

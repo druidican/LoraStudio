@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.191126f"
-VERSION = "1.191126f"
+__version__ = "1.191126g"
+VERSION = "1.191126g"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.191126f",
+    "version.py": "1.191126g",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.191126f",
@@ -28,7 +28,7 @@ RELEASE: dict = {
     "program/Data/datasets_ui.py": "1.151126h",
     "program/Data/dsflow.py": "1.191126e",
     "program/Training/training_ui.py": "1.171126d",
-    "program/Settings/settings_ui.py": "1.191126c",
+    "program/Settings/settings_ui.py": "1.191126g",
     "program/Gallery/lora_library.py": "1.181126c",
     "program/Training/comfytest.py": "1.191126e",
     "program/Training/speedtest.py": "1.111126b",
@@ -55,13 +55,13 @@ RELEASE: dict = {
     "program/Gallery/trainingcard.py": "1.191126f",
     "program/Gallery/insights.py": "1.131126b",
     "program/UI/shell.py": "1.131126c",
-    "program/UI/widgets.py": "1.181126b",
+    "program/UI/widgets.py": "1.191126g",
     "program/UI/theme.css": "1.131126c",
     "program/UI/login.py": "1.131126c",
     "program/UI/setup_page.py": "1.191126c",
     "program/UI/pg_home.py": "1.131126c",
     "program/UI/pg_datasets.py": "1.161126",
-    "program/UI/ds_steps.py": "1.191126e",
+    "program/UI/ds_steps.py": "1.191126g",
     "program/UI/ds_train.py": "1.191126f",
     "program/UI/ds_results.py": "1.151126b",
     "program/UI/ds_batch.py": "1.151126h",
@@ -69,7 +69,7 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.181126c",
     "program/UI/lora_page.py": "1.191126f",
     "program/UI/pg_settings.py": "1.131126c",
-    "program/UI/set_panels.py": "1.191126c",
+    "program/UI/set_panels.py": "1.191126g",
     "program/Gallery/lorapage.py": "1.191126f",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -93,17 +93,18 @@ RELEASE: dict = {
     "program/Other/report.py": "1.131126c",
     "program/Other/manual.py": "1.131126c",
     "program/Settings/notice.py": "1.131126c",
-    "program/Settings/venvcheck.py": "1.191126",
+    "program/Settings/venvcheck.py": "1.191126g",
     "program/Settings/features.py": "1.151126h",
     "program/Other/studio_css.py": "1.011126",
     "program/Training/Lora_Datatypes.py": "1.191126e",
     "program/Training/Training_Recommendations.py": "1.171126",
     "program/Other/lora_studio.css": "1.151126i",
-    "install.sh": "1.151126h",
+    "install.sh": "1.191126g",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.191126g", "Moving training to another ROCm: Settings › Updates › Show the PyTorch builds lists every stable PyTorch build on AMD's server (each made for one ROCm version) and installs the one you choose, with a GPU test, automatic undo and Go back. When the system's ROCm is newer than the one training uses, the Health check and Home say so (Keep ROCm … for training hides it). A new install takes the newest build (install.sh --torch picks one, --tested-torch the tested one); running install.sh again keeps the installed PyTorch. Progress lines stop when you leave a step during a job."),
     ("1.191126f", "The look of the result, part 2: when the pictures are photos and the result should be the model's own style (Illustrious, NoobAI, Pony, Anima), the text encoders are no longer trained, so the photo look does not stick to the trigger word. The LoRA page says under How to use it what the LoRA was made from and which words go in the prompt or the negative prompt. Step 9's Use the chosen look updates scripts saved before."),
     ("1.191126e", "The look of the result (step 7 and 9): Ollama tells per picture whether it is a photo, a drawing, a 3D render or a painting, and training adds words for that kind behind every caption (Pony photos no longer get source_anime), so a LoRA made from photos no longer ties the photo look to its trigger word. Per LoRA type you choose what the result should look like (its own style, Photo, 3D; Pony: Anime, Western cartoon, Photo), with a default per type; the test and sample pictures follow it. Check picture kinds for datasets sorted before."),
     ("1.191126d", "Find on this computer: a model file whose name does not say whether it is SDXL, Illustrious, Pony or NoobAI is now recognised by the label inside it (title, v-prediction), when it has one."),

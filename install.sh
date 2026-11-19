@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-# LoRA Studio version 1.151126h
+# LoRA Studio version 1.191126g
 # LoRA Studio installer: LoRA Studio + sd-scripts + musubi-tuner in ONE folder with ONE Python 3.12 venv.
 #
 #   unzip LoraStudio.zip && cd LoraStudio && ./install.sh
@@ -28,6 +28,8 @@
 #   --gfx gfxNNNN       AMD GPU architecture (default: detected, e.g. gfx1201 for the RX 9070 XT)
 #   --import DIR        old LoRA Studio folder to take settings, token, Completed marks and caches from
 #   --reinstall-torch   install PyTorch (and ROCm) again even when it already works
+#   --torch VERSION     AMD: this PyTorch build instead of the newest, e.g. 2.13.0+rocm10.1.0 (the ROCm follows it)
+#   --tested-torch      AMD: the build this installer was tested with (see "versions" below) instead of the newest
 #   --no-models         do not offer to download the Z-Image Turbo training adapter
 #   --sd install|existing|none      sd-scripts: install it, use yours, or none (only make launch scripts)
 #   --mu install|existing|none      the same for musubi-tuner
@@ -46,7 +48,9 @@ set -Eeo pipefail
 
 # ------------------------------------------------------------------ versions (edit here to move on)
 PYVER="3.12"
-# AMD: the wheels from AMD's repository (ROCm 10.1.0; 10.0.0 was tested on an RX 9070 XT, Fedora 44)
+# AMD: the wheels from AMD's repository. A new install takes the NEWEST stable PyTorch build on AMD's server (and the
+# ROCm it is built for); the versions below are the tested fallback (--tested-torch, or when the server cannot be asked).
+# (ROCm 10.1.0; 10.0.0 was tested on an RX 9070 XT, Fedora 44)
 # https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/frameworks/pytorch/install.html lists the combinations
 ROCM_INDEX="https://stable.repo.amd.com/rocm/whl-next/"
 ROCM_VER="10.1.0"                                              # must be the ROCm the torch build below is made for
@@ -78,6 +82,7 @@ sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -
 tmo() { if command -v timeout >/dev/null; then timeout "$@"; else shift; "$@"; fi; }   # tmo SECONDS command ...
 SRC="$(cd "$(dirname "$0")" && pwd -P)"
 TARGET="$HOME/LoraStudio"; DIR_GIVEN=0; GPU="auto"; GFX=""; IMPORT=""; REINSTALL_TORCH=0; MODELS=1; YES=0
+WANT_T=""; TESTED_TORCH=0; PRE=""
 TRAINERS=""; EX_SD=""; EX_VENV=""; EX_MU=""; ASK=0; ACCEPT_NOTICE=0; A_SD=""; A_MU=""; A_OL=""; A_OLURL=""
 STEP=0
 
@@ -136,6 +141,8 @@ while [ $# -gt 0 ]; do
         --gfx) GFX="$2"; shift ;;
         --import) IMPORT="$(abspath "$2")"; shift ;;
         --reinstall-torch) REINSTALL_TORCH=1 ;;
+        --torch) WANT_T="$2"; shift ;;
+        --tested-torch) TESTED_TORCH=1 ;;
         --no-models) MODELS=0 ;;
         --trainers) TRAINERS="$2"; shift ;;
         --sd-scripts) EX_SD="$(abspath "$2")"; shift ;;
@@ -537,6 +544,27 @@ fi
 ok "pip $("$PY" -m pip --version | awk '{print $2}')"
 PIP() { "$PY" -m pip "$@"; }
 
+pick_amd_torch() {   # the build to install: --torch, else the newest stable one on AMD's server, else the tested one
+    local t="$WANT_T"
+    if [ -z "$t" ] && [ "$TESTED_TORCH" = 0 ]; then
+        say "   Asking AMD's server for the newest PyTorch build..."
+        t="$(PIP index versions torch --index-url "$ROCM_INDEX" --disable-pip-version-check 2>/dev/null \
+            | sed -n 's/^Available versions: //p' | tr ',' '\n' | tr -d ' ' | grep '+rocm' \
+            | grep -Ev '^[0-9.]+(a|b|rc|dev)' | sort -V | tail -1 || true)"
+        [ -n "$t" ] || warn "could not ask AMD's server: the tested torch ${TORCH_SPEC_AMD##*==} is installed"
+    fi
+    if [ -n "$t" ] && [ "$t" != "${TORCH_SPEC_AMD##*==}" ]; then
+        [[ "$t" == *+rocm* ]] || die "--torch needs an AMD build such as 2.13.0+rocm10.1.0 (got $t)"
+        ROCM_VER="${t##*+rocm}"
+        ROCM_SPEC="rocm[libraries,devel,device-@GFX@]==$ROCM_VER"   # ROCm's own package brings its parts at this version
+        ROCM_PARTS=""
+        TORCH_SPEC_AMD="torch[device-@GFX@]==$t"
+        TV_SPEC_AMD="torchvision[device-@GFX@]"; TA_SPEC_AMD="torchaudio"   # pip picks the ones made for this torch
+        PRE="--pre"                                  # AMD pairs a stable torch with an alpha torchvision
+    fi
+    ok "PyTorch for AMD: torch ${TORCH_SPEC_AMD##*==} (ROCm $ROCM_VER)"
+}
+
 if [ "$TRAINERS" = install ]; then
 # ------------------------------------------------------------------ 4. PyTorch
 step "PyTorch for $( [ "$GPU" = amd ] && echo "ROCm ($GFX)" || echo CUDA )"
@@ -544,19 +572,12 @@ HAVE_TORCH="$("$PY" -c 'import torch; print(torch.__version__)' 2>/dev/null || t
 TORCH_FITS=0
 if [ -n "$HAVE_TORCH" ]; then
     if [ "$GPU" = amd ]; then
-        WANT_TORCH="${TORCH_SPEC_AMD##*==}"
-        NEWEST="$(printf '%s\n%s\n' "$HAVE_TORCH" "$WANT_TORCH" | sort -V | tail -1)"
-        if [ "$HAVE_TORCH" = "$WANT_TORCH" ]; then TORCH_FITS=1
-        elif [[ "$HAVE_TORCH" == *rocm* ]] && [ "$NEWEST" = "$HAVE_TORCH" ] && [ "$REINSTALL_TORCH" = 0 ]; then
-            TORCH_FITS=1                       # newer than this installer's (upgraded in Settings › Updates): kept
-            ok "torch $HAVE_TORCH is newer than this installer's $WANT_TORCH: kept"
-        elif [[ "$HAVE_TORCH" == *rocm* ]] && [ "$REINSTALL_TORCH" = 0 ]; then
-            say "   Installed: torch $HAVE_TORCH. This installer brings torch $WANT_TORCH (ROCm $ROCM_VER)."
-            if yes_no "Install torch $WANT_TORCH with ROCm $ROCM_VER now? (several GB; No keeps the current one)" y; then
-                REINSTALL_TORCH=1
-            else
-                TORCH_FITS=1
-            fi
+        # a working ROCm build stays (running install.sh again does not touch PyTorch); Settings › Updates moves it
+        if [[ "$HAVE_TORCH" == *rocm* ]] && [ "$REINSTALL_TORCH" = 0 ] && [ -z "$WANT_T" ]; then
+            TORCH_FITS=1
+            ok "torch $HAVE_TORCH kept (another build: Settings › Updates › Show the PyTorch builds, or --torch)"
+        elif [ -n "$WANT_T" ] && [ "$HAVE_TORCH" = "$WANT_T" ] && [ "$REINSTALL_TORCH" = 0 ]; then
+            TORCH_FITS=1
         fi
     else [[ "$HAVE_TORCH" != *rocm* ]] && TORCH_FITS=1 || true; fi
 fi
@@ -564,9 +585,10 @@ if [ "$TORCH_FITS" = 1 ] && [ "$REINSTALL_TORCH" = 0 ]; then
     ok "already installed: torch $HAVE_TORCH (use --reinstall-torch to install it again)"
 else
     if [ "$GPU" = amd ]; then
+        pick_amd_torch
         say "   Downloading ROCm and PyTorch for $GFX from AMD (several GB, takes a while)..."
         PIP install --force-reinstall --index-url "$ROCM_INDEX" "${ROCM_SPEC//@GFX@/$GFX}" ${ROCM_PARTS//@GFX@/$GFX}
-        PIP install --force-reinstall --index-url "$ROCM_INDEX" \
+        PIP install --force-reinstall $PRE --index-url "$ROCM_INDEX" \
             "${TORCH_SPEC_AMD//@GFX@/$GFX}" "${TV_SPEC_AMD//@GFX@/$GFX}" "$TA_SPEC_AMD"
     else
         say "   Downloading PyTorch for CUDA (several GB, takes a while)..."

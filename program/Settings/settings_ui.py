@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.191126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126g"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -122,6 +122,9 @@ def checks() -> list[dict]:
         if r.get("torch"):
             add("ok" if r["ok"] else "bad", "Training venv", r["text"], "updates",
                 "Fix" if r.get("managed") else "Show the commands")
+            rn = VC.rocm_notice(r)
+            if rn["show"]:
+                add("warn", "ROCm on the system is newer", rn["text"], "updates", "See the builds")
     except Exception:                                    # noqa: BLE001
         pass
     # the program's own files: all of the same version?

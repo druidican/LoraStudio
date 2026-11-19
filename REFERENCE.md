@@ -459,8 +459,10 @@ What it does, step by step (every step says what it found; it asks before anythi
    Hugging Face token, Completed marks, caches) from an older LoRA Studio folder it finds. The old folder
    is not changed.
 3. Creates **venv/** with Python 3.12 (an older GUI-only venv is moved aside, not deleted).
-4. Installs **PyTorch** and **bitsandbytes** (8-bit optimizers): AMD = ROCm 10.1.0 and torch 2.13.0+rocm10.1.0 from AMD's repository for your GFX version (an
-   older ROCm build is offered the upgrade on the next `./install.sh`; every ROCm part is pinned to the same version);
+4. Installs **PyTorch** and **bitsandbytes** (8-bit optimizers): AMD = the newest stable PyTorch build on AMD's
+   repository for your GFX version, with the ROCm it is built for (`--torch 2.13.0+rocm10.1.0` picks one,
+   `--tested-torch` the tested 2.13.0+rocm10.1.0, which is also used when the server cannot be asked). A working ROCm
+   build is kept when install.sh runs again (Settings > Updates moves it); every ROCm part is the same version;
    NVIDIA = torch from PyPI (CUDA 13; for an older driver set `CUDA_INDEX` at the top of install.sh).
 5. Clones (or updates) **sd-scripts** and **musubi-tuner** and installs their packages, locked to the
    PyTorch above. Their shared libraries (transformers, diffusers, accelerate, huggingface-hub, ...) are
@@ -476,8 +478,9 @@ What it does, step by step (every step says what it found; it asks before anythi
 
 **Update** everything later by running `./install.sh` again in `~/LoraStudio`: new LoRA Studio files (your
 settings stay), `git pull` of both trainers and their packages, without touching PyTorch. Options:
-`--dir DIR`, `--gpu amd|nvidia`, `--gfx gfxNNNN`, `--import OLD_FOLDER`, `--reinstall-torch`,
-`--no-models`, `--yes` (no questions). The PyTorch / ROCm versions are variables at the top of install.sh.
+`--dir DIR`, `--gpu amd|nvidia`, `--gfx gfxNNNN`, `--import OLD_FOLDER`, `--reinstall-torch`, `--torch VERSION`,
+`--tested-torch`, `--no-models`, `--yes` (no questions). The tested PyTorch / ROCm versions are variables at the top
+of install.sh.
 
 The trainers and every launch script activate `<trainer>/venv`, which is the shared venv, so nothing else
 needs to know about it. start.sh uses the same venv for the GUI.
@@ -546,13 +549,15 @@ it.
 built for, and that `constraints.txt` locks what is installed. **Fix the training venv** puts parts back, writes the
 locks again and, when PyTorch was upgraded, installs the requirements again within the new locks.
 
-**Look for a newer PyTorch** asks AMD's server (`stable.repo.amd.com/rocm/whl-next`, for ROCm) or PyPI (CUDA) which
-PyTorch builds exist; only stable PyTorch releases count, with the torchvision and torchaudio AMD pairs with them
-(for PyTorch 2.14 that is an alpha torchvision). **Upgrade** (after *Yes, upgrade*) keeps the old versions in
-`update_backups/venv_before_<time>.txt`, installs the new PyTorch, puts the ROCm parts to its version, tests the GPU,
-and puts the old versions back when the test fails; then the locks and the requirements are renewed. Only the venv
-install.sh made is changed; for your own venv it shows the command. `./install.sh` keeps a PyTorch that is newer
-than its own (2.13.0+rocm10.1.0) and offers the upgrade to an older one.
+**Show the PyTorch builds** asks AMD's server (`stable.repo.amd.com/rocm/whl-next`, for ROCm) or PyPI (CUDA) which
+PyTorch builds exist and lists them, newest first; only stable PyTorch releases count, with the torchvision and
+torchaudio AMD pairs with them (for PyTorch 2.14 that is an alpha torchvision). A build is made for one ROCm version,
+so choosing one moves training to that ROCm. **Install torch …** keeps the old versions in
+`update_backups/venv_before_<time>.txt`, installs the chosen PyTorch, puts the ROCm parts to its version, tests the
+GPU, and puts the old versions back when the test fails; then the locks and the requirements are renewed. Only the
+venv install.sh made is changed; for your own venv it shows the command. When the system's ROCm (`/opt/rocm*`) is
+newer than the training one, the Health check, Home and this card say so (*Keep ROCm … for training* hides it until
+the system ROCm changes again). `./install.sh` keeps the PyTorch that is installed.
 
 ## Updating sd-scripts and musubi-tuner (Settings > Updates)
 
