@@ -14,28 +14,29 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.191126d"
-VERSION = "1.191126d"
+__version__ = "1.191126e"
+VERSION = "1.191126e"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.131126c",
-    "version.py": "1.191126d",
+    "version.py": "1.191126e",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
-    "program/Training/sd_script.py": "1.191126b",
+    "program/Training/sd_script.py": "1.191126e",
     "program/Data/sd_prepare.py": "1.151126h",
     "program/Training/sd_settings.py": "1.171126",
     "program/Data/datasets_ui.py": "1.151126h",
-    "program/Data/dsflow.py": "1.191126b",
+    "program/Data/dsflow.py": "1.191126e",
     "program/Training/training_ui.py": "1.171126d",
     "program/Settings/settings_ui.py": "1.191126c",
     "program/Gallery/lora_library.py": "1.181126c",
-    "program/Training/comfytest.py": "1.181126",
+    "program/Training/comfytest.py": "1.191126e",
     "program/Training/speedtest.py": "1.111126b",
     "program/Training/speedjobs.py": "1.131126c",
     "program/Training/comfyupscale.py": "1.101126",
     "program/Training/comfyinpaint.py": "1.151126f",
     "program/Settings/scanner.py": "1.191126d",
+    "program/Data/lean.py": "1.191126e",
     "program/UI/scan_panel.py": "1.191126d",
     "program/Data/detailscan.py": "1.151126j",
     "program/Data/captioner.py": "1.091126",
@@ -43,7 +44,7 @@ RELEASE: dict = {
     "program/Settings/ghupdate.py": "1.011126",
     "program/Settings/hfdownload.py": "1.171126",
     "program/Settings/ollamactl.py": "1.011126",
-    "program/Data/datacheck.py": "1.151126j",
+    "program/Data/datacheck.py": "1.191126e",
     "program/Data/pictools.py": "1.191126b",
     "program/Data/pictools_worker.py": "1.191126b",
     "program/Gallery/picgallery.py": "1.011126",
@@ -60,8 +61,8 @@ RELEASE: dict = {
     "program/UI/setup_page.py": "1.191126c",
     "program/UI/pg_home.py": "1.131126c",
     "program/UI/pg_datasets.py": "1.161126",
-    "program/UI/ds_steps.py": "1.191126b",
-    "program/UI/ds_train.py": "1.131126c",
+    "program/UI/ds_steps.py": "1.191126e",
+    "program/UI/ds_train.py": "1.191126e",
     "program/UI/ds_results.py": "1.151126b",
     "program/UI/ds_batch.py": "1.151126h",
     "program/UI/pg_queue.py": "1.151126c",
@@ -95,7 +96,7 @@ RELEASE: dict = {
     "program/Settings/venvcheck.py": "1.191126",
     "program/Settings/features.py": "1.151126h",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.171126b",
+    "program/Training/Lora_Datatypes.py": "1.191126e",
     "program/Training/Training_Recommendations.py": "1.171126",
     "program/Other/lora_studio.css": "1.151126i",
     "install.sh": "1.151126h",
@@ -103,6 +104,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.191126e", "The look of the result (step 7 and 9): Ollama tells per picture whether it is a photo, a drawing, a 3D render or a painting, and training adds words for that kind behind every caption (Pony photos no longer get source_anime), so a LoRA made from photos no longer ties the photo look to its trigger word. Per LoRA type you choose what the result should look like (its own style, Photo, 3D; Pony: Anime, Western cartoon, Photo), with a default per type; the test and sample pictures follow it. Check picture kinds for datasets sorted before."),
     ("1.191126d", "Find on this computer: a model file whose name does not say whether it is SDXL, Illustrious, Pony or NoobAI is now recognised by the label inside it (title, v-prediction), when it has one."),
     ("1.191126c", "Find on this computer (Settings, and the setup page): searches the folders you name for the trainers, ComfyUI, your LoRAs, datasets and model files, and suggests what to use; nothing changes until you tick and press Use."),
     ("1.191126b", "Worn items: the sort looks for the item (sets aside pictures without it), Select adds a close-up where it is small, and Weight per kind (step 7) gives each kind its own repeat folder in the launch script."),
@@ -179,6 +181,7 @@ PARTS = [
     ("program/Training/comfyupscale.py", "upscale and sharpen pictures with your ComfyUI workflow"),
     ("program/Training/comfyinpaint.py", "remove watermarks with your ComfyUI inpaint workflow"),
     ("program/Settings/scanner.py", "Find on this computer: search folders for trainers, LoRAs, datasets, model files"),
+    ("program/Data/lean.py", "The look of the result: the kind of the pictures and the style words per LoRA type"),
     ("program/UI/scan_panel.py", "Find on this computer: the search and the suggestions"),
     ("program/Data/detailscan.py", "the detailed scan: gaps and per-picture suggestions"),
     ("program/Data/captioner.py", "captions with Ollama"),

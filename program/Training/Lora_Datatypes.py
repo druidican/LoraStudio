@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.171126b"  # LoRA Studio version, see version.py
+__version__ = "1.191126e"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -919,7 +919,8 @@ def build_prompts_text(caps, fallback_trigger, name, cfg):
             if t and t not in tags:
                 tags.append(t)
         text = ", ".join([x for x in (pre, ", ".join(tags), suf) if x])
-        lines.append(f"{text} --n {cfg.get('negative') or NEGATIVE_PROMPT} {sample_args} --d {SAMPLE_SEED}")
+        neg = ", ".join(x for x in (cfg.get("lean_negative"), cfg.get("negative") or NEGATIVE_PROMPT) if x)
+        lines.append(f"{text} --n {neg} {sample_args} --d {SAMPLE_SEED}")
 
     add([pick("view", 0) or "looking at viewer", pick("expression", 0)])      # plain baseline
     for i in range(4):                                                         # varied, from your tags
@@ -1092,6 +1093,8 @@ PYCHECK"""] if cfg.get("base_weights_check") and any(fl == "--base_weights" for 
         # musubi pairs a caption with its picture by cutting off ONE extension, so IMG.sentences.txt never matches
         # IMG.png: the pictures of each repeat folder are linked into the cache with their captions as IMG.txt
         f'CAPTION_EXT="{cfg.get("caption_ext") or ".txt"}"',
+        # words behind every caption (the kind of the pictures: Datasets › 7, "The look of the result")
+        f'CAPTION_SUF="{cfg.get("caption_add") or ""}"',
         '{',
         '  echo "[general]"',
         '  echo "resolution = [${RESOLUTION}]"',
@@ -1111,7 +1114,7 @@ PYCHECK"""] if cfg.get("base_weights_check") and any(fl == "--base_weights" for 
         "  while IFS= read -r -d '' f; do",
         '    base="${f%.*}"; name="$(basename "${base}")"',
         '    if [ -f "${base}${CAPTION_EXT}" ]; then',
-        '      ln -s "$f" "${src}/$(basename "$f")" && cp "${base}${CAPTION_EXT}" "${src}/${name}.txt" && imgs=$((imgs+1))',
+        '      ln -s "$f" "${src}/$(basename "$f")" && printf \'%s%s\\n\' "$(cat "${base}${CAPTION_EXT}")" "${CAPTION_SUF}" > "${src}/${name}.txt" && imgs=$((imgs+1))',
         '    else nocap=$((nocap+1)); fi',
         "  done < <(find \"$d\" -maxdepth 1 -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.bmp' \\) -print0)",
         '  [ "${nocap}" -eq 0 ] || echo "WARNING: ${nocap} pictures in ${b} have no caption (*${CAPTION_EXT}) and are left out"',

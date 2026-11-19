@@ -108,6 +108,11 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
 - **Test-picture workflows** per family (`comfytest.FAMILIES`: sdxl, illustrious, pony, noobai, vpred, anima;
   Illustrious/Pony fall back to the SDXL one; built-ins in `Training/workflows/`, written by `tools/make_workflows.py`).
   NoobAI-XL types `noobai` (EPS) and `noobai_vpred`. The caption consistency check was removed (1.151126h).
+- **The look of the result** (`Data/lean.py`, 1.191126e): the sort asks Ollama the kind of each picture (photo,
+  drawing, 3D, painting → `.lsflow/medium.json`); training adds words for that kind behind every caption
+  (`--caption_suffix`, musubi `CAPTION_SUF`; Pony photos lose `source_anime`); per LoRA type a lean (step 7 card, step 9
+  row, meta `lean`) puts those words in the negative (own style) or the prompt (Photo) of test and sample pictures.
+  Words from the model cards (Danbooru tags; Pony V6 has no photo source; Anima does not do realism).
 - **Quality words:** Pony trains with `score_9, score_8_up, score_7_up, source_anime` as `--caption_prefix`
   (keep_tokens raised to cover them), Illustrious with `masterpiece, best quality` as `--caption_suffix`; caption
   files stay untouched; new sample prompts get them too.

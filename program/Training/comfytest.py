@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.181126"  # LoRA Studio version, see version.py
+__version__ = "1.191126e"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -559,6 +559,16 @@ def make(logname: str, say=None) -> str:
         return "❌ This run has no LoRA files."
     prompts = prompts_for(info, int(cfg.get("prompts") or 8))
     fixed = (cfg["fixed"].get(ffam) or "").strip().rstrip(",")
+    try:                                                # the look of the result (Datasets › 7): style words
+        import lean
+        l_pos, l_neg = lean.prompt_words(info["dataset"], info["tkey"])
+    except Exception:                                    # noqa: BLE001
+        l_pos, l_neg = "", ""
+    if l_pos and "source_" in l_pos:                    # Pony: the lean's source word replaces the fixed one
+        fixed = ", ".join(w for w in (x.strip() for x in fixed.split(",")) if w and not w.startswith("source_"))
+    fixed = ", ".join(x for x in (fixed, l_pos) if x)
+    if l_neg:
+        wf = {**wf, "negative": ", ".join(x for x in (l_neg, wf.get("negative") or "") if x)}
     if fam == "vpred" and not wf.get("vpred"):          # a V-pred LoRA is always shown as v-prediction
         wf = {**wf, "vpred": True, "zsnr": True}
     d = compare_dir(info)

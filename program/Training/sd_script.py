@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.191126b"  # LoRA Studio version, see version.py
+__version__ = "1.191126e"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -795,6 +795,12 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
     cfg = tuned_cfg(tkey, cfg, stats)
     cfg = _speed(tkey, cfg)                           # Settings › Speed test: "use the faster settings" for this type
     cfg["caption_ext"] = caption_ext_for(ds, tkey)
+    if ds:                                             # the kind of the pictures and the look of the result
+        try:
+            import lean
+            cfg = lean.apply_cfg(ds, tkey, cfg)
+        except Exception as e:                         # noqa: BLE001
+            print(f"[lean] {e}")
     so = _num(steps_over)
     if so:
         cfg["steps"], cfg["targets"] = so, (round(so * 0.7), so, round(so * 1.3))

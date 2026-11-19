@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.191126b"  # LoRA Studio version, see version.py
+__version__ = "1.191126e"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -537,6 +537,64 @@ def leave_default(ds) -> str:
     return CAP.STYLE_LEAVE_OUT if m["purpose"] == "style" else CAP.DEFAULT_LEAVE_OUT
 
 
+def lean_row(ds, tkey, label: str = "", after=None):
+    """One LoRA type's 'look of the result': the choice and what it adds (step 7, and step 9 for its type)."""
+    import lean as L
+    with ui.row().classes("w-full items-center gap-3 no-wrap"):
+        if label:
+            ui.label(label).classes("w-40 shrink-0 font-semibold")
+        sel = ui.select(L.choices(tkey), value=L.lean_of(ds, tkey), label="The result should look like") \
+            .props("outlined dense").classes("w-64 shrink-0")
+        ex = ui.markdown(L.explain(ds, tkey)).classes("ls-note grow")
+
+    def changed(e):
+        if not e.value:
+            return
+        L.set_lean(ds, tkey, e.value)
+        ex.content = L.explain(ds, tkey)
+        if after:
+            after()
+    sel.on_value_change(changed)
+    return sel, ex
+
+
+def look_card(ds, types):
+    """Step 7: the kind of the pictures (Ollama) and, per LoRA type, what the result should look like."""
+    import lean as L
+    labels = F.type_labels()
+    url0, model0 = S.oc_settings()
+    with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
+        ui.label("The look of the result").classes("font-semibold")
+        note("Captions say what is in a picture, not what kind of picture it is, so a LoRA made from photos ties the "
+             "photo look to the trigger word, and on a drawing model (Illustrious, NoobAI, Pony, Anima) that look "
+             "fights the model. So training adds words for the kind of the pictures behind every caption (the "
+             "caption files stay as they are), and the choice below decides where they go in the test and sample "
+             "pictures: your character in the model's own style puts them in the negative prompt, Photo in the "
+             "prompt. Use the same words when you make pictures with the LoRA.")
+        kinds = ui.markdown("**Kinds of pictures:** " + L.summary_text(L.summary(ds)))
+        rows = []
+
+        def redraw():
+            kinds.content = "**Kinds of pictures:** " + L.summary_text(L.summary(ds))
+            for t, ex in rows:
+                ex.content = L.explain(ds, t)
+        for t in types:
+            rows.append((t, lean_row(ds, t, labels.get(t, t))[1]))
+        prog = ui.markdown("")
+
+        async def check(everything=False):
+            await stream(L.check_run(ds, url0, model0, everything), lambda line: setattr(prog, "content", line))
+            redraw()
+        with ui.row().classes("items-center gap-2"):
+            b1 = ui.button("Check picture kinds", on_click=lambda: check(False)).props("outline dense no-caps")
+            b2 = ui.button("Check them all again", on_click=lambda: check(True)).props("flat dense no-caps")
+            ui.button("Stop", on_click=F.STOP.set).props("flat dense no-caps color=negative")
+        if not FT.have("ollama") or not model0:
+            b1.disable()
+            b2.disable()
+            note("The kinds come from Ollama (Settings › AI helpers); without it nothing is added.")
+
+
 def step7(page):
     import sd_prepare as SP
     ds = page.s["ds"]
@@ -556,6 +614,8 @@ def step7(page):
              f"a picture), or put .txt files next to the pictures. Ollama: {FT.ollama_guide()}, then Settings › Start "
              "and network.")
     ui.html(V.s7_rec_html(purpose), sanitize=False).classes("w-full")
+    if m["types"]:
+        look_card(ds, m["types"])
     sets_html = ui.html(V.s7_sets_html(ds), sanitize=False).classes("w-full")
     with ui.expansion("Caption settings: trigger word, never describe, length, detail, try on 3 pictures").classes("w-full ls-card"):
         note("The Ollama model (Settings › AI helpers) looks at every picture and writes a caption that starts with the "

@@ -3,7 +3,7 @@
 saving and the queue. The script logic is sd_script.py (cs_* return what changed as a dict); the plan and the
 settings table are datasets_ui (calc, apply_settings, SETTINGS)."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.191126e"  # LoRA Studio version, see version.py
 
 from pathlib import Path
 
@@ -113,11 +113,13 @@ class Train:
         self.draw_caps()
         self.draw_download()
         self.draw_repeat()
+        self.draw_look()
 
     def set_script(self, v):
         if self.busy or not v or v == self.script:
             return
         self.apply(S.cs_script_change(self.ds, v, self.tkey, *self.args()))
+        self.draw_look()
 
     def set_choice(self):
         S.set_choice(self.purpose, self.w_prio.value)
@@ -162,6 +164,36 @@ class Train:
         import sd_script as SS
         if self.text.strip():
             self.apply({"text": SS.set_caption_ext(self.text, F.caption_ext(self.ds, self.tkey))})
+
+    def draw_look(self):
+        """The look of the result for this type (the same choice as in step 7), and whether the script follows it."""
+        import ds_steps
+        import lean as L
+        self.w_look.clear()
+        if not self.tkey:
+            return
+        with self.w_look:
+            ds_steps.lean_row(self.ds, self.tkey, "Look of the result", after=self.look_changed)
+            with ui.row().classes("items-center gap-2") as self.w_look_fix:
+                ui.label("This launch script trains with other style words than chosen.").classes("ls-note")
+                ui.button("Use the chosen look in this script", on_click=self.look_use).props("outline dense no-caps")
+            self.w_look_fix.set_visibility(L.differs(self.ds, self.tkey, self.text))
+
+    def look_changed(self):
+        if self.script in (None, "", S.NEW):             # a new script: made again, with fitting sample prompts
+            self.apply(S.cs_retype(self.ds, self.script, self.tkey, self.text, *self.args()))
+            self.w_look_fix.set_visibility(False)
+        else:
+            self.look_use()
+
+    def look_use(self):
+        import lean as L
+        if self.text.strip():
+            new = L.rewrite(self.ds, self.tkey, self.text)
+            if new != self.text:
+                self.apply({"text": new, "status": "The style words are changed in the script text: **Save** keeps them. "
+                                                   "Sample prompts already saved stay as they are."})
+        self.w_look_fix.set_visibility(L.differs(self.ds, self.tkey, self.text))
 
     def draw_download(self):
         try:
@@ -241,6 +273,7 @@ class Train:
         with ui.row().classes("items-center gap-3") as self.w_caps_row:
             ui.label("Caption set for this launch script").classes("font-semibold")
             self.w_caps = ui.radio({}, on_change=lambda e: self.pick_caps(e.value)).props("inline dense")
+        self.w_look = ui.column().classes("w-full gap-1")
         with ui.card().props("flat bordered").classes("ls-card w-full") as self.w_dl:
             with ui.row().classes("w-full items-center gap-3"):
                 self.w_dl_note = ui.label("").classes("grow")
@@ -357,6 +390,7 @@ class Train:
         self.draw_caps()
         self.draw_download()
         self.load()
+        self.draw_look()
 
 
 def step9(page):

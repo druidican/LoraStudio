@@ -36,13 +36,18 @@ class H(BaseHTTPRequestHandler):
         if d.get("keep_alive") != 0 and d.get("model"): LOADED[d["model"]] = 5_500_000_000
         if d.get("keep_alive") == 0: LOADED.pop(d.get("model"), None)
         prompt = d["messages"][-1]["content"]
-        if prompt.startswith("Look at this photo"):
+        if prompt.startswith("What kind of picture is this?"):         # lean.py: the kind of the picture
+            import hashlib
+            h = int(hashlib.md5(d["messages"][-1]["images"][0][:4000].encode()).hexdigest(), 16)
+            time.sleep(0.2)
+            return self._send({"message": {"content": json.dumps({"medium": "drawing" if h % 9 == 0 else "photo"})}})
+        if prompt.startswith(("Look at this photo", "Look at this picture for")):
             import hashlib
             h = int(hashlib.md5(d["messages"][-1]["images"][0][:4000].encode()).hexdigest(), 16)
             fr = ["close-up", "close-up", "close-up", "upper body", "full body"][h % 5]
             out = json.dumps({"people": 2 if h % 11 == 0 else 1, "main_subject_clear": True, "in_focus": True,
                               "face_visible": True, "face_problem": "", "text_or_watermark": False, "heavy_filter": False,
-                              "collage_or_screenshot": False, "framing": fr,
+                              "collage_or_screenshot": False, "framing": fr, "medium": "drawing" if h % 9 == 0 else "photo",
                               "outfit": ["red dress", "red dress", "jeans and t-shirt", "armor"][h % 4],
                               "place": ["forest", "forest", "city street", "studio"][(h >> 3) % 4], "note": "", "teaches": [1, 3, 4, 5, 5][(h >> 5) % 5], "face_size": ["tiny", "small", "medium", "large"][(h >> 7) % 4], "features_visible": (h >> 9) % 6 != 0, "part_only": "feet" if h % 13 == 0 else "", "unique_detail": "a red scarf" if h % 7 == 0 else ""})
             if '"angle"' in prompt:                      # the detailed scan's questions in the same go

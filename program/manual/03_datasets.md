@@ -165,6 +165,31 @@ originals back* undoes the step.
 
 ![Step 7: captions](img/step7.jpg)
 
+![Step 7: the kinds of the pictures and the look of the result per LoRA type](img/step7_look.jpg)
+
+**The look of the result** (the card above the caption buttons): captions say what is *in* a picture, not what
+*kind* of picture it is. A LoRA made from photos therefore ties the photo look to the trigger word, and on a drawing
+model (Illustrious, NoobAI, Pony, Anima) that look fights the model: strange half-real pictures. So:
+
+- **Kinds of pictures**: the sort (step 4) asks Ollama per picture whether it is a photo, a drawing, a 3D render or a
+  painting. For datasets sorted before, **Check picture kinds** asks only that (quick); *Check them all again* asks
+  for every picture. The most common kind counts; when more than 1 in 5 are of another kind, 8 Review says so.
+- **Training adds words for that kind** behind every caption (the caption files stay as they are):
+  Illustrious, NoobAI and Anima photos get `realistic, photorealistic, photo (medium)`, Pony photos `photo, realistic`
+  (and no `source_anime` in front: Pony has no source word for photos), SDXL, FLUX, Z-Image and the other
+  sentence models `photo` (drawings: `illustration`). The photo look then belongs to these words, not to the trigger.
+- **The result should look like**, per LoRA type: *its own style* (Illustrious: manga; NoobAI and Anima: anime),
+  *Photo* or *3D*; Pony: *Anime*, *Western cartoon* or *Photo*; SDXL and the sentence models: *Photo* or *Drawing*.
+  The default fits the type; a realistic version of Pony or Illustrious (*real* or *photo* in the name of the model
+  file in Settings) starts at *Photo*. Anima has no Photo: its model card says it does not do realism. The choice
+  decides where the words go in the **test pictures** and the **sample prompts**: its own style puts them in the
+  negative prompt, Photo in the prompt (Pony: `source_anime` or `source_cartoon` in the prompt). Do the same when
+  you make pictures with the LoRA.
+
+9 Train shows the same choice for its type. A launch script saved before (or with other words) gets a note there:
+**Use the chosen look in this script** puts the right words in (Save keeps them; its sample prompts stay as they
+are).
+
 **Write the captions** writes a caption for every picture; *Only pictures without a caption* fills the gaps; *Stop*
 stops. **Tags** (Illustrious, Pony, SDXL, Anima) come from the **WD tagger** (wd-eva02-large-tagger-v3, run by
 sd-scripts; no Ollama needed, about 1.2 GB downloaded the first time); **sentences** (Z-Image, FLUX, Qwen-Image) come
@@ -235,7 +260,8 @@ script text** shows the script itself.
   settings next to the recommendations; *Epochs* suggests fewer when your runs usually peaked early.
 
 **Quality words**: a **Pony** LoRA type (a subtype with Pony in its name) trains with `score_9, score_8_up,
-score_7_up, source_anime` in front of every caption, an **Illustrious** one with `masterpiece, best quality` behind
+score_7_up` and the source word of your choice in front of every caption (not for photos: see *The look of the
+result* in 7 Captions), an **Illustrious** one with `masterpiece, best quality` behind
 it, a **NoobAI-XL** one (EPS or V-pred) with `masterpiece, best quality, newest, absurdres, highres` in front of it.
 The launch script adds them while training (`--caption_prefix` / `--caption_suffix`, the caption files stay as
 they are; for Pony and NoobAI `--keep_tokens` keeps them and the trigger word in front), and new sample prompts get them too

@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.191126b"  # LoRA Studio version, see version.py
+__version__ = "1.191126e"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -755,6 +755,7 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
             pool = ThreadPoolExecutor(max_workers=DC.PARALLEL)
             futs = {str(p): pool.submit(DC.content, url, model, p, 600.0, with_detail) for p in todo}
         t2 = time.time()
+        kinds_found = {}                                 # the kind of each picture (photo, drawing …): lean.py
         for i, p in enumerate(rest, 1):
             if STOP.is_set():
                 note = "stopped"
@@ -777,6 +778,8 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
                 if done % 5 == 0:
                     S._dc_cache_save(cache)
             e = pics[str(p)]
+            if d.get("medium"):
+                kinds_found[p] = d["medium"]
             e["framing"] = _norm(d.get("framing")) or "other"
             e["outfit"], e["place"] = _norm(d.get("outfit")), _norm(d.get("place"))
             e["part"] = _norm(d.get("part_only"))
@@ -817,6 +820,12 @@ def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
         if pool:
             pool.shutdown(wait=False, cancel_futures=True)
         S._dc_cache_save(cache)
+        if kinds_found:
+            try:
+                import lean
+                lean.remember(ds, kinds_found)
+            except Exception:                            # noqa: BLE001
+                pass
         if fresh:
             try:
                 DSC.remember(ds, fresh, model)
@@ -2156,6 +2165,17 @@ def _improvements(ds) -> list[tuple[str, str]]:
     n = len(imgs)
     if not n:
         return [("no pictures", "The repeat folders hold no pictures.")]
+    try:                                                 # photos and drawings together: one set of style words
+        import lean
+        sm = lean.summary(ds)
+        if sm["mixed"] and sm["main"]:
+            out.append(("mixed kinds", f"The pictures are of different kinds ({lean.summary_text(sm)}). The style "
+                                       f"words (step 7, The look of the result) follow the most common kind, "
+                                       f"{lean.MEDIA[sm['main']]}, so the others are trained as if they were "
+                                       f"{lean.MEDIA[sm['main']]} too: move them out, or keep them on purpose.",
+                        sm["others"]))
+    except Exception:                                    # noqa: BLE001
+        pass
     so = sort_result(ds)
     if not so:
         if not sg()._checked_count(imgs):

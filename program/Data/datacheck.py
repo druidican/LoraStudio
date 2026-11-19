@@ -22,7 +22,7 @@ marks off and keep the subject whole are proposed, next to "set aside" and "keep
 is kept in <dataset>/_set_aside/originals/<repeat folder>/, so every choice can be changed again later.
 """
 from __future__ import annotations
-__version__ = "1.151126j"  # LoRA Studio version, see version.py
+__version__ = "1.191126e"  # LoRA Studio version, see version.py
 
 import lspaths
 import base64
@@ -152,8 +152,9 @@ def technical(paths: list[Path], min_side: int = 0, progress=None) -> dict[Path,
 
 
 # ----------------------------------------------------------------------------------------------- Ollama content pass
-CONTENT_PROMPT = """Look at this photo for an image-model training set and answer ONLY with a JSON object:
-{"people": <number of people visible>,
+CONTENT_PROMPT = """Look at this picture for an image-model training set and answer ONLY with a JSON object:
+{"medium": "<photo | drawing | 3d render | painting>: what kind of picture it is (photo: taken with a camera, also edited; drawing: anime, manga, cartoon, comic, digital illustration; 3d render: CGI, a game or 3D model)",
+ "people": <number of people visible>,
  "main_subject_clear": <true if one main subject is clearly visible and not tiny>,
  "in_focus": <true if the main subject is sharp>,
  "face_visible": <true / false / null when there is no person>,
