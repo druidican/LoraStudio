@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Datasets: the dataset list (with + New dataset) | Improvements, and the nine steps.
+"""Datasets: the dataset list (with + New dataset) and the nine steps.
 
 + New dataset starts at 1 Folder; the list shows every dataset with its next step and opens the steps from where the
-dataset is. Improvements fixes ticked datasets (its choices are folded on the page) and opens them one by one to check. The steps reuse sdgui's parts where they exist: the watermark choices (6), the caption writer
+dataset is. The steps reuse sdgui's parts where they exist: the watermark choices (6), the caption writer
 (7), the repeat folder and the launch script page (9). What each step does to the folder
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -22,8 +22,6 @@ import dsflow as F
 import features as FT
 
 FLOW = list(range(2, 12))      # 2-8 Prepare, 9 Train, 10 Results, 11 LoRA (one page per dataset)
-PARTS = [("prepare", "Prepare", "steps 1-8"), ("train", "Train", "launch script and queue"),
-         ("results", "Results", "its runs"), ("lora", "LoRA", "in the Collection")]
 PART_STEP = {"train": 9, "results": 10, "lora": 11}
 _THUMBS: dict = {}
 
@@ -79,39 +77,7 @@ def bar_html(st) -> str:
         chips.append('<span class="ls-chip">LoRA type: not set yet</span>')
     n = len(F.images(ds))
     return (f'<div class="ds-bar"><span class="ds-bar-l">Dataset</span><b>{esc(ds)}</b>{"".join(chips)}'
-            f'<span class="ds-bar-n">{n} pictures</span></div>' + parts_html(st))
-
-
-def part_of(step) -> str:
-    return {9: "train", 10: "results", 11: "lora"}.get(step, "prepare")
-
-
-def parts_html(st) -> str:
-    """The dataset page's four parts: Prepare (steps 1-8), Train (9), Results (its runs), LoRA (its LoRA files)."""
-    cur = part_of(st.get("step"))
-    out = []
-    for key, label, sub in PARTS:
-        on = " ds-part-on" if key == cur else ""
-        out.append(f'<button class="ds-part{on}" onclick="{send("part|" + key)}"><b>{esc(label)}</b>'
-                   f'<span>{esc(sub)}</span></button>')
-    return '<nav class="ds-parts" aria-label="Parts of the dataset page">' + "".join(out) + "</nav>"
-
-
-def stepper_html(st) -> str:
-    ds, cur = st.get("ds"), st.get("step", 2)
-    states = F.step_states(ds) if ds else {}
-    out = []
-    for n, key, label in F.STEPS[:8]:                       # 9 Train is a part of its own (parts_html)
-        s = states.get(key, ("todo", ""))[0]
-        cls = "ds-st-now" if n == cur else {"done": "ds-st-done", "warn": "ds-st-warn"}.get(s, "")
-        mark = "✓" if s == "done" and n != cur else str(n)
-        click = f' onclick="{send(f"step|{n}")}"' if n >= 2 else ""
-        miss = " ds-missing" if key == "tags" and not FT.have("ollama") and ds and any(
-            x["style"] != "tags" for x in F.caption_sets(ds)) else ""
-        lab = FT.label(label, "ollama") if miss else label
-        out.append(f'<button class="ds-step {cls}{miss}"{click}{" disabled" if n == 1 else ""}><span class="ds-num">{mark}</span>'
-                   f'<span>{esc(lab)}</span></button>')
-    return '<nav class="ds-stepper" aria-label="Steps">' + "".join(out) + "</nav>"
+            f'<span class="ds-bar-n">{n} pictures</span></div>')
 
 
 # --------------------------------------------------------------------------- 1 Folder (New dataset)
@@ -503,35 +469,6 @@ def s7_rec_html(purpose) -> str:
     return f'<div class="ls-card ds-rec"><span class="rs-label">RECOMMENDED FOR A {t.upper()} LORA</span><div>{body}</div></div>'
 
 
-def batch_what() -> str:
-    import html as _h
-    t = F.batch_summary()
-    t = _h.escape(t).replace("`_reserve/`", "<code>_reserve/</code>")
-    return ('<div class="ls-note"><b>Fix the ticked datasets automatically</b> (less is better): ' + t +
-            ' Change it under <i>What Fix does</i> below.</div>')
-
-
-def batch_html() -> str:
-    B = F.BATCH
-    if not B["running"] and not B["results"]:
-        return ""
-    out = []
-    if B["running"]:
-        n_done = len(B["results"])
-        total = n_done + len(B["queue"]) + (1 if B["current"] else 0)
-        out.append(f'<div class="ds-bline"><span class="ls-chip warn">running</span> <b>{esc(B["current"])}</b> '
-                   f'({n_done + 1} of {total}) · {esc(B["step"])}</div>')
-    for r in reversed(B["results"]):
-        chip = '<span class="ls-chip ok">done</span>' if r["ok"] else '<span class="ls-chip bad">stopped / error</span>'
-        out.append(f'<div class="ds-bres"><div>{chip} <b>{esc(r["ds"])}</b> <span class="ls-note">{r["secs"] // 60} min</span></div>'
-                   + "".join(f'<div class="ls-note">· {esc(l)}</div>' for l in r["lines"]) + "</div>")
-    if not B["running"] and B["results"]:
-        out.insert(0, f'<div class="ds-bline"><b>Finished {len(B["results"])} dataset(s).</b> Press Refresh to see what is '
-                      'left to improve.</div>')
-    return '<div class="ds-batch">' + "".join(out) + "</div>"
-
-
-# --------------------------------------------------------------------------- 8 Review
 def s8_render(ds, show="Problems first"):
     rv = F.review(ds)
     tree = '<div class="ds-tree">' + "".join(f'<div>{esc(a)} <span>{esc(b)}</span></div>' for a, b in rv["tree"]) + "</div>"
@@ -778,7 +715,7 @@ def lora_html(ds) -> str:
     groups = [m for m in LL.LIB.groups.values() if m and m[-1].dataset is not None and m[-1].dataset.name == ds]
     if not groups:
         return ('<p class="ls-empty">No LoRA of this dataset in your LoRA folders yet. Train makes one; the Collection '
-                'finds it after a run (or Collection › Browse › Rescan folders).</p>')
+                'finds it after a run (or Collection › Rescan folders in the left menu).</p>')
     order = {b: i for i, b in enumerate(LL.LIB.base_names())}
     cards = []
     for m in sorted(groups, key=lambda m: (order.get(m[-1].base, 99), m[-1].base)):

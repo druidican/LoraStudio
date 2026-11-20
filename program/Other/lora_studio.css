@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE */
-/* LoRA Studio version 1.151126i */
+/* LoRA Studio version 1.201126e */
 /* LoRA Studio: the look of the pages (colours come from the --ll-* variables of the Collection style).
    Edit freely. For your own changes that survive updates, use custom.css next to this file instead:
    it is loaded after this one, and an update never replaces it. Reload the page after a change
@@ -85,33 +85,17 @@ table.rs-table { border:0 !important; width:100%; border-collapse:collapse; font
 
 /* ---- Datasets ---- */
 
-.ds-stepper { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 12px; }
-.ds-step { display:inline-flex; gap:8px; align-items:center; cursor:pointer; padding:6px 12px 6px 6px; border-radius:99px;
-           border:1px solid var(--ll-line); background:var(--ll-card); color:var(--ll-text); font-size:13px; font-weight:600; }
-.ds-step:disabled { cursor:default; }
-.ds-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:99px;
-          background:var(--ll-chip, #ECEEF1); font-size:12px; }
-.ds-st-done .ds-num { background:#21857C; color:#fff; } .ds-st-warn .ds-num { background:#E8A33D; color:#1C1F24; }
-.ds-st-now { border-color:#E8A33D; background:#FBE9C8; color:#1C1F24; } .ds-st-now .ds-num { background:#E8A33D; color:#1C1F24; }
 .ds-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:8px 14px; border:1px solid var(--ll-line);
           border-radius:10px; background:var(--ll-card); font-size:14px; }
 .ds-bar-l { color:var(--ll-muted); font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
 .ds-bar-n { margin-left:auto; color:var(--ll-muted); }
-.ds-parts { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px; margin:8px 0 4px; }
-.ds-part { display:flex; flex-direction:column; align-items:flex-start; gap:1px; padding:8px 14px; cursor:pointer; text-align:left;
-           border:1px solid var(--ll-line); border-bottom:3px solid var(--ll-line); border-radius:8px; background:var(--ll-card);
-           color:var(--ll-text); font-size:14px; }
-.ds-part span { color:var(--ll-muted); font-size:12px; }
-.ds-part:hover { border-color:#E8A33D; }
-.ds-part-on { border-color:#E8A33D; border-bottom-color:#E8A33D; background:#FBE9C8; color:#1C1F24; }
-.ds-part-on span { color:#5A4A2A; }
-@media (max-width: 700px) { .ds-parts { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 .ds-lcard { display:flex; gap:14px; align-items:flex-start; }
 .ds-lcard img, .ds-lph { width:120px; height:120px; object-fit:cover; border-radius:8px; flex:none; background:var(--ll-chip, #ECEEF1); }
 .ds-lph { display:flex; align-items:center; justify-content:center; color:var(--ll-muted); font-size:12px; }
 .ds-lbody { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .ds-qrow { display:flex; gap:10px; align-items:center; padding:4px 0; font-size:14px; }
-.ds-flist, .ds-elist, .ds-slist { display:flex; flex-direction:column; gap:6px; }
+.ds-flist, .ds-slist { display:flex; flex-direction:column; gap:6px; }
+.ds-egrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:10px; }
 .ds-frow, .ds-erow { display:flex; gap:10px; align-items:center; padding:9px 12px; border:1px solid var(--ll-line); border-radius:8px;
                      background:var(--ll-card); color:var(--ll-text); text-align:left; font-size:14px; }
 .ds-frow-pick, .ds-erow { cursor:pointer; } .ds-frow-pick:hover, .ds-erow:hover { border-color:#E8A33D; }
@@ -163,19 +147,12 @@ table.ds-calc { border-collapse:collapse; font-size:14px; } .ds-calc td { paddin
 .ds-eff { display:flex; flex-direction:column; gap:8px; }
 .ds-effrow { display:flex; gap:10px; flex-wrap:wrap; align-items:baseline; font-size:14px; }
 .ds-effrow span:first-child { min-width:220px; color:var(--ll-muted); }
-.ds-impcard { margin-bottom:10px; } .ds-imph { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:6px; }
-.ds-improw { display:flex; gap:10px; align-items:baseline; padding:4px 0; font-size:14px; }
-.ds-imppics summary { cursor:pointer; font-size:13px; opacity:.8; margin-top:2px; } .ds-imppics div { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
-.ds-imppics img { width:96px; height:96px; object-fit:cover; border-radius:6px; }
 .ds-seg label { border:1px solid var(--ll-line) !important; border-radius:0 !important; padding:4px 12px !important; margin:0 !important; }
 .ds-seg label.selected { background:#262A31 !important; color:#F6F5F1 !important; }
 .ds-seg input { display:none; }
 .ds-sug .rs-big { font-size:22px; }
-.ds-frow-on *, .ds-st-now * { color:#1C1F24 !important; }
+.ds-frow-on * { color:#1C1F24 !important; }
 .ds-frow-on .ls-note { color:#4A5160 !important; }
-.ds-imptick { gap:8px; } .ds-imptick b { font-size:15px; }
-.ds-batch { display:flex; flex-direction:column; gap:8px; margin-top:6px; }
-.ds-bline { font-size:14px; } .ds-bres { border-top:1px solid var(--ll-line); padding-top:6px; font-size:14px; }
 .tr-tick { width:17px; height:17px; accent-color:#E8A33D; flex:0 0 auto; cursor:pointer; }
 .wm-tools { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
 .wm-tool { cursor:pointer; padding:3px 9px; border-radius:7px; border:1px solid var(--ll-line); background:var(--ll-card);
@@ -288,7 +265,6 @@ table.ds-calc tr:first-child td { border-top:0 !important; }
 /* a part that is not installed: its places stay, greyed, with "(… missing)" */
 .hc-off { background:var(--ll-chip, #ECEEF1); color:var(--ll-muted); }
 .hc-offcard .hc-t { color:var(--ll-muted); }
-.ds-step.ds-missing { opacity:.55; } .ds-step.ds-missing span:last-child { font-weight:400; }
 .ds-srow.ds-missing b { color:var(--ll-muted); font-weight:500; }
 .ls-missing, .ls-missing * { color:var(--ll-muted) !important; }
 .ls-missing-note { color:var(--ll-muted); font-size:13px; border:1px dashed var(--ll-line); border-radius:10px; padding:10px 14px; }

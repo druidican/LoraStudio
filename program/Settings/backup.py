@@ -7,7 +7,6 @@ A backup is one zip, LoraStudio-backup-<date>-<time>.zip, with
   hash_cache.json, model_ids.json                   file hashes and model identification (saves time)
   picture_index.json                                the Gallery's picture index
   launch_settings.json                              Settings > Launch options (port, login, start page, ...)
-  batch_settings.json                               Datasets › Improvements › What Fix does
   huggingtoken.txt                                  only when "include the token" is ticked
   gui_logs/                                         training logs shown by the Monitor
   manifest.json                                     when and where it was made
@@ -18,7 +17,7 @@ Restoring on another computer or user: paths that started with the old home fold
 folder are changed to the new ones. The current files are kept in restore_backups/<time>/ first.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -32,7 +31,7 @@ import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 APP_DIR = _LP.USER                   # the files a backup holds live in userdata/
 FILES = ["library_settings.txt", "training_settings.txt", "completed.json", "library_data.json",
          "hash_cache.json", "model_ids.json", "picture_index.json", "datacheck_cache.json",
-         "launch_settings.json", "batch_settings.json", "comfy_settings.json"]
+         "launch_settings.json", "comfy_settings.json"]
 TOKEN = "huggingtoken.txt"
 DIRS = ["gui_logs"]
 MAX_FILE = 200 << 20               # skip single files above 200 MB (a runaway log)

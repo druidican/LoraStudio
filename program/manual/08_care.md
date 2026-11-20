@@ -22,7 +22,7 @@ sd-scripts and musubi-tuner.
 **LoRA Studio itself**: pick a newer LoraStudio.zip. The list shows which parts change and what the update says.
 *Install this update* writes only the program files (your settings, token, databases, logs and venv are never
 touched), keeps a backup of what it replaces in `update_backups/`, runs the self-test, and puts the old files back
-by itself when the test fails. It refuses while a training run, the queue or the automatic improvement is busy.
+by itself when the test fails. It refuses while a training run or the queue is busy.
 *Restart LoRA Studio* goes through `start.sh` (new packages get installed) and the page reloads by itself. *Roll back
 the last update* brings back the files from before it.
 

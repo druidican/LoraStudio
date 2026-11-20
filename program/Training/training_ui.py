@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.171126d"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -947,7 +947,7 @@ def set_rating(st: dict, rate) -> str:
     info = script_info(st["script"]) if st and st.get("script") and Path(st["script"]).is_file() else None
     l = _lora_of(info)
     if l is None:
-        return ("The Collection does not know this LoRA yet: press Collection › Browse › *Rescan folders*, "
+        return ("The Collection does not know this LoRA yet: press Collection › *Rescan folders* (left menu), "
                 "then rate it.")
     import lora_library as LL
     ov = LL.LIB.overrides(l.key)

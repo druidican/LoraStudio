@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""The frame around every page: the header (logo, tabs, ?, dark/light), the status strip and the tab panels.
+"""The frame around every page: the header (logo, tabs, ?, dark/light), the status strip, the left menu (sidemenu.py:
+each page fills shell.menu.section(<its key>)) and the tab panels.
 
 Each page is a module program/UI/pg_<key>.py with build(shell) -> an object (or None) that may have on_show(**kw): called when
 the page is opened with shell.go(key, **kw), e.g. shell.go("datasets", ds="pip", part="results").
 The status strip is redrawn by a timer only when its text changed.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import importlib
 from pathlib import Path
@@ -33,6 +34,7 @@ class Shell:
         self._going = True
         self.tabs.value = key
         self._going = False
+        self.menu.show(key)
         page = self.pages.get(key)
         if page is not None and hasattr(page, "on_show"):
             page.on_show(**kw)
@@ -41,6 +43,7 @@ class Shell:
         """A tab clicked: the page refreshes what it shows (pages opened with go() are told by go)."""
         if self._going:
             return
+        self.menu.show(e.value)
         page = self.pages.get(e.value)
         if page is not None and hasattr(page, "on_show"):
             page.on_show()
@@ -123,6 +126,8 @@ def build_page():
             ui.button("?", on_click=lambda: help_dialog(shell)).props("flat round color=white") \
                 .tooltip("The manual for this page")
         _strip(shell)
+    import sidemenu                                       # the left menu: each page fills its own section
+    shell.menu = sidemenu.SideMenu(shell)
     with ui.tab_panels(shell.tabs, value=_start_page()) \
             .props("animated=false keep-alive").classes("w-full bg-transparent"):
         for key, label in PAGES:
@@ -134,6 +139,7 @@ def build_page():
                         ui.label(f"{label}: not moved to the new program yet.").classes("ls-note")
                     continue
                 shell.pages[key] = mod.build(shell)
+    shell.menu.show(_start_page())
     return shell
 
 

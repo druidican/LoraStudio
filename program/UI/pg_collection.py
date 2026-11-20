@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Collection: Browse (Pictures or Status), the LoRA page, Insights and Maintenance.
+"""Collection: Browse (Pictures or Status), the LoRA page, Insights and Maintenance, chosen in the left menu (which
+also holds the search and the filters of Browse, and the parts of an open LoRA page).
 
 The tiles and cards are drawn by lora_library (render_gallery, render_library) as one piece of HTML: a filter change
 replaces that one element, which is what makes this page quick. Clicks on them call small JavaScript helpers (COL_JS)
@@ -7,7 +8,7 @@ that send an event back here (emitEvent): a tile opens its dataset page, a type 
 Select mode is kept in the browser (picked cards get the class ll-picked) and read when a button needs it.
 """
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -71,6 +72,7 @@ class Collection:
     def redraw(self):
         self.view.content = self.browse_html()
         self.status_box.set_visibility(self.f["look"] == "Status")
+        self.draw_menu()
         ui.run_javascript("lsSelCount()")
 
     def set(self, **kw):
@@ -109,51 +111,95 @@ class Collection:
         self.sel_tools.set_visibility(on)
 
     def build_browse(self):
-        with ui.row().classes("w-full no-wrap items-start gap-6"):
-            with ui.column().classes("w-60 gap-3 flex-none"):
-                ui.input("Search", placeholder="Name, character, trigger word",
-                         on_change=lambda e: self.set(search=e.value or "")).props("outlined dense clearable") \
-                    .classes("w-full")
+        with ui.row().classes("items-center gap-4 w-full"):
+            ui.checkbox("Select", on_change=lambda e: self.select_mode(e.value))
+            with ui.row().classes("items-center gap-2") as self.sel_tools:
+                ui.button("Select all shown", on_click=lambda: ui.run_javascript(
+                    "document.querySelectorAll('.ll-card[data-gid]').forEach(e => e.classList.add('ll-picked')); lsSelCount();")
+                          ).props("flat dense no-caps")
+                ui.button("Clear", on_click=lambda: ui.run_javascript(
+                    "document.querySelectorAll('.ll-picked').forEach(e => e.classList.remove('ll-picked')); lsSelCount();")
+                          ).props("flat dense no-caps")
+                ui.label("0 selected").classes("ls-selcount ls-note")
+                ui.button("✓ Mark Completed", on_click=lambda: self.mark(True)).props("unelevated dense no-caps color=teal")
+                ui.button("Mark not completed", on_click=lambda: self.mark(False)).props("flat dense no-caps")
+                ui.button("Delete…", on_click=self.delete).props("outline dense no-caps color=negative")
+            self.sel_tools.set_visibility(False)
+        self.msg = note("")
+        self.view = ui.html(self.browse_html(), sanitize=False).classes("w-full")
+        note("Click a tile: its dataset page. Click a type label on a tile, or a card in Status: that LoRA's page. "
+             "A green label = Completed.")
+
+    # ------------------------------------------------------------------ the left menu
+    def build_menu(self):
+        import sidemenu as SM
+        with self.shell.menu.section("collection"):
+            self.m_find = self.shell.menu.search("Name, character, trigger word",
+                                                 lambda e: self.set(search=e.value or ""))
+            SM.header("Collection")
+            self.m = {"Pictures": SM.Item("photo_library", "Pictures", on_click=lambda: self.go_browse("Pictures")),
+                      "Status": SM.Item("fact_check", "Status", on_click=lambda: self.go_browse("Status")),
+                      "insights": SM.Item("insights", "Insights", on_click=lambda: self.go_tab("insights")),
+                      "maint": SM.Item("build", "Maintenance", on_click=lambda: self.go_tab("maint"))}
+            with ui.column().classes("w-full gap-0") as self.m_lora:
+                SM.header("LoRA")
+                self.m_card = ui.html("", sanitize=False).classes("ls-mcard q-mini-drawer-hide")
+                self.m_lp = {k: SM.Item(i, t, sub=True, on_click=lambda k=k: self.go_lora_part(k))
+                             for k, i, t in (("over", "dashboard", "Overview"), ("pics", "image", "Pictures"),
+                                             ("train", "model_training", "Training"), ("edit", "edit", "Edit"))}
+            self.m_lora.set_visibility(False)
+            with ui.column().classes("w-full gap-2 ls-mfilters q-mini-drawer-hide") as self.m_filters:
+                SM.header("Filter")
                 self.base_dd = ui.select(["All"] + LIB.base_names(), value="All", label="Base model",
                                          on_change=lambda e: self.set(base=e.value)).props("outlined dense") \
                     .classes("w-full")
                 ui.radio(["Newest first", "Name"], value="Newest first",
                          on_change=lambda e: self.set(sort=e.value)).props("dense")
-                ui.checkbox("Only with preview picture", on_change=lambda e: self.set(only_preview=e.value))
-                ui.checkbox("Favorites only", on_change=lambda e: self.set(favorites=e.value))
+                ui.checkbox("Only with preview picture", on_change=lambda e: self.set(only_preview=e.value)).props("dense")
+                ui.checkbox("Favorites only", on_change=lambda e: self.set(favorites=e.value)).props("dense")
                 with ui.column().classes("gap-1") as self.status_box:
                     ui.label("Status").classes("ls-note")
                     for s in LL.STATUS_CHOICES:
                         ui.checkbox(s, value=s in self.f["status"],
                                     on_change=lambda e, s=s: self.set(status=[x for x in LL.STATUS_CHOICES
                                                                               if (x == s and e.value) or
-                                                                              (x != s and x in self.f["status"])]))
+                                                                              (x != s and x in self.f["status"])])).props("dense")
                     ui.label("Group by").classes("ls-note mt-2")
                     ui.radio(["Character", "Base model"], value="Character",
                              on_change=lambda e: self.set(group=e.value)).props("dense")
                 self.status_box.set_visibility(False)
-                ui.button("Rescan folders", on_click=self.rescan).props("unelevated no-caps color=primary")
-            with ui.column().classes("grow gap-2 min-w-0"):
-                with ui.row().classes("items-center gap-4 w-full"):
-                    self.look = ui.toggle(["Pictures", "Status"], value="Pictures",
-                              on_change=lambda e: self.set(look=e.value)).props("no-caps unelevated")
-                    ui.checkbox("Select", on_change=lambda e: self.select_mode(e.value))
-                    with ui.row().classes("items-center gap-2") as self.sel_tools:
-                        ui.button("Select all shown", on_click=lambda: ui.run_javascript(
-                            "document.querySelectorAll('.ll-card[data-gid]').forEach(e => e.classList.add('ll-picked')); lsSelCount();")
-                                  ).props("flat dense no-caps")
-                        ui.button("Clear", on_click=lambda: ui.run_javascript(
-                            "document.querySelectorAll('.ll-picked').forEach(e => e.classList.remove('ll-picked')); lsSelCount();")
-                                  ).props("flat dense no-caps")
-                        ui.label("0 selected").classes("ls-selcount ls-note")
-                        ui.button("✓ Mark Completed", on_click=lambda: self.mark(True)).props("unelevated dense no-caps color=teal")
-                        ui.button("Mark not completed", on_click=lambda: self.mark(False)).props("flat dense no-caps")
-                        ui.button("Delete…", on_click=self.delete).props("outline dense no-caps color=negative")
-                    self.sel_tools.set_visibility(False)
-                self.msg = note("")
-                self.view = ui.html(self.browse_html(), sanitize=False).classes("w-full")
-                note("Click a tile: its dataset page. Click a type label on a tile, or a card in Status: that LoRA's page. "
-                     "A green label = Completed.")
+                ui.button("Rescan folders", on_click=self.rescan).props("unelevated dense no-caps color=primary")
+
+    def draw_menu(self):
+        if not getattr(self, "m", None) or self.tabs is None:
+            return
+        tab = self.tabs.value
+        for k, it in self.m.items():
+            it.active(tab == k or (tab == "browse" and k == self.f["look"]))
+        self.m_filters.set_visibility(tab == "browse")
+        lp = self.lora
+        has = bool(lp is not None and getattr(lp, "key", ""))
+        self.m_lora.set_visibility(has)
+        if has:
+            import html as H
+            self.m_card.content = (f'{H.escape(lp.title.text)}<small>{H.escape(lp.subtitle.text)}</small>')
+            for k, it in self.m_lp.items():
+                it.active(tab == "lora" and lp.tabs.value == k)
+
+    def go_browse(self, look: str):
+        self.tabs.value = "browse"
+        if self.f["look"] != look:
+            self.set(look=look)
+        self.draw_menu()
+
+    def go_tab(self, key: str):
+        self.tabs.value = key
+        self.draw_menu()
+
+    def go_lora_part(self, part: str):
+        self.tabs.value = "lora"
+        self.lora.tabs.value = part
+        self.draw_menu()
 
     async def insights(self, force: bool):
         if getattr(self, "cmp_draw", None):              # Compare settings: read the comparisons again
@@ -180,6 +226,7 @@ class Collection:
         self.tabs.value = "lora"
         if self.lora is not None:
             self.lora.show(key)
+        self.draw_menu()
 
     def on_show(self, **kw):
         async def lm_check():                            # LoRA Manager changes (a preview you set there) come in
@@ -192,8 +239,7 @@ class Collection:
                 ui.notify(f"{n} LoRA card(s) updated from LoRA Manager.")
         ui.timer(0.2, lm_check, once=True)
         if kw.get("look"):
-            self.tabs.value = "browse"
-            self.look.value = kw["look"]
+            self.go_browse(kw["look"])
         if kw.get("lora"):
             self.open_lora(kw["lora"])
 
@@ -203,15 +249,15 @@ def build(shell):
     c = Collection(shell)
     ui.on("ll_tile", lambda e: c.open_tile(e.args))
     ui.on("ll_open", lambda e: c.open_lora(e.args))
+    c.build_menu()
+
+    def tab_changed(e):
+        c.draw_menu()
+        if e.value == "insights":
+            return c.insights(False)
     with ui.column().classes("ls-page gap-2"):
-        c.tabs = ui.tabs(on_change=lambda e: e.value == "insights" and c.insights(False)).props("dense no-caps align=left active-color=amber-8 indicator-color=amber-8") \
-            .classes("ls-sub-tabs")
-        with c.tabs:
-            ui.tab("browse", "Browse")
-            ui.tab("lora", "LoRA page")
-            ui.tab("insights", "Insights")
-            ui.tab("maint", "Maintenance")
-        with ui.tab_panels(c.tabs, value="browse").props("animated=false").classes("w-full bg-transparent"):
+        with ui.tab_panels(value="browse", on_change=tab_changed).props("animated=false") \
+                .classes("w-full bg-transparent") as c.tabs:
             with ui.tab_panel("browse").classes("p-0 pt-2"):
                 c.build_browse()
             with ui.tab_panel("lora").classes("p-0 pt-2"):
@@ -224,6 +270,7 @@ def build(shell):
                 build_insights(c)
             with ui.tab_panel("maint").classes("p-0 pt-2"):
                 build_maintenance(c)
+    c.draw_menu()
     return c
 
 

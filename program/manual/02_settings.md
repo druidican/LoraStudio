@@ -16,8 +16,8 @@ shows it again later (or `./start.sh --setup`).
 
 ## Settings
 
-**Settings** has a list on the left, grouped like the work: Start, Datasets, Training, Results, Collection and Care. A number next to an item
-says how many things need a look there. It opens on the **Health check**.
+**Settings** has its groups in the left menu, grouped like the work: Start, Datasets, Training, Results, Collection and
+Care; the search field at the top finds a group by its name. A number next to a group says how many things need a look there. It opens on the **Health check**.
 
 ![Settings › Health check: what is set and working, and what needs a look](img/health.jpg)
 

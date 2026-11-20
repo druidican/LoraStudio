@@ -11,7 +11,7 @@ The Health check lists what is set and working, what needs a look and what is mi
 opens the panel where it is fixed.
 """
 from __future__ import annotations
-__version__ = "1.191126g"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -258,15 +258,6 @@ def nav_counts() -> dict:
             c[i["fix"]] = c.get(i["fix"], 0) + 1
     c["health"] = sum(c.values())
     return c
-
-
-# --------------------------------------------------------------------------- Automatic improvement
-KEEP_CHOICES = [("The suggestion for the LoRA type, at most the number below", "suggested"),
-                ("Always the number below (fewer when there are not that many)", "fixed")]
-WM_CHOICES = [("Remove them (the picture tools paint over them; crop if that fails)", "remove"),
-              ("Crop them off (the recommended crop)", "crop"), ("Set those pictures aside", "aside"),
-              ("Leave them (decide later in Datasets)", "leave")]
-CAP_CHOICES = [("Only pictures without a caption", "missing"), ("Write every caption again", "all")]
 
 
 # --------------------------------------------------------------------------- What is installed

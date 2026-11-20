@@ -9,12 +9,12 @@
 
 It checks that all program files are of one version, that every part loads, that the page builds, and runs the main
 logic on a small made-up dataset in a temporary folder: the launch script of every LoRA type (plan, form round trip,
-command, version numbers), the dataset steps (overview, improvements, repeat folder rename), captions and the
+command, version numbers), the dataset steps (overview, repeat folder rename), captions and the
 ComfyUI test-picture graph. Your settings files are only read; the made-up dataset is deleted at the end.
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.201126d"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -471,14 +471,12 @@ def _names():
 
 
 # ---------------------------------------------------------------- dataset steps
-@check("dataset steps: overview and improvements")
+@check("dataset steps: overview")
 def _flow():
     import dsflow as F
     ov = F.overview([DS])
     need(ov and ov[0]["n"] == 8, f"overview: {ov}")
-    imp = F.improvements(DS)
-    need(isinstance(imp, list), "improvements is not a list")
-    return f"next step {ov[0]['next']}, {len(imp)} improvement(s)"
+    return f"next step {ov[0]['next']}"
 
 
 @check("dataset steps: repeat folder rename (10 → 20 → 10)")
@@ -489,14 +487,6 @@ def _repeats():
     need((G.lora_path(DS) / f"20_{DS}").is_dir(), "20_ folder missing")
     F.rename_repeats(DS, 10)
     need((G.lora_path(DS) / f"10_{DS}").is_dir(), "renaming back failed")
-
-
-@check("automatic improvement settings")
-def _batch():
-    import dsflow as F
-    b = F.batch_settings()
-    need(set(F.BATCH_DEFAULTS) <= set(b), "settings miss keys")
-    need(F.batch_summary(b), "no summary")
 
 
 # ---------------------------------------------------------------- captions

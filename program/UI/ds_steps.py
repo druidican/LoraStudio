@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.191126g"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -240,7 +240,8 @@ def step4(page):
             yield ""
         await stream(lines(), lambda line: setattr(status, "text", line))
         box.content = V.s4_html(ds)
-        page.bar.content, page.stepper.content = V.bar_html(page.s), V.stepper_html(page.s)
+        page.bar.content = V.bar_html(page.s)
+        page.draw_menu()
     with ui.row().classes("items-center gap-2"):
         ui.button("Sort" if ol else "Sort (quick pass only)", on_click=sort).props("unelevated dense no-caps color=primary")
         ui.button("Stop", on_click=F.STOP.set).props("flat dense no-caps color=negative")
@@ -252,10 +253,9 @@ def step5(page):
     ds = page.s["ds"]
     head("Select the best pictures",
          "📌 Always keeps a picture whatever the rules say (a unique detail the sort missed); ⛔ Never leaves one out "
-         "(useless content the sort kept). Your pins are saved at once, stay after a new sort and count in the automatic "
-         "improvement too.")
+         "(useless content the sort kept). Your pins are saved at once and stay after a new sort.")
     n, rng, why = F.suggest_size(ds)
-    mode0 = F.meta(ds).get("select_mode") or F.batch_settings().get("select_mode") or "safe"
+    mode0 = F.meta(ds).get("select_mode") or "safe"
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.card().props("flat bordered").classes("ls-card grow basis-0 gap-2"):
             ui.html(V.s5_suggest_html(ds, n, rng, why), sanitize=False)

@@ -3,7 +3,7 @@
 
   Just trained     the last training (one LoRA or a queue) and its test pictures (comfytest.last_batch)
   Training now     the run and the queue → the queue
-  Needs a look     Settings' health check, Datasets › Improvements and the Collection's warnings, counted, with the
+  Needs a look     Settings' health check and the Collection's warnings, counted, with the
                    first few lines and a way to each
   Last results     the last five finished runs → that run
   Continue         the datasets you opened last, at the step you were at → that dataset
@@ -13,7 +13,7 @@ Nothing is scanned here: every part reads what the other pages already know (the
 data of the cards; UI/pg_home.py draws them.
 """
 from __future__ import annotations
-__version__ = "1.141126b"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -63,8 +63,8 @@ def recent() -> list[dict]:
 
 # --------------------------------------------------------------------------- the data of the Home cards
 def look_items() -> list[dict]:
-    """Needs a look: [{"level": bad|warn, "title", "detail", "go": (page, kw)}] from the health check, the
-    datasets' improvements and the Collection's warnings (each read from what those pages already know)."""
+    """Needs a look: [{"level": bad|warn, "title", "detail", "go": (page, kw)}] from the health check and the
+    Collection's warnings (each read from what those pages already know)."""
     out = []
     try:
         import settings_ui
@@ -74,15 +74,6 @@ def look_items() -> list[dict]:
     for c in bad:
         out.append({"level": c["state"], "title": c["title"], "detail": c["detail"],
                     "go": ("settings", {"group": c["fix"] or "health"})})
-    try:
-        import dsflow as F
-        import sdgui as S
-        imp = [(ds, F.improvements(ds)) for ds in S.list_lora_dirs()]
-    except Exception:                                    # noqa: BLE001
-        imp = []
-    for ds, it in imp:
-        if it:
-            out.append({"level": "warn", "title": ds, "detail": it[0][0], "go": ("datasets", {"ds": ds})})
     try:
         import lora_library as LL
         st = [LL.group_status(m)[0] for m in LL.LIB.groups.values() if m and m[-1].dataset]

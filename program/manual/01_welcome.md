@@ -11,10 +11,18 @@ Everything you see here (pictures, runs, losses) is made-up test data.
 | Tab | What it is for |
 |---|---|
 | **Home** | The start page: what you just trained (with its test pictures), what is training now, what needs a look (setup, datasets, LoRA files), the last results and the datasets you worked on last |
-| **Datasets** | Your datasets (+ New dataset) and Improvements. Each dataset has its own page with four parts: **Prepare** (steps 1-8, from a folder of pictures to captions), **Train** (the launch script and its place in the queue), **Results** (its runs: what to try first, comparing versions, your rating) and **LoRA** (its LoRA files) |
+| **Datasets** | Your datasets (+ New dataset). Each dataset has its own page with four parts, chosen in the left menu: **Prepare** (steps 1-8, from a folder of pictures to captions), **Train** (the launch script and its place in the queue), **Results** (its runs: what to try first, comparing versions, your rating) and **LoRA** (its LoRA files) |
 | **Queue** | All launch scripts, the queue and the run that is training now |
 | **Collection** | Your finished LoRAs: one tile per dataset (a click opens the dataset page's LoRA part), the LoRA page with versions, pictures made with it, its training data; Insights (what your own runs say); Maintenance (sync with LoRA Manager) |
 | **Settings** | Folders, model files, trainers and GPU, Ollama, ComfyUI, backups, updates, version |
+
+## The left menu
+
+Each tab has its own menu on the left: on Home the cards of the page and where you left off; on Datasets a search,
+the filters and, for an open dataset, its steps (✓ done, ! needs a look) and its Train, Results and LoRA parts; on Queue
+the counts and Start; on Collection the search, Pictures / Status / Insights / Maintenance, the filters and the parts
+of an open LoRA page; on Settings the groups, with a search. **Fold in** at the bottom folds the menu to a strip of
+icons (hover one for its name; the search icon folds it out again); the browser remembers it.
 
 **?** at the top right opens this manual at the chapter of the page you are on, with all chapters on the left; *Close* takes you back to where you were.
 

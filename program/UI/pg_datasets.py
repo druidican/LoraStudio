@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Datasets: the dataset list (+ New dataset), Improvements, and one page per dataset with four parts: Prepare (steps
+"""Datasets: the dataset list (+ New dataset) and one page per dataset with four parts: Prepare (steps
 1-8), Train (9), Results (its runs) and LoRA (its LoRA files).
 
 The page keeps one state (self.s, the same keys as before: view, mode, ds, step, …). A change of state redraws the bar,
@@ -8,7 +8,7 @@ Pictures, grids and lists are drawn as HTML by datasets_ui's renderers; their cl
 (route). What each step does to the dataset folder is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.161126"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -16,7 +16,6 @@ from pathlib import Path
 from nicegui import run, ui
 
 import datasets_ui as V
-import ds_batch
 import dsflow as F
 import sdgui as S
 from widgets import note, pic_url
@@ -46,6 +45,9 @@ class Datasets:
         self.draw()
 
     def on_show(self, **kw):
+        if "find" in kw:
+            self.m_find.value = kw["find"]
+            return self.go(view="edit")
         if kw.get("run"):
             self.route("run|" + kw["run"])
         elif kw.get("ds"):
@@ -63,8 +65,8 @@ class Datasets:
         """Clicks inside the HTML parts (lsSend('ds_box', …))."""
         act, _, arg = (v or "").partition("|")
         s = self.s
-        if act == "edit":
-            return self.go(view="edit", ds=arg, mode="edit")
+        if act == "edit":                                 # a dataset tile: open its page
+            return self.open_ds(arg)
         if act in ("open", "step") and s.get("ds"):
             try:
                 return self.go(view="flow", step=int(arg))
@@ -108,20 +110,15 @@ class Datasets:
         view = s.get("view", "edit")
         self.p_new.set_visibility(view == "new")
         self.p_edit.set_visibility(view == "edit")
-        self.p_imp.set_visibility(view == "imp")
         self.p_flow.set_visibility(view == "flow")
-        self.b_edit.classes(**({"add": "ls-nav-on"} if view in ("edit", "new") else {"remove": "ls-nav-on"}))
-        self.b_imp.classes(**({"add": "ls-nav-on"} if view == "imp" else {"remove": "ls-nav-on"}))
+        self.draw_menu()
         if view == "new":
             self.n_list.content = V.new_list_html(s.get("src", ""))
             self.draw_tree()
         elif view == "edit":
             self.draw_list()
-        elif view == "imp":
-            self.draw_imp()
         elif view == "flow":
             self.bar.content = V.bar_html(s)
-            self.stepper.content = V.stepper_html(s) if (s.get("step") or 2) <= 8 else ""
             self.box.clear()
             with self.box:
                 build = self.steps.get(s.get("step"))
@@ -130,37 +127,53 @@ class Datasets:
                 else:
                     note(f"Step {s.get('step')} ({NAMES.get(s.get('step'), '')}) comes in the next part of the move.")
 
+    def open_ds(self, ds: str):
+        """A dataset's page, at the step you were at (or its next step)."""
+        if ds not in S.list_lora_dirs():
+            return
+        s = self.s
+        step = s.get("prep") if s.get("prep_ds") == ds and s.get("prep") else min(F.next_step(ds), 8)
+        self.go(view="flow", mode="edit", ds=ds, step=int(step))
+
     def draw_list(self):
         rows = F.overview(S.list_lora_dirs())
-        find = (self.e_find.value or "").strip().lower()
+        find = (self.m_find.value or "").strip().lower()
+        only_new = self.m_new.value
         out = []
         for r in rows:
             if find and find not in r["ds"].lower():
                 continue
-            on = " ds-frow-on" if r["ds"] == self.s.get("ds") else ""
-            out.append(f'<button class="ds-erow{on}" onclick="{V.send("edit|" + r["ds"])}"><b>{V.esc(r["ds"])}</b>'
-                       f'<span class="ls-note">{r["n"]} · next: {r["next"]} {V.esc(r["label"])}</span></button>')
-        self.e_list.content = '<div class="ds-elist">' + ("".join(out) or '<p class="ls-empty">No datasets.</p>') + "</div>"
+            if only_new and self.lora_count(r["ds"]):
+                continue
+            out.append(f'<button class="ds-erow" onclick="{V.send("edit|" + r["ds"])}"><b>{V.esc(r["ds"])}</b>'
+                       f'<span class="ls-note">{r["n"]} pictures · next: {r["next"]} {V.esc(r["label"])}</span></button>')
+        empty = "No datasets match." if (find or only_new) else "No datasets."
+        self.e_list.content = '<div class="ds-egrid">' + ("".join(out) or f'<p class="ls-empty">{empty}</p>') + "</div>"
+
+    def build_step1(self):
+        """Step 1 Folder: the dataset folder (missing folders are made), adding pictures, and every step's state."""
         ds = self.s.get("ds")
-        self.e_open.set_visibility(bool(ds))
-        if not ds:
-            self.e_head.content, self.e_steps.content = '<p class="ls-empty">Pick a dataset on the left.</p>', ""
-            return
-        m = F.meta(ds)
-        labels = F.type_labels()
-        self.e_head.content = (f'<div class="ds-ehead"><b>{V.esc(ds)}</b> · '
-                               f'{V.esc(" + ".join(labels.get(t, t) for t in m["types"]) or "type not set")} · '
-                               f'{V.esc(F.PURPOSE_LABEL.get(m["purpose"], m["purpose"]))} · {len(F.images(ds))} pictures</div>')
         try:
             made = F.ensure_folders(ds)                   # step 1's folders, made when missing
         except OSError as e:
             made = [f"could not: {e}"]
+        with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
+            ui.label("The dataset folder").classes("text-lg font-semibold")
+            ui.html(f'<span class="ls-chip ok">{V.esc(F.folder_text(ds))}</span>'
+                    + (f' <span class="ls-note">made now: {V.esc(", ".join(made))}</span>' if made else ""),
+                    sanitize=False)
+        with ui.expansion("Add pictures from a folder").classes("w-full ls-card"):
+            note("Pictures that are good enough and not already in the dataset are copied into its repeat "
+                 "folder (and into _originals/). Then sort and select again.")
+            with ui.row().classes("w-full items-center gap-2"):
+                self.e_add_dir = ui.input("Folder", placeholder="~/Pictures/new batch") \
+                    .props("outlined dense").classes("grow")
+                self.e_add_sub = ui.checkbox("Include subfolders", value=True)
+                ui.button("Add pictures", on_click=self.add_pics).props("outline dense no-caps")
+            self.e_add_msg = ui.markdown("")
         sts = F.step_states(ds)
         nxt = F.next_step(ds)
-        rows = [f'<div class="ds-srow"><span class="ds-snum">1</span><b>Folder</b>'
-                f'<span class="ls-chip ok">{V.esc(F.folder_text(ds))}</span>'
-                + (f'<span class="ls-note">made now: {V.esc(", ".join(made))}</span>' if made else "")
-                + '<span class="ds-sp"></span></div>']
+        rows = []
         for n, key, label in F.STEPS[1:]:
             st, text = sts.get(key, ("todo", ""))
             chip = {"done": "ok", "warn": "warn", "optional": ""}.get(st, "")
@@ -168,39 +181,97 @@ class Datasets:
                         f'<b>{V.esc(label)}</b><span class="ls-chip {chip}">{V.esc(text)}</span><span class="ds-sp"></span>'
                         f'<button class="tr-btn tr-small" onclick="{V.send(f"open|{n}")}">'
                         f'{"Next: open" if n == nxt else "Open"}</button></div>')
-        self.e_steps.content = '<div class="ds-slist">' + "".join(rows) + "</div>"
+        ui.html('<div class="ds-slist">' + "".join(rows) + "</div>", sanitize=False).classes("w-full")
+
+    # ------------------------------------------------------------------ the left menu
+    STEP_ICONS = {1: "folder", 2: "tune", 3: "fact_check", 4: "sort", 5: "checklist", 6: "crop", 7: "subtitles",
+                  8: "rate_review"}
+
+    def build_menu(self):
+        import sidemenu as SM
+        menu = self.shell.menu
+        with menu.section("datasets"):
+            self.m_find = menu.search("Search datasets", lambda: self.search_changed())
+            self.m_all = SM.Item("view_list", "All datasets", on_click=lambda: self.go(view="edit"))
+            self.m_newds = SM.Item("add", "New dataset", on_click=lambda: self.go(view="new", src=""))
+            with ui.column().classes("w-full gap-0") as self.m_filters:
+                SM.header("Show")
+                with ui.column().classes("ls-mfilters gap-0 q-mini-drawer-hide"):
+                    self.m_new = ui.checkbox("Only not trained yet", on_change=lambda: self.draw_list()).props("dense")
+            with ui.column().classes("w-full gap-0") as self.m_ds:
+                self.m_card = ui.html("", sanitize=False).classes("ls-mcard")
+                SM.header("Prepare")
+                self.m_steps = {}
+                for n, key, label in F.STEPS[:8]:
+                    self.m_steps[n] = SM.Item(self.STEP_ICONS.get(n, "circle"), f"{n} {label}", sub=True,
+                                              on_click=lambda n=n: self.go(view="flow", step=n))
+                SM.header("Next")
+                self.m_train = SM.Item("play_circle", "Train", on_click=lambda: self.go(view="flow", step=9))
+                self.m_res = SM.Item("bar_chart", "Results", on_click=lambda: self.go(view="flow", step=10))
+                self.m_lora = SM.Item("collections", "LoRA", on_click=lambda: self.go(view="flow", step=11))
+
+    def search_changed(self):
+        if self.s.get("view") != "edit":
+            self.go(view="edit")
+        else:
+            self.draw_list()
+
+    def lora_count(self, ds: str) -> int:
+        """Finished LoRA files in the dataset's model/ folder (no save points), looked at every 30 s at most."""
+        import re
+        import time
+        hit = self._lora_n.get(ds)
+        if hit and time.time() - hit[0] < 30:
+            return hit[1]
+        n = 0
+        try:
+            d = S.lora_path(ds) / "model"
+            n = sum(1 for f in d.glob("*.safetensors") if not re.search(r"-\d{6}$", f.stem)) if d.is_dir() else 0
+        except OSError:
+            pass
+        self._lora_n[ds] = (time.time(), n)
+        return n
+
+    def draw_menu(self):
+        s = self.s
+        view, ds, step = s.get("view", "edit"), s.get("ds"), s.get("step") or 2
+        self.m_all.active(view == "edit")
+        self.m_newds.active(view == "new")
+        self.m_all.set_right(str(len(S.list_lora_dirs())))
+        self.m_filters.set_visibility(view == "edit")
+        flow = view == "flow" and bool(ds)
+        self.m_ds.set_visibility(flow)
+        if not flow:
+            return
+        import features as FT
+        m = F.meta(ds)
+        labels = F.type_labels()
+        kind = " + ".join(labels.get(t, t) for t in m["types"]) or "type not set"
+        self.m_card.content = (f"{V.esc(ds)}<small>{V.esc(kind)} · {V.esc(F.PURPOSE_LABEL.get(m['purpose'], m['purpose']))}"
+                               f" · {len(F.images(ds))} pictures</small>")
+        states = F.step_states(ds)
+        for n, key, label in F.STEPS[:8]:
+            st = states.get(key, ("todo", ""))[0] if n > 1 else "done"
+            it = self.m_steps[n]
+            it.active(step == n)
+            off = key == "tags" and not FT.have("ollama") and any(x["style"] != "tags" for x in F.caption_sets(ds))
+            if st == "done" and step != n:
+                it.set_icon("check_circle", "ok")
+                it.set_right("✓")
+            elif st == "warn":
+                it.set_icon("error", "warn")
+                it.set_right("!")
+            else:
+                it.set_icon(self.STEP_ICONS.get(n, "circle"), "off" if off else "")
+                it.set_right("")
+        self.m_train.active(step == 9)
+        self.m_res.active(step == 10)
+        self.m_lora.active(step == 11)
+        nl = self.lora_count(ds)
+        self.m_lora.set_right(f"{nl} file{'s' if nl != 1 else ''}" if nl else "")
 
     def draw_tree(self):
         self.n_tree.content = V.new_tree(self.n_name.value, self.n_rep.value, self.s.get("src", ""), self.n_out.value)
-
-    def draw_imp(self):
-        dss = S.list_lora_dirs()
-        cards = []
-        for ds in dss:
-            try:
-                items = F.improvements(ds)
-            except Exception as e:                       # noqa: BLE001
-                items = [("error", str(e))]
-            if not items:
-                continue
-            rows = []
-            for it in items:
-                t, x, pics = it[0], it[1], (it[2] if len(it) > 2 else [])
-                more = ""
-                if pics:
-                    thumbs = "".join(f'<img loading="lazy" src="{pic_url(q, 160)}" title="{V.esc(Path(q).name)}">'
-                                     for q in pics[:60])
-                    more = (f'<details class="ds-imppics"><summary>Show the {len(pics)} picture'
-                            f'{"s" if len(pics) != 1 else ""}</summary><div>{thumbs}</div></details>')
-                rows.append(f'<div class="ds-improw"><span class="ls-chip warn">{V.esc(t)}</span>'
-                            f'<span>{V.esc(x)}{more}</span></div>')
-            body = "".join(rows)
-            cards.append(f'<div class="ls-card ds-impcard"><div class="ds-imph"><label class="ds-tick ds-imptick">'
-                         f'<input type="checkbox" data-ds="{V.esc(ds)}"><b>{V.esc(ds)}</b></label>'
-                         f'<button class="tr-btn tr-small" onclick="{V.send("edit|" + ds)}">Open</button></div>{body}</div>')
-        self.i_head.content = f'<div class="rs-big">{len(cards)} of {len(dss)} datasets could be better</div>'
-        self.i_html.content = "".join(cards) or '<p class="ls-empty">Nothing to improve that is known.</p>'
-        self.i_what.content = V.batch_what()
 
     # ------------------------------------------------------------------ list and new
     def create(self):
@@ -217,23 +288,21 @@ class Datasets:
             return
         self.e_add_msg.content = "Looking at the pictures …"
         self.e_add_msg.content = await run.io_bound(F.add_pictures, ds, folder, self.e_add_sub.value)
-        self.draw_list()
+        self.draw_menu()
 
     # ------------------------------------------------------------------ build
     def build(self):
+        self._lora_n: dict = {}
+        self.build_menu()
         with ui.column().classes("ls-page gap-3"):
-            with ui.row().classes("gap-2"):
-                self.b_edit = ui.label("Datasets").classes("ls-nav").on("click", lambda: self.go(view="edit"))
-                self.b_imp = ui.label("Improvements").classes("ls-nav").on("click", lambda: self.go(view="imp"))
             self.build_new()
             self.build_list()
-            self.build_imp()
             with ui.column().classes("w-full gap-2") as self.p_flow:
                 self.bar = ui.html("", sanitize=False).classes("w-full")
-                self.stepper = ui.html("", sanitize=False).classes("w-full")
                 self.box = ui.column().classes("w-full gap-3")
         import ds_steps
         ds_steps.attach(self)
+        self.steps[1] = self.build_step1
         ui.add_head_html("<script>" + V.GRID_JS + "</script>")
         ui.on("ls_ds_box", lambda e: self.route(str(e.args)))
         ui.on("ls_rs_box", lambda e: getattr(self, "on_rs", lambda v: None)(str(e.args)))
@@ -242,8 +311,7 @@ class Datasets:
 
     def build_new(self):
         with ui.column().classes("w-full gap-2") as self.p_new:
-            ui.button("← All datasets", on_click=lambda: self.go(view="edit")).props("flat dense no-caps")
-            ui.html(V.stepper_html({"ds": "", "step": 1}), sanitize=False).classes("w-full")
+            ui.label("New dataset").classes("ls-h")
             with ui.row().classes("w-full no-wrap items-start gap-4"):
                 with ui.card().props("flat bordered").classes("ls-card grow basis-3/5 gap-2"):
                     ui.label("Pick a folder in your dataset folder").classes("text-lg font-semibold")
@@ -265,43 +333,8 @@ class Datasets:
                     self.n_msg = ui.markdown("")
 
     def build_list(self):
-        with ui.row().classes("w-full no-wrap items-start gap-6") as self.p_edit:
-            with ui.column().classes("w-72 flex-none gap-2"):
-                ui.button("+ New dataset", on_click=lambda: self.go(view="new", src="")) \
-                    .props("unelevated no-caps color=primary")
-                self.e_find = ui.input("Find a dataset", on_change=lambda: self.draw_list()) \
-                    .props("outlined dense clearable").classes("w-full")
-                self.e_list = ui.html("", sanitize=False).classes("w-full")
-            with ui.column().classes("grow min-w-0 gap-2"):
-                self.e_head = ui.html("", sanitize=False)
-                with ui.column().classes("w-full gap-2") as self.e_open:
-                    with ui.expansion("Add pictures from a folder").classes("w-full ls-card"):
-                        note("Pictures that are good enough and not already in the dataset are copied into its repeat "
-                             "folder (and into _originals/). Then sort and select again.")
-                        with ui.row().classes("w-full items-center gap-2"):
-                            self.e_add_dir = ui.input("Folder", placeholder="~/Pictures/new batch") \
-                                .props("outlined dense").classes("grow")
-                            self.e_add_sub = ui.checkbox("Include subfolders", value=True)
-                            ui.button("Add pictures", on_click=self.add_pics).props("outline dense no-caps")
-                        self.e_add_msg = ui.markdown("")
-                    self.e_steps = ui.html("", sanitize=False).classes("w-full")
-
-    def build_imp(self):
-        with ui.column().classes("w-full gap-2") as self.p_imp:
-            with ui.row().classes("w-full items-center"):
-                self.i_head = ui.html("", sanitize=False).classes("grow")
-                ui.button("Refresh", on_click=self.draw_imp).props("flat dense no-caps")
-            note("From what is known already; nothing is scanned on this page.")
-            with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
-                self.i_what = ui.html("", sanitize=False)
-                self.i_tools = ui.row().classes("items-center gap-2")
-                self.i_msg = ui.markdown("")
-                self.i_prog = ui.html("", sanitize=False).classes("w-full")
-                with ui.expansion("What Fix does: the choices (pictures to keep, LoRA type, watermarks, captions)") \
-                        .classes("w-full"):
-                    ds_batch.settings(self)
-                ds_batch.tools(self)
-            self.i_html = ui.html("", sanitize=False).classes("w-full")
+        with ui.column().classes("w-full gap-2") as self.p_edit:
+            self.e_list = ui.html("", sanitize=False).classes("w-full")
 
 
 def build(shell):

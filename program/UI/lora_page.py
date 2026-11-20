@@ -2,7 +2,7 @@
 """Collection › LoRA page: one LoRA (all its versions) in four parts: Overview, Pictures (made with it), Training and
 Edit. The data and the actions are in Gallery/lorapage.py; this file only draws them."""
 from __future__ import annotations
-__version__ = "1.191126f"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -44,6 +44,7 @@ class LoraPage:
         self.fill_training()
         self.fill_edit()
         self.fill_pictures()
+        self.col.draw_menu()
         async def later(k=key):
             await self.lm_refresh(k)
         ui.timer(0.1, later, once=True)
@@ -167,7 +168,10 @@ class LoraPage:
 
     def deleted(self, text: str):
         self.col.deleted(text)
-        self.col.tabs.value = "browse"
+        self.key = ""
+        self.body.set_visibility(False)
+        self.empty.set_visibility(True)
+        self.col.go_tab("browse")
 
     def new_version(self):
         lora = LIB.loras.get(self.key)
@@ -177,7 +181,6 @@ class LoraPage:
     # ------------------------------------------------------------------ build
     def build(self):
         with ui.row().classes("w-full items-center gap-3"):
-            ui.button("← Browse", on_click=lambda: setattr(self.col.tabs, "value", "browse")).props("flat dense no-caps")
             with ui.column().classes("gap-0 grow"):
                 self.title = ui.label("").classes("text-lg font-semibold")
                 self.subtitle = ui.label("").classes("ls-note")
@@ -187,13 +190,8 @@ class LoraPage:
                 .props("outlined dense").classes("w-72")
         self.empty = note("No LoRA open. Click a type label on a tile in Browse, or a card in Status.")
         with ui.column().classes("w-full gap-2") as self.body:
-            self.tabs = ui.tabs().props("dense no-caps align=left").classes("ls-sub-tabs")
-            with self.tabs:
-                ui.tab("over", "Overview")
-                ui.tab("pics", "Pictures")
-                ui.tab("train", "Training")
-                ui.tab("edit", "Edit")
-            with ui.tab_panels(self.tabs, value="over").props("animated=false").classes("w-full bg-transparent"):
+            with ui.tab_panels(value="over", on_change=lambda _e: self.col.draw_menu()).props("animated=false") \
+                    .classes("w-full bg-transparent") as self.tabs:     # parts chosen in the left menu
                 with ui.tab_panel("over").classes("p-0 pt-2"):
                     self.build_overview()
                 with ui.tab_panel("pics").classes("p-0 pt-2"):

@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Preparing a dataset: captions with Ollama, the picture check, watermarks and the automatic preparation
-(Datasets › 6 and 7).
+"""Preparing a dataset: captions with Ollama, the picture check and watermarks (Datasets › 6 and 7).
 
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -476,9 +475,9 @@ def wm_paint_mask(ds, rp, a) -> str:
             "_set_aside/originals/, the cut-out in _originals/_watermarks/.")
 
 
-def wm_apply(ds, choices_json, only_pending=False, prefer="remove"):
+def wm_apply(ds, choices_json, only_pending=False):
     """Apply the options clicked in the review (or the recommended ones). Returns a message."""
-    g = wm_apply_steps(ds, choices_json, only_pending, prefer)
+    g = wm_apply_steps(ds, choices_json, only_pending)
     while True:
         try:
             next(g)
@@ -497,7 +496,7 @@ def wm_apply_live(ds, choices_json, only_pending=False):
             return
 
 
-def wm_apply_steps(ds, choices_json, only_pending=False, prefer="remove"):
+def wm_apply_steps(ds, choices_json, only_pending=False):
     """Generator behind wm_apply: yields a progress line before each picture; returns the message."""
     if S.DC is None or not ds:
         return "Pick a LoRA folder first."
@@ -517,10 +516,6 @@ def wm_apply_steps(ds, choices_json, only_pending=False, prefer="remove"):
             if e.get("choice"):
                 continue
             c = _wm_recommended(e)
-            if prefer == "crop":                        # Improvements › What Fix does
-                c = "A" if e.get("options") else "aside"
-            elif prefer == "aside":
-                c = "aside"
         else:
             c = want.get(rp)
             if not c:

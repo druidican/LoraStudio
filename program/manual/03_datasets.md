@@ -1,7 +1,9 @@
 # Making a dataset
 
-**Datasets** has two pages: the **dataset list** (with **+ New dataset** on top) and **Improvements**. A dataset you
-open gets its own page with four parts, in the bar under its name:
+**Datasets** shows **All datasets** (every dataset as a tile; the search field in the left menu and *Only not trained
+yet* narrow it); **+ New dataset** is in the menu too. A dataset
+you open gets its own page with four parts, in the left menu under its name (Prepare as the steps 1-8, then Train,
+Results and LoRA under *Next*):
 
 | Part | What is there |
 |---|---|
@@ -22,8 +24,9 @@ count and check, so they never give false warnings.
 Pick a folder in your dataset folder. A folder with only pictures becomes a new dataset: LoRA Studio makes the repeat
 folder and moves the pictures in (*Create and continue*). Folders that already are datasets are in the dataset list.
 
-The **dataset list** shows your datasets with their next step; open one to see every step and its state. Its first
-row, **1 Folder**, shows the dataset's folders (`10_name`, `_originals`, `model`, `log`). When one is missing (a
+The **dataset list** shows your datasets with their next step; open one and it starts at the step you were at. The
+left menu shows every step with its state (✓ done, ! needs a look, greyed when the part it needs is not installed).
+Step **1 Folder** shows every step in a list, and the dataset's folders (`10_name`, `_originals`, `model`, `log`). When one is missing (a
 dataset made by hand, or a folder deleted), it is made as soon as you open the dataset, and the row says what was
 made; a new `_originals/` then holds copies of the pictures as they are now.
 
@@ -141,7 +144,7 @@ as they were cut, stay in `_originals/`.
 
 The sort can still be wrong. Under each picture: **📌 Always** keeps it whatever the rules say (a unique detail the
 sort dropped), **⛔ Never** leaves it out (useless content the sort kept). Pins are saved at once, stay after a new
-sort and count in the automatic improvement too; click a pin again to remove it.
+sort; click a pin again to remove it.
 
 ## 6 · Watermarks and size
 
@@ -299,7 +302,3 @@ Z-Image …) always train on their own set.
 the queue. With *Start the queue when nothing is training* ticked (remembered), training starts at once and the status
 strip at the top follows it; otherwise the **Queue** tab starts the queue. The card *This dataset in the queue*
 at the bottom shows its queue items and its last runs (a click opens the run in Results).
-
-## Improvements
-
-**Datasets › Improvements** lists what could be better in each dataset; see [Automatic improvement](#automatic).

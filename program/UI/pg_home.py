@@ -6,7 +6,7 @@ Just trained: the runs of the last finished queue. One LoRA: its test pictures w
 the final file; several LoRAs: the final file of each, side by side (comfytest.after_queue decides which are made).
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import time
 
@@ -109,6 +109,7 @@ class Home:
         self.look.clear()
         with self.look:
             items = H.look_items()
+            self._look_n = len(items)
             for it in items[:6]:
                 with ui.row().classes("ls-row items-center gap-2 no-wrap cursor-pointer") \
                         .on("click", lambda _, it=it: self.shell.go(it["go"][0], **it["go"][1])):
@@ -116,7 +117,7 @@ class Home:
                     ui.label(it["title"]).classes("font-semibold")
                     ui.label(it["detail"]).classes("ls-note truncate")
             if len(items) > 6:
-                note(f"{len(items) - 6} more: Settings › Health check, Datasets › Improvements, Collection › Status.")
+                note(f"{len(items) - 6} more: Settings › Health check, Collection › Status.")
             if not items:
                 note("Nothing needs a look.")
         self.results.clear()
@@ -135,31 +136,61 @@ class Home:
     def on_show(self, **kw):
         self.draw_static()
         self.draw_batch()
+        self.draw_menu()
+
+    # ------------------------------------------------------------------ the left menu
+    def build_menu(self):
+        import sidemenu as SM
+        with self.shell.menu.section("home"):
+            find = self.shell.menu.search("Search datasets", None)
+            find.on("keydown.enter", lambda _e: self.shell.go("datasets", find=find.value or ""))
+            SM.header("On this page")
+            for icon, label, anchor in (("auto_awesome", "Just trained", "home-batch"), ("play_arrow", "Training now", "home-now"),
+                                        ("history", "Continue", "home-cont"), ("error_outline", "Needs a look", "home-look"),
+                                        ("bar_chart", "Last results", "home-results")):
+                it = SM.Item(icon, label, on_click=lambda a=anchor: ui.run_javascript(
+                    f"document.getElementById('{a}')?.scrollIntoView({{behavior:'smooth',block:'start'}})"))
+                if anchor == "home-look":
+                    self.m_look = it
+            SM.header("Continue")
+            self.m_cont = ui.column().classes("w-full gap-0")
+
+    def draw_menu(self):
+        import sidemenu as SM
+        n = getattr(self, "_look_n", 0)
+        self.m_look.set_right(str(n) if n else "")
+        self.m_look.set_icon("error_outline", "warn" if n else "")
+        self.m_cont.clear()
+        with self.m_cont:
+            for it in H.continue_items()[:6]:
+                SM.Item("folder_open", it["ds"], right=it["label"], sub=True,
+                        on_click=lambda it=it: self.shell.go("datasets", ds=it["ds"], step=it["step"]))
 
     def build(self):
+        self.build_menu()
         with ui.column().classes("ls-page gap-4"):
             with ui.row().classes("items-center gap-3"):
                 ui.label("Home").classes("ls-h")
                 ui.button("Refresh", on_click=self.on_show).props("flat dense no-caps")
-            with ui.card().props("flat bordered").classes("ls-card w-full gap-2") as self.batch_card:
+            with ui.card().props('flat bordered id="home-batch"').classes("ls-card w-full gap-2") as self.batch_card:
                 ui.label("Just trained").classes("text-lg font-semibold")
                 self.batch = ui.column().classes("w-full gap-3")
             with ui.element("div").classes("w-full grid gap-4 grid-cols-1 lg:grid-cols-2"):
-                with ui.card().props("flat bordered").classes("ls-card gap-1"):
+                with ui.card().props('flat bordered id="home-now"').classes("ls-card gap-1"):
                     ui.label("Training now").classes("text-lg font-semibold")
                     self.t_big = ui.label("").classes("text-base font-semibold")
                     self.t_prog = note("")
                     self.t_more = note("")
                     ui.button("Open the queue", on_click=lambda: self.shell.go("queue")).props("outline dense no-caps")
-                with ui.card().props("flat bordered").classes("ls-card gap-1"):
+                with ui.card().props('flat bordered id="home-cont"').classes("ls-card gap-1"):
                     ui.label("Continue where you left off").classes("text-lg font-semibold")
                     self.cont = ui.column().classes("gap-0 w-full")
                     ui.button("+ New dataset", on_click=lambda: self.shell.go("datasets", new=True)) \
                         .props("outline dense no-caps")
-                with ui.card().props("flat bordered").classes("ls-card gap-1"):
+                with ui.card().props('flat bordered id="home-look"').classes("ls-card gap-1"):
                     ui.label("Needs a look").classes("text-lg font-semibold")
                     self.look = ui.column().classes("gap-0 w-full")
-                with ui.card().props("flat bordered").classes("ls-card gap-1"):
+                with ui.card().props('flat bordered id="home-results"').classes("ls-card gap-1"):
                     ui.label("Last results").classes("text-lg font-semibold")
                     self.results = ui.column().classes("gap-0 w-full")
         self.on_show()

@@ -6,7 +6,7 @@ ls_tr_box events (lsSend) that tr_action handles. Two timers keep the queue and 
 changes what changed.
 """
 from __future__ import annotations
-__version__ = "1.151126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import json
 
@@ -47,7 +47,40 @@ class Queue:
         self.set_html(self.queue, "queue", q)
         self.msg.text = msg
 
+    # ------------------------------------------------------------------ the left menu
+    def build_menu(self):
+        import sidemenu as SM
+
+        def jump(a):
+            return lambda: ui.run_javascript(f"document.getElementById('{a}')?.scrollIntoView({{behavior:'smooth',block:'start'}})")
+        with self.shell.menu.section("queue"):
+            SM.header("Queue")
+            self.m = {"running": SM.Item("play_arrow", "Running", on_click=jump("q_live")),
+                      "queued": SM.Item("hourglass_empty", "Waiting", on_click=jump("tr_queue")),
+                      "done": SM.Item("check_circle", "Done", on_click=jump("tr_queue")),
+                      "failed": SM.Item("error", "Failed", on_click=jump("tr_queue"))}
+            SM.header("Add")
+            SM.Item("description", "Launch scripts", on_click=jump("tr_scripts"))
+            SM.header("Controls")
+            self.m_start = SM.Item("play_circle", "Start the queue",
+                                   on_click=lambda: (T.start_queue(sg.QUEUE.get("stop_on_fail", True)), self.draw_lists()))
+            self.m_after = SM.Item("stop_circle", "Stop after this run", on_click=sg.queue_stop_after_current)
+
+    def draw_menu(self):
+        items = sg.QUEUE["items"]
+        n = {k: sum(1 for i in items if i.get("state") == k) for k in ("queued", "done")}
+        n["failed"] = sum(1 for i in items if i.get("state") in ("failed", "stopped"))
+        n["running"] = 1 if sg.RUN.running() else 0
+        for k, it in self.m.items():
+            it.set_right(str(n[k]))
+        self.m["running"].active(bool(n["running"]))
+        self.m["failed"].set_icon("error", "warn" if n["failed"] else "")
+        self.m["done"].set_icon("check_circle", "ok" if n["done"] else "")
+        self.m_start.show(bool(n["queued"]) and not sg.QUEUE.get("running") and not n["running"])
+        self.m_after.show(bool(sg.QUEUE.get("running")) and not sg.QUEUE.get("stop_flag"))
+
     def tick(self):
+        self.draw_menu()
         self.set_html(self.queue, "queue", T.queue_html())
         import comfytest as CT
         now = dict(CT.NOW)
@@ -77,6 +110,7 @@ class Queue:
         self.draw_lists()
 
     def build(self):
+        self.build_menu()
         trains = FT.have("sd_scripts") or FT.have("musubi")
         with ui.column().classes("ls-page gap-3"):
             if not trains:
@@ -121,7 +155,7 @@ class Queue:
                 self.pics_bar = ui.linear_progress(value=None, show_value=False).props("rounded color=amber-8")
                 self.pics_note = ui.label("").classes("ls-note")
             self.pics.set_visibility(False)
-            with ui.card().props("flat bordered").classes("ls-card w-full gap-2") as self.live:
+            with ui.card().props('flat bordered id="q_live"').classes("ls-card w-full gap-2") as self.live:
                 with ui.row().classes("w-full items-center gap-3"):
                     self.head = ui.html("", sanitize=False).classes("grow")
                     ui.button("Stop after this run", on_click=sg.queue_stop_after_current).props("outline dense no-caps")

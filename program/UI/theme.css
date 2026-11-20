@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-   LoRA Studio version 1.131126c
+   LoRA Studio version 1.201126e
    LoRA Studio's look for the NiceGUI pages: the same colours as before, light and dark (body--dark). */
 :root { --ls-bg:#F4F2EE; --ls-card:#FDFDFB; --ls-line:#D3D6DB; --ls-line2:#BCC2CA; --ls-text:#1C1F24; --ls-muted:#5A626C;
         --ls-dim:#7D858F; --ls-ok:#21857C; --ls-warn:#A86A0C; --ls-bad:#C0392B; --ls-chip:#EDEFF2; --ls-chip-text:#3A4048;
@@ -47,7 +47,6 @@ body { background:var(--ls-bg); color:var(--ls-text); font-family:Inter, system-
 .ls-chip.cur { border-color:var(--ls-accent); }
 .ls-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
 .ls-dot.warning { background:var(--ls-warn); } .ls-dot.problem { background:var(--ls-bad); } .ls-dot.ok { background:var(--ls-ok); }
-.ls-sub-tabs .q-tab { text-transform:none; font-weight:600; }
 
 /* Collection tiles */
 .ls-tile { width:200px; cursor:pointer; border-radius:12px; overflow:hidden; background:var(--ls-card);
@@ -68,9 +67,6 @@ body { background:var(--ls-bg); color:var(--ls-text); font-family:Inter, system-
 .ls-page .nicegui-markdown p { margin:4px 0; }
 .ls-row { display:flex; padding:5px 8px; border-radius:6px; text-decoration:none; color:inherit; font-size:14px; width:100%; }
 .ls-row:hover { background:rgba(127,127,127,.12); }
-.ls-set-item { padding:7px 12px; border-radius:8px; cursor:pointer; font-size:14px; color:var(--ls-text); }
-.ls-set-item:hover { background:rgba(127,127,127,.12); }
-.ls-set-item.ls-set-on { background:var(--ls-accent-bg); font-weight:650; }
 .ls-nav { padding:6px 4px; margin-right:18px; cursor:pointer; color:var(--ls-muted); font-weight:600; border-bottom:2px solid transparent; }
 .ls-nav.ls-nav-on { color:var(--ls-text); border-bottom-color:var(--ls-accent); }
 
@@ -83,3 +79,32 @@ body { background:var(--ls-bg); color:var(--ls-text); font-family:Inter, system-
 /* the colour names the older HTML parts use */
 :root { --border-color-primary: var(--ls-line); --block-background-fill: var(--ls-card);
   --background-fill-secondary: var(--ls-bg); --color-accent: #E8A33D; }
+
+/* the left menu (UI/sidemenu.py): sections per top tab, foldable to icons (Quasar mini mode) */
+.ls-side { background:#E9E6E0 !important; border-right:1px solid #D9D5CE; }
+.body--dark .ls-side { background:#1A1D22 !important; border-right-color:var(--ls-line); }
+.ls-side .q-drawer__content { display:flex; flex-direction:column; }
+.ls-side-box { flex:1 1 auto; min-height:0; overflow-y:auto; padding:10px 8px 8px; }
+.ls-mi { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:8px; cursor:pointer; white-space:nowrap;
+         color:var(--ls-text); font-size:14px; min-height:34px; width:100%; }
+.ls-mi:hover { background:rgba(127,127,127,.14); }
+.ls-mi.ls-mi-on { background:var(--ls-accent-bg); box-shadow:inset 3px 0 0 var(--ls-accent); font-weight:650; }
+.ls-mi-sub { padding-left:22px; }
+.ls-mi-ic { font-size:19px; color:var(--ls-muted); flex:none; }
+.ls-mi-lab { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; }
+.ls-mi-r { margin-left:auto; font-size:12px; color:var(--ls-dim); flex:none; }
+.ls-mi-ok .ls-mi-ic { color:var(--ls-ok); } .ls-mi-warn .ls-mi-ic { color:var(--ls-warn); }
+.ls-mi-off { opacity:.55; }
+.ls-mh { font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--ls-dim); margin:12px 10px 4px; text-transform:uppercase; }
+.ls-mcard { margin:6px 2px 2px; padding:8px 10px; background:var(--ls-card); border:1px solid var(--ls-line);
+            border-radius:8px; font-weight:650; width:calc(100% - 4px); }
+.ls-mcard small { display:block; font-weight:400; color:var(--ls-muted); margin-top:2px; font-size:12px; }
+.ls-msearch { width:100%; margin:0 0 8px; } .ls-msearch .q-field__control { background:var(--ls-card); }
+.ls-mfilters { padding:0 6px; width:100%; }
+.ls-fold { display:flex; align-items:center; gap:6px; padding:10px 14px; color:var(--ls-muted); font-size:13px; cursor:pointer;
+           border-top:1px solid rgba(127,127,127,.18); }
+.ls-fold:hover { color:var(--ls-text); }
+.q-drawer--mini .ls-mi { justify-content:center; padding:9px 0; } .q-drawer--mini .ls-mi-sub { padding-left:0; }
+.q-drawer--mini .ls-mcard { padding:6px 0; text-align:center; font-size:11px; overflow:hidden; text-overflow:ellipsis; }
+.q-drawer--mini .ls-fold { justify-content:center; padding:10px 0; }
+.q-drawer:not(.q-drawer--mini) .q-mini-drawer-only { display:none !important; }

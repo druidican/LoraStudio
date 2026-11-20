@@ -103,9 +103,16 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   test pictures of the best save point and the final file, several → the final file of each, `comfytest.WHICH`),
   Training now, Continue (`home.remember`), Needs a look, Last results. The top **?** opens the manual (all chapters,
   pictures) at the chapter of the current tab.
-- **The dataset page**: four parts (`datasets_ui.parts_html`): Prepare (steps 1-8, reopens at `prep`), Train (step 9,
+- **The left menu** (1.201126e, `UI/sidemenu.py`): one `ui.left_drawer` for the whole program, foldable to icons
+  (Quasar mini; `app.storage.user["menu_mini"]`); each page fills `with shell.menu.section(key):` and `shell.go` /
+  `changed` show it. Pages draw their menu in `draw_menu()` (counts, active item, ✓ / ! states). The top tabs stay.
+  Datasets: search + filters + the dataset list as a grid (`.ds-egrid`); an open dataset shows its steps (step 1 is the
+  overview of all steps) and Train / Results / LoRA. Collection: search, Pictures / Status / Insights / Maintenance,
+  the filters and an open LoRA page's parts (`tab_panels` without tab bars). Settings: the groups + search. Queue:
+  counts and Start. Home: the cards and Continue. The old stepper, part bar and sub-tab bars are gone.
+- **The dataset page**: four parts: Prepare (steps 1-8, reopens at `prep`), Train (step 9,
   `UI/ds_train.py`), Results (`UI/ds_results.py`) and LoRA (cards from the Collection's groups → `lsOpenLora`).
-  ds_box actions `part|`, `dspart|ds|n` (Collection tiles), `run|log` (status strip, Home). Insights is a Collection tab.
+  ds_box actions `part|`, `dspart|ds|n` (Collection tiles), `run|log` (status strip, Home). Insights is in the Collection.
 - `tools/make_test_world.py` makes an invented world with a pretend sd-scripts (runs end to end in seconds, writes a
   loss log, so Results and the manual pictures look real).
 - **Class word** (step 2, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).

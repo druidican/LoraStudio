@@ -3,7 +3,7 @@
 
     1. Read the zip: its version.py says the version, the parts and the version of each part (nothing in it is run).
     2. Show what would change: the parts of another version, the new parts, the ones that stay, what the update says.
-    3. Install (your click): refused while a training run, the queue or the automatic improvement is busy.
+    3. Install (your click): refused while a training run or the queue is busy.
        Only the program files are written (the parts listed in its version.py, requirements.txt, README.md);
        your settings, databases, token, logs and venv are never touched. The files it replaces are kept first
        in update_backups/lorastudio_<old version>_<time>/.
@@ -11,7 +11,7 @@
     5. Restart LoRA Studio (button) to use the new version. Roll back puts the files of before the last update back.
 """
 from __future__ import annotations
-__version__ = "1.171126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import ast
 import json
@@ -176,12 +176,6 @@ def busy_reason() -> str:
             return "a training run is active"
         if sg is not None and sg.QUEUE.get("running"):
             return "the training queue is running"
-    except Exception:                                    # noqa: BLE001
-        pass
-    try:
-        import dsflow
-        if dsflow.BATCH.get("running"):
-            return "the automatic improvement is running"
     except Exception:                                    # noqa: BLE001
         pass
     return ""

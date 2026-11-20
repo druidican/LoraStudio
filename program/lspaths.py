@@ -13,7 +13,7 @@ migrate() moves an older install (everything in one folder) into this layout: yo
 program files to userdata/update_backups/old_layout_<time>/. It runs at every start and does nothing once done.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126e"  # LoRA Studio version, see version.py
 
 import shutil
 import sys
@@ -32,7 +32,7 @@ except OSError:
 # your files: they move from the old single folder into userdata/
 USER_FILES = ("library_settings.txt", "training_settings.txt", "settings.txt", "huggingtoken.txt", "completed.json",
               "library_data.json", "model_ids.json", "hash_cache.json", "picture_index.json", "launch_settings.json",
-              "library_cache.pkl", "features.json", "notice_accepted.json", "batch_settings.json",
+              "library_cache.pkl", "features.json", "notice_accepted.json",
               "comfy_settings.json", "datacheck_cache.json", "custom.css", ".setup_done", "settings.txt.bak",
               "library_settings.txt.bak", "training_settings.txt.bak")
 USER_DIRS = ("gui_logs", "gui_cache", ".thumbs", "reports", "update_backups", "comfy_workflows", "pictools_models",
