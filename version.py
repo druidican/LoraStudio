@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.201126e"
-VERSION = "1.201126e"
+__version__ = "1.201126f"
+VERSION = "1.201126f"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.191126h",
-    "version.py": "1.201126e",
+    "version.py": "1.201126f",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.201126c",
     "program/Training/sd_script.py": "1.201126c",
@@ -66,7 +66,7 @@ RELEASE: dict = {
     "program/UI/setup_page.py": "1.191126c",
     "program/UI/pg_home.py": "1.201126e",
     "program/UI/pg_datasets.py": "1.201126e",
-    "program/UI/ds_steps.py": "1.201126e",
+    "program/UI/ds_steps.py": "1.201126f",
     "program/UI/ds_train.py": "1.201126c",
     "program/UI/ds_results.py": "1.201126c",
     "program/UI/pg_queue.py": "1.201126e",
@@ -79,8 +79,8 @@ RELEASE: dict = {
     "program/Other/notify.py": "1.131126c",
     "program/Gallery/delete.py": "1.141126b",
     "program/UI/delete_dialog.py": "1.141126b",
-    "program/Data/gapfill.py": "1.171126d",
-    "program/UI/ds_gapfill.py": "1.151126g",
+    "program/Data/gapfill.py": "1.201126f",
+    "program/UI/ds_gapfill.py": "1.201126f",
     "program/Other/statusbar.py": "1.191126i",
     "program/Other/home.py": "1.201126e",
     "program/Other/gpusmi.py": "1.051126b",
@@ -90,7 +90,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.201126e",
-    "selftest.py": "1.201126e",
+    "selftest.py": "1.201126f",
     "program/Settings/machinecheck.py": "1.131126c",
     "program/Settings/selfupdate.py": "1.201126e",
     "program/Training/failcodes.py": "1.131126b",
@@ -102,12 +102,13 @@ RELEASE: dict = {
     "program/Other/studio_css.py": "1.011126",
     "program/Training/Lora_Datatypes.py": "1.201126",
     "program/Training/Training_Recommendations.py": "1.201126d",
-    "program/Other/lora_studio.css": "1.201126e",
+    "program/Other/lora_studio.css": "1.201126f",
     "install.sh": "1.191126g",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.201126f", "Step 5: Your pictures made with this LoRA (every purpose). Your ComfyUI pictures made with the dataset's LoRA alone are shown; tick which ones Ollama scans (usable or not, and what each shows), then which ones are copied into the dataset (pinned always keep)."),
     ("1.201126e", "Left menu: every tab has its own menu on the left (foldable to icons). Datasets: search, filters, the datasets as tiles, and an open dataset's steps with their state plus Train, Results and LoRA. Collection: search, Pictures / Status / Insights / Maintenance, the filters and the parts of an open LoRA page. Settings: the groups with a search. Queue: counts and Start. Home: the cards and where you left off. The step bar, part bar and tab bars under the top tabs are gone. Improvements is removed completely (Datasets › Improvements, Fix the ticked datasets and its choices, the Only with warnings filter, and its lines in Home's Needs a look)."),
     ("1.201126d", "Illustrious, NoobAI and Pony characters train the text encoders at 5e-5 again (no --network_train_unet_only; your tests showed a major difference) and no longer get --clip_skip 2 (it does nothing for these LoRAs). Batch 1 and about 16 epochs stay."),
     ("1.201126c", "Compare settings: train one dataset several times from your standard launch script with one setting changed per run (learning rate, rank, text encoders; the save points for steps), get the same 6 test pictures of every run through ComfyUI after the queue, rate them blind (Results › Compare settings, or on the phone), and see per LoRA type which settings win (Collection › Insights), with a tick to make a clear winner the default for new launch scripts."),

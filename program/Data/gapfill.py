@@ -13,9 +13,13 @@ folder as found_<kind>_N / made_<kind>_N with an 'always keep' pin; the rest go 
 pictures stay where they are and are not offered again). More than a quarter LoRA-made pictures gets a warning: a LoRA
 trained on its own pictures learns its own mistakes harder. The prompts only name framing, angle, pose, expression, light,
 outfit and place, never anything about the person's body or looks.
+
+Your pictures with the LoRA (step 5, every purpose, no detailed scan needed): own_pictures lists them, you tick which
+ones Ollama looks at (own_scan: usable or not, and what each shows), then which ones join the repeat folder (own_add,
+copies named own_<framing>_N, pinned 'always keep').
 """
 from __future__ import annotations
-__version__ = "1.171126d"  # LoRA Studio version, see version.py
+__version__ = "1.201126f"  # LoRA Studio version, see version.py
 
 import json
 import random
@@ -143,6 +147,36 @@ def prompt(ds, dim: str, value: str) -> str:
 
 
 # --------------------------------------------------------------------------- looking in your own pictures
+def _ollama() -> tuple[str, str]:
+    """(url, vision model); the model is '' when Ollama cannot look at pictures here."""
+    import features as FT
+    S = F.sg()
+    url, model = S.oc_settings()
+    if FT.have("ollama") and S.CAP is not None and not model:   # no default chosen: the first vision model
+        try:
+            model = next((m["name"] for m in S.CAP.list_models(url) if m["vision"]), "")
+        except Exception:                                # noqa: BLE001
+            model = ""
+    if not (FT.have("ollama") and S.CAP is not None):
+        model = ""
+    return url, model
+
+
+def _sig(p: Path) -> str:
+    try:
+        return f"{p}|{p.stat().st_size}|{int(p.stat().st_mtime)}"
+    except OSError:
+        return ""
+
+
+def _cache(ds) -> dict:
+    """What Ollama said about your own pictures (kept per dataset, by file, size and time)."""
+    try:
+        return json.loads((_dir(ds) / "found_cache.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
 def _groups(ds) -> list[str]:
     import lora_library as LL
     LL.LIB.ensure_loaded()
@@ -187,29 +221,19 @@ def _what(url, model, p: Path, purpose: str) -> dict:
 def search(ds, jobs: list[tuple[str, str, int]], say=None) -> tuple[dict, str]:
     """Fill the jobs from your own pictures. Returns ({(dim, value): found}, message); found pictures are copied into
     .lsflow/gapfill/ to be picked like made ones."""
-    import features as FT
     say = say or (lambda t: None)
-    S = F.sg()
     cands = candidates(ds)
     if not cands:
         return {}, "No pictures of your own with only this LoRA (scan your ComfyUI picture folders on the LoRA page)."
-    url, model = S.oc_settings()
-    if FT.have("ollama") and S.CAP is not None and not model:   # no default chosen: the first vision model
-        try:
-            model = next((m["name"] for m in S.CAP.list_models(url) if m["vision"]), "")
-        except Exception:                                # noqa: BLE001
-            model = ""
-    if not (FT.have("ollama") and model and S.CAP is not None):
+    url, model = _ollama()
+    if not model:
         return {}, "Your own pictures were not looked through: Ollama is not available (Settings › AI helpers)."
     counts, _, _, _ = DSC.active(ds)
     have = {d: set(c) for d, c in counts.items()}
     need = {(d, v): n for d, v, n in jobs if n > 0}
     purpose = F.meta(ds).get("purpose") or "character"
     cache_f = _dir(ds) / "found_cache.json"
-    try:
-        cache = json.loads(cache_f.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        cache = {}
+    cache = _cache(ds)
     st = state(ds)
     out, used, asked = Counter(), set(), 0
     _dir(ds).mkdir(parents=True, exist_ok=True)
@@ -217,9 +241,8 @@ def search(ds, jobs: list[tuple[str, str, int]], say=None) -> tuple[dict, str]:
         if not any(need[k] > out[k] for k in need) or F.STOP.is_set():
             break
         p = Path(c["path"])
-        try:
-            sig = f"{p}|{p.stat().st_size}|{int(p.stat().st_mtime)}"
-        except OSError:
+        sig = _sig(p)
+        if not sig:
             continue
         w = cache.get(sig)
         if w is None:
@@ -353,6 +376,119 @@ def make(ds, jobs: list[tuple[str, str, int]], say=None) -> str:
         return f"❌ {e}"
     return (f"✔ {done} picture(s) made with {lo['label']}. Tick the good ones and press *Add the ticked to the dataset*."
             + (f" {len(errors)} failed: {errors[0][:200]}" if errors else ""))
+
+
+# --------------------------------------------------------------------------- your pictures with the LoRA, picked by you
+WHAT_WORDS = ("framing", "angle", "pose", "expression", "lighting", "outfit", "place")
+
+
+def own_pictures(ds) -> list[dict]:
+    """Every picture of yours made with this dataset's LoRA alone (any purpose; newest version, highest strength,
+    newest picture first), with what Ollama said about it when it was scanned, and whether it is in the dataset.
+    [{"path", "lora", "strength", "what": {…} | None, "added": bool}]"""
+    cache = _cache(ds)
+    added = set(state(ds).get("own_added") or [])
+    out = []
+    import lora_library as LL
+    for gid in _groups(ds):
+        members = LL.LIB.groups[gid]
+        order = {m.key: i for i, m in enumerate(members)}
+        for x in LL.group_pictures(gid):
+            p = Path(x["path"])
+            if len((x["e"].get("loras") or {})) != 1 or not p.is_file():
+                continue
+            try:
+                strength = float(x.get("strength") or 1.0)
+            except (TypeError, ValueError):
+                strength = 1.0
+            out.append({"path": str(p), "lora": f"{x['lora'].stem} ({x['lora'].vlabel})", "strength": strength,
+                        "what": cache.get(_sig(p)), "added": str(p) in added,
+                        "rank": (order.get(x["lora"].key, -1), strength, p.stat().st_mtime)})
+    out.sort(key=lambda c: c["rank"], reverse=True)
+    return out
+
+
+def what_text(w: dict | None) -> str:
+    if not w:
+        return ""
+    if w.get("bad"):
+        return "✗ " + str(w["bad"])
+    return "✓ " + ", ".join(w[k] for k in WHAT_WORDS if w.get(k))
+
+
+def own_scan(ds, paths: list[str]):
+    """Ollama looks at the ticked pictures (the sort's questions: usable or not, and what each shows). A generator of
+    progress lines; returns a message. Answers are kept, so a picture is asked about once."""
+    url, model = _ollama()
+    if not model:
+        return "❌ Ollama cannot look at pictures here (Settings › AI helpers: a model that reads pictures)."
+    if F.sg().RUN.running():
+        return "❌ A training run is using the GPU: scan when it is done."
+    purpose = F.meta(ds).get("purpose") or "character"
+    cache = _cache(ds)
+    _dir(ds).mkdir(parents=True, exist_ok=True)
+    asked = bad = 0
+    for i, ps in enumerate(paths, 1):
+        if F.STOP.is_set():
+            break
+        p = Path(ps)
+        sig = _sig(p)
+        if not sig or sig in cache:
+            continue
+        yield f"⏳ Ollama looks at your picture {i} of {len(paths)}: {p.name}"
+        try:
+            cache[sig] = _what(url, model, p, purpose)
+        except Exception as e:                           # noqa: BLE001
+            (_dir(ds) / "found_cache.json").write_text(json.dumps(cache), encoding="utf-8")
+            return f"❌ Ollama stopped answering: {e}"
+        asked += 1
+        bad += bool(cache[sig].get("bad"))
+        if asked % 5 == 0:
+            (_dir(ds) / "found_cache.json").write_text(json.dumps(cache), encoding="utf-8")
+    (_dir(ds) / "found_cache.json").write_text(json.dumps(cache), encoding="utf-8")
+    stopped = " Stopped." if F.STOP.is_set() else ""
+    return (f"✔ {asked} picture(s) scanned, {bad} not usable (✗, unticked).{stopped} Tick the ones you want and press "
+            "*Add the ticked to the dataset*." if asked else "These pictures were scanned before: their answers are shown.")
+
+
+def own_add(ds, paths: list[str]) -> str:
+    """Copies the ticked pictures into the repeat folder as own_<framing>_N (pinned 'always keep'); your originals stay
+    where they are. Only scanned pictures: the scan says whether a picture is usable."""
+    rows = F.sg().dataset_stats(ds)["rows"]
+    if not rows:
+        return "This dataset has no repeat folder."
+    rep = Path(rows[0]["folder"])
+    cache = _cache(ds)
+    st = state(ds)
+    added, skipped = [], 0
+    for ps in paths:
+        p = Path(ps)
+        w = cache.get(_sig(p))
+        if w is None or not p.is_file():
+            skipped += 1
+            continue
+        kind = (w.get("framing") or "picture").replace(" ", "-").replace("/", "-")
+        ext = p.suffix.lower() or ".png"
+        k = 1
+        while (rep / f"own_{kind}_{k}{ext}").exists():
+            k += 1
+        dest = rep / f"own_{kind}_{k}{ext}"
+        shutil.copy2(p, dest)
+        F.set_pin(ds, dest, "keep")
+        added.append(dest)
+        st.setdefault("own_added", []).append(str(p))
+        st.setdefault("seen", []).append(str(p))         # the gap fill does not offer it again
+    if added:
+        F.ensure_originals(ds, added)
+        _save_state(ds, st)
+        m = F.meta(ds)
+        m["made_pictures"] = sorted(set(m.get("made_pictures") or []) | {p.name for p in added})
+        F.meta_save(ds, m)
+    warn = share_note(ds)
+    return ((f"✔ {len(added)} picture(s) copied into {rep.name}/ (pinned 📌 always keep); your originals stay where "
+             "they are. Write their captions in step 7." if added else "Nothing added.")
+            + (f" {skipped} not scanned yet were left out: scan them first." if skipped else "")
+            + (f"\n\n{warn}" if warn else ""))
 
 
 # --------------------------------------------------------------------------- picking

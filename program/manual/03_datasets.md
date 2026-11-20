@@ -146,6 +146,24 @@ The sort can still be wrong. Under each picture: **📌 Always** keeps it whatev
 sort dropped), **⛔ Never** leaves it out (useless content the sort kept). Pins are saved at once, stay after a new
 sort; click a pin again to remove it.
 
+### Your pictures made with this LoRA
+
+For a new version of a LoRA, the pictures you made with it can join its dataset (every purpose; open the folded
+**Your pictures made with this LoRA** in step 5). It lists your ComfyUI pictures made with this dataset's LoRA alone,
+newest version first: a picture made together with other LoRAs is left out, because their look would be learned too.
+They are found through the LoRA page's *Pictures made with it* (scan your picture folder there first).
+
+1. Tick the pictures that look right and press **Scan the ticked**: Ollama says for each whether it is usable (✗ and
+   why) and what it shows (framing, angle, pose, expression, light, outfit, place). Each picture is asked about once.
+2. The usable ones stay ticked. Change the ticks and press **Add the ticked to the dataset**: they are copied into
+   the repeat folder as `own_<framing>_N` with the 📌 always keep pin; your originals stay where they are. Write their
+   captions in step 7.
+
+![Step 5: your pictures made with the LoRA, scanned](img/own_pics.jpg)
+
+A few that show what the dataset lacks (a side view, another outfit) help. Many teach the LoRA its own mistakes:
+when more than a quarter of the repeat folder is made by the LoRA, the card warns.
+
 ## 6 · Watermarks and size
 
 ![Step 6: watermarks first, then the size of each picture](img/step6.jpg)

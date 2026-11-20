@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.201126f"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -294,6 +294,8 @@ def step5(page):
                 ui.button("Stop", on_click=F.STOP.set).props("flat dense no-caps color=negative")
         import ds_gapfill
         ds_gapfill.card(ds, lambda: draw())
+    import ds_gapfill
+    ds_gapfill.own_card(ds, lambda: draw())
     with ui.row().classes("items-center gap-2"):
         ui.button("Tick all", on_click=lambda: ui.run_javascript("dsTickAll(true)")).props("flat dense no-caps")
         ui.button("Untick all", on_click=lambda: ui.run_javascript("dsTickAll(false)")).props("flat dense no-caps")

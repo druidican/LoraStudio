@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
-"""Step 5's card "Fill the gaps with your LoRA" (logic in Data/gapfill.py): what is missing or too much, how many
-pictures of each, looking through your own pictures made with the LoRA first, making the rest through ComfyUI, and
-picking the good ones."""
+"""Step 5's cards (logic in Data/gapfill.py): "Your pictures made with this LoRA" (every purpose: tick which ones
+Ollama scans, then which ones join the dataset) and "Fill the gaps with your LoRA" (after the detailed scan: what is
+missing or too much, looking through your own pictures first, making the rest through ComfyUI, picking the good ones)."""
 from __future__ import annotations
-__version__ = "1.151126g"  # LoRA Studio version, see version.py
+__version__ = "1.201126f"  # LoRA Studio version, see version.py
 
 from pathlib import Path
 
@@ -11,7 +11,7 @@ from nicegui import run, ui
 
 import dsflow as F
 import gapfill as GF
-from widgets import note, pic_url
+from widgets import note, pic_url, stream
 
 
 def card(ds, after_add):
@@ -124,3 +124,93 @@ def card(ds, after_add):
                 make_btn.disable()
             draw_made()
         ui.timer(0, first, once=True)
+
+
+# --------------------------------------------------------------------------- your pictures with the LoRA
+PAGE = 48
+
+
+def own_card(ds, after_add):
+    """after_add(): async, redraws step 5's picture list."""
+    import html as H
+    box = {"rows": [], "shown": PAGE}
+    with ui.expansion("Your pictures made with this LoRA: add the good ones to the dataset").classes("w-full ls-card") \
+            as exp:
+        note("Your ComfyUI pictures made with this dataset's LoRA alone (a picture with other LoRAs too is left out: "
+             "their look would be learned as well), newest version first. Tick the ones that look right and press Scan "
+             "the ticked: Ollama says whether each is usable and what it shows. Then tick the ones to add: they are "
+             "copied into the repeat folder, pinned 📌 always keep. A few that show something the dataset lacks help; "
+             "many teach the LoRA its own mistakes. (Found through the LoRA page's Pictures made with it.)")
+        head = ui.label("").classes("font-semibold")
+        grid = ui.html("", sanitize=False).classes("w-full").props(f'id="own_{id(box)}"')
+        more = ui.button("Show more", on_click=lambda: (box.__setitem__("shown", box["shown"] + PAGE), draw())) \
+            .props("flat dense no-caps")
+        with ui.row().classes("items-center gap-2"):
+            ui.button("Tick all shown", on_click=lambda: tick("true")).props("flat dense no-caps")
+            ui.button("Untick all", on_click=lambda: tick("false")).props("flat dense no-caps")
+            scan_btn = ui.button("Scan the ticked").props("unelevated dense no-caps color=primary")
+            ui.button("Stop", on_click=F.STOP.set).props("flat dense no-caps color=negative")
+            ui.button("Add the ticked to the dataset", on_click=lambda: add()) \
+                .props("unelevated dense no-caps color=teal")
+        msg = ui.markdown("")
+        warn = note("")
+    gid = f"own_{id(box)}"
+
+    def tick(on: str):
+        ui.run_javascript(f"document.querySelectorAll('#{gid} .own-tick').forEach(i => i.checked = {on});")
+
+    async def ticked() -> list[str]:
+        idx = await ui.run_javascript(
+            f"Array.from(document.querySelectorAll('#{gid} .own-tick:checked')).map(e => +e.dataset.i)")
+        rows = box["rows"]
+        return [rows[i]["path"] for i in (idx or []) if 0 <= i < len(rows)]
+
+    def draw(keep: set | None = None):
+        rows = box["rows"]
+        cells = []
+        for i, r in enumerate(rows[:box["shown"]]):
+            w = r["what"]
+            on = keep is not None and r["path"] in keep and not (w or {}).get("bad")
+            state = (' <span class="ls-chip ok">in the dataset</span>' if r["added"] else "")
+            cells.append(
+                f'<label class="own-pic{" own-bad" if (w or {}).get("bad") else ""}">'
+                f'<img loading="lazy" src="{pic_url(r["path"], 240)}" title="{H.escape(Path(r["path"]).name)}">'
+                f'<span><input type="checkbox" class="own-tick" data-i="{i}"{" checked" if on else ""}> '
+                f'{H.escape(r["lora"])} · {r["strength"]:g}{state}</span>'
+                f'<small>{H.escape(GF.what_text(w)) or "not scanned"}</small></label>')
+        grid.content = ('<div class="own-grid">' + "".join(cells) + "</div>") if cells else (
+            '<p class="ls-note">No pictures of yours made with this LoRA alone yet. Scan your ComfyUI picture folders '
+            "on the LoRA page (Pictures made with it).</p>")
+        n, scanned = len(rows), sum(1 for r in rows if r["what"])
+        head.text = f"{n} picture(s), {scanned} scanned, {sum(1 for r in rows if r['added'])} in the dataset"
+        more.set_visibility(n > box["shown"])
+
+    async def load(keep: set | None = None):
+        box["rows"] = await run.io_bound(GF.own_pictures, ds)
+        draw(keep)
+        warn.text = await run.io_bound(GF.share_note, ds)
+
+    async def scan():
+        paths = await ticked()
+        if not paths:
+            msg.content = "Tick the pictures to scan first."
+            return
+        F.STOP.clear()
+        scan_btn.disable()
+        try:
+            msg.content = await stream(GF.own_scan(ds, paths), lambda line: setattr(msg, "content", line))
+        finally:
+            scan_btn.enable()
+        await load(set(paths))                           # the usable ones stay ticked
+    scan_btn.on_click(scan)
+
+    async def add():
+        paths = await ticked()
+        if not paths:
+            msg.content = "Tick the pictures to add first."
+            return
+        msg.content = await run.io_bound(GF.own_add, ds, paths)
+        await load()
+        await after_add()
+
+    exp.on_value_change(lambda e: e.value and load())

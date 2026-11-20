@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.201126f"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -477,6 +477,16 @@ def _flow():
     ov = F.overview([DS])
     need(ov and ov[0]["n"] == 8, f"overview: {ov}")
     return f"next step {ov[0]['next']}"
+
+
+@check("your pictures made with the LoRA (step 5)")
+def _own():
+    import gapfill as GF
+    rows = GF.own_pictures(DS)
+    need(isinstance(rows, list), "own_pictures is not a list")
+    need(GF.what_text({"bad": "x"}).startswith("✗") and GF.what_text({"framing": "close-up"}) == "✓ close-up",
+         "what_text")
+    return f"{len(rows)} picture(s)"
 
 
 @check("dataset steps: repeat folder rename (10 → 20 → 10)")

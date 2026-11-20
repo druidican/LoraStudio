@@ -15,7 +15,7 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   `start.sh` / `install.sh` (Linux, WSL, macOS without trainers),
   `install-windows.ps1` + `Install LoRA Studio.cmd` (installs into WSL2).
 - `program/UI/`: the NiceGUI pages (`shell.py` header/tabs/strip/manual, `pg_home.py`, `pg_datasets.py` + `ds_steps.py`
-  `ds_train.py` `ds_results.py` `ds_batch.py`, `pg_queue.py`, `pg_collection.py` + `lora_page.py`, `pg_settings.py` +
+  `ds_train.py` `ds_results.py` `ds_gapfill.py`, `pg_queue.py`, `pg_collection.py` + `lora_page.py`, `pg_settings.py` +
   `set_panels.py`, `setup_page.py`, `login.py`, `widgets.py`, `theme.css`). No logic in them.
 - `program/`: `Data/` (datasets, the nine steps: `dsflow.py`, `datasets_ui.py` (HTML renderers), `captioner.py`, `wdtagger.py`), `Training/` (`sdgui.py` runner/queue, `sd_script.py` launch scripts, `Lora_Datatypes.py`
   presets per LoRA type, `Training_Recommendations.py` numbers per type and purpose), `Gallery/` (Collection,
@@ -120,6 +120,10 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   picture, coverage over the kept pictures, suggestions in step 5 (add / upscale / sharpen / crop into a new picture),
   done only when ticked. Upscales go through the owner's ComfyUI workflow (`Training/comfyupscale.py`: UI or API
   format, SeedVR2 size and noise set per picture), else the picture tools. Judges visibility, never identity.
+- **Your pictures made with the LoRA** (1.201126f, step 5, every purpose, `gapfill.own_pictures` / `own_scan` /
+  `own_add`, card `ds_gapfill.own_card`): your ComfyUI pictures with this dataset's LoRA alone (Collection picture
+  index); you tick which Ollama scans (the sort's questions, answers in `.lsflow/gapfill/found_cache.json`), then which
+  join the repeat folder as copies `own_<framing>_N`, pinned keep, counted as LoRA-made (`share_note` warns > 25 %).
 - **Speed test**: `Training/speedtest.py` (terminal, one launch script) and `Training/speedjobs.py` (Settings ›
   Speed test, per LoRA type, invented dataset in `userdata/speedtest/`, results.json, use.json applied in
   `sd_script.make_plan` via `_speed`). The launch script is run up to `accelerate` with a bash function recording it.
