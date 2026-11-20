@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.191126f"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -308,9 +308,9 @@ SCRIPT_DIR_OLD = 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" 
 
 
 def script_home(p) -> Path:
-    """The dataset folder of a launch script (one up for a script in _old_runs/)."""
+    """The dataset folder of a launch script (one up for a script in _old_runs/ or _compare/)."""
     p = Path(p)
-    return p.parent.parent if p.parent.name == OLD_RUNS else p.parent
+    return p.parent.parent if p.parent.name in (OLD_RUNS, "_compare") else p.parent
 
 
 def find_script(path) -> str:
@@ -856,6 +856,13 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
             text = lean.mark(ds, tkey, text)
         except Exception as e:                         # noqa: BLE001
             print(f"[lean] {e}")
+    try:                                               # settings that won your comparisons (Training/compare.py)
+        import compare
+        text, cnotes = compare.apply(tkey, text)
+        if cnotes:
+            text = re.sub(r"^(#!/bin/bash\n)", lambda m: m.group(1) + "".join(f"# {n}\n" for n in cnotes), text, count=1)
+    except Exception as e:                             # noqa: BLE001
+        print(f"[compare] {e}")
     if not musubi:
         text = add_logging(text)
     if hf:

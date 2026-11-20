@@ -7,7 +7,7 @@ that send an event back here (emitEvent): a tile opens its dataset page, a type 
 Select mode is kept in the browser (picked cards get the class ll-picked) and read when a button needs it.
 """
 from __future__ import annotations
-__version__ = "1.181126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -156,6 +156,8 @@ class Collection:
                      "A green label = Completed.")
 
     async def insights(self, force: bool):
+        if getattr(self, "cmp_draw", None):              # Compare settings: read the comparisons again
+            await self.cmp_draw()
         if self.ins_html.content and not force:
             return
         import insights
@@ -231,6 +233,8 @@ def build_insights(c: Collection):
          "LoRAs, and what your graphics card managed per LoRA type. Rate runs in Results (or on a LoRA page) to teach "
          "it. With few LoRAs these are hints, not rules: each says how many it comes from.")
     ui.button("Read again", on_click=lambda: c.insights(True)).props("outline dense no-caps")
+    import cmp_ui                                        # Compare settings: what won, per LoRA type
+    c.cmp_draw = cmp_ui.best_card()
     c.ins_html = ui.html("", sanitize=False).classes("w-full")
 
 

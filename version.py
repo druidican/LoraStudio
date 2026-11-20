@@ -14,31 +14,33 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.201126b"
-VERSION = "1.201126b"
+__version__ = "1.201126c"
+VERSION = "1.201126c"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.191126h",
-    "version.py": "1.201126b",
+    "version.py": "1.201126c",
     "program/lspaths.py": "1.131126c",
-    "program/Training/sdgui.py": "1.201126b",
-    "program/Training/sd_script.py": "1.191126f",
+    "program/Training/sdgui.py": "1.201126c",
+    "program/Training/sd_script.py": "1.201126c",
     "program/Data/sd_prepare.py": "1.151126h",
     "program/Training/sd_settings.py": "1.171126",
     "program/Data/datasets_ui.py": "1.151126h",
     "program/Data/dsflow.py": "1.191126e",
     "program/Training/training_ui.py": "1.171126d",
     "program/Settings/settings_ui.py": "1.191126g",
-    "program/Gallery/lora_library.py": "1.181126c",
-    "program/Training/comfytest.py": "1.191126e",
+    "program/Gallery/lora_library.py": "1.201126c",
+    "program/Training/comfytest.py": "1.201126c",
     "program/Training/speedtest.py": "1.191126i",
     "program/Training/speedjobs.py": "1.191126i",
     "program/Training/comfyupscale.py": "1.101126",
     "program/Training/comfyinpaint.py": "1.151126f",
     "program/Settings/scanner.py": "1.191126d",
     "program/Data/lean.py": "1.201126",
-    "program/Other/mobile.py": "1.191126i",
-    "program/UI/mobile_page.py": "1.191126i",
+    "program/Other/mobile.py": "1.201126c",
+    "program/UI/mobile_page.py": "1.201126c",
+    "program/Training/compare.py": "1.201126c",
+    "program/UI/cmp_ui.py": "1.201126c",
     "program/UI/scan_panel.py": "1.191126d",
     "program/Data/detailscan.py": "1.151126j",
     "program/Data/captioner.py": "1.091126",
@@ -64,11 +66,11 @@ RELEASE: dict = {
     "program/UI/pg_home.py": "1.131126c",
     "program/UI/pg_datasets.py": "1.161126",
     "program/UI/ds_steps.py": "1.191126g",
-    "program/UI/ds_train.py": "1.191126f",
-    "program/UI/ds_results.py": "1.151126b",
+    "program/UI/ds_train.py": "1.201126c",
+    "program/UI/ds_results.py": "1.201126c",
     "program/UI/ds_batch.py": "1.151126h",
     "program/UI/pg_queue.py": "1.151126c",
-    "program/UI/pg_collection.py": "1.181126c",
+    "program/UI/pg_collection.py": "1.201126c",
     "program/UI/lora_page.py": "1.191126f",
     "program/UI/pg_settings.py": "1.131126c",
     "program/UI/set_panels.py": "1.191126i",
@@ -88,7 +90,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.131126c",
-    "selftest.py": "1.201126b",
+    "selftest.py": "1.201126c",
     "program/Settings/machinecheck.py": "1.131126c",
     "program/Settings/selfupdate.py": "1.171126c",
     "program/Training/failcodes.py": "1.131126b",
@@ -106,6 +108,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.201126c", "Compare settings: train one dataset several times from your standard launch script with one setting changed per run (learning rate, rank, text encoders; the save points for steps), get the same 6 test pictures of every run through ComfyUI after the queue, rate them blind (Results › Compare settings, or on the phone), and see per LoRA type which settings win (Collection › Insights), with a tick to make a clear winner the default for new launch scripts."),
     ("1.201126b", "Illustrious, NoobAI and Pony characters get your tested launch script as the default: batch 1, clip skip 2, about 16 epochs (the repeats are chosen for it), --network_train_unet_only with --text_encoder_lr 5e-5, plus 32/32, AdamW8bit 1e-4, cosine with restarts, min SNR 5, noise offset 0.0357, save and sample every epoch. --clip_skip is no longer taken out of SDXL-based scripts."),
     ("1.201126", "Illustrious, NoobAI and Pony characters use your tested setup: batch size 2 (with AdamW8bit, UNet 1e-4, text encoders 5e-5, cosine with restarts, min SNR 5, noise offset 0.0357, 32/32, save and sample every epoch, as before). Text encoders are trained again for photo datasets too (the freeze of 1.191126f is removed)."),
     ("1.191126i", "Speed test you can follow: the card shows which variant runs and what it changes, what it does right now (preparing, loading the model, caching, compiling, warming up, measuring), step and seconds per step, how long the type still takes, how busy the GPU is and its video memory, the trainer's last line and (opened) its last 40 lines. The status strip and the phone page show a running speed test too, and Stop on the phone stops it."),
@@ -192,6 +195,8 @@ PARTS = [
     ("program/Data/lean.py", "The look of the result: the kind of the pictures and the style words per LoRA type"),
     ("program/Other/mobile.py", "The phone page's data: run, progress, failure, queue, newest sample picture"),
     ("program/UI/mobile_page.py", "The phone page /m: small HTML page and its routes"),
+    ("program/Training/compare.py", "Compare settings: runs with one setting changed, blind rating, best per LoRA type"),
+    ("program/UI/cmp_ui.py", "Compare settings: start card, rating, best settings per type"),
     ("program/UI/scan_panel.py", "Find on this computer: the search and the suggestions"),
     ("program/Data/detailscan.py", "the detailed scan: gaps and per-picture suggestions"),
     ("program/Data/captioner.py", "captions with Ollama"),

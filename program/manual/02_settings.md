@@ -39,7 +39,7 @@ command line still wins). The same page has **What is installed**: see [Installi
 your phone on the same Wi-Fi (this card shows the exact address); add it to the home screen to open it like an app.
 It shows what is training (or a running speed test: the variant, what it does, the GPU), a progress bar with the
 percentage and the time left, step, epoch, loss and running time;
-when a run failed, LoRA Studio's explanation and the last lines of the error; the newest sample picture; the queue.
+when a run failed, LoRA Studio's explanation and the last lines of the error; the newest sample picture; the queue, and *Rate the pictures* when a comparison (Results › Compare settings) waits for you.
 **Stop now** and **Stop after this run** (while training) and **Start the queue** (when something waits) ask first.
 The page is small and asks for about 1 KB every 10 s while training, once a minute otherwise, and not at all while
 the phone's screen is off; the picture is fetched only when a new one appears. Light or dark follows the phone.

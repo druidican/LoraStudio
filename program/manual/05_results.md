@@ -44,6 +44,34 @@ shows that version first, even when a newer one exists.
 
 > **Do** compare two versions that differ in one or two settings: then you know what made the difference.
 
+## Compare settings (which settings make the best LoRA of a type)
+
+**Start** (dataset page › Train › *Compare settings*): tick what to compare and press *Start the comparison*. Every
+run starts from your standard launch script of the chosen LoRA type with ONE setting changed:
+
+- **Learning rate**: the two of 5e-5, 1e-4 and 2e-4 your script does not use;
+- **Rank**: the two of 16/16, 32/32 and 64/64 your script does not use;
+- **Text encoders**: trained (5e-5) when your script trains the image model only, and the other way round;
+- **Steps / epochs**: no extra run; the save points of your standard script at about half and three quarters of the
+  way are compared with its final file.
+
+The card lists the runs and, after a speed test of the type, about how many hours they take; everything ticked is
+six trainings, so start it in the evening. The runs train into `_compare/` in the dataset folder (the Collection skips
+it) and wait in the queue as one group. When the queue is done, every run gets the same 6 test pictures (3 captions
+of the dataset × 2 seeds) through ComfyUI, made by themselves (or *Make pictures*).
+
+**Rate** (Results › *Compare settings*, or the phone page's *Rate the pictures*): each row is one prompt and seed with
+the picture of every run, shuffled and named A, B, C …; tap the best (or two). *None are good* and *All look the
+same* count too. When every row is rated (or with *Show the answers*) the names show and what won: a setting wins
+**clearly** with at least 3 picks and twice as many as the next one. *Delete* moves a comparison's scripts, LoRA
+files and pictures to the Trash.
+
+**Best settings per LoRA type** (Collection › Insights): every rated comparison added up per type. A setting that won
+clearly in at least 2 comparisons, more often than anything else, gets a tick **Use … for new launch scripts**; new
+launch scripts of that type then use it (with a comment line saying so). Untick to go back to your standard.
+
+> **Do** compare on two or three different datasets before you tick a winner: one dataset can fool you.
+
 ## Insights (Collection › Insights)
 
 ![Collection › Insights: the datasets behind your good and weak LoRAs](img/insights.jpg)

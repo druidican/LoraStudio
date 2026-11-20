@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.191126e"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -529,6 +529,39 @@ def staged_lora(f: Path, url: str):
             pass
 
 
+def prepare(dataset: str, tkey: str, type_label: str = "") -> tuple:
+    """(settings, workflow, url, LoRA folder, fixed words) for test pictures of a LoRA of this dataset and type; the
+    look of the result (Datasets › 7) adds its words. RuntimeError with the reason when they cannot be made now."""
+    S = sg()
+    fam = family(tkey)
+    cfg = settings()
+    wf, ffam = workflow(cfg, fam)
+    if not fam or not wf:
+        raise RuntimeError(f"No workflow for {type_label or tkey} yet: add one in Settings › Test pictures." if fam else
+                           f"Test pictures are not made for {type_label or tkey} yet (SDXL, Illustrious, Pony, Anima).")
+    url = cfg["url"]
+    if not alive(url):
+        raise RuntimeError(f"ComfyUI does not answer at {url}. Start it; the test pictures are made when it answers.")
+    roots = [Path(cfg["lora_dir"]).expanduser()] if cfg.get("lora_dir") else [Path(p).expanduser()
+                                                                              for p in S.lora_dirs_setting()]
+    if not roots:
+        raise RuntimeError("No LoRA folder is set (Settings › Folders, or Settings › Test pictures).")
+    fixed = (cfg["fixed"].get(ffam) or "").strip().rstrip(",")
+    try:                                                # the look of the result (Datasets › 7): style words
+        import lean
+        l_pos, l_neg = lean.prompt_words(dataset, tkey)
+    except Exception:                                    # noqa: BLE001
+        l_pos, l_neg = "", ""
+    if l_pos and "source_" in l_pos:                    # Pony: the lean's source word replaces the fixed one
+        fixed = ", ".join(w for w in (x.strip() for x in fixed.split(",")) if w and not w.startswith("source_"))
+    fixed = ", ".join(x for x in (fixed, l_pos) if x)
+    if l_neg:
+        wf = {**wf, "negative": ", ".join(x for x in (l_neg, wf.get("negative") or "") if x)}
+    if fam == "vpred" and not wf.get("vpred"):          # a V-pred LoRA is always shown as v-prediction
+        wf = {**wf, "vpred": True, "zsnr": True}
+    return cfg, wf, url, roots[0], fixed
+
+
 def make(logname: str, say=None) -> str:
     """Make the test pictures of one run. Returns a message (starting with ✔ or ❌)."""
     say = say or (lambda t: None)
@@ -539,38 +572,15 @@ def make(logname: str, say=None) -> str:
     if not facts:
         return "❌ The launch script of this run is gone."
     info = facts["info"]
-    fam = family(info["tkey"])
-    cfg = settings()
-    wf, ffam = workflow(cfg, fam)
-    if not fam or not wf:
-        return (f"❌ No workflow for {info['type']} yet: add one in Settings › Test pictures."
-                if fam else f"❌ Test pictures are not made for {info['type']} yet (SDXL, Illustrious, Pony, Anima).")
-    url = cfg["url"]
-    if not alive(url):
-        return f"❌ ComfyUI does not answer at {url}. Start it; the test pictures are made when it answers."
-    roots = [Path(cfg["lora_dir"]).expanduser()] if cfg.get("lora_dir") else [Path(p).expanduser()
-                                                                              for p in S.lora_dirs_setting()]
-    if not roots:
-        return "❌ No LoRA folder is set (Settings › Folders, or Settings › Test pictures)."
-    root = roots[0]
+    try:
+        cfg, wf, url, root, fixed = prepare(info["dataset"], info["tkey"], info["type"])
+    except RuntimeError as e:
+        return f"❌ {e}"
     eps = pick_epochs(facts["eps"], facts["final"], facts["best"], int(cfg.get("around") or 2),
                       WHICH.pop(logname, "around"))
     if not eps:
         return "❌ This run has no LoRA files."
     prompts = prompts_for(info, int(cfg.get("prompts") or 8))
-    fixed = (cfg["fixed"].get(ffam) or "").strip().rstrip(",")
-    try:                                                # the look of the result (Datasets › 7): style words
-        import lean
-        l_pos, l_neg = lean.prompt_words(info["dataset"], info["tkey"])
-    except Exception:                                    # noqa: BLE001
-        l_pos, l_neg = "", ""
-    if l_pos and "source_" in l_pos:                    # Pony: the lean's source word replaces the fixed one
-        fixed = ", ".join(w for w in (x.strip() for x in fixed.split(",")) if w and not w.startswith("source_"))
-    fixed = ", ".join(x for x in (fixed, l_pos) if x)
-    if l_neg:
-        wf = {**wf, "negative": ", ".join(x for x in (l_neg, wf.get("negative") or "") if x)}
-    if fam == "vpred" and not wf.get("vpred"):          # a V-pred LoRA is always shown as v-prediction
-        wf = {**wf, "vpred": True, "zsnr": True}
     d = compare_dir(info)
     grid = {"labels": [lab for lab, _ in eps], "files": {lab: str(f) for lab, f in eps},
             "prompts": prompts, "pics": {lab: [None] * len(prompts) for lab, _ in eps}, "at": time.strftime("%Y-%m-%d %H:%M")}
@@ -721,6 +731,12 @@ def _finish(logname: str, say=None) -> str:
 def after_run(logname: str, say=None) -> str:
     """Called by the queue right after a run finished well, before the next one starts."""
     say = say or (lambda t: None)
+    try:                                                # a run of a comparison: its own pictures come after the queue
+        f = _run_facts(logname)
+        if f and Path(f["script"]).parent.name == "_compare":
+            return "A run of a comparison: its test pictures are made when all its runs are done."
+    except Exception:                                    # noqa: BLE001
+        pass
     cfg = settings()
     if not cfg.get("auto"):
         try:
@@ -743,11 +759,16 @@ def after_run(logname: str, say=None) -> str:
 
 def after_queue(lognames: list[str]):
     """Called when the training queue has finished: remember its runs for Home › Just trained (their test pictures
-    were made after each run, see after_run)."""
+    were made after each run, see after_run), and make the pictures of comparisons whose runs are all done."""
     try:
         BATCH_FILE.write_text(json.dumps({"logs": list(lognames), "at": time.time()}), encoding="utf-8")
     except OSError:
         pass
+    try:
+        import compare
+        compare.after_queue()
+    except Exception as e:                               # noqa: BLE001
+        print(f"[compare] {e}")
 
 
 def _kick():

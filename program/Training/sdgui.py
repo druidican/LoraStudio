@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.201126b"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
@@ -491,7 +491,7 @@ def list_scripts():
     found = {}
 
     def add(p: Path):
-        if not p.name.startswith(".gui_run_") and OLD_RUNS not in p.parts:
+        if not p.name.startswith(".gui_run_") and OLD_RUNS not in p.parts and "_compare" not in p.parts:
             found[p.resolve()] = p
 
     if ROOT.is_dir():
@@ -508,7 +508,7 @@ def list_scripts():
                     # never into the picture folders: they hold thousands of files and no launch scripts
                     dirnames[:] = [] if depth >= 2 else [
                         d for d in dirnames if not d.startswith(".") and d.lower() not in IGNORE_DIRS
-                        and not REPEAT_RE.match(d) and d not in ("venv", ".venv", "node_modules", OLD_RUNS)]
+                        and not REPEAT_RE.match(d) and d not in ("venv", ".venv", "node_modules", OLD_RUNS, "_compare")]
                     for fn in filenames:
                         if fn.endswith(".sh"):
                             add(Path(dirpath) / fn)

@@ -73,6 +73,12 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   (ETag, 10 s running / 60 s idle, paused when hidden), `/m/sample` (newest sample, 640 px JPEG), POST stop / after /
   start; data in `Other/mobile.py`. Behind `login.allowed()` (also guards `/pic` and the file route now);
   `/login?next=/m` returns there. Address shown in Settings › Start and network (`mobile.phone_text`).
+- **Compare settings** (1.201126c, `Training/compare.py`, UI `UI/cmp_ui.py`): runs from the standard script with ONE
+  setting changed (lr / rank / te; epochs = the baseline's save points), scripts in `<dataset>/_compare/` (SCRIPT_DIR
+  one up, OUTPUT_DIR `_compare/model`, skipped by the Collection and `list_scripts`), one JSON per comparison in
+  `userdata/compare/`. `comfytest.after_queue` → `compare.after_queue` makes 6 pictures per entry (`comfytest.prepare`
+  is shared with `make`); blind rows A, B … (also `/m/rate`); `summary` (clear = ≥3 picks and 2× the next), `best`
+  per type (offer after 2 clear wins), `compare_use.json` applied in `sd_script.make_plan` (`compare.apply`).
 - **Updater** (`ghupdate.py`): channel *Releases only* (default) or *Betas too*; the token is never sent along a
   redirect to another host (codeload); *Test token* explains each failure.
 - **WD tagger writes every tag** for characters and worn items; step 7's *tags → trigger words* card moves the

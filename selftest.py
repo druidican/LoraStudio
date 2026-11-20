@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.201126b"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -166,6 +166,24 @@ def _noobai():
     need("masterpiece, best quality, newest" in vp and "--sample_sampler euler" in vp, "V-pred quality words / sampler")
     need(G.script_type("a.sh", vp) == "noobai_vpred" and G.script_type("b.sh", eps) == "noobai", "types not recognised")
     return "EPS and V-pred scripts as expected"
+
+
+@check("compare settings: one setting changed per run, blind rows, a clear winner offered")
+def _compare():
+    import compare as CMP
+    ill = G.make_plan(DS, "illustrious")["script_text"]
+    vs = CMP.variants_for(ill, ["lr", "rank", "te"])
+    keys = [v["key"] for v in vs]
+    need(keys == ["base", "lr5e5", "lr2e4", "r16x16", "r64x64", "teon"], keys)
+    te = CMP.apply_variant(ill, vs[-1])
+    need("--network_train_unet_only" not in te and "--text_encoder_lr 5e-5" in te, "text encoders not switched on")
+    need("--learning_rate 2e-4" in CMP.apply_variant(ill, vs[2]) and "--network_dim 16 --network_alpha 16" in
+         CMP.apply_variant(ill, vs[3]), "learning rate / rank not changed")
+    e = {"id": "x", "groups": ["lr"], "base": CMP.base_values(ill), "runs": [{**v, "script": ""} for v in vs[:3]],
+         "rows": [{"i": i, "order": ["base", "lr5e5", "lr2e4"], "pick": ["lr2e4"]} for i in range(4)]}
+    sm = CMP.summary(e)
+    need(sm["groups"]["lr"]["winner"] == "lr2e4" and sm["groups"]["lr"]["clear"], sm)
+    return "variants, rows and the winner as expected"
 
 
 @check("character defaults: Illustrious as tested, SDXL text encoders, FLUX/Chroma rank 32, Z-Image Base without the adapter")

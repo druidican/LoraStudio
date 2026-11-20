@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.181126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -81,7 +81,7 @@ THUMB_DIR = APP_DIR / ".thumbs"
 ARCHIVE_DIR = "LoraManager"                      # subfolder inside each dataset
 IMG_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 SKIP_DIRS = {"venv", ".venv", ".git", "node_modules", "__pycache__", "site-packages",
-             ".thumbs", "sample", "samples", ARCHIVE_DIR, "_set_aside"}
+             ".thumbs", "sample", "samples", ARCHIVE_DIR, "_set_aside", "_compare"}   # _compare: Training/compare.py
 LOG_DIR_NAMES = ("log", "logs")
 EPOCH_RE = re.compile(r"^(.*)-(\d{6})$")
 REPEAT_RE = re.compile(r"^(\d+)_(.+)$")

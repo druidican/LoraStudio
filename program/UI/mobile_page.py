@@ -6,7 +6,7 @@ log lines, the queue and the newest sample picture (/m/sample, a small JPEG), wi
 (login.allowed); open it at http://<this computer>:<port>/m with Settings › Start and network › Reachable on the
 network. The data comes from Other/mobile.py."""
 from __future__ import annotations
-__version__ = "1.191126i"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 
 import hashlib
 import io
@@ -71,6 +71,11 @@ button.bad{border-color:var(--bad);color:var(--bad)}button.go{background:var(--a
    <button id="after" onclick="act('after','Stop the queue after this run?')">Stop after this run</button>
   </div>
  </section>
+ <section class="card" id="ratecard" hidden>
+  <h2>A comparison is ready to rate</h2>
+  <div id="ratetxt" class="msg"></div>
+  <div class="btns"><a id="ratego" href="#"><button class="go">Rate the pictures</button></a></div>
+ </section>
  <section class="card" id="samplecard" hidden>
   <h2>Newest sample picture <span id="sname"></span></h2>
   <img id="sample" alt="newest sample picture" loading="lazy">
@@ -112,6 +117,7 @@ function show(d){
  $("start").hidden=!(q.waiting&&!q.running&&!run);
  if(d.sample){$("samplecard").hidden=false;$("sname").textContent="· "+d.sample.when;
   const u="/m/sample?v="+d.sample.v;if($("sample").getAttribute("src")!==u)$("sample").src=u}else $("samplecard").hidden=true;
+ const R=d.rate;$("ratecard").hidden=!R;if(R){$("ratetxt").textContent=R.name+" · "+R.left+" of "+R.rows+" rows left";$("ratego").href="/m/rate?id="+encodeURIComponent(R.id)}
  last=d;
 }
 async function poll(){
@@ -206,3 +212,85 @@ def _after():
 @app.post("/m/start")
 def _start():
     return _act(mobile.start_queue)
+
+
+RATE_PAGE = r"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rate · LoRA Studio</title>
+<style>
+:root{--bg:#F4F2EE;--card:#fff;--ink:#1C1F24;--mute:#6B6F76;--line:#E3E0DA;--acc:#2F6FDB;--pick:#E39B12}
+@media (prefers-color-scheme:dark){:root{--bg:#15171B;--card:#1F2228;--ink:#ECEDEF;--mute:#9AA0A8;--line:#2E3239;--acc:#6EA0FF;--pick:#F2B84B}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#1C1F24;color:#fff}header a{color:#fff;margin-left:auto;font-size:13px}
+main{padding:12px 16px 40px;max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.p{font-size:13px;color:var(--mute);margin-bottom:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pic{position:relative;border-radius:8px;overflow:hidden;border:3px solid transparent}
+.pic.on{border-color:var(--pick)}.pic img{width:100%;display:block}
+.pic b{position:absolute;left:6px;top:6px;background:rgba(0,0,0,.6);color:#fff;border-radius:6px;padding:1px 7px;font-size:14px}
+.btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+button{font:inherit;font-weight:600;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 12px;min-height:42px}
+button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.top{font-weight:600}
+</style></head><body>
+<header><b>Rate the comparison</b><a href="/m">← back</a></header>
+<main><div class="top" id="top">…</div><div class="p">Tap the best picture in each row (or two). The names show in LoRA Studio › Results when every row is rated.</div><div id="rows"></div></main>
+<script>
+const id=new URLSearchParams(location.search).get("id");const L="ABCDEFGHIJKLMNOP";let rows=[];
+async function load(){const r=await fetch("/m/rate/rows?id="+encodeURIComponent(id),{cache:"no-store"});
+ if(r.status===401){location.href="/login?next=/m";return}rows=await r.json();draw()}
+function draw(){const left=rows.filter(r=>!r.pick).length;document.getElementById("top").textContent=left?left+" of "+rows.length+" rows left":"All rows rated: thank you";
+ document.getElementById("rows").innerHTML=rows.map(r=>{const pk=Array.isArray(r.pick)?r.pick:[];
+  let g="";for(let n=0;n<r.n;n++)g+=`<div class="pic ${pk.includes(n)?"on":""}" onclick="tap(${r.i},${n})"><img loading="lazy" src="/m/rate/pic?id=${encodeURIComponent(id)}&i=${r.i}&n=${n}"><b>${L[n]}${pk.includes(n)?" ★":""}</b></div>`;
+  return `<section class="card"><div class="p">${r.prompt.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}</div><div class="grid">${g}</div>
+  <div class="btns"><button class="${r.pick==="none"?"on":""}" onclick="set(${r.i},'none')">None are good</button><button class="${r.pick==="same"?"on":""}" onclick="set(${r.i},'same')">All look the same</button>${r.pick?`<button onclick="set(${r.i},null)">Undo</button>`:""}</div></section>`}).join("")}
+function tap(i,n){const r=rows.find(x=>x.i===i);let pk=Array.isArray(r.pick)?r.pick.slice():[];
+ if(pk.includes(n))pk=pk.filter(x=>x!==n);else pk=pk.concat([n]).slice(-2);set(i,pk.length?pk:null)}
+async function set(i,v){const r=rows.find(x=>x.i===i);r.pick=v;draw();
+ await fetch("/m/rate/pick",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,i:i,pick:v})})}
+load();
+</script></body></html>"""
+
+
+@app.get("/m/rate")
+def _rate_page():
+    if not login.allowed():
+        return RedirectResponse("/login?next=/m")
+    return HTMLResponse(RATE_PAGE, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/m/rate/rows")
+def _rate_rows(id: str = ""):                            # noqa: A002 (the query parameter's name)
+    if not login.allowed():
+        return _no()
+    return JSONResponse(mobile.rate_rows(id), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/m/rate/pic")
+def _rate_pic(id: str = "", i: int = 0, n: int = 0):     # noqa: A002
+    """One test picture of a comparison, at most 512 px, JPEG."""
+    if not login.allowed():
+        return _no()
+    p = mobile.rate_pic(id, i, n)
+    if p is None or not p.is_file():
+        return Response(status_code=404)
+    from PIL import Image
+    try:
+        with Image.open(p) as im:
+            im = im.convert("RGB")
+            im.thumbnail((512, 512))
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=82)
+    except OSError:
+        return Response(status_code=404)
+    return Response(buf.getvalue(), media_type="image/jpeg", headers={"Cache-Control": "max-age=86400"})
+
+
+@app.post("/m/rate/pick")
+async def _rate_pick(request: Request):
+    if not login.allowed():
+        return _no()
+    d = await request.json()
+    return JSONResponse({"msg": mobile.rate_pick(str(d.get("id") or ""), int(d.get("i") or 0), d.get("pick"))})

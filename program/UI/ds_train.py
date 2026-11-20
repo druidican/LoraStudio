@@ -3,7 +3,7 @@
 saving and the queue. The script logic is sd_script.py (cs_* return what changed as a dict); the plan and the
 settings table are datasets_ui (calc, apply_settings, SETTINGS)."""
 from __future__ import annotations
-__version__ = "1.191126f"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 
 from pathlib import Path
 
@@ -114,6 +114,8 @@ class Train:
         self.draw_download()
         self.draw_repeat()
         self.draw_look()
+        if getattr(self, "cmp_show", None):
+            ui.timer(0.1, self.cmp_show, once=True)
 
     def set_script(self, v):
         if self.busy or not v or v == self.script:
@@ -388,6 +390,8 @@ class Train:
         with ui.card().props("flat bordered").classes("ls-card w-full gap-1"):
             ui.label("This dataset in the queue").classes("font-semibold")
             self.w_queue = ui.html(V.queue_card(self.ds), sanitize=False).classes("w-full")
+        import cmp_ui                                    # Compare settings (Training/compare.py)
+        self.cmp_show = cmp_ui.start_card(lambda: self.ds, lambda: self.tkey)
         self.draw_caps()
         self.draw_download()
         self.load()

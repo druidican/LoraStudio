@@ -3,7 +3,7 @@
 last lines of its log), the queue and the newest sample picture. Small on purpose: the phone asks for it every few
 seconds while a run is going and every minute when nothing runs."""
 from __future__ import annotations
-__version__ = "1.191126i"  # LoRA Studio version, see version.py
+__version__ = "1.201126c"  # LoRA Studio version, see version.py
 
 import re
 import sys
@@ -100,6 +100,7 @@ def status() -> dict:
             tail = [l for l in run.lines[-60:] if l.strip()]
         keep = [l for l in tail if not re.search(r"steps:\s*\d+%\|", l)]
         out["error"] = [l[:300] for l in keep[-14:]]
+    out["rate"] = to_rate()
     if run.script:
         p = newest_sample(run.script)
         if p is not None:
@@ -169,3 +170,51 @@ def phone_text(v: dict) -> str:
     return (f"**Phone page:** open `http://{ip}:{int(v.get('port') or 7860)}/m` on your phone on the same Wi-Fi "
             "(the same login): the run, how far it is, time left, a failure with its error, the queue and the "
             "newest sample picture. Add it to the home screen to open it like an app.")
+
+
+def to_rate() -> dict | None:
+    """The newest comparison (Training/compare.py) with pictures not rated yet: {"id", "left", "rows", "name"}."""
+    try:
+        import compare as CMP
+        for e in CMP.all_comparisons():
+            rws = e.get("rows") or []
+            left = sum(1 for r in rws if not r.get("pick"))
+            if rws and left:
+                return {"id": e["id"], "left": left, "rows": len(rws), "name": f"{e['ds']} · {e['tkey']}"}
+    except Exception:                                    # noqa: BLE001
+        pass
+    return None
+
+
+def rate_rows(cid: str) -> list[dict]:
+    """The rows for the phone, without the names: [{"i", "prompt", "n", "pick": [index] | "none" | "same" | None}]."""
+    import compare as CMP
+    out = []
+    for r in CMP.rows(cid):
+        pk = r["pick"]
+        if isinstance(pk, list):
+            pk = [r["order"].index(k) for k in pk if k in r["order"]]
+        out.append({"i": r["i"], "prompt": r["prompt"][:200], "n": len(r["order"]), "pick": pk})
+    return out
+
+
+def rate_pic(cid: str, i: int, n: int):
+    import compare as CMP
+    for r in CMP.rows(cid):
+        if r["i"] == i and 0 <= n < len(r["pics"]):
+            return Path(r["pics"][n])
+    return None
+
+
+def rate_pick(cid: str, i: int, pick) -> str:
+    """pick: a list of picture indexes, "none", "same" or None."""
+    import compare as CMP
+    for r in CMP.rows(cid):
+        if r["i"] == i:
+            if isinstance(pick, list):
+                pick = [r["order"][n] for n in pick if isinstance(n, int) and 0 <= n < len(r["order"])][:2] or None
+            elif pick not in ("none", "same"):
+                pick = None
+            CMP.pick(cid, i, pick)
+            return "saved"
+    return "not found"
