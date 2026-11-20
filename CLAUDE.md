@@ -133,12 +133,13 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   files stay untouched; new sample prompts get them too.
 - **SDXL / Illustrious / Pony characters: dim 32, alpha 32** (1.071126c). The owner's test: 32/16 learned at half
   strength and was clearly worse. Anima characters use 16/16. Since 1.091126 SDXL-family characters also train the
-  text encoders at 5e-5 and (1.201126, the owner's tested Illustrious setup) batch 2 (`RECS` `batch` →
-  `suggest_settings`); FLUX / Chroma characters rank 32/32, 1600-3000 steps; Z-Image Base is its own
+  text encoders at 5e-5. Illustrious / NoobAI / Pony characters (1.201126b) follow the owner's TESTED script exactly
+  (`RECS["sdxl"]["character"]["tested"]`): batch 1 (`cfg["batch"]` → `suggest_settings`), `--clip_skip 2`, 16 epochs,
+  `--network_train_unet_only` together with `--text_encoder_lr 5e-5` (so the image model only; kept on purpose, as
+  run). `fix_flags` no longer removes `--clip_skip`; FLUX / Chroma characters rank 32/32, 1600-3000 steps; Z-Image Base is its own
   type (no adapter).
 - **Never sample without prompts:** sd-scripts crashes at the first sample when `--sample_every_n_epochs` has no
-  `--sample_prompts`; `sdgui.fix_flags` removes it (and `--clip_skip` from SDXL scripts, which ignore it) when
-  saving, when a form field is applied and when a script runs.
+  `--sample_prompts`; `sdgui.fix_flags` removes it when saving, when a form field is applied and when a script runs.
 - **Training stops Ollama** to free video memory and does not start it again.
 - Model choice matters as much as settings: the owner trains and generates Illustrious LoRAs on
   Illustrious-XL v0.1 by choice. Watermarks in training pictures are learned; step 6 removes them, but check.

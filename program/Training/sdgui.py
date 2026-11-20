@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.151126h"  # LoRA Studio version, see version.py
+__version__ = "1.201126b"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
@@ -639,8 +639,8 @@ def _drop_arg(body: str, name: str) -> tuple[str, bool]:
 
 
 def fix_flags(body: str) -> tuple[str, list]:
-    """Options that make sd-scripts fail or are ignored, taken out: sampling without --sample_prompts (it crashes
-    at the first sample) and --clip_skip in an SDXL script (SDXL does not use it). Returns (body, notes)."""
+    """Options that make sd-scripts fail, taken out: sampling without --sample_prompts (it crashes at the first
+    sample). --clip_skip stays (owner's tested Illustrious script carries --clip_skip 2). Returns (body, notes)."""
     notes = []
     if not re.search(r"(?<![\w-])--sample_prompts(?![\w-])", body):
         gone = [f for f in _SAMPLE_FLAGS if _drop_arg(body, f)[1]]
@@ -648,9 +648,6 @@ def fix_flags(body: str) -> tuple[str, list]:
             body = _drop_arg(body, f)[0]
         if gone:
             notes.append("removed " + ", ".join("--" + f for f in gone) + " (no --sample_prompts: sd-scripts would stop at the first sample)")
-    if re.search(r"sdxl_train\w*\.py", body) and re.search(r"(?<![\w-])--clip_skip(?![\w-])", body):
-        body = _drop_arg(body, "clip_skip")[0]
-        notes.append("removed --clip_skip (SDXL, Illustrious and Pony do not use it)")
     return body, notes
 
 

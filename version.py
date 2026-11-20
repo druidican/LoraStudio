@@ -14,14 +14,14 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.201126"
-VERSION = "1.201126"
+__version__ = "1.201126b"
+VERSION = "1.201126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.191126h",
-    "version.py": "1.201126",
+    "version.py": "1.201126b",
     "program/lspaths.py": "1.131126c",
-    "program/Training/sdgui.py": "1.151126h",
+    "program/Training/sdgui.py": "1.201126b",
     "program/Training/sd_script.py": "1.191126f",
     "program/Data/sd_prepare.py": "1.151126h",
     "program/Training/sd_settings.py": "1.171126",
@@ -88,7 +88,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.131126c",
-    "selftest.py": "1.171126",
+    "selftest.py": "1.201126b",
     "program/Settings/machinecheck.py": "1.131126c",
     "program/Settings/selfupdate.py": "1.171126c",
     "program/Training/failcodes.py": "1.131126b",
@@ -99,13 +99,14 @@ RELEASE: dict = {
     "program/Settings/features.py": "1.151126h",
     "program/Other/studio_css.py": "1.011126",
     "program/Training/Lora_Datatypes.py": "1.201126",
-    "program/Training/Training_Recommendations.py": "1.201126",
+    "program/Training/Training_Recommendations.py": "1.201126b",
     "program/Other/lora_studio.css": "1.151126i",
     "install.sh": "1.191126g",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.201126b", "Illustrious, NoobAI and Pony characters get your tested launch script as the default: batch 1, clip skip 2, about 16 epochs (the repeats are chosen for it), --network_train_unet_only with --text_encoder_lr 5e-5, plus 32/32, AdamW8bit 1e-4, cosine with restarts, min SNR 5, noise offset 0.0357, save and sample every epoch. --clip_skip is no longer taken out of SDXL-based scripts."),
     ("1.201126", "Illustrious, NoobAI and Pony characters use your tested setup: batch size 2 (with AdamW8bit, UNet 1e-4, text encoders 5e-5, cosine with restarts, min SNR 5, noise offset 0.0357, 32/32, save and sample every epoch, as before). Text encoders are trained again for photo datasets too (the freeze of 1.191126f is removed)."),
     ("1.191126i", "Speed test you can follow: the card shows which variant runs and what it changes, what it does right now (preparing, loading the model, caching, compiling, warming up, measuring), step and seconds per step, how long the type still takes, how busy the GPU is and its video memory, the trainer's last line and (opened) its last 40 lines. The status strip and the phone page show a running speed test too, and Stop on the phone stops it."),
     ("1.191126h", "Phone page: open http://<this computer>:<port>/m on your phone (same Wi-Fi, same login) to see what is training, how far it is and the time left, a failure with its error, the newest sample picture and the queue, with Stop now, Stop after this run and Start the queue. Small on purpose: about 1 KB every 10 s while training, once a minute otherwise, nothing while the screen is off. Settings › Start and network shows the address. Pictures and files are now only shown to a logged-in browser."),

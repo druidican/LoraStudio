@@ -280,7 +280,8 @@ their sample prompts. Their test pictures have their own workflows in Settings �
 
 | LoRA type | Rank / alpha | Learning rate | Steps | Also |
 |---|---|---|---|---|
-| SDXL, Illustrious, Pony, NoobAI-XL | 32 / 32 | 1e-4, text encoders 5e-5 | 1600–3000 | the text encoders learn the trigger word too; batch 2 (the tested setup) |
+| SDXL | 32 / 32 | 1e-4, text encoders 5e-5 | 1600–3000 | the text encoders learn the trigger word too; batch at most 4 |
+| Illustrious, Pony, NoobAI-XL | 32 / 32 | 1e-4 (image model only: `--network_train_unet_only`, with `--text_encoder_lr 5e-5` as in the tested script) | 1600–3000 | the owner's tested script: batch 1, clip skip 2, 16 epochs |
 | Anima | 16 / 16 | 1e-4 | 1200–2200 | |
 | FLUX.1, Chroma | 32 / 32 | 1e-4 | 1600–3000 | without `--fp8_base` and with block swapping if results stay blurry |
 | Z-Image Turbo | 32 / 32 | 1e-4 | 1600–3000 | with the training adapter; try *Discrete flow shift* 3.0 for weak likeness |

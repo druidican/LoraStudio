@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.171126"  # LoRA Studio version, see version.py
+__version__ = "1.201126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -168,12 +168,17 @@ def _noobai():
     return "EPS and V-pred scripts as expected"
 
 
-@check("character defaults: SDXL text encoders, FLUX/Chroma rank 32, Z-Image Base without the adapter")
+@check("character defaults: Illustrious as tested, SDXL text encoders, FLUX/Chroma rank 32, Z-Image Base without the adapter")
 def _chardefaults():
     sc, presets = G.merged_presets()
     G.set_choice("character", "balanced")
     ill = G.make_plan(DS, "illustrious")["script_text"]
-    need("--text_encoder_lr 5e-5" in ill and "--network_train_unet_only" not in ill, "Illustrious: text encoders not trained")
+    miss = [f for f in ("--text_encoder_lr 5e-5", "--network_train_unet_only", "--clip_skip 2", "--train_batch_size 1")
+            if f not in ill]          # (the epochs follow from the test dataset's repeat folders)
+    need(not miss, f"Illustrious: not the owner's tested script, missing {miss}")
+    sx = G.make_plan(DS, "sdxl")["script_text"]
+    need("--text_encoder_lr 5e-5" in sx and "--network_train_unet_only" not in sx and "--clip_skip" not in sx,
+         "SDXL: text encoders not trained")
     for t in ("flux", "chroma"):
         need("--network_dim 32 --network_alpha 32" in G.make_plan(DS, t)["script_text"], f"{t}: not rank 32/32")
     zib, zit = G.make_plan(DS, "zimagebase")["script_text"], G.make_plan(DS, "zimage")["script_text"]
@@ -860,18 +865,18 @@ def _quality():
     need(not SS.add_quality("sdxl", {"label": "SDXL", "flags": []}).get("quality_words"), "plain SDXL got quality words")
 
 
-@check("a launch script never samples without prompts, and SDXL scripts carry no --clip_skip")
+@check("a launch script never samples without prompts; --clip_skip stays")
 def _fixflags():
     import sdgui as G
     import sd_script as SS
     a = 'accelerate launch sdxl_train_network.py \\\n  --seed 42 --sample_every_n_epochs 1 --clip_skip 2\n'
     b, n = G.fix_flags(a)
-    need("--sample_every_n_epochs" not in b and "--clip_skip" not in b and len(n) == 2, b)
+    need("--sample_every_n_epochs" not in b and "--clip_skip 2" in b and len(n) == 1, b)
     c = 'accelerate launch sdxl_train_network.py --sample_every_n_epochs 1 --sample_prompts "p.txt"\n'
     need(G.fix_flags(c)[0] == c, "sampling with prompts was changed")
     vals = ["1" if f == "sample_every_n_epochs" else "2" if f == "clip_skip" else "" for f, _ in SS.FORM_FIELDS]
     t, _, _ = SS.apply_form('accelerate launch sdxl_train_network.py --seed 42\n', vals)
-    need("--sample_every_n_epochs" not in t and "--clip_skip" not in t, t)
+    need("--sample_every_n_epochs" not in t and "--clip_skip 2" in t, t)
 
 
 @check("a chosen LoRA goes into the folder of its LoRA type, never a LoRA folder's root")
