@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.201126c"
-VERSION = "1.201126c"
+__version__ = "1.201126d"
+VERSION = "1.201126d"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.191126h",
-    "version.py": "1.201126c",
+    "version.py": "1.201126d",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.201126c",
     "program/Training/sd_script.py": "1.201126c",
@@ -90,7 +90,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.131126c",
-    "selftest.py": "1.201126c",
+    "selftest.py": "1.201126d",
     "program/Settings/machinecheck.py": "1.131126c",
     "program/Settings/selfupdate.py": "1.171126c",
     "program/Training/failcodes.py": "1.131126b",
@@ -101,13 +101,14 @@ RELEASE: dict = {
     "program/Settings/features.py": "1.151126h",
     "program/Other/studio_css.py": "1.011126",
     "program/Training/Lora_Datatypes.py": "1.201126",
-    "program/Training/Training_Recommendations.py": "1.201126b",
+    "program/Training/Training_Recommendations.py": "1.201126d",
     "program/Other/lora_studio.css": "1.151126i",
     "install.sh": "1.191126g",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.201126d", "Illustrious, NoobAI and Pony characters train the text encoders at 5e-5 again (no --network_train_unet_only; your tests showed a major difference) and no longer get --clip_skip 2 (it does nothing for these LoRAs). Batch 1 and about 16 epochs stay."),
     ("1.201126c", "Compare settings: train one dataset several times from your standard launch script with one setting changed per run (learning rate, rank, text encoders; the save points for steps), get the same 6 test pictures of every run through ComfyUI after the queue, rate them blind (Results › Compare settings, or on the phone), and see per LoRA type which settings win (Collection › Insights), with a tick to make a clear winner the default for new launch scripts."),
     ("1.201126b", "Illustrious, NoobAI and Pony characters get your tested launch script as the default: batch 1, clip skip 2, about 16 epochs (the repeats are chosen for it), --network_train_unet_only with --text_encoder_lr 5e-5, plus 32/32, AdamW8bit 1e-4, cosine with restarts, min SNR 5, noise offset 0.0357, save and sample every epoch. --clip_skip is no longer taken out of SDXL-based scripts."),
     ("1.201126", "Illustrious, NoobAI and Pony characters use your tested setup: batch size 2 (with AdamW8bit, UNet 1e-4, text encoders 5e-5, cosine with restarts, min SNR 5, noise offset 0.0357, 32/32, save and sample every epoch, as before). Text encoders are trained again for photo datasets too (the freeze of 1.191126f is removed)."),

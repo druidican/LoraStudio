@@ -24,7 +24,7 @@ Run it on its own to print the table:  python Training_Recommendations.py
 """
 
 from __future__ import annotations
-__version__ = "1.201126b"  # LoRA Studio version, see version.py
+__version__ = "1.201126d"  # LoRA Studio version, see version.py
 
 import os
 import re
@@ -63,15 +63,15 @@ FAMILY = {"sdxl": "sdxl", "illustrious": "sdxl", "noobai": "sdxl", "noobai_vpred
 RECS = {
     "sdxl": {
         "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=12, lr="1e-4", dim=32, alpha=32, noise_offset=0.0357,
-                          te_lr="5e-5", tested=dict(batch=1, clip_skip=2, epochs=16),
+                          te_lr="5e-5", tested=dict(batch=1, epochs=16),
                           notes=["Caption with booru tags, trigger word first; drop tags for permanent traits (hair/eye "
                                  "colour, horns) so they bind to the trigger, keep clothes, pose, background, expression.",
                                  "Illustrious and Pony are trained the same way; generate with clip skip 2 as usual for them.",
                                  "Alpha = dim (32/32): with alpha 16 the LoRA learns at half strength, which gave weaker likeness "
                                  "and detail in tests.",
-                                 "The owner's tested Illustrious script: batch 1, clip skip 2, AdamW8bit, UNet 1e-4, "
-                                 "--network_train_unet_only with --text_encoder_lr 5e-5 (with unet-only, sd-scripts trains "
-                                 "the image model only), cosine with restarts, min SNR 5, noise offset 0.0357, 32/32. "
+                                 "The owner's tested Illustrious setup: batch 1, AdamW8bit, UNet 1e-4, text encoders trained "
+                                 "at 5e-5 (a major difference in his tests), cosine with restarts, min SNR 5, noise offset "
+                                 "0.0357, 32/32. Clip skip does nothing in training these LoRAs. "
                                  "No flip: leave --flip_aug out for characters with one-sided features (a side part, a scar)."]),
         "style": dict(views=30, steps_min=2000, steps_max=4000, epochs=10, lr="1e-4", dim=32, alpha=32, noise_offset=0.04,
                       notes=["Style LoRAs need more varied images (30-100+: many subjects, scenes and compositions) and "
@@ -266,28 +266,18 @@ def apply(tkey: str, cfg: dict, purpose: str = "character", priority: str = "bal
     if tested:
         out["epochs"] = tested["epochs"]
         notes.append(f"{tested['epochs']} epochs (save points), as in your tested script.")
-    if tested and r.get("te_lr"):
-        # exactly the owner's tested script: --network_train_unet_only AND --text_encoder_lr (the rate is then unused)
-        flags = [x for x in flags if x and not re.match(r"--text_encoder_lr\b", x)]
-        if not any(re.search(r"(^|\s)--network_train_unet_only(?=\s|$)", x) for x in flags):
-            flags.append("--network_train_unet_only")
-        flags.append(f"--text_encoder_lr {r['te_lr']}")
-        notes.append(f"As in your tested script: --network_train_unet_only with --text_encoder_lr {r['te_lr']} (sd-scripts "
-                     "then trains the image model only; take --network_train_unet_only out to train the text encoders "
-                     f"at {r['te_lr']}).")
-    elif r.get("te_lr"):
+    if r.get("te_lr"):
         # the text encoders learn too, slowly: an invented trigger word gets a meaning of its own (likeness)
         flags = [re.sub(r"(^|\s)--network_train_unet_only(?=\s|$)", " ", x).strip() for x in flags]
         flags = [x for x in flags if x and not re.match(r"--text_encoder_lr\b", x)] + [f"--text_encoder_lr {r['te_lr']}"]
         out["max_batch"] = min(int(cfg.get("max_batch", 4)), 4)
-    if tested:
-        out["batch"] = min(int(tested["batch"]), int(out.get("max_batch", tested["batch"])))
-        flags = [x for x in flags if not re.match(r"--clip_skip\b", x)] + [f"--clip_skip {tested['clip_skip']}"]
-        notes.append(f"Batch size {out['batch']} and clip skip {tested['clip_skip']}, as in your tested script.")
         notes.append(f"Text encoders trained too, at {r['te_lr']} (half the LR): the trigger word is a new word, and "
                      "training the text encoders lightly lets it stand for this character. It needs more video memory, "
                      f"so the batch size stays at {out['max_batch']} or less. Out of memory or odd colours? Put "
                      "--network_train_unet_only back.")
+    if tested:
+        out["batch"] = min(int(tested["batch"]), int(out.get("max_batch", tested["batch"])))
+        notes.append(f"Batch size {out['batch']}, as in your tested setup.")
     if "noise_offset" in r:
         flags = _sub(flags, r"--noise_offset[ =]\S+", f"--noise_offset {r['noise_offset']}")
 

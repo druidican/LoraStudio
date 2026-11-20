@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.201126d"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -174,9 +174,9 @@ def _compare():
     ill = G.make_plan(DS, "illustrious")["script_text"]
     vs = CMP.variants_for(ill, ["lr", "rank", "te"])
     keys = [v["key"] for v in vs]
-    need(keys == ["base", "lr5e5", "lr2e4", "r16x16", "r64x64", "teon"], keys)
+    need(keys == ["base", "lr5e5", "lr2e4", "r16x16", "r64x64", "teoff"], keys)
     te = CMP.apply_variant(ill, vs[-1])
-    need("--network_train_unet_only" not in te and "--text_encoder_lr 5e-5" in te, "text encoders not switched on")
+    need("--network_train_unet_only" in te, "text encoders not switched off")
     need("--learning_rate 2e-4" in CMP.apply_variant(ill, vs[2]) and "--network_dim 16 --network_alpha 16" in
          CMP.apply_variant(ill, vs[3]), "learning rate / rank not changed")
     e = {"id": "x", "groups": ["lr"], "base": CMP.base_values(ill), "runs": [{**v, "script": ""} for v in vs[:3]],
@@ -191,9 +191,9 @@ def _chardefaults():
     sc, presets = G.merged_presets()
     G.set_choice("character", "balanced")
     ill = G.make_plan(DS, "illustrious")["script_text"]
-    miss = [f for f in ("--text_encoder_lr 5e-5", "--network_train_unet_only", "--clip_skip 2", "--train_batch_size 1")
-            if f not in ill]          # (the epochs follow from the test dataset's repeat folders)
-    need(not miss, f"Illustrious: not the owner's tested script, missing {miss}")
+    miss = [f for f in ("--text_encoder_lr 5e-5", "--train_batch_size 1") if f not in ill]
+    miss += [f"no {f}" for f in ("--network_train_unet_only", "--clip_skip") if f in ill]
+    need(not miss, f"Illustrious: not the owner's tested setup: {miss}")
     sx = G.make_plan(DS, "sdxl")["script_text"]
     need("--text_encoder_lr 5e-5" in sx and "--network_train_unet_only" not in sx and "--clip_skip" not in sx,
          "SDXL: text encoders not trained")
