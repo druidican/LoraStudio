@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.191126e"  # LoRA Studio version, see version.py
+__version__ = "1.201126"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -778,6 +778,9 @@ def suggest_settings(num_images, cfg):
     steps, epochs, views = cfg["steps"], cfg["epochs"], cfg["views"]
     eff = max(1, round(views * num_images / steps))
     bs = max(1, min(cfg["max_batch"], eff))
+    if cfg.get("batch"):                 # a tested batch size (Training_Recommendations: Illustrious/NoobAI/Pony characters)
+        bs = max(1, min(cfg["max_batch"], int(cfg["batch"])))
+        eff = max(eff, bs)
     ga = math.ceil(eff / bs)
     repeats = suggest_repeats(num_images, bs, ga, epochs, steps)
     return bs, ga, repeats

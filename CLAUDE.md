@@ -125,15 +125,16 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   (`--caption_suffix`, musubi `CAPTION_SUF`; Pony photos lose `source_anime`); per LoRA type a lean (step 7 card, step 9
   row, meta `lean`) puts those words in the negative (own style) or the prompt (Photo) of test and sample pictures.
   Words from the model cards (Danbooru tags; Pony V6 has no photo source; Anima does not do realism).
-  1.191126f: kind ≠ lean on Illustrious/NoobAI/Pony/Anima → `--network_train_unet_only` (`lean.freeze_te`); scripts
-  carry `# lorastudio-look: {json}` (`lean.mark`), read by the training card (`look`, CARD_VERSION 3) → LoRA page
-  *How to use it*. Step 9's *Use the chosen look* (`lean.rewrite`) does words, text encoders and the comment.
+  Scripts carry `# lorastudio-look: {json}` (`lean.mark`), read by the training card (`look`, CARD_VERSION 3) → LoRA
+  page *How to use it*; step 9's *Use the chosen look* (`lean.rewrite`) does the words and the comment. The
+  text-encoder freeze of 1.191126f was removed in 1.201126 (owner: his tested setup trains them at 5e-5).
 - **Quality words:** Pony trains with `score_9, score_8_up, score_7_up, source_anime` as `--caption_prefix`
   (keep_tokens raised to cover them), Illustrious with `masterpiece, best quality` as `--caption_suffix`; caption
   files stay untouched; new sample prompts get them too.
 - **SDXL / Illustrious / Pony characters: dim 32, alpha 32** (1.071126c). The owner's test: 32/16 learned at half
   strength and was clearly worse. Anima characters use 16/16. Since 1.091126 SDXL-family characters also train the
-  text encoders at 5e-5 (batch ≤ 4); FLUX / Chroma characters rank 32/32, 1600-3000 steps; Z-Image Base is its own
+  text encoders at 5e-5 and (1.201126, the owner's tested Illustrious setup) batch 2 (`RECS` `batch` →
+  `suggest_settings`); FLUX / Chroma characters rank 32/32, 1600-3000 steps; Z-Image Base is its own
   type (no adapter).
 - **Never sample without prompts:** sd-scripts crashes at the first sample when `--sample_every_n_epochs` has no
   `--sample_prompts`; `sdgui.fix_flags` removes it (and `--clip_skip` from SDXL scripts, which ignore it) when

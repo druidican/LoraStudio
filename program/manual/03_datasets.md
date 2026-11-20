@@ -186,13 +186,8 @@ model (Illustrious, NoobAI, Pony, Anima) that look fights the model: strange hal
   negative prompt, Photo in the prompt (Pony: `source_anime` or `source_cartoon` in the prompt). Do the same when
   you make pictures with the LoRA.
 
-**Text encoders**: when the pictures are of another kind than the result should look like (photos, and the model's
-own style wanted), a new launch script trains the image model only (`--network_train_unet_only`, even for a
-character). Training the text encoders would tie the look of the photos to the trigger word itself; step 9's
-recommendations say so. Choose *Photo* and they are trained as before.
-
 9 Train shows the same choice for its type. A launch script saved before (or with other words) gets a note there:
-**Use the chosen look in this script** puts the right words in, freezes the text encoders where needed and adds the
+**Use the chosen look in this script** puts the right words in and adds the
 note for the LoRA page (Save keeps it; its sample prompts stay as they are). The **LoRA page** in the Collection then
 says under *How to use it* what the LoRA was made from and which words to put in the prompt or the negative prompt
 (also on its Training card).
@@ -285,7 +280,7 @@ their sample prompts. Their test pictures have their own workflows in Settings �
 
 | LoRA type | Rank / alpha | Learning rate | Steps | Also |
 |---|---|---|---|---|
-| SDXL, Illustrious, Pony, NoobAI-XL | 32 / 32 | 1e-4, text encoders 5e-5 | 1600–3000 | the text encoders learn the trigger word too; batch at most 4 |
+| SDXL, Illustrious, Pony, NoobAI-XL | 32 / 32 | 1e-4, text encoders 5e-5 | 1600–3000 | the text encoders learn the trigger word too; batch 2 (the tested setup) |
 | Anima | 16 / 16 | 1e-4 | 1200–2200 | |
 | FLUX.1, Chroma | 32 / 32 | 1e-4 | 1600–3000 | without `--fp8_base` and with block swapping if results stay blurry |
 | Z-Image Turbo | 32 / 32 | 1e-4 | 1600–3000 | with the training adapter; try *Discrete flow shift* 3.0 for weak likeness |

@@ -24,7 +24,7 @@ Run it on its own to print the table:  python Training_Recommendations.py
 """
 
 from __future__ import annotations
-__version__ = "1.171126"  # LoRA Studio version, see version.py
+__version__ = "1.201126"  # LoRA Studio version, see version.py
 
 import os
 import re
@@ -63,12 +63,15 @@ FAMILY = {"sdxl": "sdxl", "illustrious": "sdxl", "noobai": "sdxl", "noobai_vpred
 RECS = {
     "sdxl": {
         "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=12, lr="1e-4", dim=32, alpha=32, noise_offset=0.0357,
-                          te_lr="5e-5",
+                          te_lr="5e-5", batch=2,
                           notes=["Caption with booru tags, trigger word first; drop tags for permanent traits (hair/eye "
                                  "colour, horns) so they bind to the trigger, keep clothes, pose, background, expression.",
                                  "Illustrious and Pony are trained the same way; generate with clip skip 2 as usual for them.",
                                  "Alpha = dim (32/32): with alpha 16 the LoRA learns at half strength, which gave weaker likeness "
-                                 "and detail in tests."]),
+                                 "and detail in tests.",
+                                 "Batch size 2: the owner's tested Illustrious setup (AdamW8bit, UNet 1e-4, text encoders "
+                                 "5e-5, cosine with restarts, min SNR 5, noise offset 0.0357, save and sample every epoch). "
+                                 "No flip: leave --flip_aug out for characters with one-sided features (a side part, a scar)."]),
         "style": dict(views=30, steps_min=2000, steps_max=4000, epochs=10, lr="1e-4", dim=32, alpha=32, noise_offset=0.04,
                       notes=["Style LoRAs need more varied images (30-100+: many subjects, scenes and compositions) and "
                              "a higher rank than characters.",
@@ -262,6 +265,9 @@ def apply(tkey: str, cfg: dict, purpose: str = "character", priority: str = "bal
         flags = [re.sub(r"(^|\s)--network_train_unet_only(?=\s|$)", " ", x).strip() for x in flags]
         flags = [x for x in flags if x and not re.match(r"--text_encoder_lr\b", x)] + [f"--text_encoder_lr {r['te_lr']}"]
         out["max_batch"] = min(int(cfg.get("max_batch", 4)), 4)
+    if r.get("batch"):
+        out["batch"] = min(int(r["batch"]), int(out.get("max_batch", r["batch"])))
+        notes.append(f"Batch size {out['batch']} (tested setting for this type).")
         notes.append(f"Text encoders trained too, at {r['te_lr']} (half the LR): the trigger word is a new word, and "
                      "training the text encoders lightly lets it stand for this character. It needs more video memory, "
                      f"so the batch size stays at {out['max_batch']} or less. Out of memory or odd colours? Put "

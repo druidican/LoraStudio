@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.191126i"
-VERSION = "1.191126i"
+__version__ = "1.201126"
+VERSION = "1.201126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.191126h",
-    "version.py": "1.191126i",
+    "version.py": "1.201126",
     "program/lspaths.py": "1.131126c",
     "program/Training/sdgui.py": "1.151126h",
     "program/Training/sd_script.py": "1.191126f",
@@ -36,7 +36,7 @@ RELEASE: dict = {
     "program/Training/comfyupscale.py": "1.101126",
     "program/Training/comfyinpaint.py": "1.151126f",
     "program/Settings/scanner.py": "1.191126d",
-    "program/Data/lean.py": "1.191126f",
+    "program/Data/lean.py": "1.201126",
     "program/Other/mobile.py": "1.191126i",
     "program/UI/mobile_page.py": "1.191126i",
     "program/UI/scan_panel.py": "1.191126d",
@@ -98,14 +98,15 @@ RELEASE: dict = {
     "program/Settings/venvcheck.py": "1.191126g",
     "program/Settings/features.py": "1.151126h",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.191126e",
-    "program/Training/Training_Recommendations.py": "1.171126",
+    "program/Training/Lora_Datatypes.py": "1.201126",
+    "program/Training/Training_Recommendations.py": "1.201126",
     "program/Other/lora_studio.css": "1.151126i",
     "install.sh": "1.191126g",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.201126", "Illustrious, NoobAI and Pony characters use your tested setup: batch size 2 (with AdamW8bit, UNet 1e-4, text encoders 5e-5, cosine with restarts, min SNR 5, noise offset 0.0357, 32/32, save and sample every epoch, as before). Text encoders are trained again for photo datasets too (the freeze of 1.191126f is removed)."),
     ("1.191126i", "Speed test you can follow: the card shows which variant runs and what it changes, what it does right now (preparing, loading the model, caching, compiling, warming up, measuring), step and seconds per step, how long the type still takes, how busy the GPU is and its video memory, the trainer's last line and (opened) its last 40 lines. The status strip and the phone page show a running speed test too, and Stop on the phone stops it."),
     ("1.191126h", "Phone page: open http://<this computer>:<port>/m on your phone (same Wi-Fi, same login) to see what is training, how far it is and the time left, a failure with its error, the newest sample picture and the queue, with Stop now, Stop after this run and Start the queue. Small on purpose: about 1 KB every 10 s while training, once a minute otherwise, nothing while the screen is off. Settings › Start and network shows the address. Pictures and files are now only shown to a logged-in browser."),
     ("1.191126g", "Moving training to another ROCm: Settings › Updates › Show the PyTorch builds lists every stable PyTorch build on AMD's server (each made for one ROCm version) and installs the one you choose, with a GPU test, automatic undo and Go back. When the system's ROCm is newer than the one training uses, the Health check and Home say so (Keep ROCm … for training hides it). A new install takes the newest build (install.sh --torch picks one, --tested-torch the tested one); running install.sh again keeps the installed PyTorch. Progress lines stop when you leave a step during a job."),
