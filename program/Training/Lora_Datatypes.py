@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.211126b"  # LoRA Studio version, see version.py
+__version__ = "1.211126c"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -468,6 +468,7 @@ PRESETS.update({
         "convert": "networks/convert_z_image_lora_to_comfy.py",
         # --base_weights must be a Z-Image LoRA (the ostris training adapter): musubi merges by layer name, so a LoRA
         # for another model merges NOTHING without an error, and Turbo then trains without its adapter (blurry results)
+        "te_key": "model.embed_tokens.weight",         # plain Qwen3 4B (Qwen3-VL and others lack it)
         "base_weights_check": r"layers[._]\d+[._](attention|feed_forward|adaln)",    # musubi stage 6 (path inside src/musubi_tuner); None = the LoRA is used as saved
         "steps": 2400, "epochs": 10, "views": 50, "targets": (1600, 2400, 3000),   # a face needs more than a style
         "lr": "1e-4", "optimizer": "AdamW8bit", "scheduler": "cosine", "warmup": 80,
@@ -1088,6 +1089,34 @@ PYCHECK"""] if cfg.get("base_weights_check") and any(fl == "--base_weights" for 
         "for f in " + " ".join(f'"${{{musubi_var(fl)}}}"' for fl, _ in cfg["model_args"]) + "; do",
         '  [ -f "$f" ] || fail_stage "model file not found: $f"',
         "done",
+        # ComfyUI's int8 / fp8 files (scale tensors next to the weights) and the wrong Qwen stop here, in seconds,
+        # instead of after caching the latents
+        "python - " + " ".join(f'"{fl.lstrip("-")}=${{{musubi_var(fl)}}}"' for fl, _ in cfg["model_args"]
+                                if fl != "--base_weights") + f""" <<'PYFILES' || fail_stage "a model file does not fit (see the line above)"
+import json, struct, sys
+need_te = {(cfg.get("te_key") or "")!r}
+bad = []
+for arg in sys.argv[1:]:
+    flag, path = arg.split("=", 1)
+    try:
+        with open(path, "rb") as fh:
+            keys = list(json.loads(fh.read(struct.unpack("<Q", fh.read(8))[0])))
+    except Exception as e:
+        bad.append(f"{{flag}}: cannot read {{path}} ({{e}})")
+        continue
+    if any(k.endswith((".comfy_quant", ".weight_scale", ".input_scale", ".scale_weight")) for k in keys):
+        bad.append(f"{{flag}}: {{path}} is a ComfyUI int8 / fp8 file; musubi-tuner trains only on the full (bf16) file. "
+                   "Keep the small one for pictures in ComfyUI.")
+    elif flag == "text_encoder" and need_te and need_te not in keys:
+        vl = any(k.startswith(("model.language_model.", "visual.", "model.visual.")) for k in keys)
+        bad.append(f"text_encoder: {{path}} is " + ("Qwen3-VL (the version that reads pictures)" if vl else
+                   "not the text model this type needs") + f": it has no {{need_te}}. Use qwen_3_4b.safetensors.")
+    else:
+        print(f"{{flag}}: ok ({{len(keys)}} tensors)")
+for b in bad:
+    print("✗ " + b)
+sys.exit(1 if bad else 0)
+PYFILES""",
         "",
         f'stage "{ST[1]}"',
         '[ -n "${CHARACTER_NAME}" ] || fail_stage "empty character name"',

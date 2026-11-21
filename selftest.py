@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.211126b"  # LoRA Studio version, see version.py
+__version__ = "1.211126c"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -487,6 +487,15 @@ def _comfy_names():
     need(CT.match_name("anima-base-v1.0.safetensors", names) == names[0], "moved file not found")
     need(CT.match_name("gone.safetensors", names) == "", "a missing file was matched")
     return "renamed, moved and missing files"
+
+
+@check("musubi scripts check the model files first (ComfyUI int8/fp8, Qwen3-VL)")
+def _musubi_files():
+    import Lora_Datatypes as L
+    txt = L.render_musubi_script("/x", "/y", "plan", "cmd", {}, dict(L.PRESETS["zimage"]), 1)
+    need("<<'PYFILES'" in txt and '"text_encoder=${TEXT_ENCODER}"' in txt, "no model file check in stage 1")
+    need("'model.embed_tokens.weight'" in txt, "no Qwen3 text-model check")
+    return "stage 1 reads the headers"
 
 
 @check("test pictures: Z-Image (shift, GGUF loaders)")

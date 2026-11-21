@@ -313,7 +313,7 @@ Alpha is always the same as the rank: a lower alpha makes the LoRA learn at a fr
 **Z-Image** has two LoRA types, *Z-Image › Turbo* and *Z-Image › Base*, both trained with musubi-tuner. Training
 needs the full files (musubi cannot read int8 or GGUF): `z_image_turbo_bf16.safetensors` (Base:
 `z_image_bf16.safetensors`), `qwen_3_4b.safetensors`, `ae.safetensors` and, for Turbo, the training adapter
-`zimage_turbo_training_adapter_v2.safetensors`. For pictures in ComfyUI a smaller set does the same in half the
+`zimage_turbo_training_adapter_v2.safetensors`. Stage 1 *Check files* stops at once when one does not fit: a ComfyUI int8 / fp8 file (`…_int8_convrot`, `…_fp8_mixed`) or a Qwen3-VL text encoder. For pictures in ComfyUI a smaller set does the same in half the
 memory: `z_image_turbo_int8_convrot.safetensors` (Comfy-Org/z_image_turbo) or `z-image-turbo-Q6_K.gguf`
 (jayn7/Z-Image-Turbo-GGUF, with ComfyUI-GGUF), `qwen_3_4b_fp8_mixed.safetensors` and the same `ae.safetensors`. A
 Z-Image LoRA's test pictures are made on Turbo (8 steps, CFG 1, shift 3; Settings › Test pictures), also for a Base
