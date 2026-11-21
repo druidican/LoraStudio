@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.201126f"
-VERSION = "1.201126f"
+__version__ = "1.211126"
+VERSION = "1.211126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.191126h",
-    "version.py": "1.201126f",
+    "version.py": "1.211126",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.201126c",
     "program/Training/sd_script.py": "1.201126c",
@@ -30,7 +30,7 @@ RELEASE: dict = {
     "program/Training/training_ui.py": "1.201126e",
     "program/Settings/settings_ui.py": "1.201126e",
     "program/Gallery/lora_library.py": "1.201126c",
-    "program/Training/comfytest.py": "1.201126c",
+    "program/Training/comfytest.py": "1.211126",
     "program/Training/speedtest.py": "1.191126i",
     "program/Training/speedjobs.py": "1.191126i",
     "program/Training/comfyupscale.py": "1.101126",
@@ -90,7 +90,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.201126e",
-    "selftest.py": "1.201126f",
+    "selftest.py": "1.211126",
     "program/Settings/machinecheck.py": "1.131126c",
     "program/Settings/selfupdate.py": "1.201126e",
     "program/Training/failcodes.py": "1.131126b",
@@ -108,6 +108,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.211126", "Test pictures: a model file renamed or moved in ComfyUI after the workflow was read is found again (same name in another subfolder, or written differently, e.g. novaFurryAM_v30 / NovaFurryAMV30) and remembered; a file that is really gone stops with its name instead of ComfyUI's 'Value not in list'."),
     ("1.201126f", "Step 5: Your pictures made with this LoRA (every purpose). Your ComfyUI pictures made with the dataset's LoRA alone are shown; tick which ones Ollama scans (usable or not, and what each shows), then which ones are copied into the dataset (pinned always keep)."),
     ("1.201126e", "Left menu: every tab has its own menu on the left (foldable to icons). Datasets: search, filters, the datasets as tiles, and an open dataset's steps with their state plus Train, Results and LoRA. Collection: search, Pictures / Status / Insights / Maintenance, the filters and the parts of an open LoRA page. Settings: the groups with a search. Queue: counts and Start. Home: the cards and where you left off. The step bar, part bar and tab bars under the top tabs are gone. Improvements is removed completely (Datasets › Improvements, Fix the ticked datasets and its choices, the Only with warnings filter, and its lines in Home's Needs a look)."),
     ("1.201126d", "Illustrious, NoobAI and Pony characters train the text encoders at 5e-5 again (no --network_train_unet_only; your tests showed a major difference) and no longer get --clip_skip 2 (it does nothing for these LoRAs). Batch 1 and about 16 epochs stay."),

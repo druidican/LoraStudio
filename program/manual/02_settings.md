@@ -185,6 +185,8 @@ type in Settings › Training:
 | NoobAI-XL EPS | masterpiece, best quality, newest, absurdres, highres, safe | worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands | Euler a, 5.5, 28 |
 | NoobAI-XL V-pred | as EPS | as EPS | Euler, 5, 28, v-prediction with zero terminal SNR |
 
+When you rename a model file or move it to another subfolder of ComfyUI after reading the workflow, LoRA Studio finds it again (same name in another folder, or the same name written differently, like `novaFurryAM_v30` and `NovaFurryAMV30`) and remembers ComfyUI's new name. When the file is really gone, the test pictures stop with its name: pick the model again in ComfyUI, save the workflow and read it again here.
+
 The same files are in `program/Training/workflows/` to open in ComfyUI. A V-pred LoRA's test pictures always use
 v-prediction, also with a workflow of your own. LoRA Studio then makes test pictures with every save point of a run,
 with the same model, sampler and size as your workflow: how many prompts, and whether they are made by themselves.

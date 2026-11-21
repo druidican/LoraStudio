@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.201126f"  # LoRA Studio version, see version.py
+__version__ = "1.211126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -477,6 +477,16 @@ def _flow():
     ov = F.overview([DS])
     need(ov and ov[0]["n"] == 8, f"overview: {ov}")
     return f"next step {ov[0]['next']}"
+
+
+@check("test pictures: ComfyUI's name for a renamed or moved model file")
+def _comfy_names():
+    import comfytest as CT
+    names = ["Anima/anime/anima-base-v1.0.safetensors", "Anima/furry/NovaFurryAMV30.safetensors"]
+    need(CT.match_name("Anima/furry/novaFurryAM_v30.safetensors", names) == names[1], "renamed file not found")
+    need(CT.match_name("anima-base-v1.0.safetensors", names) == names[0], "moved file not found")
+    need(CT.match_name("gone.safetensors", names) == "", "a missing file was matched")
+    return "renamed, moved and missing files"
 
 
 @check("your pictures made with the LoRA (step 5)")

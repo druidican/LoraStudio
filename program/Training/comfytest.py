@@ -15,10 +15,11 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.211126"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
+import re
 import random
 import shutil
 import sys
@@ -322,22 +323,61 @@ def lora_names(url) -> list[str]:
         return []
 
 
-def ckpt_names(url) -> list[str]:
-    """The checkpoint names ComfyUI knows (with their subfolders, e.g. NoobAI/NoobAI-XL-v1.1.safetensors)."""
+LOADERS = {"ckpt": ("CheckpointLoaderSimple", "ckpt_name"), "unet": ("UNETLoader", "unet_name"),
+           "vae": ("VAELoader", "vae_name"), "clip": ("CLIPLoader", "clip_name")}
+
+
+def model_names(url, what: str = "ckpt") -> list[str]:
+    """The file names ComfyUI offers for a loader (with their subfolders, e.g. Anima/furry/x.safetensors)."""
+    node, inp = LOADERS[what]
     try:
-        d = json.loads(_req(url, "/object_info/CheckpointLoaderSimple", timeout=20))
-        return list(d["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0])
+        d = json.loads(_req(url, f"/object_info/{node}", timeout=20))
+        return list(d[node]["input"]["required"][inp][0])
     except Exception:                                    # noqa: BLE001
         return []
 
 
+def _key(name: str) -> str:
+    """A file name without folder, extension, case and punctuation: novaFurryAM_v30 and NovaFurryAMV30 are one."""
+    return re.sub(r"[^a-z0-9]", "", Path(name.replace("\\", "/")).stem.lower())
+
+
+def match_name(want: str, names: list[str]) -> str:
+    """ComfyUI's own name for a file: the same name, else the same file name in another subfolder, else the same name
+    written differently (case, _ - and spaces). '' when ComfyUI has no such file."""
+    if not want or not names or want in names:
+        return want if (want in names or not names) else ""
+    base = Path(want.replace("\\", "/")).name.lower()
+    hit = [n for n in names if Path(n.replace("\\", "/")).name.lower() == base]
+    if not hit:
+        k = _key(want)
+        hit = [n for n in names if _key(n) == k]
+    return hit[0] if len(hit) == 1 else ""
+
+
 def comfy_name(want: str, url=None) -> str:
-    """ComfyUI's own name for a checkpoint file: the same file name in whatever subfolder ComfyUI has it; else as is."""
-    names = ckpt_names(url or settings()["url"])
-    if not want or want in names:
-        return want
-    base = Path(want).name.lower()
-    return next((n for n in names if Path(n.replace("\\", "/")).name.lower() == base), want)
+    """ComfyUI's own name for a checkpoint file (see match_name); else as is."""
+    return match_name(want, model_names(url or settings()["url"], "ckpt")) or want
+
+
+def check_models(wf: dict, url: str) -> tuple[dict, list[str]]:
+    """The workflow's model files under the names ComfyUI has now (a file renamed or moved to another subfolder since
+    the workflow was read is found again). Returns (workflow, [what is missing])."""
+    keys = ("unet", "clip", "vae") if wf.get("kind") == "unet" else ("ckpt", "vae")
+    out, missing = dict(wf), []
+    for k in keys:
+        want = wf.get(k) or ""
+        if not want:
+            continue
+        names = model_names(url, k)
+        if not names:                                    # this ComfyUI does not list them: leave it to ComfyUI
+            continue
+        got = match_name(want, names)
+        if got:
+            out[k] = got
+        else:
+            missing.append(f"{LOADERS[k][1]} `{want}`")
+    return out, missing
 
 
 def graph(wf: dict, lora_name: str, positive: str, seed: int, prefix: str) -> dict:
@@ -542,6 +582,16 @@ def prepare(dataset: str, tkey: str, type_label: str = "") -> tuple:
     url = cfg["url"]
     if not alive(url):
         raise RuntimeError(f"ComfyUI does not answer at {url}. Start it; the test pictures are made when it answers.")
+    fixed_wf, missing = check_models(wf, url)
+    if missing:
+        raise RuntimeError("ComfyUI does not have the model file(s) of your workflow any more: " + ", ".join(missing)
+                           + ". Open the workflow in ComfyUI, pick the model again, save it and read it again in "
+                           "Settings › Test pictures.")
+    if fixed_wf != wf:                                  # renamed or moved: remember ComfyUI's name for next time
+        wf = fixed_wf
+        if (cfg.get("families") or {}).get(ffam):
+            cfg["families"][ffam] = {**cfg["families"][ffam], **{k: wf[k] for k in LOADERS if k in wf}}
+            save_settings(families=cfg["families"])
     roots = [Path(cfg["lora_dir"]).expanduser()] if cfg.get("lora_dir") else [Path(p).expanduser()
                                                                               for p in S.lora_dirs_setting()]
     if not roots:
