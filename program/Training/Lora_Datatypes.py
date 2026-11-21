@@ -49,7 +49,7 @@ How sd-scripts counts (this script mirrors it):
     (approximate: sd-scripts buckets images, so the real number can be a bit higher;
      check the step count it prints at startup.)
 """
-__version__ = "1.201126"  # LoRA Studio version, see version.py
+__version__ = "1.211126b"  # LoRA Studio version, see version.py
 
 import argparse
 import math
@@ -464,7 +464,7 @@ PRESETS.update({
     # Turbo is a distilled model: training on it needs the ostris training adapter (--base_weights), otherwise the
     # distillation breaks down quickly. No sample images (musubi uses another prompt format and they are not wanted).
     "zimage": {
-        "label": "Z-Image Turbo (musubi-tuner)", "suffix": "ZIT", "trainer": "musubi", "max_batch": 1,
+        "label": "Z-Image › Turbo (musubi-tuner)", "suffix": "ZIT", "trainer": "musubi", "max_batch": 1,
         "convert": "networks/convert_z_image_lora_to_comfy.py",
         # --base_weights must be a Z-Image LoRA (the ostris training adapter): musubi merges by layer name, so a LoRA
         # for another model merges NOTHING without an error, and Turbo then trains without its adapter (blurry results)
@@ -514,7 +514,7 @@ PRESETS.update({
 # A LoRA trained on Base keeps likeness better and also works on Turbo (often at a strength of 1.0-1.5).
 PRESETS["zimagebase"] = {
     **PRESETS["zimage"],
-    "label": "Z-Image Base (musubi-tuner)", "suffix": "ZIB",
+    "label": "Z-Image › Base (musubi-tuner)", "suffix": "ZIB",
     "base_weights_check": None,
     "prompts_name": "ZIBprompts.txt", "script_name": "{name}ZIB_lora.sh",
     "model_args": [("--dit", _PH + "z_image_bf16.safetensors"),

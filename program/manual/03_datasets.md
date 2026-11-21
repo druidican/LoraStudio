@@ -305,10 +305,19 @@ their sample prompts. Their test pictures have their own workflows in Settings �
 | Illustrious, Pony, NoobAI-XL | 32 / 32 | 1e-4, text encoders 5e-5 | 1600–3000 | the tested setup: batch 1, about 16 epochs; training the text encoders makes a large difference |
 | Anima | 16 / 16 | 1e-4 | 1200–2200 | |
 | FLUX.1, Chroma | 32 / 32 | 1e-4 | 1600–3000 | without `--fp8_base` and with block swapping if results stay blurry |
-| Z-Image Turbo | 32 / 32 | 1e-4 | 1600–3000 | with the training adapter; try *Discrete flow shift* 3.0 for weak likeness |
-| Z-Image Base | 32 / 32 | 1e-4 | 1600–3000 | no adapter; the LoRA also works on Turbo (strength 1.0–1.5) |
+| Z-Image › Turbo | 32 / 32 | 1e-4 | 1600–3000 | with the training adapter; flow shift 3.0 (styles 2.0); a first set to try, not yet tested |
+| Z-Image › Base | 32 / 32 | 1e-4 | 1600–3000 | no adapter; the LoRA also works on Turbo (strength 1.0–1.5) |
 
 Alpha is always the same as the rank: a lower alpha makes the LoRA learn at a fraction of its strength.
+
+**Z-Image** has two LoRA types, *Z-Image › Turbo* and *Z-Image › Base*, both trained with musubi-tuner. Training
+needs the full files (musubi cannot read int8 or GGUF): `z_image_turbo_bf16.safetensors` (Base:
+`z_image_bf16.safetensors`), `qwen_3_4b.safetensors`, `ae.safetensors` and, for Turbo, the training adapter
+`zimage_turbo_training_adapter_v2.safetensors`. For pictures in ComfyUI a smaller set does the same in half the
+memory: `z_image_turbo_int8_convrot.safetensors` (Comfy-Org/z_image_turbo) or `z-image-turbo-Q6_K.gguf`
+(jayn7/Z-Image-Turbo-GGUF, with ComfyUI-GGUF), `qwen_3_4b_fp8_mixed.safetensors` and the same `ae.safetensors`. A
+Z-Image LoRA's test pictures are made on Turbo (8 steps, CFG 1, shift 3; Settings › Test pictures), also for a Base
+LoRA.
 
 **Caption set for this launch script** (only when the dataset has a tag set and a sentence set that this LoRA type
 can read): pick *Tags (IMG.txt)* or *Sentences (IMG.sentences.txt)*. It is written into the script

@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.191126i"  # LoRA Studio version, see version.py
+__version__ = "1.211126b"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -626,8 +626,9 @@ def panel_comfy(page):
                 with ui.row().classes("items-center gap-2"):
                     ui.button("Use LoRA Studio's workflow", on_click=builtin) \
                         .props("outline dense no-caps color=primary")
-                    note(CT.BUILTIN_NOTE[fam] + ", 832×1216 (the model card's advice). The file is also in LoRA "
-                         "Studio's Training/workflows/ folder to open in ComfyUI.")
+                    note(CT.BUILTIN_NOTE[fam] + ", 832×1216 (the model card's advice)." + (
+                        " The file is also in LoRA Studio's Training/workflows/ folder to open in ComfyUI."
+                        if CT.BUILTIN[fam] else ""))
             fams[fam] = fixed
     msg = ui.markdown("")
 

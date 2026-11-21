@@ -172,8 +172,8 @@ by you, written into launch scripts that download models, and masked in the run 
 ![Settings › Test pictures](img/set_comfy.jpg)
 
 The ComfyUI address (*Test* checks it) and your LoRA folder as ComfyUI sees it. Import your own ComfyUI workflow per
-model family once (Workflow › Save in ComfyUI): SDXL, Illustrious, Pony, NoobAI-XL EPS, NoobAI-XL V-pred and Anima
-each have their own. A family without one uses your SDXL workflow (and its fixed tags), as before. **Use LoRA
+model family once (Workflow › Save in ComfyUI): SDXL, Illustrious, Pony, NoobAI-XL EPS, NoobAI-XL V-pred, Anima and
+Z-Image each have their own (a GGUF loader in your workflow is kept). A family without one uses your SDXL workflow (and its fixed tags), as before. **Use LoRA
 Studio's workflow** sets one up with the model card's advice, at 832×1216, with the checkpoint set for that LoRA
 type in Settings › Training:
 
@@ -184,6 +184,7 @@ type in Settings › Training:
 | Pony Diffusion V6 XL | score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up, source_anime | – (not needed, says the model card) | Euler a, 7, 25, CLIP skip 2 |
 | NoobAI-XL EPS | masterpiece, best quality, newest, absurdres, highres, safe | worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands | Euler a, 5.5, 28 |
 | NoobAI-XL V-pred | as EPS | as EPS | Euler, 5, 28, v-prediction with zero terminal SNR |
+| Z-Image Turbo | – | – (CFG 1 ignores it) | res_multistep, simple, 1, 8 steps, shift 3; set up from the files your ComfyUI has (int8 / fp8 first) |
 
 When you rename a model file or move it to another subfolder of ComfyUI after reading the workflow, LoRA Studio finds it again (same name in another folder, or the same name written differently, like `novaFurryAM_v30` and `NovaFurryAMV30`) and remembers ComfyUI's new name. When the file is really gone, the test pictures stop with its name: pick the model again in ComfyUI, save the workflow and read it again here.
 

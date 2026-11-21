@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.211126"  # LoRA Studio version, see version.py
+__version__ = "1.211126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -487,6 +487,22 @@ def _comfy_names():
     need(CT.match_name("anima-base-v1.0.safetensors", names) == names[0], "moved file not found")
     need(CT.match_name("gone.safetensors", names) == "", "a missing file was matched")
     return "renamed, moved and missing files"
+
+
+@check("test pictures: Z-Image (shift, GGUF loaders)")
+def _zimage_graph():
+    import comfytest as CT
+    need(CT.family("zimage") == "zimage" and CT.family("zimagebase") == "zimage", "Z-Image family")
+    wf = {"kind": "unet", "unet": "z.gguf", "unet_node": "UnetLoaderGGUF", "clip": "q.gguf", "clip_node": "CLIPLoaderGGUF",
+          "clip_type": "lumina2", "vae": "ae.safetensors", "shift": 3.0, "steps": 8, "cfg": 1.0,
+          "sampler": "res_multistep", "scheduler": "simple", "width": 832, "height": 1216}
+    g = CT.graph(wf, "x.safetensors", "pip", 1, "t")
+    need(g["1"]["class_type"] == "UnetLoaderGGUF" and "weight_dtype" not in g["1"]["inputs"], "GGUF unet loader")
+    need(g["2"]["class_type"] == "CLIPLoaderGGUF" and g["1s"]["inputs"]["shift"] == 3.0, "GGUF clip / shift")
+    need(CT._pick(["ZImageTurbo/z_image_turbo_bf16.safetensors", "ZImageTurbo/z_image_turbo_int8_convrot.safetensors",
+                   "z_image_bf16.safetensors"], ("zimage", "turbo"), ("int8", "fp8", "bf16")).endswith("int8_convrot.safetensors"),
+         "int8 Turbo first")
+    return "GGUF loaders, shift 3, int8 picked"
 
 
 @check("your pictures made with the LoRA (step 5)")

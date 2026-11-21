@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.211126"  # LoRA Studio version, see version.py
+__version__ = "1.211126b"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -43,10 +43,11 @@ POSITIVE = {
     "pony": "score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up, source_anime",
     "noobai": "masterpiece, best quality, newest, absurdres, highres, safe",
     "vpred": "masterpiece, best quality, newest, absurdres, highres, safe",
+    "zimage": "",
 }
 NOOB_POSITIVE = POSITIVE["noobai"]
 BUILTIN = {"sdxl": "sdxl.json", "illustrious": "illustrious.json", "pony": "pony.json",
-           "noobai": "noobai_eps.json", "vpred": "noobai_vpred.json"}
+           "noobai": "noobai_eps.json", "vpred": "noobai_vpred.json", "zimage": ""}   # zimage: made in code
 BUILTIN_NOTE = {
     "sdxl": "SDXL 1.0: no quality words, negative 'worst quality, low quality, blurry', DPM++ 2M Karras, CFG 7, "
             "28 steps",
@@ -56,12 +57,15 @@ BUILTIN_NOTE = {
     "noobai": "NoobAI-XL EPS: its words in front, its negative prompt, Euler a, CFG 5.5, 28 steps",
     "vpred": "NoobAI-XL V-pred: its words in front, its negative prompt, Euler, CFG 5, 28 steps, v-prediction with "
              "zero terminal SNR",
+    "zimage": "Z-Image Turbo: the Turbo model (int8 / fp8 when ComfyUI has one), Qwen3 4B, the FLUX AE, res_multistep, "
+              "CFG 1, 8 steps, shift 3, no negative prompt (CFG 1 ignores it). A Z-Image Base LoRA is tested on Turbo too",
 }
-TYPE_OF = {"sdxl": "sdxl", "illustrious": "illustrious", "pony": "", "noobai": "noobai", "vpred": "noobai_vpred"}
+TYPE_OF = {"sdxl": "sdxl", "illustrious": "illustrious", "pony": "", "noobai": "noobai", "vpred": "noobai_vpred",
+           "zimage": "zimage"}
 FAMILIES = {"sdxl": "SDXL", "illustrious": "Illustrious", "pony": "Pony", "noobai": "NoobAI-XL EPS",
-            "vpred": "NoobAI-XL V-pred", "anima": "Anima"}
+            "vpred": "NoobAI-XL V-pred", "anima": "Anima", "zimage": "Z-Image"}
 FAMILY_OF = {"illustrious": "illustrious", "sdxl": "sdxl", "pony": "pony", "noobai_vpred": "vpred", "noobai": "noobai",
-             "anima": "anima"}
+             "anima": "anima", "zimage": "zimage"}      # zimagebase starts with zimage: Base LoRAs are tested on Turbo
 # a family without a workflow of its own uses this one's (before 1.171126d SDXL, Illustrious, Pony and NoobAI shared one)
 FALLBACK = {"illustrious": "sdxl", "pony": "sdxl"}
 # NoobAI has no fallback: its model and its advice differ too much; without a workflow of its own LoRA Studio's is set
@@ -106,7 +110,7 @@ def workflow(cfg: dict, fam: str | None) -> tuple[dict | None, str]:
     fams = cfg.get("families") or {}
     if fam and fams.get(fam):
         return fams[fam], fam
-    if fam in ("noobai", "vpred"):
+    if fam in ("noobai", "vpred", "zimage"):
         try:
             wf, _ = use_builtin(fam)
             return wf, fam
@@ -192,17 +196,20 @@ def read_workflow(d: dict) -> dict:
             links[ln[0]] = ln                               # [id, from node, from slot, to node, to slot, type]
     out = {"kind": "", "ckpt": "", "unet": "", "clip": "", "clip_type": "stable_diffusion", "vae": "", "clip_skip": 0,
            "steps": 20, "cfg": 6.0, "sampler": "euler", "scheduler": "normal", "width": 1024, "height": 1024,
-           "negative": "", "fixed": "", "vpred": False, "zsnr": False}
+           "negative": "", "fixed": "", "vpred": False, "zsnr": False, "shift": 0.0,
+           "unet_node": "UNETLoader", "clip_node": "CLIPLoader"}
     for n in nodes.values():
         t, w = n.get("type", ""), _named(n)
         if n.get("mode") in (2, 4):                         # muted / bypassed
             continue
         if "ckpt_name" in w and not out["ckpt"]:
             out["ckpt"] = w["ckpt_name"]
-        if "unet_name" in w and not out["unet"]:
-            out["unet"] = w["unet_name"]
-        if t in ("CLIPLoader",) and w.get("clip_name"):
-            out["clip"], out["clip_type"] = w["clip_name"], w.get("type") or "stable_diffusion"
+        if "unet_name" in w and not out["unet"]:              # UNETLoader, or a GGUF loader (ComfyUI-GGUF)
+            out["unet"], out["unet_node"] = w["unet_name"], t or "UNETLoader"
+        if t in ("CLIPLoader", "CLIPLoaderGGUF") and w.get("clip_name"):
+            out["clip"], out["clip_type"], out["clip_node"] = w["clip_name"], w.get("type") or "stable_diffusion", t
+        if t in ("ModelSamplingAuraFlow", "ModelSamplingSD3") and w.get("shift") not in (None, ""):
+            out["shift"] = float(w["shift"])
         if t == "VAELoader" and w.get("vae_name"):
             out["vae"] = w["vae_name"]
         if t == "ModelSamplingDiscrete" and str(w.get("sampling") or "").startswith("v_pred"):
@@ -267,7 +274,50 @@ def import_workflow(fam: str, path) -> tuple[dict, str]:
                 + (f", text encoder `{wf['clip']}`, VAE `{wf['vae']}`" if wf["kind"] == "unet" else "") + ".")
 
 
+def _pick(names: list[str], must: tuple, prefer: tuple) -> str:
+    """The first name containing all of must (letters and digits only), the preferred kinds first."""
+    ok = [n for n in names if all(m in _key(n) for m in must)]
+    for p in prefer:
+        hit = next((n for n in ok if p in _key(n)), "")
+        if hit:
+            return hit
+    return ok[0] if ok else ""
+
+
+def zimage_builtin() -> tuple[dict, str]:
+    """LoRA Studio's Z-Image Turbo test workflow, made from the files ComfyUI has: the Turbo model (int8 / fp8 first:
+    the same pictures in half the memory), Qwen3 4B (fp8 first), the FLUX AE; res_multistep, simple, 8 steps, CFG 1,
+    shift 3 (the Comfy-Org example workflow)."""
+    url = settings()["url"]
+    unets, clips, vaes = (model_names(url, k) for k in ("unet", "clip", "vae"))
+    unet = _pick(unets, ("zimage", "turbo"), ("int8", "fp8", "bf16")) or "z_image_turbo_bf16.safetensors"
+    clip = _pick(clips, ("qwen", "34b"), ("fp8", "")) or _pick(clips, ("qwen3", "4b"), ("fp8", "")) \
+        or "qwen_3_4b.safetensors"
+    vae = next((v for v in vaes if Path(v).name.lower() in ("ae.safetensors", "flux_ae.safetensors")), "") \
+        or _pick(vaes, ("flux", "ae"), ("",)) or "ae.safetensors"
+    wf = {"kind": "unet", "ckpt": "", "unet": unet, "unet_node": "UNETLoader", "clip": clip, "clip_node": "CLIPLoader",
+          "clip_type": "lumina2", "vae": vae, "clip_skip": 0, "steps": 8, "cfg": 1.0, "sampler": "res_multistep",
+          "scheduler": "simple", "width": 832, "height": 1216, "negative": "", "fixed": "", "vpred": False,
+          "zsnr": False, "shift": 3.0}
+    found = bool(unets)
+    if found:                                            # kept only when made from ComfyUI's own files
+        s = settings()
+        s["families"]["zimage"] = wf
+        s["fixed"]["zimage"] = ""
+        save_settings(families=s["families"], fixed=s["fixed"])
+    if not found:
+        return wf, ("❌ ComfyUI did not list its models (is it running?). Start it and press the button again: the "
+                    "workflow is made from the files your ComfyUI has.")
+    return wf, f"✔ Z-Image Turbo workflow set: `{unet}`, `{clip}`, `{vae}`."
+
+
 def use_builtin(fam: str) -> tuple[dict, str]:
+    if fam == "zimage":
+        return zimage_builtin()
+    return _use_file(fam)
+
+
+def _use_file(fam: str) -> tuple[dict, str]:
     """LoRA Studio's own NoobAI workflow for a family (NoobAI's advice: prompt words, negative prompt, sampler, CFG; V-pred
     with Model Sampling Discrete v_prediction + zsnr), with the checkpoint of the LoRA type from Settings › Training
     when one is set there (only its file name: ComfyUI knows its models by name)."""
@@ -327,9 +377,10 @@ LOADERS = {"ckpt": ("CheckpointLoaderSimple", "ckpt_name"), "unet": ("UNETLoader
            "vae": ("VAELoader", "vae_name"), "clip": ("CLIPLoader", "clip_name")}
 
 
-def model_names(url, what: str = "ckpt") -> list[str]:
-    """The file names ComfyUI offers for a loader (with their subfolders, e.g. Anima/furry/x.safetensors)."""
-    node, inp = LOADERS[what]
+def model_names(url, what: str = "ckpt", node: str = "") -> list[str]:
+    """The file names ComfyUI offers for a loader (with their subfolders, e.g. Anima/furry/x.safetensors); node: the
+    workflow's own loader (a GGUF one) instead of the usual."""
+    node, inp = node or LOADERS[what][0], LOADERS[what][1]
     try:
         d = json.loads(_req(url, f"/object_info/{node}", timeout=20))
         return list(d[node]["input"]["required"][inp][0])
@@ -369,7 +420,7 @@ def check_models(wf: dict, url: str) -> tuple[dict, list[str]]:
         want = wf.get(k) or ""
         if not want:
             continue
-        names = model_names(url, k)
+        names = model_names(url, k, wf.get(f"{k}_node") or "")
         if not names:                                    # this ComfyUI does not list them: leave it to ComfyUI
             continue
         got = match_name(want, names)
@@ -384,9 +435,11 @@ def graph(wf: dict, lora_name: str, positive: str, seed: int, prefix: str) -> di
     """The small API graph: ComfyUI's own nodes only."""
     g = {}
     if wf["kind"] == "unet":
-        g["1"] = {"class_type": "UNETLoader", "inputs": {"unet_name": wf["unet"], "weight_dtype": "default"}}
-        g["2"] = {"class_type": "CLIPLoader", "inputs": {"clip_name": wf["clip"], "type": wf.get("clip_type") or
-                                                         "stable_diffusion"}}
+        un, cn = wf.get("unet_node") or "UNETLoader", wf.get("clip_node") or "CLIPLoader"
+        g["1"] = {"class_type": un, "inputs": {"unet_name": wf["unet"],
+                                               **({"weight_dtype": "default"} if un == "UNETLoader" else {})}}
+        g["2"] = {"class_type": cn, "inputs": {"clip_name": wf["clip"], "type": wf.get("clip_type") or
+                                               "stable_diffusion"}}
         g["3"] = {"class_type": "VAELoader", "inputs": {"vae_name": wf["vae"]}}
         model, clip, vae = ["1", 0], ["2", 0], ["3", 0]
     else:
@@ -395,6 +448,9 @@ def graph(wf: dict, lora_name: str, positive: str, seed: int, prefix: str) -> di
         if wf.get("vae"):
             g["3"] = {"class_type": "VAELoader", "inputs": {"vae_name": wf["vae"]}}
             vae = ["3", 0]
+    if wf.get("shift"):                                 # flow models (Z-Image, Anima …): the workflow's own shift
+        g["1s"] = {"class_type": "ModelSamplingAuraFlow", "inputs": {"model": model, "shift": float(wf["shift"])}}
+        model = ["1s", 0]
     if wf.get("vpred"):                                 # a v-prediction model (NoobAI-XL V-pred): tell the sampler
         g["2v"] = {"class_type": "ModelSamplingDiscrete", "inputs": {"model": model, "sampling": "v_prediction",
                                                                      "zsnr": bool(wf.get("zsnr", True))}}

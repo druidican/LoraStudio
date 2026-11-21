@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.211126"
-VERSION = "1.211126"
+__version__ = "1.211126b"
+VERSION = "1.211126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.191126h",
-    "version.py": "1.211126",
+    "version.py": "1.211126b",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.201126c",
     "program/Training/sd_script.py": "1.201126c",
@@ -30,7 +30,7 @@ RELEASE: dict = {
     "program/Training/training_ui.py": "1.201126e",
     "program/Settings/settings_ui.py": "1.201126e",
     "program/Gallery/lora_library.py": "1.201126c",
-    "program/Training/comfytest.py": "1.211126",
+    "program/Training/comfytest.py": "1.211126b",
     "program/Training/speedtest.py": "1.191126i",
     "program/Training/speedjobs.py": "1.191126i",
     "program/Training/comfyupscale.py": "1.101126",
@@ -73,7 +73,7 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.201126e",
     "program/UI/lora_page.py": "1.201126e",
     "program/UI/pg_settings.py": "1.201126e",
-    "program/UI/set_panels.py": "1.191126i",
+    "program/UI/set_panels.py": "1.211126b",
     "program/Gallery/lorapage.py": "1.191126f",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -90,7 +90,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.201126e",
-    "selftest.py": "1.211126",
+    "selftest.py": "1.211126b",
     "program/Settings/machinecheck.py": "1.131126c",
     "program/Settings/selfupdate.py": "1.201126e",
     "program/Training/failcodes.py": "1.131126b",
@@ -100,14 +100,15 @@ RELEASE: dict = {
     "program/Settings/venvcheck.py": "1.191126g",
     "program/Settings/features.py": "1.151126h",
     "program/Other/studio_css.py": "1.011126",
-    "program/Training/Lora_Datatypes.py": "1.201126",
-    "program/Training/Training_Recommendations.py": "1.201126d",
+    "program/Training/Lora_Datatypes.py": "1.211126b",
+    "program/Training/Training_Recommendations.py": "1.211126b",
     "program/Other/lora_studio.css": "1.201126f",
     "install.sh": "1.191126g",
     "start.sh": "1.131126c",
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.211126b", "Z-Image: Turbo and Base grouped as Z-Image › Turbo / › Base. Turbo's first recommended set (to test): flow shift 3.0 for characters and concepts, 2.0 for styles. Test pictures for Z-Image LoRAs (also Base, tested on Turbo): Settings › Test pictures › Z-Image › Use LoRA Studio's workflow picks the Turbo model (int8 / fp8 first), Qwen3 4B and the FLUX AE from your ComfyUI; res_multistep, CFG 1, 8 steps, shift 3. Workflows with GGUF loaders and a model shift are kept."),
     ("1.211126", "Test pictures: a model file renamed or moved in ComfyUI after the workflow was read is found again (same name in another subfolder, or written differently, e.g. novaFurryAM_v30 / NovaFurryAMV30) and remembered; a file that is really gone stops with its name instead of ComfyUI's 'Value not in list'."),
     ("1.201126f", "Step 5: Your pictures made with this LoRA (every purpose). Your ComfyUI pictures made with the dataset's LoRA alone are shown; tick which ones Ollama scans (usable or not, and what each shows), then which ones are copied into the dataset (pinned always keep)."),
     ("1.201126e", "Left menu: every tab has its own menu on the left (foldable to icons). Datasets: search, filters, the datasets as tiles, and an open dataset's steps with their state plus Train, Results and LoRA. Collection: search, Pictures / Status / Insights / Maintenance, the filters and the parts of an open LoRA page. Settings: the groups with a search. Queue: counts and Start. Home: the cards and where you left off. The step bar, part bar and tab bars under the top tabs are gone. Improvements is removed completely (Datasets › Improvements, Fix the ticked datasets and its choices, the Only with warnings filter, and its lines in Home's Needs a look)."),

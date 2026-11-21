@@ -24,13 +24,13 @@ Run it on its own to print the table:  python Training_Recommendations.py
 """
 
 from __future__ import annotations
-__version__ = "1.201126d"  # LoRA Studio version, see version.py
+__version__ = "1.211126b"  # LoRA Studio version, see version.py
 
 import os
 import re
 
-VERSION = "1.2"
-UPDATED = "2026-11-09"
+VERSION = "1.3"
+UPDATED = "2026-11-21"
 HARDWARE = "AMD Radeon RX 9070 XT, 16 GB VRAM, ROCm (PyTorch 2.13 + ROCm 10), 32 GB RAM"
 
 SOURCES = [
@@ -130,19 +130,23 @@ RECS = {
 RECS["zimage"] = {
     # Z-Image Turbo through musubi-tuner + the ostris training adapter. 6B model, so a lower LR than the tiny-rank
     # defaults of the SDXL family is not needed; 1e-4 at rank 16 with AdamW is the usual starting point.
-    "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32,
+    # v1.3 (untested, a first set to try): characters and concepts train at flow shift 3.0, styles at 2.0; save points
+    # every 2 epochs get test pictures (Z-Image Turbo workflow), so the best one can be picked.
+    "character": dict(views=50, steps_min=1600, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32, shift=3.0,
                       notes=["Z-Image Turbo needs the training adapter (--base_weights); the finished LoRA is used WITHOUT it.",
-                             "Weak likeness at the last epoch? Try Discrete flow shift 3.0 (More settings) instead of 2.0: a "
-                             "higher shift spends more of the training on the large shapes, where a face and its proportions "
-                             "are learned; 2.0 favours fine texture.",
+                             "Discrete flow shift 3.0 (2.0 before v1.3): a higher shift spends more of the training on the "
+                             "large shapes, where a face, its proportions and the build are learned; 2.0 favours fine "
+                             "texture. Blurry fine detail at the best save point? Try 2.0 (More settings).",
                              "Turbo is a distilled model, so LoRAs trained on it have a ceiling. For the best likeness, train "
                              "on Z-Image Base (its own LoRA type) and use the LoRA on Turbo.",
                              "Captions: short natural sentences starting with the trigger word (Qwen3 reads them); leave out "
                              "the face, hair colour, freckles and tattoos so the trigger word learns them.",
                              "Raised in v1.1 from rank 16 / 1200-2200 steps / 768 px: that gave weak likeness for a real person."]),
-    "style": dict(views=30, steps_min=1500, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32,
-                  notes=["Styles want more rank than characters; describe what is IN each picture, not the style."]),
-    "concept": dict(views=40, steps_min=1200, steps_max=2200, epochs=10, lr="1e-4", dim=16, alpha=16, notes=[]),
+    "style": dict(views=30, steps_min=1500, steps_max=3000, epochs=10, lr="1e-4", dim=32, alpha=32, shift=2.0,
+                  notes=["Styles want more rank than characters; describe what is IN each picture, not the style.",
+                         "Flow shift 2.0: a style lives in texture and brush work, the fine detail."]),
+    "concept": dict(views=40, steps_min=1200, steps_max=2200, epochs=10, lr="1e-4", dim=16, alpha=16, shift=3.0,
+                    notes=["Flow shift 3.0: a concept is mostly shape and layout."]),
 }
 RECS["zimagebase"] = {
     # Z-Image Base through musubi-tuner (docs/zimage.md: shift 2.0, LR 1e-4, rank 32), no training adapter.
@@ -278,6 +282,9 @@ def apply(tkey: str, cfg: dict, purpose: str = "character", priority: str = "bal
     if tested:
         out["batch"] = min(int(tested["batch"]), int(out.get("max_batch", tested["batch"])))
         notes.append(f"Batch size {out['batch']}, as in your tested setup.")
+    if r.get("shift"):                                  # flow models: where in the noise the training spends its time
+        flags = _sub(flags, r"--discrete_flow_shift[ =]\S+", f"--discrete_flow_shift {r['shift']}")
+        notes.append(f"Discrete flow shift {r['shift']}.")
     if "noise_offset" in r:
         flags = _sub(flags, r"--noise_offset[ =]\S+", f"--noise_offset {r['noise_offset']}")
 

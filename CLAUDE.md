@@ -134,9 +134,14 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   the sort finds the item with OWLv2 (`pictools.find_items`, kind words), Select adds `closeup_*.png` where it is
   small (`dsflow.add_closeups`), *Weight per kind* links the pictures into `.lsflow/kinds_view/<rep×w>_<kind>` in the
   launch script (`dsflow.kinds_block`, plan counts `n_eff`).
-- **Test-picture workflows** per family (`comfytest.FAMILIES`: sdxl, illustrious, pony, noobai, vpred, anima;
+- **Test-picture workflows** per family (`comfytest.FAMILIES`: sdxl, illustrious, pony, noobai, vpred, anima, zimage;
   Illustrious/Pony fall back to the SDXL one; built-ins in `Training/workflows/`, written by `tools/make_workflows.py`).
   NoobAI-XL types `noobai` (EPS) and `noobai_vpred`. The caption consistency check was removed (1.151126h).
+  Z-Image (1.211126b): `zimage_builtin` builds the workflow in code from ComfyUI's own lists (Turbo int8/fp8 first,
+  Qwen3 4B, ae; res_multistep, CFG 1, 8 steps, shift 3), Base LoRAs (`zimagebase`) are tested on Turbo. Workflows keep
+  their loader nodes (`unet_node` / `clip_node`, GGUF) and shift (`ModelSamplingAuraFlow`). `check_models` finds
+  renamed or moved model files (1.211126). Turbo recs v1.3: `shift` per purpose (3.0 character/concept, 2.0 style),
+  untested; the owner tries a test LoRA.
 - **The look of the result** (`Data/lean.py`, 1.191126e): the sort asks Ollama the kind of each picture (photo,
   drawing, 3D, painting → `.lsflow/medium.json`); training adds words for that kind behind every caption
   (`--caption_suffix`, musubi `CAPTION_SUF`; Pony photos lose `source_anime`); per LoRA type a lean (step 7 card, step 9
