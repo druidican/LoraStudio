@@ -3,7 +3,7 @@
 saving and the queue. The script logic is sd_script.py (cs_* return what changed as a dict); the plan and the
 settings table are datasets_ui (calc, apply_settings, SETTINGS)."""
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 from pathlib import Path
 
@@ -70,7 +70,7 @@ class Train:
             self.busy = False
 
     def args(self):
-        return (self.w_steps.value or 0, self.w_userep.value, self.w_hf.value, False)
+        return (self.w_steps.value or 0, self.w_userep.value, False)
 
     def load(self):
         self.apply(S.cs_ds_change(self.ds, self.tkey, *self.args()))
@@ -316,7 +316,6 @@ class Train:
                 self.w_steps = ui.number("Target total steps (0 = recommended for the type)", value=0, precision=0) \
                     .props("outlined dense").classes("w-72")
                 self.w_userep = ui.checkbox("Plan with the recommended repeat count", value=True)
-                self.w_hf = ui.checkbox("Fill HF_TOKEN from the token file", value=True)
             self.w_steps.on("keydown.enter", lambda: self.apply(S.cs_retype(self.ds, self.script, self.tkey, self.text,
                                                                             *self.args())))
             ui.markdown(S.recs_status()).classes("ls-note")
@@ -333,8 +332,6 @@ class Train:
             with ui.row().classes("gap-2"):
                 ui.button("Use model files from Settings", on_click=lambda: self.apply(S.cs_use_settings(
                     self.ds, self.tkey, self.script, self.text, self.plan))).props("outline dense no-caps")
-                ui.button("Fill HF_TOKEN in the script text", on_click=lambda: self.apply(S.cs_fill_hf(
-                    self.text, self.plan))).props("outline dense no-caps")
             self.w_mk = ui.checkbox("Create missing folders when saving: the repeat folder (<N>_<name>), model and log. "
                                     "Images lying directly in the dataset folder are moved into a new repeat folder.",
                                     value=True)

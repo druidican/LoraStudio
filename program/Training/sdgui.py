@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
@@ -640,7 +640,8 @@ def _drop_arg(body: str, name: str) -> tuple[str, bool]:
 
 def fix_flags(body: str) -> tuple[str, list]:
     """Options that make sd-scripts fail, taken out: sampling without --sample_prompts (it crashes at the first
-    sample). --clip_skip stays (owner's tested Illustrious script carries --clip_skip 2). Returns (body, notes)."""
+    sample). --clip_skip stays (owner's tested Illustrious script carries --clip_skip 2). A Hugging Face token in the
+    script is replaced by the lines that read it when the script runs (scrub_hf). Returns (body, notes)."""
     notes = []
     if not re.search(r"(?<![\w-])--sample_prompts(?![\w-])", body):
         gone = [f for f in _SAMPLE_FLAGS if _drop_arg(body, f)[1]]
@@ -648,6 +649,9 @@ def fix_flags(body: str) -> tuple[str, list]:
             body = _drop_arg(body, f)[0]
         if gone:
             notes.append("removed " + ", ".join("--" + f for f in gone) + " (no --sample_prompts: sd-scripts would stop at the first sample)")
+    body, had = scrub_hf(body)                         # the token is passed when the script runs, never stored in it
+    if had:
+        notes.append("took the Hugging Face token out of the script (it is passed when the script runs)")
     return body, notes
 
 
@@ -723,6 +727,9 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
     venv_bin = str(Path(sys.executable).parent)   # keep the GUI's venv out of the script's PATH
     env["PATH"] = os.pathsep.join(p for p in env.get("PATH", "").split(os.pathsep) if p != venv_bin)
     env.pop("VIRTUAL_ENV", None)
+    tok = read_hf_token()
+    if tok:                                         # scripts read HF_TOKEN from here; it is never written into them
+        env["HF_TOKEN"] = tok
 
     run = Run()
     run.name = src.name
@@ -1789,7 +1796,6 @@ from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other
     SECTION_NAMES,
     _type_base,
     apply_gfx_env,
-    cs_fill_hf,
     cs_set_epochs,
     cs_use_settings,
     detect_gfx,
@@ -1797,7 +1803,8 @@ from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other
     env_saved,
     vendor_env,
     env_update_scripts,
-    fill_hf,
+    scrub_all_scripts,
+    scrub_hf,
     get_export,
     get_gfx,
     gfx_load,

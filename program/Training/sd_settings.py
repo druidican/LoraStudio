@@ -5,7 +5,7 @@ and the GPU / GFX values.
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.171126"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 import glob
 import math
@@ -74,30 +74,55 @@ def set_export(text: str, name: str, value: str) -> str:
     return "\n".join(lines)
 
 
-def fill_hf(text: str, force: bool):
-    """Write the token from huggingtoken.txt into `export HF_TOKEN=...`.
-    force=False only fills an empty value. Returns (text, changed)."""
-    tok = read_hf_token()
-    if not tok or not re.fullmatch(r"[\w.\-]+", tok):
-        return text, False
-    cur = get_export(text, "HF_TOKEN")
-    if cur == tok or (cur and not force):
-        return text, False
-    return set_export(text, "HF_TOKEN", tok), True
+def token_block() -> str:
+    """The lines a launch script gets instead of the token: LoRA Studio passes HF_TOKEN when it runs the script; in a
+    terminal it is read from the token file. The token itself is never written into a script (they sit in synced
+    dataset folders)."""
+    f = str(hf_path()).replace("'", "'\\''")
+    return ("# Hugging Face token: never stored here. LoRA Studio passes it when it runs this script; in a terminal\n"
+            "# it is read from LoRA Studio's token file.\n"
+            f"[ -n \"${{HF_TOKEN:-}}\" ] || HF_TOKEN=\"$(grep -v '^[[:space:]]*#' '{f}' 2>/dev/null | grep -m1 . | tr -d \"[:space:]\\\"'\" || true)\"\n"
+            "export HF_TOKEN")
 
 
-def cs_fill_hf(text, plan):
-    tok = read_hf_token()
-    if not tok:
-        notify.warning(f"No token found in {hf_path()}.")
-        return S._cs_result(status=f"No token found in `{hf_path()}`.", plan=plan)
-    if not re.fullmatch(r"[\w.\-]+", tok):
-        notify.warning("The token contains unusual characters; not written into the script.")
-        return S._cs_result(status="The token contains unusual characters, so it was not written into the script.", plan=plan)
-    new, changed = fill_hf(text or "", force=True)
-    return S._cs_result(text=new, plan=plan,
-                      status="`HF_TOKEN` set in the script text (not saved yet)." if changed
-                      else "`HF_TOKEN` already matches huggingtoken.txt.")
+_HF_OLD = re.compile(r"^# Hugging Face token \(fill in if needed\)\n", re.M)
+_HF_SET = re.compile(r"^export\s+HF_TOKEN=.*$", re.M)
+
+
+def scrub_hf(text: str) -> tuple[str, bool]:
+    """`export HF_TOKEN="…"` (with or without a token) → token_block(). Returns (text, a token was taken out)."""
+    had = bool(get_export(text, "HF_TOKEN"))
+    if not _HF_SET.search(text):
+        return text, False
+    text = _HF_OLD.sub("", text)
+    first = [True]
+
+    def one(_m):
+        if first[0]:
+            first[0] = False
+            return token_block()
+        return ""
+    return _HF_SET.sub(one, text), had
+
+
+def scrub_all_scripts() -> int:
+    """Takes the token out of every saved launch script of every dataset (also archived and compare ones). Returns
+    how many scripts held one."""
+    n = 0
+    for ds in S.list_lora_dirs():
+        root = S.lora_path(ds)
+        for f in list(root.glob("*.sh")) + list(root.glob("*/*.sh")) + list(root.glob("*/*/*.sh")):
+            try:
+                t = f.read_text(encoding="utf-8", errors="ignore")
+                if "HF_TOKEN=" not in t:
+                    continue
+                new, had = scrub_hf(t)
+                if new != t:
+                    f.write_text(new, encoding="utf-8")
+                    n += had
+            except OSError:
+                continue
+    return n
 
 
 # --------------------------------------------------------------------------- repeat folders (rename)

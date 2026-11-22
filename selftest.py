@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.211126c"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -487,6 +487,21 @@ def _comfy_names():
     need(CT.match_name("anima-base-v1.0.safetensors", names) == names[0], "moved file not found")
     need(CT.match_name("gone.safetensors", names) == "", "a missing file was matched")
     return "renamed, moved and missing files"
+
+
+@check("no Hugging Face token in launch scripts; Z-Image Turbo strength 1.3")
+def _token_strength():
+    import sdgui as G
+    import comfytest as CT
+    old = '#!/bin/bash\n# Hugging Face token (fill in if needed)\nexport HF_TOKEN="hf_secret123"\necho x\n'
+    new, had = G.scrub_hf(old)
+    need(had and "hf_secret123" not in new and 'export HF_TOKEN\n' in new, "token not taken out")
+    need(G.scrub_hf(new) == (new, False), "not the same on a second pass")
+    need("hf_secret" not in G.fix_flags(old)[0], "fix_flags keeps the token")
+    g = CT.graph({"kind": "ckpt", "ckpt": "m", "steps": 8, "cfg": 1, "sampler": "euler", "scheduler": "simple",
+                  "width": 64, "height": 64, "lora_strength": CT.lora_strength("zimage")}, "x", "p", 1, "t")
+    need(g["5"]["inputs"]["strength_model"] == 1.3 and CT.lora_strength("sdxl") == 1.0, "strength")
+    return "token read at run time, strength 1.3"
 
 
 @check("musubi scripts check the model files first (ComfyUI int8/fp8, Qwen3-VL)")

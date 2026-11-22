@@ -165,7 +165,7 @@ sudo systemctl daemon-reload && sudo systemctl restart ollama
 Without it Ollama answers them one after the other, as fast as before.
 
 **Hugging Face token**: for gated models and the downloads above (a *Read* token is enough). It is kept readable only
-by you, written into launch scripts that download models, and masked in the run log.
+by you and masked in the run log. It is never written into a launch script (they sit in your dataset folders, which may be synced): LoRA Studio passes it when it runs a script, and a script run in a terminal reads it from the token file. Scripts from before 1.221126 that held it are cleaned when the program starts.
 
 ## Test pictures (ComfyUI)
 
@@ -173,7 +173,8 @@ by you, written into launch scripts that download models, and masked in the run 
 
 The ComfyUI address (*Test* checks it) and your LoRA folder as ComfyUI sees it. Import your own ComfyUI workflow per
 model family once (Workflow › Save in ComfyUI): SDXL, Illustrious, Pony, NoobAI-XL EPS, NoobAI-XL V-pred, Anima and
-Z-Image each have their own (a GGUF loader in your workflow is kept). A family without one uses your SDXL workflow (and its fixed tags), as before. **Use LoRA
+Z-Image each have their own (a GGUF loader in your workflow is kept). Z-Image Turbo LoRAs are tested at strength 1.3: trained with the training adapter, which is not in the
+finished file, they come through weaker at 1.0 (the LoRA page's *How to use it* says so too). A family without one uses your SDXL workflow (and its fixed tags), as before. **Use LoRA
 Studio's workflow** sets one up with the model card's advice, at 832×1216, with the checkpoint set for that LoRA
 type in Settings › Training:
 

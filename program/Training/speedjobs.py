@@ -13,7 +13,7 @@
 Nothing runs while a training run is active, and the training queue does not start while a speed test runs.
 """
 from __future__ import annotations
-__version__ = "1.191126i"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 import json
 import shlex
@@ -140,7 +140,7 @@ def make_dataset() -> Path:
 def make_script(tkey: str) -> Path:
     import sd_script as SS
     ds = make_dataset()
-    plan = SS.make_plan(str(ds), tkey, hf=True, samples=False)
+    plan = SS.make_plan(str(ds), tkey, samples=False)
     p = ds / f"lsspeedtest_{tkey}.sh"
     p.write_text(plan["script_text"], encoding="utf-8")
     p.chmod(0o755)

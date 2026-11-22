@@ -14,25 +14,25 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.211126c"
-VERSION = "1.211126c"
+__version__ = "1.221126"
+VERSION = "1.221126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.191126h",
-    "version.py": "1.211126c",
+    "lora_studio.py": "1.221126",
+    "version.py": "1.221126",
     "program/lspaths.py": "1.201126e",
-    "program/Training/sdgui.py": "1.201126c",
-    "program/Training/sd_script.py": "1.201126c",
+    "program/Training/sdgui.py": "1.221126",
+    "program/Training/sd_script.py": "1.221126",
     "program/Data/sd_prepare.py": "1.201126e",
-    "program/Training/sd_settings.py": "1.171126",
+    "program/Training/sd_settings.py": "1.221126",
     "program/Data/datasets_ui.py": "1.201126e",
     "program/Data/dsflow.py": "1.201126e",
     "program/Training/training_ui.py": "1.201126e",
     "program/Settings/settings_ui.py": "1.201126e",
     "program/Gallery/lora_library.py": "1.201126c",
-    "program/Training/comfytest.py": "1.211126b",
+    "program/Training/comfytest.py": "1.221126",
     "program/Training/speedtest.py": "1.191126i",
-    "program/Training/speedjobs.py": "1.191126i",
+    "program/Training/speedjobs.py": "1.221126",
     "program/Training/comfyupscale.py": "1.101126",
     "program/Training/comfyinpaint.py": "1.151126f",
     "program/Settings/scanner.py": "1.191126d",
@@ -57,7 +57,7 @@ RELEASE: dict = {
     "program/Data/housekeeping.py": "1.011126",
     "program/Gallery/completed.py": "1.131126b",
     "program/Gallery/model_guide.py": "1.191126d",
-    "program/Gallery/trainingcard.py": "1.191126f",
+    "program/Gallery/trainingcard.py": "1.221126",
     "program/Gallery/insights.py": "1.131126b",
     "program/UI/shell.py": "1.201126e",
     "program/UI/widgets.py": "1.191126h",
@@ -67,13 +67,13 @@ RELEASE: dict = {
     "program/UI/pg_home.py": "1.201126e",
     "program/UI/pg_datasets.py": "1.201126e",
     "program/UI/ds_steps.py": "1.201126f",
-    "program/UI/ds_train.py": "1.201126c",
+    "program/UI/ds_train.py": "1.221126",
     "program/UI/ds_results.py": "1.201126c",
     "program/UI/pg_queue.py": "1.201126e",
     "program/UI/pg_collection.py": "1.201126e",
     "program/UI/lora_page.py": "1.201126e",
     "program/UI/pg_settings.py": "1.201126e",
-    "program/UI/set_panels.py": "1.211126b",
+    "program/UI/set_panels.py": "1.221126",
     "program/Gallery/lorapage.py": "1.191126f",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -90,8 +90,8 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.201126e",
-    "selftest.py": "1.211126c",
-    "program/Settings/machinecheck.py": "1.131126c",
+    "selftest.py": "1.221126",
+    "program/Settings/machinecheck.py": "1.221126",
     "program/Settings/selfupdate.py": "1.201126e",
     "program/Training/failcodes.py": "1.131126b",
     "program/Other/report.py": "1.131126c",
@@ -108,6 +108,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.221126", "The Hugging Face token is never written into a launch script any more: LoRA Studio passes it when it runs a script, a script run in a terminal reads it from the token file, and scripts that held it are cleaned at start (and when saved or run). Z-Image Turbo LoRAs: test pictures at strength 1.3, and the LoRA page's How to use it says so."),
     ("1.211126c", "musubi types (Z-Image, Qwen-Image, FLUX.2): stage 1 Check files reads the model files' headers and stops at once with a plain message for a ComfyUI int8 / fp8 file (musubi trains only on the full bf16 file) or a Qwen3-VL text encoder (Z-Image needs plain Qwen3 4B), instead of failing after caching."),
     ("1.211126b", "Z-Image: Turbo and Base grouped as Z-Image › Turbo / › Base. Turbo's first recommended set (to test): flow shift 3.0 for characters and concepts, 2.0 for styles. Test pictures for Z-Image LoRAs (also Base, tested on Turbo): Settings › Test pictures › Z-Image › Use LoRA Studio's workflow picks the Turbo model (int8 / fp8 first), Qwen3 4B and the FLUX AE from your ComfyUI; res_multistep, CFG 1, 8 steps, shift 3. Workflows with GGUF loaders and a model shift are kept."),
     ("1.211126", "Test pictures: a model file renamed or moved in ComfyUI after the workflow was read is found again (same name in another subfolder, or written differently, e.g. novaFurryAM_v30 / NovaFurryAMV30) and remembered; a file that is really gone stops with its name instead of ComfyUI's 'Value not in list'."),

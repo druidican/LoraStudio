@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.211126b"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -120,6 +120,18 @@ def workflow(cfg: dict, fam: str | None) -> tuple[dict | None, str]:
     if fb and fams.get(fb):
         return fams[fb], fb
     return None, fam or ""
+
+
+# The LoRA strength of the test pictures (and the LoRA page's "How to use it") per LoRA type: a Turbo LoRA is trained
+# with the training adapter, which is not in the finished file, so it comes through weaker (owner 2026-11-22: 1.0 was
+# 40 % there, 1.3 about 90 %).
+STRENGTH = {"zimage": 1.3}
+STRENGTH_WHY = {"zimage": "a Z-Image Turbo LoRA comes through weaker at 1.0 (it was trained with the training adapter, "
+                          "which is not in the finished file)."}
+
+
+def lora_strength(tkey: str) -> float:
+    return STRENGTH.get((tkey or "").lower(), 1.0)
 
 
 def family(tkey: str) -> str | None:
@@ -459,7 +471,8 @@ def graph(wf: dict, lora_name: str, positive: str, seed: int, prefix: str) -> di
         g["4"] = {"class_type": "CLIPSetLastLayer", "inputs": {"clip": clip, "stop_at_clip_layer": int(wf["clip_skip"])}}
         clip = ["4", 0]
     g["5"] = {"class_type": "LoraLoader", "inputs": {"model": model, "clip": clip, "lora_name": lora_name,
-                                                     "strength_model": 1.0, "strength_clip": 1.0}}
+                                                     "strength_model": float(wf.get("lora_strength") or 1.0),
+                                                     "strength_clip": float(wf.get("lora_strength") or 1.0)}}
     g["6"] = {"class_type": "CLIPTextEncode", "inputs": {"clip": ["5", 1], "text": positive}}
     g["7"] = {"class_type": "CLIPTextEncode", "inputs": {"clip": ["5", 1], "text": wf.get("negative") or ""}}
     g["8"] = {"class_type": "EmptyLatentImage", "inputs": {"width": int(wf["width"]), "height": int(wf["height"]),
@@ -638,6 +651,7 @@ def prepare(dataset: str, tkey: str, type_label: str = "") -> tuple:
     url = cfg["url"]
     if not alive(url):
         raise RuntimeError(f"ComfyUI does not answer at {url}. Start it; the test pictures are made when it answers.")
+    wf = {**wf, "lora_strength": lora_strength(tkey)}
     fixed_wf, missing = check_models(wf, url)
     if missing:
         raise RuntimeError("ComfyUI does not have the model file(s) of your workflow any more: " + ", ".join(missing)

@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.211126b"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -796,8 +796,9 @@ def panel_ai(page):
     refresh()
     with card():
         ui.label("Hugging Face token").classes("font-semibold")
-        note(f"Kept in {S.hf_path()} (readable only by you) and written into export HF_TOKEN=\"...\" of launch scripts that "
-             "download models. The token is masked in the run log.")
+        note(f"Kept in {S.hf_path()} (readable only by you). It is never written into a launch script (they sit in "
+             "your dataset folders, which may be synced): LoRA Studio passes it when it runs a script, and a script run "
+             "in a terminal reads it from this file. The token is masked in the run log.")
         cur = ui.input("Current token", value=S.read_hf_token(), password=True, password_toggle_button=True) \
             .props("outlined dense readonly").classes("w-full")
         with ui.row().classes("w-full items-end gap-2"):

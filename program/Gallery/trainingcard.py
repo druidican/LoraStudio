@@ -18,7 +18,7 @@ model when empty and the clip skip (usage_tips; 1 when nothing says otherwise). 
 sync: LoRA Manager's when LoRA Studio has none, the dataset's trigger word when neither has any.
 """
 from __future__ import annotations
-__version__ = "1.191126f"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 import copy
 import json
@@ -28,7 +28,7 @@ import sys
 import time
 from pathlib import Path
 
-CARD_VERSION = 3                       # raise when the fields change: every card is filled again once
+CARD_VERSION = 4                       # raise when the fields change: every card is filled again once
 
 GROUPS = ("Dataset", "Schedule", "Network and optimizer", "Result")
 FIELDS = [   # (group, key, label)
@@ -376,6 +376,14 @@ def build(lib, lora) -> dict:
             c["look"] = lean.how_to_use(lean.look_of(text)).replace("`", '"')
         except Exception:                              # noqa: BLE001
             pass
+    try:                                               # the strength it wants (comfytest.STRENGTH: Z-Image Turbo 1.3)
+        import comfytest
+        w = comfytest.lora_strength(c.get("_tkey", ""))
+        if w != 1.0:
+            c["look"] = (f"Strength about {w:g}: {comfytest.STRENGTH_WHY.get(c['_tkey'], '')} "
+                         + c.get("look", "")).strip()
+    except Exception:                                  # noqa: BLE001
+        pass
     if script is not None:
         c["_script"] = str(script)
     return {k: v for k, v in c.items() if _ok(v)}

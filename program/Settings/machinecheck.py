@@ -12,7 +12,7 @@ The report is written to lorastudio_check_<time>.md in the program folder: no to
 no dataset names (only how many there are). Upload that file when something is not right.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -371,7 +371,7 @@ def tiny_training(R, G, usable, venv):
         ds = "lscheck"
         _pictures(tmp / ds / f"1_{ds}")
         G.IMAGES_DIR = tmp
-        p = G.make_plan(ds, tkey, hf=False, samples=False)
+        p = G.make_plan(ds, tkey, samples=False)
         text = p["script_text"]
         vals = G.read_form(text)
         names = [n for n, _ in G.FORM_FIELDS]

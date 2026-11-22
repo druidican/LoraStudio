@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.221126"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -775,7 +775,7 @@ def recs_status() -> str:
     return f"Recommendations: `{RECS_FILE}` v{recs.VERSION} ({recs.UPDATED})."
 
 
-def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
+def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, samples=True):
     sc, presets = merged_presets()
     if sc is None:
         raise FileNotFoundError("Lora_Datatypes.py could not be loaded: " + (PRESETS_ERROR["msg"] or "file not found"))
@@ -865,8 +865,7 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, hf=True, samples=True):
         print(f"[compare] {e}")
     if not musubi:
         text = add_logging(text)
-    if hf:
-        text, _ = S.fill_hf(text, force=True)
+    text, _ = S.scrub_hf(text)                         # the token is passed when the script runs, never stored
     return dict(cfg=cfg, stats=stats, rec=rec, script_text=text, prompts_path=prompts_path,
                 prompts_text=prompts_text, prompts_new=prompts_new, out_name=out_name, musubi=musubi,
                 filename=unique_script_name(lora, f"{out_name}.sh"))
@@ -1140,8 +1139,6 @@ def explain_md(ds, tkey, cfg, stats, text, rec, existing, planned_repeats=None, 
     if imgs < 15:
         A.append(f"Only {imgs} images: expect weak or overfit results. 20-100 good, varied images is the sweet spot.")
     A += type_dataset_checks(cfg, stats)
-    if S.get_export(text, "HF_TOKEN") == "" and S.read_hf_token():
-        A.append("`HF_TOKEN` is empty in this script but huggingtoken.txt has a token. Press **Fill HF_TOKEN** if you use gated Hugging Face models.")
     if not _has(text, "--logging_dir") and not S.is_musubi_text(text):
         A.append("No `--logging_dir`: nothing is written to the `log` folder, so TensorBoard has no loss curves. "
                  "Put `${LOG_DIR}` (or a folder path) in the form field 'Logging dir'.")
@@ -1241,7 +1238,7 @@ def script_for_type(ds, tkey) -> str:
     return str(best) if best else NEW
 
 
-def cs_load(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
+def cs_load(ds, script, tkey, steps_over, use_rep, samples=True):
     if not ds:
         return _cs_result(status="Pick a LoRA folder.")
     files = launch_scripts(ds)
@@ -1254,7 +1251,7 @@ def cs_load(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
     n = len(FORM_FIELDS)
     if script == NEW:
         try:
-            plan = make_plan(ds, tkey, steps_over, use_rep, hf_auto, samples)
+            plan = make_plan(ds, tkey, steps_over, use_rep, samples)
         except Exception as e:
             return _cs_result(**upd, text="", fields=[""] * n, explain="", prompts_path="", prompts_text="",
                               newname="", can_save_over=False,
@@ -1268,9 +1265,7 @@ def cs_load(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
                           newname=plan["filename"], can_save_over=False,
                           status=_new_status(plan), plan=ps)
     text = Path(script).read_text(encoding="utf-8", errors="ignore")
-    filled = False
-    if hf_auto:
-        text, filled = S.fill_hf(text, force=False)
+    text, filled = S.scrub_hf(text)
     _, presets = merged_presets()
     tk = infer_type(text, presets, tkey)
     pp = prompts_path_from_text(text, S.lora_path(ds))
@@ -1284,7 +1279,7 @@ def cs_load(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
                       can_save_over=True,
                       status=f"**Loaded `{Path(script).name}`** (detected type: {label}). Edit the form or the text, then Save. "
                              "Use Save as new to keep the original untouched."
-                             + (" `HF_TOKEN` was empty and has been filled from huggingtoken.txt (not saved yet)." if filled else ""))
+                             + (" The Hugging Face token was taken out of the text (save to take it out of the file; it is passed when the script runs)." if filled else ""))
 
 
 def _next_name(ds, text, script) -> str:
@@ -1293,27 +1288,27 @@ def _next_name(ds, text, script) -> str:
     return unique_script_name(lora, f"{base}V{n}.sh" if base else Path(script).stem + "_new.sh")
 
 
-def cs_ds_change(ds, tkey, steps_over, use_rep, hf_auto=True, samples=True):
-    return cs_load(ds, "", tkey, steps_over, use_rep, hf_auto, samples)
+def cs_ds_change(ds, tkey, steps_over, use_rep, samples=True):
+    return cs_load(ds, "", tkey, steps_over, use_rep, samples)
 
 
-def cs_script_change(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
-    return cs_load(ds, script, tkey, steps_over, use_rep, hf_auto, samples)
+def cs_script_change(ds, script, tkey, steps_over, use_rep, samples=True):
+    return cs_load(ds, script, tkey, steps_over, use_rep, samples)
 
 
-def cs_suggest(ds, script, tkey, steps_over, use_rep, hf_auto=True, samples=True):
+def cs_suggest(ds, script, tkey, steps_over, use_rep, samples=True):
     """Replace the editor with the recommended script for the chosen type (does not save anything)."""
     if not ds:
         return _cs_result(status="Pick a LoRA folder.")
     try:
-        plan = make_plan(ds, tkey, steps_over, use_rep, hf_auto, samples)
+        plan = make_plan(ds, tkey, steps_over, use_rep, samples)
     except Exception as e:
         return _cs_result(status=f"**Cannot build a recommendation:** {e}")
     renamed = ""
     if use_rep and plan["rec"].get("rename") and plan["rec"].get("want_repeats"):
         renamed = _auto_rename(ds, plan["rec"]["want_repeats"])
         if renamed and not renamed.startswith("⚠"):
-            plan = make_plan(ds, tkey, steps_over, use_rep, hf_auto, samples)   # the folder has the count now
+            plan = make_plan(ds, tkey, steps_over, use_rep, samples)   # the folder has the count now
     text, ps = plan["script_text"], _plan_state(plan)
     notify.info("The editor now shows the recommended script. Nothing is saved until you press a Save button.")
     return _cs_result(text=text, fields=read_form(text),
@@ -1343,9 +1338,9 @@ def cs_apply_quiet(ds, tkey, script, text, plan, *vals):
     return _cs_result(text=new, explain=explain_for(ds, tkey, script, new, plan), plan=plan)
 
 
-def cs_retype(ds, script, tkey, text, steps_over, use_rep, hf_auto=True, samples=True):
+def cs_retype(ds, script, tkey, text, steps_over, use_rep, samples=True):
     if script == NEW:
-        return cs_load(ds, NEW, tkey, steps_over, use_rep, hf_auto, samples)
+        return cs_load(ds, NEW, tkey, steps_over, use_rep, samples)
     if ds and tkey:
         # another LoRA type means its own script, or a new one with that type's recommended settings;
         # never the settings of the type that was open before
@@ -1354,7 +1349,7 @@ def cs_retype(ds, script, tkey, text, steps_over, use_rep, hf_auto=True, samples
         except OSError:
             cur = ""
         if cur != tkey:
-            return cs_load(ds, script_for_type(ds, tkey), tkey, steps_over, use_rep, hf_auto, samples)
+            return cs_load(ds, script_for_type(ds, tkey), tkey, steps_over, use_rep, samples)
     return _cs_result(explain=explain_for(ds, tkey, script, text, {}),
                       status="Comparison updated for the chosen type. Your script text is unchanged.")
 
