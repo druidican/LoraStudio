@@ -7,7 +7,7 @@ the page is opened with shell.go(key, **kw), e.g. shell.go("datasets", ds="pip",
 The status strip is redrawn by a timer only when its text changed.
 """
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.231126b"  # LoRA Studio version, see version.py
 
 import importlib
 from pathlib import Path
@@ -125,6 +125,8 @@ def build_page():
             ui.button(icon="dark_mode", on_click=flip).props("flat round color=white").tooltip("Dark / light")
             ui.button("?", on_click=lambda: help_dialog(shell)).props("flat round color=white") \
                 .tooltip("The manual for this page")
+            ui.button(icon="power_settings_new", on_click=shutdown_dialog).props("flat round color=white") \
+                .tooltip("Shut down LoRA Studio")
         _strip(shell)
     import sidemenu                                       # the left menu: each page fills its own section
     shell.menu = sidemenu.SideMenu(shell)
@@ -161,6 +163,39 @@ def _start_page() -> str:
     import launchopts
     k = launchopts.load().get("start_page") or "home"
     return k if k in dict(PAGES) else "home"
+
+
+async def shutdown_dialog():
+    """The power button (header) and Settings › Start and network: shut the program down. While a training run or the
+    queue runs, it says so and stops the run first (like Stop now: the last save point stays)."""
+    import asyncio
+    import sdgui as S
+    busy = S.RUN.running() or bool(S.QUEUE.get("running"))
+    with ui.dialog() as d, ui.card().classes("gap-3"):
+        ui.label("Shut down LoRA Studio?").classes("text-lg font-semibold")
+        ui.label("A training run is going (or the queue is running). Shutting down stops it, like Stop now: the save "
+                 "points written so far stay." if busy else
+                 "The page stops answering. Start it again from the applications menu or with ./start.sh.") \
+            .classes("ls-note")
+        with ui.row().classes("w-full justify-end gap-2"):
+            ui.button("Cancel", on_click=lambda: d.submit(False)).props("flat no-caps")
+            ui.button("Stop the run and shut down" if busy else "Shut down", on_click=lambda: d.submit(True)) \
+                .props("unelevated no-caps color=negative")
+    if not await d:
+        return
+    if busy:
+        S.QUEUE["stop_flag"] = True
+        if S.RUN.running():
+            S.stop_run()
+        n = ui.notification("Stopping the training run …", spinner=True, timeout=None)
+        for _ in range(70):                          # stop_run escalates to SIGKILL after 30 s
+            if not S.RUN.running():
+                break
+            await asyncio.sleep(1)
+        n.dismiss()
+    ui.run_javascript("document.body.innerHTML = '<div style=\"font:16px sans-serif;padding:48px;text-align:center\">"
+                      "LoRA Studio is shut down. You can close this tab.</div>'")
+    ui.timer(1.0, app.shutdown, once=True)
 
 
 def help_dialog(shell: Shell):

@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.231126"  # LoRA Studio version, see version.py
+__version__ = "1.231126b"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -141,26 +141,15 @@ def _shortcut_card():
             return
         note("LoRA Studio with its icon in your applications menu (and, pinned, in the dock). Clicking it opens the page; "
              "when LoRA Studio is not running it is started first, quietly: no terminal window (the output goes to "
-             "userdata/logs/shortcut-start.log), so stop it with Stop LoRA Studio below.")
+             "userdata/logs/shortcut-start.log); shut it down with the ⏻ button at the top right.")
         msg = ui.markdown("")
 
         def tick(e):
             msg.content = SC.make() if e.value else SC.remove()
         ui.checkbox("Show LoRA Studio in the applications menu", value=SC.exists(), on_change=tick)
 
-        async def stop():
-            import sdgui as S
-            if S.RUN.running() or S.QUEUE.get("running"):
-                msg.content = ("❌ A training run or the queue is running: stop it first (Queue), so nothing is cut off "
-                               "halfway.")
-                return
-            if not await confirm("Stop LoRA Studio? The page stops answering; start it again from the menu shortcut "
-                                 "or with ./start.sh.", "Stop LoRA Studio"):
-                return
-            from nicegui import app
-            msg.content = "Stopping … you can close this page."
-            ui.timer(1.0, app.shutdown, once=True)
-        ui.button("Stop LoRA Studio", on_click=stop).props("outline dense no-caps color=negative")
+        import shell
+        ui.button("Shut down LoRA Studio", on_click=shell.shutdown_dialog).props("outline dense no-caps color=negative")
 
 
 # --------------------------------------------------------------------------- Folders

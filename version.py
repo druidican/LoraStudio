@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.231126"
-VERSION = "1.231126"
+__version__ = "1.231126b"
+VERSION = "1.231126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.231126",
-    "version.py": "1.231126",
+    "version.py": "1.231126b",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.221126",
     "program/Training/sd_script.py": "1.221126",
@@ -59,7 +59,7 @@ RELEASE: dict = {
     "program/Gallery/model_guide.py": "1.191126d",
     "program/Gallery/trainingcard.py": "1.221126",
     "program/Gallery/insights.py": "1.131126b",
-    "program/UI/shell.py": "1.201126e",
+    "program/UI/shell.py": "1.231126b",
     "program/UI/widgets.py": "1.191126h",
     "program/UI/theme.css": "1.201126e",
     "program/UI/login.py": "1.191126h",
@@ -73,7 +73,7 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.201126e",
     "program/UI/lora_page.py": "1.201126e",
     "program/UI/pg_settings.py": "1.201126e",
-    "program/UI/set_panels.py": "1.231126",
+    "program/UI/set_panels.py": "1.231126b",
     "program/Gallery/lorapage.py": "1.191126f",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -109,6 +109,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.231126b", "A shut-down button (⏻) at the top right of every page: asks first; while a training run or the queue is running it says so and stops the run first (the save points written so far stay), then shuts LoRA Studio down. The same in Settings › Start and network."),
     ("1.231126", "Settings › Start and network: Show LoRA Studio in the applications menu (Linux desktops), with its icon. Clicking it opens the page; when LoRA Studio is not running it is started first, quietly (no terminal; output in userdata/logs/shortcut-start.log). Stop LoRA Studio on the same card. The shortcut follows when the folder is moved."),
     ("1.221126", "The Hugging Face token is never written into a launch script any more: LoRA Studio passes it when it runs a script, a script run in a terminal reads it from the token file, and scripts that held it are cleaned at start (and when saved or run). Z-Image Turbo LoRAs: test pictures at strength 1.3, and the LoRA page's How to use it says so."),
     ("1.211126c", "musubi types (Z-Image, Qwen-Image, FLUX.2): stage 1 Check files reads the model files' headers and stops at once with a plain message for a ComfyUI int8 / fp8 file (musubi trains only on the full bf16 file) or a Qwen3-VL text encoder (Z-Image needs plain Qwen3 4B), instead of failing after caching."),

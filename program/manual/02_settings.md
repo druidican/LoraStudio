@@ -37,8 +37,9 @@ command line still wins). The same page has **What is installed**: see [Installi
 **Shortcut in the applications menu** (Linux desktops): tick *Show LoRA Studio in the applications menu* and LoRA
 Studio appears with its icon in the app grid and search; right-click it in the dock to pin it. Clicking it opens the
 page, and when LoRA Studio is not running it starts it first, quietly: no terminal window (the output goes to
-`userdata/logs/shortcut-start.log`), and the page opens when it is ready. **Stop LoRA Studio** on the same card stops
-the program (not while a training run or the queue is running). Untick to remove the shortcut. When you move the
+`userdata/logs/shortcut-start.log`), and the page opens when it is ready. The **⏻** button at the top right of every
+page (and *Shut down LoRA Studio* on this card) shuts the program down; while a training run or the queue is running
+it says so and stops the run first, like *Stop now* (the save points written so far stay). Untick to remove the shortcut. When you move the
 LoRA Studio folder, the shortcut follows at the next start.
 
 
