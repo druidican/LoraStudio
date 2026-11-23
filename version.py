@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.221126"
-VERSION = "1.221126"
+__version__ = "1.231126"
+VERSION = "1.231126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.221126",
-    "version.py": "1.221126",
+    "lora_studio.py": "1.231126",
+    "version.py": "1.231126",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.221126",
     "program/Training/sd_script.py": "1.221126",
@@ -73,7 +73,7 @@ RELEASE: dict = {
     "program/UI/pg_collection.py": "1.201126e",
     "program/UI/lora_page.py": "1.201126e",
     "program/UI/pg_settings.py": "1.201126e",
-    "program/UI/set_panels.py": "1.221126",
+    "program/UI/set_panels.py": "1.231126",
     "program/Gallery/lorapage.py": "1.191126f",
     "program/Gallery/maint.py": "1.131126c",
     "program/Other/notify.py": "1.131126c",
@@ -85,12 +85,13 @@ RELEASE: dict = {
     "program/Other/home.py": "1.201126e",
     "program/Other/gpusmi.py": "1.051126b",
     "program/Training/savepoint.py": "1.011126",
+    "program/Settings/shortcut.py": "1.231126",
     "program/Settings/launchopts.py": "1.131126c",
     "program/Settings/firstrun.py": "1.131126c",
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.201126e",
-    "selftest.py": "1.221126",
+    "selftest.py": "1.231126",
     "program/Settings/machinecheck.py": "1.221126",
     "program/Settings/selfupdate.py": "1.201126e",
     "program/Training/failcodes.py": "1.131126b",
@@ -108,6 +109,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.231126", "Settings › Start and network: Show LoRA Studio in the applications menu (Linux desktops), with its icon. Clicking it opens the page; when LoRA Studio is not running it is started first, quietly (no terminal; output in userdata/logs/shortcut-start.log). Stop LoRA Studio on the same card. The shortcut follows when the folder is moved."),
     ("1.221126", "The Hugging Face token is never written into a launch script any more: LoRA Studio passes it when it runs a script, a script run in a terminal reads it from the token file, and scripts that held it are cleaned at start (and when saved or run). Z-Image Turbo LoRAs: test pictures at strength 1.3, and the LoRA page's How to use it says so."),
     ("1.211126c", "musubi types (Z-Image, Qwen-Image, FLUX.2): stage 1 Check files reads the model files' headers and stops at once with a plain message for a ComfyUI int8 / fp8 file (musubi trains only on the full bf16 file) or a Qwen3-VL text encoder (Z-Image needs plain Qwen3 4B), instead of failing after caching."),
     ("1.211126b", "Z-Image: Turbo and Base grouped as Z-Image › Turbo / › Base. Turbo's first recommended set (to test): flow shift 3.0 for characters and concepts, 2.0 for styles. Test pictures for Z-Image LoRAs (also Base, tested on Turbo): Settings › Test pictures › Z-Image › Use LoRA Studio's workflow picks the Turbo model (int8 / fp8 first), Qwen3 4B and the FLUX AE from your ComfyUI; res_multistep, CFG 1, 8 steps, shift 3. Workflows with GGUF loaders and a model shift are kept."),
@@ -248,6 +250,7 @@ PARTS = [
     ("program/Other/home.py", "Home page"),
     ("program/Other/gpusmi.py", "AMD GPU values: amd-smi (ROCm 10 and newer) or rocm-smi"),
     ("program/Training/savepoint.py", "save points"),
+    ("program/Settings/shortcut.py", "Settings › Start and network: the applications-menu shortcut"),
     ("program/Settings/launchopts.py", "start options"),
     ("program/Settings/firstrun.py", "first start"),
     ("program/Settings/setup.py", "setup"),

@@ -9,7 +9,7 @@ LoRA Studio: train LoRAs with sd-scripts and musubi-tuner, make the datasets, ke
 Run:  python lora_studio.py [--port 7860] [--host 127.0.0.1] [--auth user:password] [--no-browser]
 """
 from __future__ import annotations
-__version__ = "1.221126"  # LoRA Studio version, see version.py
+__version__ = "1.231126"  # LoRA Studio version, see version.py
 
 import argparse
 import os
@@ -87,6 +87,11 @@ def start_tasks(lo: dict):
             print(f"[Scripts] took the Hugging Face token out of {n_tok} launch script(s); it is passed when they run")
     except Exception as e:                 # noqa: BLE001
         print(f"[Scripts] {e!r}")
+    try:                                   # the menu shortcut: current paths (the folder may have moved)
+        import shortcut
+        shortcut.refresh()
+    except Exception as e:                 # noqa: BLE001
+        print(f"[Shortcut] {e!r}")
     n_old = sdgui.archive_all_datasets()
     if n_old:
         print(f"[Scripts] {n_old} older launch script(s) moved to {sdgui.OLD_RUNS}/ (one script per LoRA type is shown)")

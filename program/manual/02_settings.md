@@ -31,8 +31,15 @@ the painted logo:
 
 ![The login page](img/login.jpg)
 
-*Save and restart* uses it at once; `./start.sh` and the desktop starter use it from then on (an option typed on the
+*Save and restart* uses it at once; `./start.sh` and the menu shortcut use it from then on (an option typed on the
 command line still wins). The same page has **What is installed**: see [Installing](#install).
+
+**Shortcut in the applications menu** (Linux desktops): tick *Show LoRA Studio in the applications menu* and LoRA
+Studio appears with its icon in the app grid and search; right-click it in the dock to pin it. Clicking it opens the
+page, and when LoRA Studio is not running it starts it first, quietly: no terminal window (the output goes to
+`userdata/logs/shortcut-start.log`), and the page opens when it is ready. **Stop LoRA Studio** on the same card stops
+the program (not while a training run or the queue is running). Untick to remove the shortcut. When you move the
+LoRA Studio folder, the shortcut follows at the next start.
 
 
 **The phone page** (`/m`): with *Reachable on the network* and a login, open `http://<this computer>:<port>/m` on

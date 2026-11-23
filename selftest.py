@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.221126"  # LoRA Studio version, see version.py
+__version__ = "1.231126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -487,6 +487,33 @@ def _comfy_names():
     need(CT.match_name("anima-base-v1.0.safetensors", names) == names[0], "moved file not found")
     need(CT.match_name("gone.safetensors", names) == "", "a missing file was matched")
     return "renamed, moved and missing files"
+
+
+@check("applications-menu shortcut (made in a throw-away folder)")
+def _shortcut():
+    import os, tempfile, subprocess
+    import shortcut as SC
+    if not SC.possible()[0]:
+        return "not a Linux desktop: skipped"
+    with tempfile.TemporaryDirectory() as d:
+        old = os.environ.get("XDG_DATA_HOME")
+        os.environ["XDG_DATA_HOME"] = d
+        try:
+            launcher_old = SC.LAUNCHER
+            SC.LAUNCHER = Path(d) / "lorastudio-launch.sh"
+            need(SC.make().startswith("✔") and SC.exists(), "shortcut not made")
+            t = SC.entry().read_text()
+            need("Exec=\"" in t and "Icon=" in t and SC.ICON.is_file(), "desktop entry")
+            r = subprocess.run(["bash", "-n", str(SC.LAUNCHER)], capture_output=True, text=True)
+            need(r.returncode == 0, f"launcher script: {r.stderr}")
+            need(SC.remove().startswith("✔") and not SC.exists(), "not removed")
+        finally:
+            SC.LAUNCHER = launcher_old
+            if old is None:
+                os.environ.pop("XDG_DATA_HOME", None)
+            else:
+                os.environ["XDG_DATA_HOME"] = old
+    return "made, checked, removed"
 
 
 @check("no Hugging Face token in launch scripts; Z-Image Turbo strength 1.3")
