@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.231126"  # LoRA Studio version, see version.py
+__version__ = "1.241126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -487,6 +487,34 @@ def _comfy_names():
     need(CT.match_name("anima-base-v1.0.safetensors", names) == names[0], "moved file not found")
     need(CT.match_name("gone.safetensors", names) == "", "a missing file was matched")
     return "renamed, moved and missing files"
+
+
+@check("settings profiles: import checks, apply, export")
+def _profiles():
+    import profiles as PR
+    bad = ('[profile]\nname = "x"\ntype = "flux1dev"\n[character]\nlearning_rate = 8e-5\n'
+           'optimizer_type = "AdamW8bit; rm -rf ~"\nnetwork_dim = 5000\nmodel = "/home/x.safetensors"\n[foo]\na = 1\n')
+    p, problems = PR.parse(bad)
+    need(p["settings"]["character"] == {"learning_rate": 8e-5}, f"checked values: {p['settings']}")
+    need(len(problems) == 4, f"refused: {problems}")
+    cfg, notes = PR.apply_cfg({"lr": "1e-4", "flags": ["--network_dim 16 --network_alpha 16"], "steps": 1000},
+                              {"name": "t", "settings": {"character": {"learning_rate": 5e-5, "network_dim": 32,
+                                                                       "steps": 2400, "noise_offset": 0.05}}}, "character")
+    need(cfg["lr"] == "5e-05" and "--network_dim 32 --network_alpha 16" in cfg["flags"] and cfg["steps"] == 2400
+         and "--noise_offset 0.05" in cfg["flags"], f"apply_cfg: {cfg}")
+    script = ("#!/bin/bash\n# Output xV1. Plan: … (target 2000)\naccelerate launch x.py \\\n  --network_dim 16 \\\n"
+              "  --network_train_unet_only \\\n  --optimizer_type AdamW8bit --learning_rate 1e-4 \\\n  --seed 1\n")
+    got = PR.from_script(script, "character")
+    need(got["learning_rate"] == 1e-4 and got["network_dim"] == 16 and got["steps"] == 2000
+         and got["network_train_unet_only"] is True and got["optimizer_type"] == "AdamW8bit", f"from_script: {got}")
+    t2 = PR.apply_text(script, {"name": "t", "settings": {"character": {"learning_rate": 3e-4,
+                                                                       "network_train_unet_only": False,
+                                                                       "discrete_flow_shift": 3.0}}}, "character")
+    need("--learning_rate 0.0003" in t2 and "network_train_unet_only" not in t2 and "--discrete_flow_shift 3" in t2
+         and "# lorastudio-profile: t" in t2, "apply_text")
+    p2, _ = PR.parse(PR.to_toml({"name": "rt", "type": "sdxl", "settings": {"style": got}}))
+    need(p2["settings"]["style"]["learning_rate"] == 1e-4, "round trip")
+    return "bad values refused, applied, exported"
 
 
 @check("applications-menu shortcut (made in a throw-away folder)")

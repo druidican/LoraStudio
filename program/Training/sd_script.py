@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.221126"  # LoRA Studio version, see version.py
+__version__ = "1.241126"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -794,6 +794,14 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, samples=True):
     stats = with_virtual_row(dataset_stats(ds))
     cfg = tuned_cfg(tkey, cfg, stats)
     cfg = _speed(tkey, cfg)                           # Settings › Speed test: "use the faster settings" for this type
+    prof, prof_notes = None, []
+    if ds:                                             # step 9's settings profile (Training/profiles.py) wins
+        try:
+            import profiles as PR
+            prof = PR.load(tkey, PR.chosen(ds, tkey))
+            cfg, prof_notes = PR.apply_cfg(cfg, prof, CHOICE["purpose"])
+        except Exception as e:                         # noqa: BLE001
+            print(f"[profiles] {e}")
     cfg["caption_ext"] = caption_ext_for(ds, tkey)
     if ds:                                             # the kind of the pictures and the look of the result
         try:
@@ -858,7 +866,10 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, samples=True):
             print(f"[lean] {e}")
     try:                                               # settings that won your comparisons (Training/compare.py)
         import compare
-        text, cnotes = compare.apply(tkey, text)
+        text, cnotes = compare.apply(tkey, text) if prof is None else (text, [])   # a chosen profile wins
+        if prof is not None:
+            import profiles as PR
+            text, cnotes = PR.mark(text, prof), prof_notes
         if cnotes:
             text = re.sub(r"^(#!/bin/bash\n)", lambda m: m.group(1) + "".join(f"# {n}\n" for n in cnotes), text, count=1)
     except Exception as e:                             # noqa: BLE001

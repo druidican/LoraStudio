@@ -79,6 +79,12 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   `userdata/compare/`. `comfytest.after_queue` → `compare.after_queue` makes 6 pictures per entry (`comfytest.prepare`
   is shared with `make`); blind rows A, B … (also `/m/rate`); `summary` (clear = ≥3 picks and 2× the next), `best`
   per type (offer after 2 clear wins), `compare_use.json` applied in `sd_script.make_plan` (`compare.apply`).
+- **Settings profiles** (1.241126, `Training/profiles.py`, step 9 row in `UI/ds_train.py`): per LoRA type, TOML
+  (`[profile]` name/type/author/note + `[character]`/`[style]`/`[concept]`), only the `KEYS` whitelist, each value
+  checked (`check`: numbers in range, one safe word) because scripts are bash; never model files, memory settings,
+  paths or tokens. Original = no file. Kept in `userdata/profiles/<type>/`; chosen per dataset and type in meta
+  `profile` (owner: a personal choice, not a system one). `make_plan` applies it after `_speed` (`apply_cfg`) and
+  skips `compare.apply` then; a saved script gets `apply_text`; scripts carry `# lorastudio-profile:`.
 - **Updater** (`ghupdate.py`): channel *Releases only* (default) or *Betas too*; the token is never sent along a
   redirect to another host (codeload); *Test token* explains each failure.
 - **WD tagger writes every tag** for characters and worn items; step 7's *tags → trigger words* card moves the

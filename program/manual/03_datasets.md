@@ -275,6 +275,20 @@ hit the target steps* adjusts the epochs. **More settings** has the optimizer, s
 advanced values and the repeat folder; **Why these settings** has the notes and the checks before training; **The
 script text** shows the script itself.
 
+- **Settings profile**: the training settings of a LoRA type, to share and to try. *Original (LoRA Studio)* is
+  LoRA Studio's own settings and is always there. **Export…** writes the settings of the open launch script for this
+  purpose (learning rates, rank and alpha, optimizer, scheduler, warm-up, flow shift, timestep sampling, noise offset,
+  min SNR, target steps, epochs) into a `.toml` file, with a name, your name and a note; model files, memory settings
+  (block swap, fp8, batch size), paths and your token are never in it. It is also kept here as a profile of yours.
+  **Import…** reads such a file for this LoRA type and keeps it under the name you choose; every value is checked
+  (a known setting, a number in its range, a plain name), and what is skipped is listed. Pick a profile in the list:
+  a new launch script is made with it (it is written into the script as `# lorastudio-profile:`), a saved script gets
+  its values written into the text (*Save* keeps them). The choice is kept per dataset and type, so it is your own
+  choice, not a setting for every dataset. A profile wins over *Compare settings*. **Delete profile** removes an
+  imported one; datasets that used it go back to Original.
+
+  ![Step 9: an imported settings profile](img/train_profile.jpg)
+
 - **Missing model files**: when a model file the script needs is missing, a card offers *⬇ Download from Hugging Face*
   for it (with your token for gated models). It downloads in the background, the same way as in step 2; when it is
   done, *Use model files from Settings* puts the files into a script that is already open.

@@ -14,15 +14,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.231126b"
-VERSION = "1.231126b"
+__version__ = "1.241126"
+VERSION = "1.241126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.231126",
-    "version.py": "1.231126b",
+    "version.py": "1.241126",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.221126",
-    "program/Training/sd_script.py": "1.221126",
+    "program/Training/sd_script.py": "1.241126",
     "program/Data/sd_prepare.py": "1.201126e",
     "program/Training/sd_settings.py": "1.221126",
     "program/Data/datasets_ui.py": "1.201126e",
@@ -40,6 +40,7 @@ RELEASE: dict = {
     "program/Other/mobile.py": "1.201126c",
     "program/UI/mobile_page.py": "1.201126c",
     "program/UI/sidemenu.py": "1.201126e",
+    "program/Training/profiles.py": "1.241126",
     "program/Training/compare.py": "1.201126c",
     "program/UI/cmp_ui.py": "1.201126c",
     "program/UI/scan_panel.py": "1.191126d",
@@ -67,7 +68,7 @@ RELEASE: dict = {
     "program/UI/pg_home.py": "1.201126e",
     "program/UI/pg_datasets.py": "1.201126e",
     "program/UI/ds_steps.py": "1.201126f",
-    "program/UI/ds_train.py": "1.221126",
+    "program/UI/ds_train.py": "1.241126",
     "program/UI/ds_results.py": "1.201126c",
     "program/UI/pg_queue.py": "1.201126e",
     "program/UI/pg_collection.py": "1.201126e",
@@ -91,7 +92,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.201126e",
-    "selftest.py": "1.231126",
+    "selftest.py": "1.241126",
     "program/Settings/machinecheck.py": "1.221126",
     "program/Settings/selfupdate.py": "1.201126e",
     "program/Training/failcodes.py": "1.131126b",
@@ -109,6 +110,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.241126", "Settings profiles in step 9: export the training settings of a launch script (learning rates, rank, optimizer, scheduler, shift, steps, epochs …) as a .toml file to share, and import someone's under a name you choose. Original (LoRA Studio's own) always stays; the profile is chosen per dataset and LoRA type. Imported values are checked one by one; model files, memory settings, paths and tokens are never in a profile."),
     ("1.231126b", "A shut-down button (⏻) at the top right of every page: asks first; while a training run or the queue is running it says so and stops the run first (the save points written so far stay), then shuts LoRA Studio down. The same in Settings › Start and network."),
     ("1.231126", "Settings › Start and network: Show LoRA Studio in the applications menu (Linux desktops), with its icon. Clicking it opens the page; when LoRA Studio is not running it is started first, quietly (no terminal; output in userdata/logs/shortcut-start.log). Stop LoRA Studio on the same card. The shortcut follows when the folder is moved."),
     ("1.221126", "The Hugging Face token is never written into a launch script any more: LoRA Studio passes it when it runs a script, a script run in a terminal reads it from the token file, and scripts that held it are cleaned at start (and when saved or run). Z-Image Turbo LoRAs: test pictures at strength 1.3, and the LoRA page's How to use it says so."),
@@ -206,6 +208,7 @@ PARTS = [
     ("program/Other/mobile.py", "The phone page's data: run, progress, failure, queue, newest sample picture"),
     ("program/UI/mobile_page.py", "The phone page /m: small HTML page and its routes"),
     ("program/UI/sidemenu.py", "The left menu: one foldable drawer whose contents follow the top tab"),
+    ("program/Training/profiles.py", "Settings profiles: export / import training settings per LoRA type (step 9)"),
     ("program/Training/compare.py", "Compare settings: runs with one setting changed, blind rating, best per LoRA type"),
     ("program/UI/cmp_ui.py", "Compare settings: start card, rating, best settings per type"),
     ("program/UI/scan_panel.py", "Find on this computer: the search and the suggestions"),

@@ -3,7 +3,7 @@
 saving and the queue. The script logic is sd_script.py (cs_* return what changed as a dict); the plan and the
 settings table are datasets_ui (calc, apply_settings, SETTINGS)."""
 from __future__ import annotations
-__version__ = "1.221126"  # LoRA Studio version, see version.py
+__version__ = "1.241126"  # LoRA Studio version, see version.py
 
 from pathlib import Path
 
@@ -114,6 +114,7 @@ class Train:
         self.draw_download()
         self.draw_repeat()
         self.draw_look()
+        self.draw_profiles()
         if getattr(self, "cmp_show", None):
             ui.timer(0.1, self.cmp_show, once=True)
 
@@ -265,6 +266,124 @@ class Train:
         launchopts.save(lo)
 
     # ------------------------------------------------------------------ build
+    # ------------------------------------------------------------------ settings profiles (Training/profiles.py)
+    def draw_profiles(self):
+        import profiles as PR
+        if not self.tkey:
+            return
+        self.busy = True
+        try:
+            cur = PR.chosen(self.ds, self.tkey)
+            opts = {PR.ORIGINAL: "Original (LoRA Studio)", **{n: n for n in PR.names(self.tkey)}}
+            if cur not in opts:
+                cur = PR.ORIGINAL
+            self.w_prof.options = opts
+            self.w_prof.value = cur
+            self.w_prof.update()
+        finally:
+            self.busy = False
+        p = PR.load(self.tkey, cur)
+        self.w_prof_del.set_visibility(bool(p))
+        self.w_prof_info.text = (" · ".join(x for x in ((f"by {p['author']}" if p.get("author") else ""), p.get("note"),
+                                                      ", ".join(p["settings"])) if x)) if p else (
+            "LoRA Studio's own settings for this type. Import a profile someone shared, or export these settings.")
+
+    def set_profile(self, name):
+        import profiles as PR
+        if self.busy or not self.tkey:
+            return
+        PR.choose(self.ds, self.tkey, name or "")
+        self.draw_profiles()
+        p = PR.load(self.tkey, name)
+        if self.script in (None, "", S.NEW):             # a new script: made again, from scratch, with the profile
+            self.apply(S.cs_retype(self.ds, self.script, self.tkey, "", *self.args()))
+        elif p:
+            self.apply({"text": PR.apply_text(self.text, p, self.purpose),
+                        "status": f"The script text now has the settings of **{p['name']}**: **Save** keeps it."})
+        else:
+            self.apply({"status": "Original is used for new launch scripts. This saved script keeps its values: make "
+                                  "a **+ New launch script** to start from LoRA Studio's own settings."})
+
+    def import_dialog(self):
+        import profiles as PR
+        got = {"text": ""}
+        with ui.dialog() as d, ui.card().classes("gap-2 w-[32rem]"):
+            ui.label("Import a settings profile").classes("text-lg font-semibold")
+            note(f"A LoRA Studio profile file (.toml) for this LoRA type ({self.tkey}). Original and your other "
+                 "profiles stay; the import gets the name you choose.")
+            name = ui.input("Name for it here").props("outlined dense").classes("w-full")
+            msg = ui.markdown("")
+
+            async def got_file(e):
+                try:
+                    data = e.content.read() if hasattr(e, "content") else await e.file.read()
+                    got["text"] = data.decode("utf-8", errors="replace")
+                    p, problems = PR.parse(got["text"])
+                    name.value = name.value or p["name"]
+                    msg.content = (f"**{p['name']}** for `{p['type']}`" + (f" by {p['author']}" if p["author"] else "")
+                                   + (f": {p['note']}" if p["note"] else "") + f" ({', '.join(p['settings'])})")
+                except Exception as ex:                  # noqa: BLE001
+                    got["text"] = ""
+                    msg.content = f"❌ {ex}"
+            ui.upload(on_upload=got_file, auto_upload=True, max_file_size=200_000).props(
+                'accept=".toml,.txt" flat bordered').classes("w-full")
+
+            def go():
+                if not got["text"]:
+                    msg.content = "Choose the file first."
+                    return
+                r = PR.import_text(got["text"], self.tkey, name.value or "")
+                msg.content = r
+                if r.startswith("✔"):
+                    imported = (name.value or "").strip() or PR.parse(got["text"])[0]["name"]
+                    d.close()
+                    self.set_profile(imported)
+                    self.w_status.content = r
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Cancel", on_click=d.close).props("flat no-caps")
+                ui.button("Import", on_click=go).props("unelevated no-caps color=primary")
+        d.open()
+
+    def export_dialog(self):
+        import profiles as PR
+        if not self.text.strip():
+            self.w_status.content = "There is no script text to export yet."
+            return
+        with ui.dialog() as d, ui.card().classes("gap-2 w-[32rem]"):
+            ui.label("Export these settings").classes("text-lg font-semibold")
+            note("Writes the training settings of this launch script (learning rates, rank, optimizer, scheduler, "
+                 "shift, steps, epochs …) for this purpose into a .toml file to share. Model files, memory settings, "
+                 "paths and your token are never in it. It is also kept here as a profile of yours.")
+            name = ui.input("Name of the settings", value="").props("outlined dense").classes("w-full")
+            author = ui.input("Your name (optional)").props("outlined dense").classes("w-full")
+            nt = ui.textarea("Note: what it is good for, what you tested it on (optional)").props("outlined dense") \
+                .classes("w-full")
+
+            def go():
+                if not (name.value or "").strip() or name.value.strip().lower() == "original":
+                    ui.notify("Give the settings a name (not Original).")
+                    return
+                labels = F.type_labels()
+                txt, fname = PR.export_text(self.text, self.tkey, labels.get(self.tkey, self.tkey), self.purpose,
+                                            name.value, author.value or "", nt.value or "")
+                ui.download(txt.encode("utf-8"), fname)
+                d.close()
+                self.draw_profiles()
+                self.w_status.content = f"✔ Exported as `{fname}` and kept as the profile **{name.value.strip()}**."
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Cancel", on_click=d.close).props("flat no-caps")
+                ui.button("Export", on_click=go).props("unelevated no-caps color=primary")
+        d.open()
+
+    async def delete_profile(self):
+        import profiles as PR
+        from widgets import confirm
+        cur = PR.chosen(self.ds, self.tkey)
+        if not cur or not await confirm(f"Delete the profile {cur!r}? Original and your scripts stay.", "Delete"):
+            return
+        self.w_status.content = PR.delete(self.tkey, cur)
+        self.set_profile(PR.ORIGINAL)
+
     def build(self):
         ui.label("Train: the launch script").classes("text-lg font-semibold")
         if not self.types:
@@ -291,6 +410,13 @@ class Train:
                                       on_change=lambda e: self.set_script(e.value)).props("outlined dense").classes("w-96")
             self.w_prio = ui.select(PRIORITIES, value=S.CHOICE.get("priority") or "balanced", label="Priority",
                                     on_change=lambda: self.set_choice()).props("outlined dense").classes("w-48")
+            self.w_prof = ui.select({"": "Original (LoRA Studio)"}, value="", label="Settings profile",
+                                    on_change=lambda e: self.set_profile(e.value)).props("outlined dense").classes("w-64")
+            ui.button("Import…", on_click=self.import_dialog).props("flat dense no-caps")
+            ui.button("Export…", on_click=self.export_dialog).props("flat dense no-caps")
+            self.w_prof_del = ui.button("Delete profile", on_click=self.delete_profile) \
+                .props("flat dense no-caps color=negative")
+        self.w_prof_info = ui.label("").classes("ls-note")
         self.w_status = ui.markdown("")
         with ui.card().props("flat bordered").classes("ls-card w-full gap-1"):
             ui.label("Your plan").classes("font-semibold")
@@ -391,6 +517,7 @@ class Train:
         self.cmp_show = cmp_ui.start_card(lambda: self.ds, lambda: self.tkey)
         self.draw_caps()
         self.draw_download()
+        self.draw_profiles()
         self.load()
         self.draw_look()
 
