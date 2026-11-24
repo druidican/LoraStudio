@@ -4,7 +4,7 @@ The Collection's pages are in the left menu: **Pictures** and **Status** (the tw
 [Results](#results)) and **Maintenance**; an open **LoRA page** adds its parts (Overview, Pictures, Training, Edit)
 under *LoRA*. The search field and the filters (base model, order, preview, favorites, status) are in the menu too.
 
-## Browse
+## Pictures and Status
 
 One tile per dataset with the picture of its newest (or ★ best) LoRA, and a label per LoRA type (✓ = Completed). With
 *Colour the Collection cards by purpose* on (Settings › Look and base models), each card has a border and a label in
@@ -24,7 +24,7 @@ that LoRA page directly.
 
 ## Deleting a LoRA
 
-*Delete…* (Browse › Select, or on the LoRA page) opens a list of everything that belongs to each LoRA, with the size.
+*Delete…* (Pictures › Select, or on the LoRA page) opens a list of everything that belongs to each LoRA, with the size.
 Tick what goes:
 
 - the **versions** (all are ticked; untick one to keep it);
@@ -62,7 +62,7 @@ Click a tile for its **LoRA page**; the *Version* menu at the top switches betwe
   how the steps add up, the network and optimizer settings, and the result (training time, final loss, the save point
   to try first). They are read from the LoRA file, its launch script and its logs, once per version; *Read the
   training again* after you changed the script or the log. *Train a new version…* opens the dataset's Train part.
-- **Edit**: display name, character (groups it in Browse), version (shown in ComfyUI's LoRA Manager), clip skip,
+- **Edit**: display name, character (groups it in the Collection), version (shown in ComfyUI's LoRA Manager), clip skip,
   **Your rating** (4-5 good, 1-2 weak, for Collection › Insights; the same rating as on the run's page in Results), trigger words, description, notes, strength and CLIP strength,
   the preview's NSFW level, favorite, and a flag with its reason. Saved in LoRA Manager's format in the dataset's
   `LoraManager/` folder (a `.bak` is kept).

@@ -10,6 +10,14 @@
 - **Do** mark the version you like with ★ and copy it to your LoRA folder from Results (it brings its LoRA Manager data).
 - **Do** run *Check this machine* after installing, after a driver or ROCm update, and when training fails strangely.
 - **Do** make a backup (Settings › Backup) before big changes.
+- **Do** train on the **full** model files (bf16 / fp16). The small int8, fp8 and GGUF versions are for making
+  pictures in ComfyUI; musubi-tuner (Z-Image, Qwen-Image, FLUX.2) cannot train on them, and stage 1 says so.
+- **Do** train with the VAE you make pictures with, and the one the type is made for (Anima: `qwen_image_vae`,
+  Z-Image: the FLUX `ae`).
+- **Do** use a **Z-Image Turbo** LoRA at about strength **1.3**: it was trained with the training adapter, which is not
+  in the finished file, so it comes through weaker at 1.0. Its test pictures are made at 1.3.
+- **Do** keep a settings profile (step 9) for settings you found good, and share the `.toml` file instead of a
+  launch script.
 
 ## Don't
 
@@ -20,7 +28,8 @@
 - **Don't** delete `_originals/` or `_reserve/` by hand while working on a dataset: they are how steps 5 and 6 can be undone.
 - **Don't** edit a launch script while it is in the queue or training.
 - **Don't** give your LoRA Studio folder to someone else: it holds your settings and your Hugging Face token. Give
-  them LoraStudio.zip.
+  them LoraStudio.zip. (Launch scripts never hold the token: LoRA Studio passes it when a script runs.)
+- **Don't** use a Qwen3-**VL** text encoder (the one that also reads pictures) for Z-Image: it needs plain Qwen3 4B.
 
 ## Words used in LoRA Studio
 
@@ -34,3 +43,8 @@
 | **Network dim / alpha** | The size of the LoRA; higher holds more detail but copies the pictures sooner |
 | **Trigger word** | The first word of every caption; the word that calls the LoRA in a prompt |
 | **Save point** | The LoRA as it was after an epoch (`pipILLV2-000010.safetensors`) |
+| **Text encoder** | The part of the model that reads the prompt; trained lightly, it learns what the trigger word means |
+| **Flow shift** | For flow models (Z-Image, FLUX, Anima): where in the noise the training spends its time; higher = more on large shapes (face, build), lower = more on fine detail |
+| **Training adapter** | For Z-Image Turbo: a helper LoRA merged in while training, so the sped-up model can be trained; not part of the finished LoRA |
+| **Settings profile** | The training settings of one LoRA type in a `.toml` file, to share and import (step 9) |
+| **int8 / fp8 / GGUF** | Smaller versions of a model file for making pictures; train on the full (bf16) file |

@@ -40,6 +40,10 @@ unzip LoraStudio.zip && cd LoraStudio
 cd ~/LoraStudio && ./start.sh
 ```
 
+After the first start, Settings › Start and network › *Show LoRA Studio in the applications menu* puts it with its icon
+in your applications menu (pin it to the dock with a right-click); it starts LoRA Studio quietly when needed and opens
+the page. The **⏻** button at the top right shuts it down.
+
 With a trainer to install, it installs PyTorch for your graphics card: **AMD Radeon** with ROCm, **NVIDIA** with
 CUDA. For the GPU values in the top bar it looks for **amd-smi** (ROCm 10 and newer, where `rocm-smi` is gone) or
 `rocm-smi` (older ROCm); without either, training still works (Fedora: `sudo dnf install amdsmi`, Ubuntu: `sudo apt

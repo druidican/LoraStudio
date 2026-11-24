@@ -7,6 +7,8 @@ to open that run in its dataset's Results.
 
 ![The Queue: the launch scripts and the queue](img/run.jpg)
 
+- The left menu shows how many are running, waiting, done and failed, with *Start the queue* and *Stop after this
+  run* when they apply.
 - The queue **stops Ollama** first, to free the video memory (it is not started again by itself).
 - Each LoRA runs as its own program, so its memory is free again when it ends. When the next one uses another model
   (Anima → SDXL), the queue also asks ComfyUI to unload its models and waits until the video memory is empty; the
@@ -20,7 +22,8 @@ to open that run in its dataset's Results.
 
 ## The run
 
-While a run trains, the page shows its stages (caching, training, saving), the progress (step, epoch, time left),
+While a run trains, the page shows its stages (caching, training, saving; musubi types: *Check files*, *Prepare
+dataset*, *Cache latents*, *Cache text encoder*, *Train LoRA*, *Convert for ComfyUI*), the progress (step, epoch, time left),
 the **loss** curve and the save points written so far, the next item in the queue, and the **Run log** (folded).
 **Stop after this run** lets the running LoRA finish and then stops the queue; **Stop now** stops it at once (a
 saved state, if the script writes them, lets you resume later). The top bar shows the same on every page.
@@ -42,6 +45,8 @@ wrong, what it means and what to do, in the queue, the top bar and on the run's 
 | **Out of normal memory (RAM)** | close programs, 0–1 data loader workers, cache latents to disk |
 | **The loss became NaN** | a lower learning rate, bf16 instead of fp16 |
 | **A model file is missing or broken** | check Settings › Model files, download a broken file again |
+| **A model file does not fit** (musubi types: Z-Image, Qwen-Image, FLUX.2) | stage 1 *Check files* names the file: a ComfyUI int8 / fp8 file (`…_int8_convrot`, `…_fp8_mixed`) cannot be trained on, use the full bf16 file; a Qwen3-VL text encoder cannot be used for Z-Image, use `qwen_3_4b.safetensors` |
+| **Size mismatch / missing keys while loading the VAE** | the wrong VAE for the type: Anima and Qwen-Image need `qwen_image_vae.safetensors` (a similar-looking `qwen_image_2.1_vae` is a different VAE); Z-Image the FLUX `ae.safetensors` |
 | **The model does not fit this LoRA type** | pick the right base model for the type |
 | **No pictures to train on** | the repeat folder `<N>_<dataset name>` must hold the pictures |
 | **A picture is broken** | Datasets › 3 Usable scan finds it |

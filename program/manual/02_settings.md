@@ -110,6 +110,12 @@ scripts use them. *Refresh file lists* reads the folders again; *training_settin
 > **Don't** pick a model of another family (an SD 1.5 checkpoint for SDXL, a VAE as the checkpoint): the run fails
 > with "The model does not fit this LoRA type".
 
+> **Don't** pick ComfyUI's small int8 / fp8 / GGUF files (`…_int8_convrot`, `…_fp8_mixed`, `.gguf`) for training:
+> they are for making pictures. musubi-tuner types (Z-Image, Qwen-Image, FLUX.2) stop at stage 1 *Check files* with
+> the file's name; use the full bf16 file (musubi makes it smaller in memory itself with fp8, see Speed test). Z-Image
+> needs plain Qwen3 4B as its text encoder (`qwen_3_4b.safetensors`), not Qwen3-VL. A VAE with a similar name can
+> be another VAE: Anima and Qwen-Image train with `qwen_image_vae.safetensors`, Z-Image with the FLUX `ae.safetensors`.
+
 ## Trainers and GPU
 
 ![Settings › Trainers and GPU](img/set_trainers.jpg)

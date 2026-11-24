@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.241126"
-VERSION = "1.241126"
+__version__ = "1.241126b"
+VERSION = "1.241126b"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.231126",
-    "version.py": "1.241126",
+    "version.py": "1.241126b",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.221126",
     "program/Training/sd_script.py": "1.241126",
@@ -110,6 +110,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.241126b", "Manual brought up to date: the top-right buttons (⏻ shut down), starting from the applications menu, the Queue's left menu, musubi stages and the model-file checks, the right VAE and text encoder per type, Z-Image Turbo strength 1.3, settings profiles with Compare settings, new Do / Don't lines and words (text encoder, flow shift, training adapter, settings profile, int8 / fp8 / GGUF); Browse renamed Pictures and Status; new Home and top-bar pictures."),
     ("1.241126", "Settings profiles in step 9: export the training settings of a launch script (learning rates, rank, optimizer, scheduler, shift, steps, epochs …) as a .toml file to share, and import someone's under a name you choose. Original (LoRA Studio's own) always stays; the profile is chosen per dataset and LoRA type. Imported values are checked one by one; model files, memory settings, paths and tokens are never in a profile."),
     ("1.231126b", "A shut-down button (⏻) at the top right of every page: asks first; while a training run or the queue is running it says so and stops the run first (the save points written so far stay), then shuts LoRA Studio down. The same in Settings › Start and network."),
     ("1.231126", "Settings › Start and network: Show LoRA Studio in the applications menu (Linux desktops), with its icon. Clicking it opens the page; when LoRA Studio is not running it is started first, quietly (no terminal; output in userdata/logs/shortcut-start.log). Stop LoRA Studio on the same card. The shortcut follows when the folder is moved."),

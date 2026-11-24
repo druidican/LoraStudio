@@ -32,9 +32,24 @@ icons (hover one for its name; the search icon folds it out again); the browser 
 
 It is the same on every page: what is training now (step, loss, time left), how busy the GPU, CPU and RAM are (AMD:
 from `amd-smi` with ROCm 10 and newer, `rocm-smi` before; NVIDIA: `nvidia-smi`), and
-which Ollama model sits in video memory (Settings › AI helpers starts and stops it). The moon button at the top right
-switches between dark and light. When a run ends it says so, with the save point to try first, or what went
-wrong. Click it to go to the queue, or to the finished run in its dataset's Results.
+which Ollama model sits in video memory (Settings › AI helpers starts and stops it). When a run ends it says so, with
+the save point to try first, or what went wrong. Click it to go to the queue, or to the finished run in its dataset's
+Results.
+
+Three buttons sit at the top right of every page:
+
+- **Moon**: dark or light.
+- **?**: this manual, at the chapter of the page you are on.
+- **⏻ Shut down**: stops LoRA Studio after asking. While a training run or the queue is running, it says so and stops
+  the run first, like *Stop now* (the save points written so far stay). Start it again from the applications menu
+  (Settings › Start and network › *Shortcut*) or with `./start.sh`.
+
+## Starting LoRA Studio
+
+- **From the applications menu** (Linux): tick *Show LoRA Studio in the applications menu* once in Settings › Start and
+  network. The icon opens the page; when LoRA Studio is not running it starts it first, quietly, without a terminal.
+- **From a terminal**: `cd ~/LoraStudio && ./start.sh`.
+- **On the phone**: the phone page `/m` shows what is training (Settings › Start and network).
 
 ## Just trained
 

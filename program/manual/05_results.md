@@ -72,6 +72,9 @@ launch scripts of that type then use it (with a comment line saying so). Untick 
 
 > **Do** compare on two or three different datasets before you tick a winner: one dataset can fool you.
 
+A **settings profile** chosen in step 9 wins over the comparison winners for that dataset. To share a winner, make a
+launch script with it and use *Export…* in step 9 (see [step 9](#datasets)).
+
 ## Insights (Collection › Insights)
 
 ![Collection › Insights: the datasets behind your good and weak LoRAs](img/insights.jpg)
