@@ -5,7 +5,7 @@ fields, Completed, accepting warnings, copying to the LoRA folder, reading the t
 (head, training card, versions, picture grid) come from lora_library.
 """
 from __future__ import annotations
-__version__ = "1.191126f"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import copy
 import json
@@ -161,7 +161,7 @@ def save_edits(key: str, e: dict) -> str:
         ov.pop("flag", None)
         ov.pop("flag_reason", None)
     LIB.save_data()
-    lora.sidecar, lora.sidecar_path, lora.sidecar_from_archive = data, target, False
+    lora.sidecar, lora.sidecar_path = data, target
     if char and LIB.dataset_by_name(char) and lora.dataset is None:
         lora.dataset = LIB.dataset_by_name(char)
     if ov.get("character"):

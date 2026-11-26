@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -445,13 +445,32 @@ def create(source: str, name: str, repeats: int, outside: str = "") -> tuple[str
 
 def ensure_folders(ds) -> list[str]:
     """Step 1's folders for a dataset that already exists: model/, log/ and _originals/<repeat folder>/ with an
-    untouched copy of every picture are made when they are missing (a dataset made by hand, or folders deleted).
-    Returns what was made."""
+    untouched copy of every picture are made when they are missing (a dataset made by hand, or folders deleted). A
+    folder with only pictures (opened from the dataset list) first gets its repeat folder 10_<name>/, the pictures and
+    their captions moved in. Returns what was made."""
     r = root(ds)
-    rows = sg().dataset_stats(ds)["rows"]
-    if not r.is_dir() or not rows:
+    if not r.is_dir():
         return []
+    rows = sg().dataset_stats(ds)["rows"]
     made = []
+    if not rows:                                       # a folder with only pictures: make it a dataset where it is
+        pics = _pictures_in(r, False)
+        if not pics:
+            return []
+        rep = r / f"10_{ds}"
+        rep.mkdir(exist_ok=True)
+        for p in pics:
+            shutil.move(str(p), str(rep / p.name))
+            for c in DC.caption_of(p):
+                shutil.move(str(c), str(rep / (p.stem + c.name[len(p.stem):])))
+        made.append(f"{rep.name}/ ({len(pics)} pictures moved in)")
+        m = meta(ds)
+        if not m.get("created"):
+            m["created"] = time.strftime("%Y-%m-%d %H:%M")
+            m["trigger"] = m.get("trigger") or ds
+            m["steps"]["folder"] = {"at": m["created"]}
+            meta_save(ds, m)
+        rows = sg().dataset_stats(ds)["rows"]
     for sub in ("model", "log"):
         if not (r / sub).is_dir():
             (r / sub).mkdir(exist_ok=True)
@@ -1163,17 +1182,8 @@ def fit_box(w, h, l, t, r, b, aspect: str):
     return [round(max(0.0, l), 4), round(max(0.0, t), 4), round(min(1.0, r), 4), round(min(1.0, b), 4)]
 
 
-def apply_resize(ds, max_side: int, upscale: bool = True) -> str:
-    g = apply_resize_steps(ds, max_side, upscale)
-    while True:
-        try:
-            next(g)
-        except StopIteration as e:
-            return e.value
-
-
 def apply_resize_steps(ds, max_side: int, upscale: bool = True):
-    """Generator: yields a progress line per picture; its return value is the message (see apply_resize)."""
+    """Generator: yields a progress line per picture; its return value is the message."""
     over = resize_overrides(ds)
     rows = resize_plan(ds, max_side, over, upscale)
     todo = [x for x in rows if x["mode"] in ("scale", "crop", "upscale")
@@ -1336,7 +1346,7 @@ def set_count(ds, ext) -> tuple[int, int]:
 
 
 def write_set(ds, url, model, trigger, leave_out, style, length, detail, ext, only_missing=False):
-    """Generator like sdgui.oc_run, for any caption set (IMG.sentences.txt ...). Tag sets are written by the WD
+    """Generator: writes a caption set (IMG.sentences.txt ...). Tag sets are written by the WD
     tagger (wdtagger.py), sentence sets by Ollama."""
     S = sg()
     if style == "tags":

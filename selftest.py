@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261126"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -519,7 +519,7 @@ def _profiles():
                                                                        "steps": 2400, "noise_offset": 0.05}}}, "character")
     need(cfg["lr"] == "5e-05" and "--network_dim 32 --network_alpha 16" in cfg["flags"] and cfg["steps"] == 2400
          and "--noise_offset 0.05" in cfg["flags"], f"apply_cfg: {cfg}")
-    script = ("#!/bin/bash\n# Output xV1. Plan: … (target 2000)\naccelerate launch x.py \\\n  --network_dim 16 \\\n"
+    script = ("#!/bin/bash\n# Output xV1. Plan: … (target 2000)\naccelerate launch sdxl_train_network.py \\\n  --network_dim 16 \\\n"
               "  --network_train_unet_only \\\n  --optimizer_type AdamW8bit --learning_rate 1e-4 \\\n  --seed 1\n")
     got = PR.from_script(script, "character")
     need(got["learning_rate"] == 1e-4 and got["network_dim"] == 16 and got["steps"] == 2000

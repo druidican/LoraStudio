@@ -1,7 +1,9 @@
 # Making a dataset
 
 **Datasets** shows **All datasets** (every dataset as a tile; the search field in the left menu and *Only not trained
-yet* narrow it); **+ New dataset** is in the menu too. A dataset
+yet* narrow it); **+ New dataset** is in the menu too. A folder with only pictures that you put in the dataset folder yourself shows as a tile too:
+opening it makes it a dataset where it is (`10_<name>/` with the pictures and their captions moved in, `_originals/`,
+`model/`, `log/`). A dataset
 you open gets its own page with four parts, in the left menu under its name (Prepare as the steps 1-8, then Train,
 Results and LoRA under *Next*):
 

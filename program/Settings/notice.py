@@ -7,7 +7,7 @@ itself). The answer is kept in notice_accepted.json next to the program; a new N
 text is in the NOTICE file and in Settings › Version › Licences and credits.
 """
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import json
 import time
@@ -46,11 +46,6 @@ def accepted() -> bool:
 def accept(where: str = "page") -> None:
     FILE.write_text(json.dumps({"version": NOTICE_VERSION, "accepted": time.strftime("%Y-%m-%d %H:%M"),
                                 "where": where}, indent=1), encoding="utf-8")
-
-
-def plain() -> str:
-    """The text without Markdown, for the terminal and the NOTICE file."""
-    return TITLE + "\n\n" + TEXT.replace("**", "")
 
 
 def logo_data_url() -> str:

@@ -7,7 +7,7 @@ dataset is. The steps reuse sdgui's parts where they exist: the watermark choice
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -21,7 +21,6 @@ import detailscan as DSC
 import dsflow as F
 import features as FT
 
-FLOW = list(range(2, 12))      # 2-8 Prepare, 9 Train, 10 Results, 11 LoRA (one page per dataset)
 PART_STEP = {"train": 9, "results": 10, "lora": 11}
 _THUMBS: dict = {}
 

@@ -24,7 +24,7 @@ userdata/profiles/<type>/<name>.toml; the profile chosen for a dataset and type 
 apply_text writes the values into the script text.
 """
 from __future__ import annotations
-__version__ = "1.241126"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -219,15 +219,15 @@ def import_text(text: str, tkey: str, new_name: str) -> str:
 
 
 # --------------------------------------------------------------------------- reading a script (export)
-def _flag_value(text: str, flag: str):
-    m = re.search(rf"(?:^|\s){re.escape(flag)}(?:[ =]+(\S+))?(?=\s|$)", text, re.M)
-    if not m:
-        return None
-    return True if m.group(1) is None or m.group(1).startswith("--") or m.group(1) == "\\" else m.group(1).strip("\"'")
+def _sg():
+    import sys
+    return sys.modules.get("sdgui") or __import__("sdgui")
 
 
 def from_script(text: str, purpose: str) -> dict:
-    """The profile settings in a launch script's text, for one purpose: {key: value}."""
+    """The profile settings in a launch script's text, for one purpose: {key: value}. Read with the same helpers as
+    step 9's form (sdgui.form_value)."""
+    S = _sg()
     out = {}
     for k, (where, kind, _, _) in KEYS.items():
         if where == "cfg:steps":
@@ -235,12 +235,12 @@ def from_script(text: str, purpose: str) -> dict:
             if m:
                 out[k] = int(m.group(1))
             continue
-        flag = TEXT_FLAG.get(where, where)
-        v = _flag_value(text, flag)
+        name = TEXT_FLAG.get(where, where).lstrip("-")
         if kind is bool:
-            out[k] = v is True
+            out[k] = re.search(rf"(?<![\w-])--{name}(?![\w-])", text) is not None
             continue
-        if v is None or v is True:
+        v = S.form_value(text, name)
+        if not v:
             continue
         try:
             raw = float(v) if kind in (int, float) else v
@@ -306,36 +306,16 @@ def apply_cfg(cfg: dict, p: dict | None, purpose: str) -> tuple[dict, list[str]]
 
 
 def apply_text(text: str, p: dict | None, purpose: str) -> str:
-    """A saved script's text with the profile's values (target steps only change a new plan)."""
+    """A saved script's text with the profile's values (target steps only change a new plan); written with the same
+    helpers as step 9's form (sdgui.set_arg / set_switch)."""
+    S = _sg()
     vals = ((p or {}).get("settings") or {}).get(purpose_key(purpose)) or {}
-    lines = text.split("\n")
     for k, v in vals.items():
         where = KEYS[k][0]
         if where == "cfg:steps":
             continue
-        flag = TEXT_FLAG.get(where, where)
-        pat = re.compile(rf"(?<!\S){re.escape(flag)}(?:[ =]+(?!--)[^\s\\]+)?(?=\s|$)")
-        hit = [i for i, ln in enumerate(lines) if pat.search(ln)]
-        if isinstance(v, bool):
-            if v and not hit:
-                anchor = next((i for i, ln in enumerate(lines) if "--network_dim" in ln), None)
-                if anchor is not None:
-                    lines.insert(anchor, re.match(r"\s*", lines[anchor]).group(0) + f"{flag} \\")
-            if not v:
-                for i in hit:
-                    lines[i] = pat.sub("", lines[i]).rstrip()
-                    if lines[i].strip() in ("", "\\"):
-                        lines[i] = None
-                lines = [ln for ln in lines if ln is not None]
-            continue
-        if hit:
-            for i in hit:
-                lines[i] = pat.sub(f"{flag} {_fmt(v)}", lines[i])
-        else:
-            anchor = next((i for i, ln in enumerate(lines) if "--network_dim" in ln), None)
-            if anchor is not None:
-                lines.insert(anchor, re.match(r"\s*", lines[anchor]).group(0) + f"{flag} {_fmt(v)} \\")
-    text = "\n".join(lines)
+        name = TEXT_FLAG.get(where, where).lstrip("-")
+        text = S.set_switch(text, name, v)[0] if isinstance(v, bool) else S.set_arg(text, name, _fmt(v))[0]
     return mark(text, p)
 
 

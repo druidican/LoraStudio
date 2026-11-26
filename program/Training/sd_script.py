@@ -5,7 +5,7 @@ page (Datasets › 9).
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.241126"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import copy
 import functools
@@ -934,17 +934,12 @@ def _has(text, flag):
 
 def safetensors_keys(path: Path, limit: int = 4000) -> list:
     """Tensor names from a .safetensors header (only the header is read, not the weights)."""
-    import json as _json
-    import struct as _struct
+    import model_guide
     try:
-        with open(path, "rb") as fh:
-            (n,) = _struct.unpack("<Q", fh.read(8))
-            if n > 200_000_000:
-                return []
-            head = _json.loads(fh.read(n))
-        return [k for k in head if k != "__metadata__"][:limit]
-    except Exception:
+        head = model_guide.read_header(path)
+    except Exception:                                  # noqa: BLE001
         return []
+    return [k for k in head if k != "__metadata__"][:limit]
 
 
 # Separate component files (text encoders, VAE/AE) must contain only that component. A full checkpoint that

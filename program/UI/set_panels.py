@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.231126b"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -737,7 +737,7 @@ def panel_ai(page):
         note("Ollama is not installed (Settings › Start and network › What is installed): the detailed sort and writing "
              f"captions by Ollama are hidden. Get it from {FT.ollama_guide()}, tick it there, "
              "restart.")
-    url0, use0 = S.oc_settings()
+    url0, _ = S.oc_settings()
     with card():
         ui.label("Ollama: reads pictures and writes captions").classes("font-semibold")
         with ui.row().classes("w-full items-end gap-2"):
@@ -976,9 +976,6 @@ def panel_models(page):
     slots_box = ui.column().classes("w-full gap-2")
     dl_md = ui.markdown("")
     msg = ui.markdown("")
-
-    def files_of(d):
-        return SSET.list_model_files(d, rec.value)
 
     def gather(tkey, recursive):
         """Everything load() shows, read from disk (slow on big model folders: runs in a thread)."""

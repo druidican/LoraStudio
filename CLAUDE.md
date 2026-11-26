@@ -181,6 +181,17 @@ NiceGUI updates only the elements that change, so the old Gradio tricks (joined 
 are gone. Keep it that way: build a step's controls when it is opened, redraw HTML parts only when their HTML changed
 (`set_html` in the pages), and run slow work with `run.io_bound` or `widgets.stream`. `script_type` is cached per file.
 
+## Cleanup (1.261126b)
+
+Stage 1-3 of the owner's cleanup (2026-11-26): dead code removed (Gradio leftovers, the old caption writer `oc_run`,
+unused constants and imports; the remaining "unused imports" in `sdgui.py` are its re-exports, used as `S.x`), script
+options read and written only through `sdgui.form_value` / `set_arg` / `set_switch` / `drop_arg` / `append_args`
+(compare.py and profiles.py had their own regexes), one safetensors header reader (`model_guide.read_header`; the
+copies inside generated bash scripts stay, they run in the trainers' venvs). The `_sg()` helpers differ on purpose
+(some return None when sdgui is not loaded). Measured at the owner's size (80 datasets, 200 LoRAs): start 1.4 s, every
+page under 0.3 s, 0.2 % of a core idle: no speed work needed. Stage 4 (splitting lora_library / sdgui / dsflow) not
+done (owner chose 1-3).
+
 ## Testing
 
 - `python selftest.py` (use the program's venv). It also starts the program once with `LS_PAGE_CHECK=1` (no login,

@@ -32,7 +32,7 @@ never into the .safetensors file or the LoRA folder.
 """
 
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -69,7 +69,6 @@ import picgallery as PG                # Gallery tab: which pictures were made w
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 APP_DIR = _LP.USER                  # your settings, data and caches (userdata/)
 SETTINGS_FILE = APP_DIR / "library_settings.txt"  # (version 1 used settings.txt, migrated once)
-FOLDERS_BLOCK = LOOK_BLOCK = None                 # settings panels, see build_library_ui()
 ON_SETTINGS_SAVED: list = []                      # callbacks(settings) run after saving, used by lora_studio.py
 DATA_FILE = APP_DIR / "library_data.json"        # character overrides + flags
 HASH_CACHE_FILE = APP_DIR / "hash_cache.json"    # sha256 cache
@@ -436,14 +435,10 @@ def file_sha256(path: Path, cache: dict) -> str:
 # --------------------------------------------------------------------------- #
 
 def read_safetensors_meta(path: Path) -> dict:
+    import model_guide
     try:
-        with open(path, "rb") as f:
-            n = struct.unpack("<Q", f.read(8))[0]
-            if n <= 0 or n > 200_000_000:
-                return {}
-            header = json.loads(f.read(n))
-        return header.get("__metadata__") or {}
-    except Exception:
+        return model_guide.read_header(path).get("__metadata__") or {}
+    except Exception:                                  # noqa: BLE001
         return {}
 
 
@@ -625,7 +620,6 @@ class Lora:
     dataset: Dataset | None = None
     sidecar: dict | None = None
     sidecar_path: Path | None = None
-    sidecar_from_archive: bool = False
     preview: Path | None = None
     examples: list = field(default_factory=list)    # [Path] LoRA Manager example images
     base: str = "Unknown"
@@ -1232,7 +1226,6 @@ class Library:
             lora.sidecar_path = arch / (lora.stem + ".metadata.json")
             if lora.sidecar_path.exists():
                 sc = _load_json(lora.sidecar_path, None)
-                lora.sidecar_from_archive = True
             if arch.is_dir():
                 lora.preview = find_preview(arch, lora.stem, None)
                 ex_dir = arch / f"{lora.stem}_examples"       # copies made by older versions of the sync
@@ -2849,11 +2842,7 @@ body.ls-selecting .ll-card-data[data-gid] { padding-top:38px; }
 
 
 
-# The LoRA Studio palette (the same as the layout slides): warm paper, ink, amber for actions, teal for "done".
-PALETTE = {"paper": "#F6F5F1", "card": "#FDFDFB", "ink": "#1C1F24", "muted": "#4A5160", "amber": "#E8A33D",
-           "amber_text": "#8F560B", "amber_tint": "#FBE9C8", "line": "#C9CDD3", "teal": "#21857C", "chip": "#ECEEF1",
-           "dark_paper": "#14161A", "dark_card": "#1B1E23", "dark_card2": "#262A31", "dark_line": "#343944",
-           "dark_ink": "#E6E8EB"}
+
 
 
 STATUS_CHOICES = ["OK", "Warnings", "Problems"]
@@ -2899,9 +2888,6 @@ def version_choices(lora) -> list:
     return [(f"{m.vlabel}{' (newest)' if m is newest and len(members) > 1 else ''}"
              f"{' ★ best' if m is best else ''}  ·  {m.stem}", m.key)
             for m in reversed(members)]
-
-
-UI_HOOKS: dict = {}          # components lora_studio.py wires to other tabs
 
 
 def versions_html(lora) -> str:

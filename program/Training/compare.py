@@ -16,7 +16,7 @@ of every run, rate them blind, and learn per LoRA type which settings make the b
 Every comparison is one JSON file in userdata/compare/.
 """
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import json
 import random
@@ -46,13 +46,16 @@ def _sg():
 
 # --------------------------------------------------------------------------- the settings in a launch script
 def lr_of(text: str) -> str:
-    m = re.search(r"--learning_rate[ =](\S+)", text or "")
-    return m.group(1) if m else ""
+    return _sg().form_value(text or "", "learning_rate")
 
 
 def rank_of(text: str) -> tuple[int, int] | None:
-    d, a = re.search(r"--network_dim[ =](\d+)", text or ""), re.search(r"--network_alpha[ =]([\d.]+)", text or "")
-    return (int(d.group(1)), int(float(a.group(1)))) if d and a else None
+    S = _sg()
+    d, a = S.form_value(text or "", "network_dim"), S.form_value(text or "", "network_alpha")
+    try:
+        return (int(float(d)), int(float(a))) if d and a else None
+    except ValueError:
+        return None
 
 
 def te_trained(text: str) -> bool | None:
@@ -70,23 +73,20 @@ def _same_lr(a: str, b: str) -> bool:
 
 
 def set_lr(text: str, v: str) -> str:
-    return re.sub(r"--learning_rate[ =]\S+", f"--learning_rate {v}", text, count=1)
+    return _sg().set_arg(text, "learning_rate", v)[0]
 
 
 def set_rank(text: str, d: int, a: int) -> str:
-    text = re.sub(r"--network_dim[ =]\d+", f"--network_dim {d}", text, count=1)
-    return re.sub(r"--network_alpha[ =][\d.]+", f"--network_alpha {a}", text, count=1)
+    S = _sg()
+    return S.set_arg(S.set_arg(text, "network_dim", str(d))[0], "network_alpha", str(a))[0]
 
 
 def set_te(text: str, on: bool, lr: str = "5e-5") -> str:
-    if on:
-        text = re.sub(r"[ \t]*--network_train_unet_only[ \t]*\\\n", "", text, count=1)
-        text = re.sub(r"[ \t]*--network_train_unet_only\b", "", text, count=1)
-        if not re.search(r"--text_encoder_lr\b", text):
-            text = re.sub(r"(--learning_rate[ =]\S+)", rf"\1 --text_encoder_lr {lr}", text, count=1)
-        return text
-    if "--network_train_unet_only" not in text:
-        text = re.sub(r"(--learning_rate[ =]\S+)", r"\1 --network_train_unet_only", text, count=1)
+    """on: the text encoders learn (at lr, unless the script has its own); off: the image model only."""
+    S = _sg()
+    text = S.set_switch(text, "network_train_unet_only", not on)[0]
+    if on and not S.form_value(text, "text_encoder_lr"):
+        text = S.set_arg(text, "text_encoder_lr", lr)[0]
     return text
 
 

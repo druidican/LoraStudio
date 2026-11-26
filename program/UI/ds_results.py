@@ -3,7 +3,7 @@
 rating, report, TensorBoard) and comparing runs. The data and the HTML parts are training_ui's; clicks inside them
 come back as ls_rs_box events (open, copy, cmpkeep, best)."""
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -147,7 +147,7 @@ class Results:
                 ui.button("Compare the ticked", on_click=self.compare).props("unelevated dense no-caps color=primary")
             self.msg0 = ui.markdown("")
             import cmp_ui                                # Compare settings: the comparisons and the blind rating
-            self.cmp_card = cmp_ui.ResultsCard(lambda: self.ds)
+            cmp_ui.ResultsCard(lambda: self.ds)
             self.lst = ui.html("", sanitize=False).classes("w-full").props('id="rs_list"')
         with ui.column().classes("w-full gap-3") as self.cmp_col:
             ui.button("← All runs", on_click=lambda: (self.draw_list(), self.show("list"))).props("flat dense no-caps")

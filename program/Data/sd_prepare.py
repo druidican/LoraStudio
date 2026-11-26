@@ -4,7 +4,7 @@
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -193,59 +193,6 @@ def oc_preview(ds, url, model, trigger, leave_out, hints, style="sentences", len
         yield "\n".join(out) + (f"\n⏳ {pick[i].name} ..." if i < len(pick) else "")
     out.append("Happy with these? Press **Recaption all images**. Not happy: change the leave-out list or try another model.")
     yield "\n".join(out)
-
-
-def oc_run(ds, url, model, trigger, leave_out, hints, unload_after, style="sentences", length=3, detail=3,
-           only_missing=False):
-    """Rewrite every caption of the dataset. Old captions: Undo button + safety copy in gui_logs/."""
-    bad = _oc_check(ds, url, model, trigger)
-    if bad:
-        yield bad
-        return
-    url = (url or "").strip() or S.CAP.DEFAULT_URL
-    oc_save_settings(url, model)
-    imgs = oc_images(ds)
-    if only_missing:
-        imgs = [im for im in imgs if not S.read_caption(im)]
-    if not imgs:
-        yield "No images in this dataset's repeat folders." if not only_missing else "Every picture already has a caption."
-        return
-    olds = {im: S.read_caption(im) for im in imgs}
-    record_change(f"recaption {ds} with {model}",
-                  {S.caption_file(im): (S.caption_file(im).read_text(encoding="utf-8", errors="ignore")
-                                      if S.caption_file(im).is_file() else None) for im in imgs})
-    OC_STOP["flag"] = False
-    done, leaky, failed, t_start = 0, [], [], time.time()
-    for i, im in enumerate(imgs, 1):
-        if OC_STOP["flag"]:
-            break
-        el = time.time() - t_start
-        eta = f", about {S.fmt(el / max(done, 1) * (len(imgs) - done))} left" if done else ""
-        yield f"⏳ {i}/{len(imgs)}: {im.parent.name}/{im.name}{eta}"
-        try:
-            r = S.CAP.caption(url, model, im, trigger.strip(), leave_out, _oc_hint(olds[im]) if hints else "",
-                          style=style or "sentences", length=int(length or 3), detail=int(detail or 3))
-        except S.CAP.OllamaError as e:
-            failed.append(f"{im.name}: {e}")
-            if "not reachable" in str(e):
-                break
-            continue
-        S.caption_file(im).write_text(r["caption"] + "\n", encoding="utf-8")
-        done += 1
-        if r["leaks"]:
-            leaky.append(f"{im.parent.name}/{im.name}: {', '.join(r['leaks'])}")
-    if unload_after:
-        S.CAP.unload(url, model)
-    L = [f"{'■ Stopped' if OC_STOP['flag'] else '✔ Done'}: {done} of {len(imgs)} captions rewritten in {S.fmt(time.time() - t_start)}"
-         + (" (model unloaded from VRAM)." if unload_after else "."),
-         "**Undo last change** restores all the old captions (a safety copy is in gui_logs/)."]
-    if leaky:
-        L.append(f"\n⚠️ {len(leaky)} caption(s) still mention a left-out trait; check and edit them by hand:")
-        L += [f"- {x}" for x in leaky[:30]]
-    if failed:
-        L.append(f"\n❌ {len(failed)} image(s) failed:")
-        L += [f"- {x}" for x in failed[:10]]
-    yield "\n".join(L)
 
 
 DC_CACHE_NAME = "datacheck_cache.json"

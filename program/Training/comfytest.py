@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.221126"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -45,7 +45,6 @@ POSITIVE = {
     "vpred": "masterpiece, best quality, newest, absurdres, highres, safe",
     "zimage": "",
 }
-NOOB_POSITIVE = POSITIVE["noobai"]
 BUILTIN = {"sdxl": "sdxl.json", "illustrious": "illustrious.json", "pony": "pony.json",
            "noobai": "noobai_eps.json", "vpred": "noobai_vpred.json", "zimage": ""}   # zimage: made in code
 BUILTIN_NOTE = {

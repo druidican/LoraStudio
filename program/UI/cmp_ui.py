@@ -2,7 +2,7 @@
 """Compare settings, the pages' part (the logic is Training/compare.py): the start card in the dataset's Train part,
 the comparisons and the blind rating in its Results part, and "Best settings per LoRA type" in Collection › Insights."""
 from __future__ import annotations
-__version__ = "1.201126c"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import time
 
@@ -61,9 +61,6 @@ def start_card(get_ds, get_tkey):
 
 
 # --------------------------------------------------------------------------- Results: the comparisons and rating
-STATE_TEXT = {"queued": "waiting", "running": "training", "done": "done", "failed": "failed", "gone": "gone"}
-
-
 def _status(e: dict) -> str:
     st = C.run_states(e)
     done = sum(1 for v in st.values() if v == "done")

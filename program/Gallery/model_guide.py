@@ -15,7 +15,7 @@ Results of identify() are cached in model_ids.json (keyed by path, size and modi
 """
 
 from __future__ import annotations
-__version__ = "1.261126"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -112,6 +112,8 @@ PREFIXES = ("model.diffusion_model.", "diffusion_model.", "first_stage_model.", 
 
 # --------------------------------------------------------------------------- identify
 def read_header(path: Path) -> dict:
+    """A .safetensors file's JSON header (tensor names, shapes, dtypes, __metadata__); only the header is read. The
+    one reader for the whole program (LoRA metadata, model checks, launch-script checks)."""
     with open(path, "rb") as fh:
         (n,) = struct.unpack("<Q", fh.read(8))
         if n <= 0 or n > 300_000_000:

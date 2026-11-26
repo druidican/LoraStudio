@@ -9,12 +9,11 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
                  changes, stop on fail, Completed marks after a run that wrote its final LoRA
   launch scripts reading and writing their options (the form), the LoRA types (Lora_Datatypes.py) and the
                  recommendations; split over sd_script.py, sd_prepare.py and sd_settings.py, imported back here
-  build_ui(app)  the training parts of the page, built hidden in BLOCKS for lora_studio.py / datasets_ui.py to place
 
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.261126"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
@@ -628,7 +627,7 @@ def append_args(body: str, argstr: str):
 _SAMPLE_FLAGS = ("sample_every_n_epochs", "sample_every_n_steps", "sample_at_first", "sample_sampler")
 
 
-def _drop_arg(body: str, name: str) -> tuple[str, bool]:
+def drop_arg(body: str, name: str) -> tuple[str, bool]:
     """Remove --name and its value (if any) from the script text."""
     pat = re.compile(rf"[ \t]*(?<![\w-])--{name}(?![\w-])(?:(?:=|[ \t]+)(?!--)(?:\"[^\"]*\"|'[^']*'|[^\s\\]+))?")
     new = pat.sub("", body)
@@ -638,15 +637,24 @@ def _drop_arg(body: str, name: str) -> tuple[str, bool]:
     return new, True
 
 
+def set_switch(body: str, name: str, on: bool) -> tuple[str, bool]:
+    """An option without a value (--network_train_unet_only): added to the training command, or taken out.
+    Returns (body, changed)."""
+    has = re.search(rf"(?<![\w-])--{name}(?![\w-])", body) is not None
+    if on == has:
+        return body, False
+    return append_args(body, f"--{name}") if on else drop_arg(body, name)
+
+
 def fix_flags(body: str) -> tuple[str, list]:
     """Options that make sd-scripts fail, taken out: sampling without --sample_prompts (it crashes at the first
     sample). --clip_skip stays (owner's tested Illustrious script carries --clip_skip 2). A Hugging Face token in the
     script is replaced by the lines that read it when the script runs (scrub_hf). Returns (body, notes)."""
     notes = []
     if not re.search(r"(?<![\w-])--sample_prompts(?![\w-])", body):
-        gone = [f for f in _SAMPLE_FLAGS if _drop_arg(body, f)[1]]
+        gone = [f for f in _SAMPLE_FLAGS if drop_arg(body, f)[1]]
         for f in gone:
-            body = _drop_arg(body, f)[0]
+            body = drop_arg(body, f)[0]
         if gone:
             notes.append("removed " + ", ".join("--" + f for f in gone) + " (no --sample_prompts: sd-scripts would stop at the first sample)")
     body, had = scrub_hf(body)                         # the token is passed when the script runs, never stored in it
@@ -1783,8 +1791,8 @@ from sd_script import (  # noqa: F401  (also used as sdgui.<name> by the other p
     explain_for,
     find_script,
     form_dict,
+    form_value,
     infer_type,
-    launch_scripts,
     load_recs,
     make_plan,
     merged_presets,
@@ -1806,40 +1814,24 @@ from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other 
     _dc_min_side,
     _oc_check,
     _oc_family,
-    oc_example,
     oc_images,
-    oc_preview,
-    oc_recommend,
-    oc_run,
     oc_save_settings,
     oc_settings,
     record_change,
-    rv_undo,
-    wm_apply,
-    wm_apply_live,
-    wm_crop_apply,
-    wm_crop_show,
-    wm_render,
 )
 from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
-    ENV_EXTRA,
     GFX_VAR,
-    KNOWN_GFX,
     SECTION_NAMES,
     _type_base,
     apply_gfx_env,
     cs_set_epochs,
     cs_use_settings,
     detect_gfx,
-    env_save,
     env_saved,
     vendor_env,
-    env_update_scripts,
     scrub_all_scripts,
     scrub_hf,
-    get_export,
     get_gfx,
-    gfx_load,
     hf_path,
     hf_status_text,
     mask_token,
@@ -1852,15 +1844,7 @@ from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other
     settings_models,
     settings_path,
     slot_label,
-    st_online,
-    st_download_stop,
     st_raw,
-    st_save,
-    st_suggest,
-    sub_add,
-    sub_choices,
-    sub_list_md,
-    sub_remove,
     type_slots,
     vae_optional,
     write_settings,
@@ -1961,11 +1945,6 @@ SETTINGS_FILE = "settings.txt"
 ST_N = 4            # number of file slots in the Settings tab (set from the presets in build_ui)
 
 
-# --------------------------------------------------------------------------- UI
-# --------------------------------------------------------------------------- test pictures from LoRA files (Review tab)
-GEN_HELP_CACHE: dict = {}
-
-
 def script_saved_hook(ds) -> str:
     """After a new launch script: dsflow moves other repeat folders to _extra/ and ends 'look outside the repeat
     folder' (Datasets › 3). Returns its note ('' when there is nothing to say)."""
@@ -1976,55 +1955,8 @@ def script_saved_hook(ds) -> str:
         return f"(tidying the dataset folder failed: {e})"
 
 
-def auto_script(ds, tkey) -> str:
-    """Write a launch script with the recommended settings for the type (the next version). Returns a note."""
-    if not ds or not tkey:
-        return ""
-    try:
-        plan = make_plan(ds, tkey)
-        dest = lora_path(ds) / plan["filename"]
-        dest.write_text(plan["script_text"].rstrip("\n") + "\n", encoding="utf-8")
-        dest.chmod(dest.stat().st_mode | 0o755)
-        ensure_folders(ds, plan["script_text"], plan, tkey)
-        archive_old_scripts(lora_path(ds), keep=dest)
-        tidy = script_saved_hook(ds)
-        return (f" New launch script **`{dest.name}`** written with the recommended settings for "
-                f"{dict((v, l) for l, v in type_choices()).get(tkey, tkey)} (check it in the dataset's Train)."
-                + (f" {tidy[:1].upper()}{tidy[1:]}." if tidy else ""))
-    except Exception as e:                  # noqa: BLE001
-        return f" (No launch script written: {e})"
-
-
 # --------------------------------------------------------------------------- LoRA Studio pages: helpers
 ON_SD_DIR: list = []   # callbacks(path) when Settings > Trainers saves a new sd-scripts folder
-BLOCKS: dict = {}      # page name -> gr.Column(render=False), placed by lora_studio.py and datasets_ui.py
-UI: dict = {}          # components and chains lora_studio.py wires across pages
-
-
-_KEYS_MEMO = {"t": 0.0, "keys": set()}
-
-
-def _checked_keys() -> set:
-    if time.time() - _KEYS_MEMO["t"] > 5:
-        _KEYS_MEMO["keys"] = set(k.rsplit("|", 1)[0] for k in _dc_cache_load())
-        _KEYS_MEMO["t"] = time.time()
-    return _KEYS_MEMO["keys"]
-
-
-def _checked_count(imgs) -> int:
-    """How many of these pictures have a content-check result for their current file (any model)."""
-    keys = _checked_keys()
-    if not keys:
-        return 0
-    n = 0
-    for p in imgs:
-        try:
-            st = p.stat()
-        except OSError:
-            continue
-        if f"{p}|{st.st_size}|{int(st.st_mtime)}" in keys:
-            n += 1
-    return n
 
 
 def _marks_counts(ds) -> tuple[int, int]:

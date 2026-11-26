@@ -11,7 +11,7 @@ Only the Python standard library is used (urllib); Pillow is used to shrink the 
 Run it on its own to test the connection:   python3 captioner.py [--url http://127.0.0.1:11434] [image.jpg]
 """
 from __future__ import annotations
-__version__ = "1.091126"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -451,14 +451,6 @@ def _example_sentences(t: str, length: int, detail: int) -> str:
 def clip_tokens(text: str) -> int:
     """Rough CLIP token count (CLIP reads 75 per chunk): about 1.3 tokens per word plus one per comma."""
     return int(round(len(re.findall(r"[A-Za-z0-9']+", text)) * 1.3 + text.count(",")))
-
-
-def unload(url: str, model: str):
-    """Free the model's VRAM right away (before training starts)."""
-    try:
-        _req(url, "/api/chat", {"model": model, "messages": [], "keep_alive": 0}, timeout=30)
-    except OllamaError:
-        pass
 
 
 if __name__ == "__main__":

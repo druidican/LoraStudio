@@ -8,7 +8,7 @@ that send an event back here (emitEvent): a tile opens its dataset page, a type 
 Select mode is kept in the browser (picked cards get the class ll-picked) and read when a button needs it.
 """
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
@@ -48,9 +48,6 @@ window.llToggle = function(gid, btn){
 };
 </script>
 """
-
-STATUS_MAP = {"OK": "OK", "Warnings": "Warnings", "Problems": "Problems"}
-
 
 class Collection:
     def __init__(self, shell):

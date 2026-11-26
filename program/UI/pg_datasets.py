@@ -8,7 +8,7 @@ Pictures, grids and lists are drawn as HTML by datasets_ui's renderers; their cl
 (route). What each step does to the dataset folder is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -18,7 +18,7 @@ from nicegui import run, ui
 import datasets_ui as V
 import dsflow as F
 import sdgui as S
-from widgets import note, pic_url
+from widgets import note
 
 NAMES = {2: "Setup", 3: "Usable scan", 4: "Sort", 5: "Select", 6: "Watermarks and size", 7: "Captions", 8: "Review",
          9: "Train", 10: "Results", 11: "LoRA"}
@@ -91,7 +91,7 @@ class Datasets:
             return
         if act == "folder":
             self.s["src"] = arg
-            self.n_src = arg
+            self.n_out.value = ""                          # a folder picked here, not the one typed before
             self.n_name.value = F.safe_name(arg.replace("_batch", "").replace("_raw", ""))
             self.n_list.content = V.new_list_html(arg)
             self.draw_tree()
@@ -132,6 +132,13 @@ class Datasets:
         if ds not in S.list_lora_dirs():
             return
         s = self.s
+        try:                                               # a folder with only pictures becomes a dataset here
+            made = F.ensure_folders(ds)
+        except OSError as e:
+            made = []
+            ui.notify(f"Could not make the dataset's folders: {e}", type="negative")
+        if made:
+            ui.notify(f"{ds}: made " + ", ".join(made), type="positive")
         step = s.get("prep") if s.get("prep_ds") == ds and s.get("prep") else min(F.next_step(ds), 8)
         self.go(view="flow", mode="edit", ds=ds, step=int(step))
 
@@ -277,7 +284,11 @@ class Datasets:
     def create(self):
         ds, msg = F.create(self.s.get("src", ""), self.n_name.value, self.n_rep.value, self.n_out.value)
         self.n_msg.content = msg
-        if ds:
+        if ds:                                             # an empty form for the next new dataset
+            self.s["src"] = ""
+            self.n_out.value = ""
+            self.n_name.value = ""
+            self.n_msg.content = ""
             self.go(view="flow", mode="new", ds=ds, step=2, src="")
 
     async def add_pics(self):

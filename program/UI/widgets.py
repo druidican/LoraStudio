@@ -7,7 +7,7 @@ the Collection's cached thumbnail (lora_library.thumb_file, made when the browse
 only (allowed_roots).
 """
 from __future__ import annotations
-__version__ = "1.191126h"  # LoRA Studio version, see version.py
+__version__ = "1.261126b"  # LoRA Studio version, see version.py
 
 import hashlib
 from pathlib import Path
@@ -105,11 +105,7 @@ def chip(text: str, kind: str = "", tip: str = ""):
     return c
 
 
-def heading(text: str, sub: str = ""):
-    with ui.column().classes("gap-0"):
-        ui.label(text).classes("ls-h")
-        if sub:
-            ui.label(sub).classes("ls-note")
+
 
 
 def note(text: str):
