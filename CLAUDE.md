@@ -116,9 +116,21 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   overview of all steps) and Train / Results / LoRA. Collection: search, Pictures / Status / Insights / Maintenance,
   the filters and an open LoRA page's parts (`tab_panels` without tab bars). Settings: the groups + search. Queue:
   counts and Start. Home: the cards and Continue. The old stepper, part bar and sub-tab bars are gone.
-- **The dataset page**: four parts: Prepare (steps 1-8, reopens at `prep`), Train (step 9,
-  `UI/ds_train.py`), Results (`UI/ds_results.py`) and LoRA (cards from the Collection's groups → `lsOpenLora`).
-  ds_box actions `part|`, `dspart|ds|n` (Collection tiles), `run|log` (status strip, Home). Insights is in the Collection.
+- **The dataset page**: five parts: Prepare (steps 1-8, reopens at `prep`), Train (step 9,
+  `UI/ds_train.py`), Results (`UI/ds_results.py`), Review and export (step 12) and LoRA (cards → `lsOpenLora`).
+  ds_box actions `part|`, `dspart|ds|n` (Collection tiles), `run|log` and `review|log` (status strip, Home).
+- **Review and export** (1.271126, `UI/ds_review.py`, logic `Training/lmexport.py`, dataset part step 12, menu *Next*):
+  opened by the status strip after a run (`shell.go("datasets", review=log)`, failed runs → Results) and Home › Just
+  trained. One row of test pictures per save point (`comfytest.results`; `make` reuses pictures of the same file and
+  prompts, "around" adds more); export = the chosen file becomes the run's final file (owner: NEVER the epoch in the
+  name; the old final becomes `-0000NN` unless cleaned up), `HK.copy_lora` into the LoRA folder, `.metadata.json` +
+  `.preview.png` next to it, the whole row as LM example pictures (`<example_images_path>/<sha256>/custom_ls<sha6><nn>`
+  + `civitai.customImages`, LM's own format), the dataset's card the same, Completed, rating, then `check_step`.
+  It replaced Results' Keep this one / Copy a file (removed).
+- **Fixed features** (1.271126, `Data/fixedfeat.py`, step 2 card `ds_steps.FixedCard`, step 8 `fixed_check_card`):
+  your word + wrong words, meta `fixed`; always "part of the trigger": taken out of every caption when written
+  (`dsflow.write_set` / WD write via `FX.strip`, `sd_prepare.oc_preview`), Ollama told (`captioner.PURPOSE["fixed"]`,
+  `dsflow.tell_fixed`); a gender word among them drops the class word (`FX.class_word`). Never suggest features.
 - `tools/make_test_world.py` makes an invented world with a pretend sd-scripts (runs end to end in seconds, writes a
   loss log, so Results and the manual pictures look real).
 - **Class word** (step 2, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).

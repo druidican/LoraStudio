@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-only · Copyright (C) 2026 L. G. H. Druidican · see LICENSE
 """The dataset page's Results part (step 10): its runs, one run (advice, save points, test pictures, clean up,
 rating, report, TensorBoard) and comparing runs. The data and the HTML parts are training_ui's; clicks inside them
-come back as ls_rs_box events (open, copy, cmpkeep, best)."""
+come back as ls_rs_box events (open, best). Test pictures, keeping a save point and the export are on Review and export
+(ds_review.py)."""
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
-from nicegui import run, ui
+from nicegui import ui
 
 import features as FT
 import sdgui as sg
@@ -44,13 +45,13 @@ class Results:
 
     # ------------------------------------------------------------------ one run
     def open(self, log: str):
-        h, t, p, s, c, th, tl, d, st = T.open_run(log)
+        h, t, p, s, c, th, tl, st = T.open_run(log)
         self.st = st
         self.head.content, self.tryf.content, self.sp.content, self.clean_md.content = h, t, s, c
-        self.this.content, self.tail.value, self.dest.value = th, tl, d
+        self.this.content, self.tail.value = th, tl
         self.plot.options["series"] = _series(p)
         self.plot.update()
-        self.cmsg.content = self.clean_msg.content = self.again_msg.content = ""
+        self.clean_msg.content = self.again_msg.content = ""
         logdir = ""
         if st.get("script"):
             try:
@@ -60,12 +61,11 @@ class Results:
         self.tb_dir.value = logdir
         info = T.script_info(st["script"]) if st.get("script") and __import__("os").path.isfile(st["script"]) else None
         self.rate.value = T.rating_of(info)
-        self.cmp_html.content = T.compare_html(st)
         self.show("one")
 
     def reopen(self):
         if self.st:
-            h, t, p, s, c, th, tl, d, _ = T.open_run(self.st["log"])
+            h, t, p, s, c, th, tl, _ = T.open_run(self.st["log"])
             self.sp.content, self.clean_md.content, self.tryf.content = s, c, t
             self.plot.options["series"] = _series(p)
             self.plot.update()
@@ -74,31 +74,14 @@ class Results:
         act, _, arg = (v or "").partition("|")
         if act == "open":
             self.open(arg)
-        elif act == "copy":
-            self.cmsg.content = T.copy_file(self.st, arg, self.dest.value, self.over.value)
-            self.reopen()
-        elif act == "cmpkeep":
-            ui.timer(0, lambda: self.keep(arg), once=True)
         elif act == "best":
             msg = T.toggle_best(arg)
             self.again_msg.content = self.cmp_bmsg.content = msg
             if self.logs:
                 self.cmp_head.content = T.compare_head_html(self.logs)
 
-    async def keep(self, label: str):
-        from widgets import confirm
-        if not await confirm(f"Keep {label} of this run? It becomes the run's final file; the other save points, the "
-                             "old final file and the resume states go to the Trash.", "Keep it"):
-            return
-        self.kmsg.content = "⏳ Keeping …"
-        self.kmsg.content = await run.io_bound(T.keep_epoch, self.st, label)
-        self.cmp_html.content = T.compare_html(self.st)
-        self.reopen()
-
     def tick(self):
         import comfytest as CT
-        if self.one.visible and self.st.get("log") and (CT.JOBS.get(self.st["log"]) or {}).get("state") == "running":
-            self.cmp_html.content = T.compare_html(self.st)
         if self.cmp_col.visible and self.logs and any(
                 (CT.JOBS.get(ln) or {}).get("state") == "running" or ln in CT.PENDING for ln in self.logs):
             self.cmp_pics.content = T.compare_pics_html(self.logs, self.which.value)
@@ -120,6 +103,16 @@ class Results:
         self.cmp_pics.content = T.compare_pics_html(logs, self.which.value)
         self.msg0.content = ""
         self.show("cmp")
+
+    def review(self):
+        if self.st.get("log"):
+            self.page.go(step=12, review=self.st["log"])
+
+    def make(self):
+        import comfytest as CT
+        if self.st.get("log"):
+            CT.WHICH[self.st["log"]] = "best+final"
+            self.cmsg.content = CT.make_in_background(self.st["log"]) + " They show on Review and export."
 
     def report(self):
         import report
@@ -184,35 +177,14 @@ class Results:
         with ui.column().classes("w-full gap-3") as self.one:
             ui.button("← All runs", on_click=lambda: (self.draw_list(), self.show("list"))).props("flat dense no-caps")
             self.head = ui.html("", sanitize=False).classes("w-full")
-            with ui.card().props("flat bordered").classes("ls-card w-full gap-1"):
-                ui.label("What was made: the test pictures, and which file to keep").classes("font-semibold")
-                note("Made by themselves after the run (the save point to try first and the final file). Pick the one "
-                     "to keep with Keep this one.")
-                self.kmsg = ui.markdown("")
-
-                def make():
-                    import comfytest as CT
-                    if self.st.get("log"):
-                        CT.WHICH[self.st["log"]] = "best+final"
-                        self.cmsg.content = CT.make_in_background(self.st["log"])
-                        self.cmp_html.content = T.compare_html(self.st)
-                self.cmp_html = ui.html("", sanitize=False).classes("w-full")
-                with ui.row().classes("gap-2"):
-                    ui.button("Make them again", on_click=make).props("flat dense no-caps")
-                    ui.button("Refresh", on_click=lambda: setattr(self.cmp_html, "content", T.compare_html(self.st))) \
-                        .props("flat dense no-caps")
             with ui.row().classes("w-full no-wrap items-start gap-4"):
-                with ui.expansion("Copy a file to your LoRA folder").classes("ls-card grow basis-2/5"):
+                with ui.card().props("flat bordered").classes("ls-card grow basis-2/5 gap-2"):
                     self.tryf = ui.html("", sanitize=False)
+                    note("Its test pictures, which save point to keep and the export to LoRA Manager (file, data, "
+                         "preview, example pictures) are on Review and export.")
                     with ui.row().classes("gap-2"):
-                        ui.button("Copy the one to try first", on_click=lambda: (setattr(self.cmsg, "content", T.copy_best(
-                            self.st, self.dest.value, self.over.value)), self.reopen())).props("unelevated dense no-caps color=primary")
-                        ui.button("Copy the final", on_click=lambda: (setattr(self.cmsg, "content", T.copy_final(
-                            self.st, self.dest.value, self.over.value)), self.reopen())).props("outline dense no-caps")
-                    self.dest = ui.input("Copy to").props("outlined dense").classes("w-full")
-                    note("The folder where older versions of this LoRA are; an epoch file is copied with a name like "
-                         "mycharZITV1-e8.")
-                    self.over = ui.checkbox("Replace a different file with the same name (the old one goes to the Trash)")
+                        ui.button("Review and export →", on_click=self.review).props("unelevated dense no-caps color=primary")
+                        ui.button("Make the test pictures", on_click=self.make).props("flat dense no-caps")
                     self.cmsg = ui.markdown("")
                 with ui.card().props("flat bordered").classes("ls-card grow basis-3/5 gap-1"):
                     ui.label("Loss per epoch").classes("font-semibold")

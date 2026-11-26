@@ -8,7 +8,7 @@ Pictures, grids and lists are drawn as HTML by datasets_ui's renderers; their cl
 (route). What each step does to the dataset folder is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -21,7 +21,7 @@ import sdgui as S
 from widgets import note
 
 NAMES = {2: "Setup", 3: "Usable scan", 4: "Sort", 5: "Select", 6: "Watermarks and size", 7: "Captions", 8: "Review",
-         9: "Train", 10: "Results", 11: "LoRA"}
+         9: "Train", 10: "Results", 11: "LoRA", 12: "Review and export"}
 
 
 class Datasets:
@@ -34,6 +34,7 @@ class Datasets:
     def go(self, **kw):
         s = dict(self.s)
         s.pop("open_run", None)                          # a run is opened once (Results), not on every later visit
+        s.pop("review", None)
         if kw.get("step") and kw["step"] <= 8:
             kw.setdefault("prep", kw["step"])            # Prepare reopens at the step you were at
             kw.setdefault("prep_ds", kw.get("ds", s.get("ds")))
@@ -50,6 +51,8 @@ class Datasets:
             return self.go(view="edit")
         if kw.get("run"):
             self.route("run|" + kw["run"])
+        elif kw.get("review"):
+            self.route("review|" + kw["review"])
         elif kw.get("ds"):
             part = kw.get("part")
             step = kw.get("step") or (V.PART_STEP.get(part) if part else None) or F.next_step(kw["ds"])
@@ -81,13 +84,16 @@ class Datasets:
             if ds in S.list_lora_dirs():
                 self.go(view="flow", mode="edit", ds=ds, step=int(n or 11))
             return
-        if act == "run":
+        if act in ("run", "review"):                     # a run in Results, or its Review and export
             import training_ui as TU
             have = S.list_lora_dirs()
             ds = TU.dataset_of_log(arg)
             ds = ds if ds in have else (s.get("ds") or (have[0] if have else ""))
             if ds:
-                self.go(view="flow", mode="edit", ds=ds, step=10, open_run=arg)
+                if act == "run":
+                    self.go(view="flow", mode="edit", ds=ds, step=10, open_run=arg)
+                else:
+                    self.go(view="flow", mode="edit", ds=ds, step=12, review=arg)
             return
         if act == "folder":
             self.s["src"] = arg
@@ -215,6 +221,7 @@ class Datasets:
                 SM.header("Next")
                 self.m_train = SM.Item("play_circle", "Train", on_click=lambda: self.go(view="flow", step=9))
                 self.m_res = SM.Item("bar_chart", "Results", on_click=lambda: self.go(view="flow", step=10))
+                self.m_rev = SM.Item("star", "Review and export", on_click=lambda: self.go(view="flow", step=12))
                 self.m_lora = SM.Item("collections", "LoRA", on_click=lambda: self.go(view="flow", step=11))
 
     def search_changed(self):
@@ -273,6 +280,7 @@ class Datasets:
                 it.set_right("")
         self.m_train.active(step == 9)
         self.m_res.active(step == 10)
+        self.m_rev.active(step == 12)
         self.m_lora.active(step == 11)
         nl = self.lora_count(ds)
         self.m_lora.set_right(f"{nl} file{'s' if nl != 1 else ''}" if nl else "")

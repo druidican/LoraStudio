@@ -18,7 +18,7 @@ State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.jso
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -33,6 +33,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageOps
 
 import datacheck as DC
+import fixedfeat as FX
 
 FLOW_DIR = ".lsflow"
 ORIGINALS = "_originals"
@@ -1349,6 +1350,7 @@ def write_set(ds, url, model, trigger, leave_out, style, length, detail, ext, on
     """Generator: writes a caption set (IMG.sentences.txt ...). Tag sets are written by the WD
     tagger (wdtagger.py), sentence sets by Ollama."""
     S = sg()
+    tell_fixed(ds, trigger)
     if style == "tags":
         yield from _write_set_wd(ds, trigger, leave_out, length, ext, only_missing)
         return
@@ -1384,12 +1386,21 @@ def write_set(ds, url, model, trigger, leave_out, style, length, detail, ext, on
             if "not reachable" in str(e):
                 break
             continue
-        set_file(p, ext).write_text(r["caption"] + "\n", encoding="utf-8")
+        set_file(p, ext).write_text(FX.strip(ds, r["caption"], style, (trigger or ds).strip()) + "\n", encoding="utf-8")
         done += 1
     msg = f"{'■ Stopped' if STOP.is_set() else '✔ Done'}: {done} of {len(imgs)} captions written to `IMG{ext}`."
     if failed:
         msg += f" {len(failed)} failed: " + "; ".join(failed[:3])
     yield msg
+
+
+def tell_fixed(ds, trigger=""):
+    """The caption writer (captioner.PURPOSE) gets the dataset's fixed features and its class word (none when the
+    gender is a fixed feature)."""
+    S = sg()
+    if S is not None and S.CAP is not None:
+        S.CAP.PURPOSE["fixed"] = FX.prompt_rule(ds, (trigger or meta(ds).get("trigger") or ds).strip())
+        S.CAP.PURPOSE["class"] = FX.class_word(ds)
 
 
 def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
@@ -1416,7 +1427,8 @@ def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
     write_leave = "" if character or purpose == "worn" else (leave_out or "")
     last = ""
     for last in WD.tag(imgs, (trigger or ds).strip(), write_leave, max_tags,
-                       lambda img, line: set_file(img, ext).write_text(line + "\n", encoding="utf-8"), STOP, traits,
+                       lambda img, line: set_file(img, ext).write_text(
+                           FX.strip(ds, line, "tags", (trigger or ds).strip()) + "\n", encoding="utf-8"), STOP, traits,
                        trait_leave=(leave_out or cap.DEFAULT_LEAVE_OUT) if character else
                        ("" if purpose == "worn" else None)):
         yield last

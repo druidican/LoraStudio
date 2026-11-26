@@ -7,7 +7,7 @@ the page is opened with shell.go(key, **kw), e.g. shell.go("datasets", ds="pip",
 The status strip is redrawn by a timer only when its text changed.
 """
 from __future__ import annotations
-__version__ = "1.231126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import importlib
 from pathlib import Path
@@ -68,14 +68,20 @@ def _strip(shell: Shell):
             last["state"] = state
         ev = statusbar.DONE_EVENTS[-1] if statusbar.DONE_EVENTS and state in ("done", "fail") else None
         last["log"] = ev.get("log", "") if ev else ""
+        last["ok"] = bool(ev and ev.get("ok"))
         m = statusbar.machine_html() + statusbar.ollama_html()
         if m != last["machine"]:
             machine.content = last["machine"] = m
 
     def click():
-        shell.go("home" if last["log"] else "queue")
+        if last["log"] and last.get("ok"):
+            shell.go("datasets", review=last["log"])     # its test pictures: Review and export
+        elif last["log"]:
+            shell.go("datasets", run=last["log"])        # a failed run: its result
+        else:
+            shell.go("queue")
     run.on("click", click)
-    run.tooltip("Open the queue, or Home › Just trained after a run")
+    run.tooltip("Open the queue, or after a run: Review and export (its test pictures), or why it failed")
     tick()
     ui.timer(1.5, tick)
 

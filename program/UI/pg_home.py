@@ -6,7 +6,7 @@ Just trained: the runs of the last finished queue. One LoRA: its test pictures w
 the final file; several LoRAs: the final file of each, side by side (comfytest.after_queue decides which are made).
 """
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import time
 
@@ -69,8 +69,11 @@ class Home:
                             note({"making": "⏳ making the test pictures …",
                                   "waiting": "⏳ waiting for ComfyUI"}.get(r["state"], r["state"]))
                         ui.space()
-                        ui.button("Its results →", on_click=lambda _, ln=r["log"]: self.shell.go("datasets", run=ln)) \
+                        ui.button("Its results", on_click=lambda _, ln=r["log"]: self.shell.go("datasets", run=ln)) \
                             .props("flat dense no-caps")
+                        ui.button("Review and export →",
+                                  on_click=lambda _, ln=r["log"]: self.shell.go("datasets", review=ln)) \
+                            .props("unelevated dense no-caps color=primary")
                         if not r["labels"] and not r["state"]:
                             ui.button("Make test pictures",
                                       on_click=lambda _, ln=r["log"], n=len(runs): self.make(ln, n)) \

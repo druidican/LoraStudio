@@ -3,7 +3,7 @@
 the open step's controls into the page's box from the dataset as it is now; what a step does to the folder is in
 dsflow.py, the HTML parts (grids, lists) come from datasets_ui."""
 from __future__ import annotations
-__version__ = "1.201126f"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -23,9 +23,10 @@ from widgets import CropPanel, PaintPanel, note, pic_url, stream
 
 def attach(page):
     import ds_results
+    import ds_review
     import ds_train
     for n, fn in ((2, step2), (3, step3), (4, step4), (5, step5), (6, step6), (7, step7), (8, step8),
-                  (9, ds_train.step9), (10, ds_results.step10), (11, step11)):
+                  (9, ds_train.step9), (10, ds_results.step10), (11, step11), (12, ds_review.step12)):
         page.steps[n] = (lambda fn=fn: fn(page))
 
 
@@ -107,6 +108,8 @@ def step2(page):
                 dl.set_visibility(missing)
 
             def go_on():
+                import fixedfeat as FX
+                FX.save(ds, fixed.rows())
                 why = save_setup(ds, t.value or [], pu.value, wm.value, trig.value, words.value, worn.value, cls.value,
                                  caps.value)
                 if why:
@@ -127,9 +130,94 @@ def step2(page):
             ui.html(f'<div class="ls-card"><b>All {len(imgs)} pictures</b><div class="ds-strip">{strip}</div>'
                     + (f'<div class="ls-note">… {len(imgs) - 24} more</div>' if len(imgs) > 24 else "") + "</div>",
                     sanitize=False).classes("w-full")
+    fixed = FixedCard(ds, lambda: trig.value or ds, lambda: cls.value)
     for w in (t, pu):
         w.on_value_change(lambda: shown())
     shown()
+
+
+class FixedCard:
+    """Step 2: Fixed features (fixedfeat.py): your word, the wrong words the tagger or Ollama use, part of the
+    trigger. LoRA Studio suggests none; Fill … from the tags lists the dataset's tags for you to tick."""
+
+    def __init__(self, ds, trigger, cls):
+        import fixedfeat as FX
+        self.ds, self.trigger, self.cls = ds, trigger, cls
+        self.items: list = []
+        with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
+            ui.label("Fixed features: what must stay right").classes("font-semibold")
+            note("Features that belong to the subject (an outfit, an object, a colour, a style) or the gender, in your "
+                 "own words; LoRA Studio suggests none. Each is part of the trigger: the word and its wrong words are "
+                 "left out of every caption (tags and sentences), so the trigger word learns them. The WD tagger's and "
+                 "Ollama's words for them are taken out when the captions are written (step 7), Ollama is told not to "
+                 "name them, and step 8 lists captions that still do.")
+            self.box = ui.column().classes("w-full gap-1")
+            with ui.row().classes("items-center gap-2"):
+                ui.button("＋ Add a feature", on_click=lambda: self.add("", "")).props("outline dense no-caps")
+                ui.button("Save", on_click=self.save).props("flat dense no-caps")
+            self.cls_note = note("")
+            self.msg = ui.markdown("")
+        for r in FX.rows(ds) or [{"word": "", "wrong": ""}]:
+            self.add(r["word"], r["wrong"])
+        self.draw_note()
+
+    def add(self, word, wrong):
+        with self.box:
+            with ui.row().classes("w-full items-center gap-2 no-wrap") as row:
+                w = ui.input("Your word", value=word, placeholder="orange visor").props("outlined dense").classes("w-64")
+                x = ui.input("Wrong words the tagger or Ollama use", value=wrong, placeholder="goggles, visor") \
+                    .props("outlined dense").classes("grow")
+                ui.label("part of the trigger").classes("ls-chip warn flex-none")
+                item = {"row": row, "w": w, "x": x}
+                ui.button("from the tags…", on_click=lambda it=item: self.pick_tags(it)).props("flat dense no-caps")
+                ui.button(icon="close", on_click=lambda it=item: self.remove(it)).props("flat dense round size=sm")
+        self.items.append(item)
+
+    def remove(self, it):
+        it["row"].delete()
+        self.items.remove(it)
+
+    def rows(self) -> list[dict]:
+        return [{"word": it["w"].value or "", "wrong": it["x"].value or ""} for it in self.items]
+
+    def save(self):
+        import fixedfeat as FX
+        self.msg.content = FX.save(self.ds, self.rows())
+        self.draw_note()
+
+    def draw_note(self):
+        import fixedfeat as FX
+        cls = (self.cls() or "").strip()
+        self.cls_note.text = (f"The gender is a fixed feature: the class word ({cls}) goes too, so sentence captions "
+                              f"begin \"{self.trigger()}, …\".") if FX.drops_class(self.ds) and cls else ""
+
+    def pick_tags(self, it):
+        """The dataset's tags (from its captions), for you to tick the wrong words of this feature."""
+        sets = F.caption_sets(self.ds)
+        ext = next((x["ext"] for x in sets if x["style"] == "tags"), sets[0]["ext"] if sets else ".txt")
+        counts, n = F.tag_counts(self.ds, ext, self.trigger())
+        have = [t.strip().lower() for t in (it["x"].value or "").split(",") if t.strip()]
+        with ui.dialog() as d, ui.card().classes("w-[44rem] max-w-[95vw] gap-2"):
+            ui.label(f"Wrong words for “{it['w'].value or 'this feature'}”").classes("font-semibold")
+            if not counts:
+                note("No tags yet: write the captions in step 7 first, then come back.")
+            else:
+                note(f"The tags in the captions of {n} pictures, most used first. Tick the ones that name this feature "
+                     "wrongly.")
+            boxes = []
+            with ui.row().classes("w-full gap-x-4 gap-y-0 max-h-[60vh] overflow-y-auto"):
+                for tag_, k in counts[:150]:
+                    boxes.append((tag_, ui.checkbox(f"{tag_} ({k})", value=tag_ in have).props("dense")))
+
+            def use():
+                picked = [t for t, b in boxes if b.value]
+                keep = [t for t in have if t not in {x for x, _ in boxes}]
+                it["x"].value = ", ".join(dict.fromkeys(keep + picked))
+                d.close()
+            with ui.row().classes("gap-2"):
+                ui.button("Use the ticked", on_click=use).props("unelevated dense no-caps color=primary")
+                ui.button("Cancel", on_click=d.close).props("flat dense no-caps")
+        d.open()
 
 
 # --------------------------------------------------------------------------- 3 Usable scan
@@ -604,7 +692,8 @@ def step7(page):
     m = F.meta(ds)
     purpose = m["purpose"]
     if S.CAP is not None:
-        S.CAP.PURPOSE.update(value=purpose, words=m.get("concept_words") or "", **{"class": m.get("class_word", "person")})
+        S.CAP.PURPOSE.update(value=purpose, words=m.get("concept_words") or "")
+        F.tell_fixed(ds)
     tkey = page.s.get("tkey") if page.s.get("tkey") in m["types"] else (m["types"] or [""])[0]
     url0, model0 = S.oc_settings()
     head("Tag every picture",
@@ -867,6 +956,7 @@ def step8(page):
     ds = page.s["ds"]
     head("Review")
     sets = F.caption_sets(ds)
+    fixed_draw = fixed_check_card(page, ds, lambda: draw())
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.card().props("flat bordered").classes("ls-card w-72 flex-none gap-1"):
             ui.label("The folder").classes("font-semibold")
@@ -900,6 +990,7 @@ def step8(page):
 
     def draw():
         tree.content, checks.content, g.content = V.s8_render(ds, show.value)
+        fixed_draw()
 
     def pick(path):
         p = Path(path)
@@ -923,6 +1014,49 @@ def step8(page):
     show.on_value_change(lambda: draw())
     ui.button("Continue to Train →", on_click=done).props("unelevated no-caps color=primary")
     draw()
+
+
+def fixed_check_card(page, ds, redraw):
+    """Step 8: captions that still name a fixed feature (fixedfeat.check). Returns its draw function."""
+    import fixedfeat as FX
+    card = ui.card().props("flat bordered").classes("ls-card w-full gap-1")
+    with card:
+        title = ui.label("").classes("font-semibold")
+        note("Captions that still name a fixed feature or one of its wrong words (written by hand, or by an older "
+             "caption run). Left in, that word learns the feature instead of the trigger word.")
+        box = ui.column().classes("w-full gap-1")
+        with ui.row().classes("items-center gap-2"):
+            ui.button("Take them out everywhere", on_click=lambda: out("")).props("unelevated dense no-caps color=primary")
+            ui.button("Edit the fixed features (step 2)", on_click=lambda: page.go(step=2)).props("flat dense no-caps")
+        msg = ui.markdown("")
+
+    def out(path):
+        msg.content = FX.take_out(ds, path)
+        redraw()
+
+    def draw():
+        if card.is_deleted:
+            return
+        if not FX.rows(ds):
+            card.set_visibility(False)
+            return
+        items = FX.check(ds)
+        card.set_visibility(True)
+        title.text = (f"Fixed features: {len(items)} caption{'s still name' if len(items) != 1 else ' still names'} one"
+                      if items else "Fixed features: ✓ no caption names one")
+        box.clear()
+        with box:
+            for it in items[:60]:
+                with ui.row().classes("w-full items-center gap-3 no-wrap"):
+                    ui.image(pic_url(Path(it["path"]), 120)).classes("w-14 h-14 rounded flex-none").props("fit=cover")
+                    with ui.column().classes("grow min-w-0 gap-0"):
+                        ui.label(f"{Path(it['path']).name} · IMG{it['ext']}").classes("font-semibold")
+                        ui.label(it["caption"][:220]).classes("ls-note truncate")
+                    ui.label(", ".join(it["hits"])).classes("ls-chip bad flex-none")
+                    ui.button("Take out", on_click=lambda _, p=it["path"]: out(p)).props("outline dense no-caps")
+            if len(items) > 60:
+                note(f"… {len(items) - 60} more.")
+    return draw
 
 
 # --------------------------------------------------------------------------- 11 LoRA

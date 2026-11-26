@@ -70,6 +70,16 @@ pictures beat many similar ones. For a style: 30–80 pictures in that style wit
   new word means, which helps likeness. Tag captions are not changed. Leave it empty to start with the trigger word
   alone.
 
+**Fixed features: what must stay right** (the card under them): things that belong to the subject and must not be
+misread by the taggers: an outfit, an object, a colour, a style, the gender. Write each in **your own words** (LoRA
+Studio suggests none), and next to it the **wrong words** the WD tagger or Ollama use for it (`goggles, visor` for an
+orange visor; *from the tags…* lists the tags in the dataset's captions to tick). Each fixed feature is **part of the
+trigger**: the word and its wrong words are left out of every caption, tags and sentences, so the trigger word learns
+them. Step 7 takes them out when it writes the captions and tells Ollama not to name them; step 8 lists captions that
+still do. When the gender is a fixed feature, the class word goes too (sentence captions begin `pip, …`).
+
+![Step 2: fixed features, in your own words](img/fixed.jpg)
+
 **Ready for these LoRA types?** (the card on the right): for each ticked type, whether its model files are on this computer and its trainer is installed, and whether Ollama has a model that reads pictures (the sort and sentence captions need it). *⬇ Download the missing model files* fetches them from Hugging Face **in the background**: go on with the next steps meanwhile; the line under the button says how far it is.
 
 ## 3 · Usable scan
@@ -266,6 +276,10 @@ puts the captions from before the last run back.
 
 The last look: pictures without a caption, captions without the trigger word first, very long captions. Click a
 picture to see and edit its caption, then *Save caption changes*.
+
+**Fixed features** (on top, when the dataset has them): captions that still name a fixed feature or one of its wrong
+words, for example written by hand or by an older caption run. *Take out* (one picture) or *Take them out everywhere*
+removes them (in sentences, the part of the sentence that names it); step 7's *Undo last change* brings them back.
 
 ## 9 · Train (the Train part)
 

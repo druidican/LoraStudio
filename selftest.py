@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -452,6 +452,51 @@ def _classword():
         need(C.clean("pip sits", "pip") == "pip sits", "style captions changed")
     finally:
         C.PURPOSE.clear(); C.PURPOSE.update(old)
+
+
+@check("fixed features: out of tags and sentences, the class word goes with the gender")
+def _fixed():
+    import dsflow as F
+    import fixedfeat as FX
+    ts = sorted(["orange visor", "goggles", "male", "man", "1boy"], key=lambda t: (-len(t), t))
+    need(FX.strip_tags("pip, 1boy, orange visor, standing, woman", ts, "pip") == "pip, standing, woman", "tags")
+    got = FX.strip_sentences("pip wears an orange visor and stands in a female crowd near a man.", ts, "pip")
+    need(got == "pip stands in a female crowd.", got)
+    got = FX.strip_sentences("pip walks along a street, his goggles reflect the light, the sky is blue.", ts, "pip")
+    need(got == "pip walks along a street, the sky is blue.", got)
+    m = F.meta(DS)
+    old = m.get("fixed")
+    try:
+        FX.save(DS, [{"word": "red background", "wrong": "red, background"}])
+        need(not FX.drops_class(DS) and FX.class_word(DS) == m.get("class_word", "person"), "class word kept")
+        need(len(FX.check(DS)) == 8, f"step 8 check: {len(FX.check(DS))}")
+        FX.save(DS, [{"word": "red background", "wrong": ""}, {"word": "male", "wrong": "man"}])
+        need(FX.drops_class(DS) and FX.class_word(DS) == "", "class word dropped with the gender")
+        need("NEVER name or describe these" in FX.prompt_rule(DS, DS), "prompt rule")
+        FX.take_out(DS)
+        cap = F.read_set(F.images(DS)[0], ".txt")
+        need("red background" not in cap and "person" not in cap, cap)
+    finally:
+        m = F.meta(DS)
+        m["fixed"] = old or []
+        F.meta_save(DS, m)
+    return "tags, sentences, class word, step 8"
+
+
+@check("review and export: the check at the end")
+def _export_check():
+    import lmexport as LX
+    need(LX.view("no_such_run.log") is None, "a missing run")
+    need(LX.check_step([])[0] == "❌", "an unfinished export")
+    f = TMP / "exp" / "x.safetensors"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_bytes(b"lora")
+    import hashlib
+    sha = hashlib.sha256(b"lora").hexdigest()
+    (f.parent / "x.metadata.json").write_text(json.dumps({"sha256": sha}), encoding="utf-8")
+    need(LX.check_step([], f, sha)[0] == "✔", LX.check_step([], f, sha))
+    need(LX.check_step([], f, "0" * 64)[0] == "❌", "another hash")
+    return "missing run, hash, metadata"
 
 
 @check("launch script names count up (V1, V2, ...)")

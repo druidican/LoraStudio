@@ -8,29 +8,49 @@ copied to your LoRA folder, and the leftovers *Clean up* can remove.
 
 ## One run
 
-![One run: what was made, and which file to keep](img/result_one.jpg)
+![One run: try first, the loss and the way to Review and export](img/result_one.jpg)
 
-**What was made** comes first: the test pictures that were made right after the run, one row per save point (the one
-to try first and the final file), the same prompt and seed in each column. **Keep this one** makes that save point the
-run's final file (`<name>.safetensors`); the other save points of the run, the old final file and the resume states go
-to the Trash, a copy in your LoRA folder with the same name is replaced, and the LoRA card gets that row's first
-picture as its preview. *Make them again* makes the pictures anew (for example when ComfyUI was off).
+**Review and export →** opens the run's test pictures, where you pick the save point to keep and export it to LoRA
+Manager (see [Review and export](#results) below). *Make the test pictures* makes them when ComfyUI was off.
 
 **Try first** is the earliest saved epoch whose loss is within 1 % of the lowest, and it says when the loss rose at the
 end (trained too long) or was still falling (could train longer). Loss is only a rough guide for image LoRAs: make
 a few test pictures with it and the final file.
 
-- *Copy a file to your LoRA folder* (folded): *Copy the one to try first* / *Copy the final* copies the file into
-  your LoRA folder, with its LoRA Manager data: into the folder of its LoRA type (next to an older version when there
-  is one, in a subfolder), never into the LoRA folder's root.
+- **Save points**: every file of the run with its loss, size and whether it is in your LoRA folder.
 - **Clean up this run** moves epoch files you did not copy, saved states and caches to the Trash.
 - **This run**: *Train a new version…* opens the dataset's Train part; *Run it again* puts the same
   script in the queue; *★ Best version* marks it; *Your rating* (4-5 good, 1-2 weak) teaches Insights; *Report for Claude* makes the report file (see [Training](#training)).
 - **TensorBoard** (folded): *Start TensorBoard* opens the run's logs in TensorBoard; *End of the run log* shows the
   last lines as the trainer wrote them.
 
-When a run or a queue has just ended, Home's **Just trained** card leads straight to these test pictures (see
-[Welcome](#welcome)).
+## Review and export (to LoRA Manager)
+
+When a run's test pictures are made, the status strip (*→ Review and export*) and Home's **Just trained** open this
+part of the dataset page; the left menu has it under *Next*. *Run* picks another run of the dataset.
+
+![Review and export: one row of test pictures per save point, and what goes to LoRA Manager](img/review.jpg)
+
+1. **Pick the version**: one row per save point, the same prompts and seeds in each row (*★ try first* marks the
+   suggested one). Click a row to keep it, a picture to make it the preview; double-click a picture to see it big.
+   *Make pictures of the save points around it* adds the save points on each side of the suggested one (pictures that
+   are already there are not made again).
+2. **What goes to LoRA Manager**: the file name (always the run's name, never with the epoch in it), the folder it is
+   copied to (the folder of its LoRA type, next to an older version), the base model, the trigger words, the strength
+   (LoRA Manager's usage tips), the preview, the example pictures (the whole row of the chosen save point), the
+   training, your note and your rating. *After export*: mark the version Completed (on), and clean up the other save
+   points and resume states of the run (off; they go to the Trash).
+3. **Select and export to LoRA Manager**: the chosen save point becomes the run's final file (the old final file stays
+   as its own save point, unless you clean up), it is copied into your LoRA folder with `<name>.metadata.json`
+   and `<name>.preview.png` next to it, and the row's pictures go into LoRA Manager's example picture folder (its
+   setting *example_images_path*, one folder per LoRA hash) with their prompt and seed. The dataset's LoRA card in the
+   Collection gets the same data.
+
+![Exported: every step, checked at the end](img/review_done.jpg)
+
+The list says what was done and checks it at the end (the copy, its data, the preview and the example pictures).
+LoRA Manager reads the new files at its next scan: *Refresh* in LoRA Manager, or restart ComfyUI. When LoRA Manager's
+example picture folder is not known, set it in Collection › Maintenance; the LoRA and its data are exported anyway.
 
 ## Comparing versions
 

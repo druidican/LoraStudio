@@ -4,7 +4,7 @@
 Part of sdgui.py (split by topic): the names of sdgui are reached as S.<name>; sdgui imports
 the names of this file back, so callers use sdgui.<name> as before."""
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -172,6 +172,9 @@ def oc_preview(ds, url, model, trigger, leave_out, hints, style="sentences", len
         return
     step = max(1, len(imgs) // n)
     pick = imgs[::step][:n]
+    import dsflow as F
+    import fixedfeat as FX
+    F.tell_fixed(ds, trigger)
     out = [f"### Preview: {len(pick)} of {len(imgs)} images, nothing written\n"
            "The first image also loads the model into VRAM, so it takes longer.\n"]
     yield "\n".join(out) + f"\n⏳ {pick[0].name} ..."
@@ -185,6 +188,7 @@ def oc_preview(ds, url, model, trigger, leave_out, hints, style="sentences", len
             out.append(f"❌ {e}")
             yield "\n".join(out)
             return
+        r["caption"] = FX.strip(ds, r["caption"], style or "sentences", trigger.strip())
         warn = f"  \n⚠️ still mentions: {', '.join(r['leaks'])}" if r["leaks"] else ""
         if r.get("dropped"):
             warn += f"  \n(left out tags about: {', '.join(r['dropped'])})"

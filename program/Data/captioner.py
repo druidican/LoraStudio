@@ -11,7 +11,7 @@ Only the Python standard library is used (urllib); Pillow is used to shrink the 
 Run it on its own to test the connection:   python3 captioner.py [--url http://127.0.0.1:11434] [image.jpg]
 """
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import base64
 import io
@@ -30,7 +30,8 @@ DEFAULT_LEAVE_OUT = ("face, facial features, eye colour, hair colour, freckles, 
 
 # What the LoRA is for: "character" (default), "style" or "concept". Set by the Datasets steps (and the launch script
 # page's Purpose) so every caption writer uses the right prompt.
-PURPOSE = {"value": "character", "words": "", "class": ""}   # class: "person" -> "trigger, a person, ..."
+PURPOSE = {"value": "character", "words": "", "class": "", "fixed": ""}   # class: "person" -> "trigger, a person, ..."
+# fixed: the line about the dataset's fixed features (fixedfeat.prompt_rule), added to every caption prompt
 CONCEPT_KINDS = ("object", "worn", "action", "concept")   # Object / item, Worn item, Action / pose, Concept / effect
 CONCEPT_WHAT = {
     "object": ("an OBJECT (an item)", "the object itself: its shape, colours, material, parts and decorations",
@@ -117,6 +118,12 @@ def _style_prompt(style: str, trigger: str, leave_out: str, length: int, detail:
 
 
 def build_prompt(style: str, trigger: str, leave_out: str, length: int, detail: int, purpose: str | None = None) -> str:
+    rule = (PURPOSE.get("fixed") or "").strip()
+    text = _build_prompt(style, trigger, leave_out, length, detail, purpose)
+    return text + ("\n" + rule if rule else "")
+
+
+def _build_prompt(style: str, trigger: str, leave_out: str, length: int, detail: int, purpose: str | None = None) -> str:
     pu = purpose or PURPOSE["value"]
     if pu == "style":
         return _style_prompt(style, trigger, leave_out or STYLE_LEAVE_OUT, length, detail)

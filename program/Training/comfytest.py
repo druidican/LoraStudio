@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -701,6 +701,8 @@ def make(logname: str, say=None) -> str:
         return "❌ This run has no LoRA files."
     prompts = prompts_for(info, int(cfg.get("prompts") or 8))
     d = compare_dir(info)
+    old = results(info) or {}                           # pictures of the same file and prompts are kept, not made again
+    same = old.get("prompts") == prompts
     grid = {"labels": [lab for lab, _ in eps], "files": {lab: str(f) for lab, f in eps},
             "prompts": prompts, "pics": {lab: [None] * len(prompts) for lab, _ in eps}, "at": time.strftime("%Y-%m-%d %H:%M")}
     total, done = len(eps) * len(prompts), 0
@@ -708,6 +710,12 @@ def make(logname: str, say=None) -> str:
     tdir = root / TEST_DIR
     try:
         for lab, f in eps:
+            have = (old.get("pics") or {}).get(lab) or [] if same and (old.get("files") or {}).get(lab) == str(f) else []
+            if len(have) == len(prompts) and all(have):
+                grid["pics"][lab] = list(have)
+                done += len(prompts)
+                _save_grid(d, grid)
+                continue
             try:
                 tmp, name = _stage(f, url, root)
             except RuntimeError as e:
@@ -756,6 +764,7 @@ def make_in_background(logname: str) -> str:
             with _LOCK:
                 if logname not in PENDING:
                     PENDING.append(logname)
+            _kick()
     threading.Thread(target=work, daemon=True, name="comfy-test").start()
     return "Making the test pictures in ComfyUI …"
 

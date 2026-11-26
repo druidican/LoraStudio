@@ -62,7 +62,8 @@ When training ends, Home's **Just trained** card shows what came out, with a dir
 - **Several LoRAs trained** (a queue): the final file of each, together on one page.
 
 The pictures are made right after each run, before the next one starts (Settings › Test pictures), and the LoRA card
-gets one as its preview. *Its results →* opens the run in Results, where you choose which file to keep. *Make test
+gets one as its preview. **Review and export →** opens the run's test pictures, where you pick the save point to keep
+and export it to LoRA Manager (see [Results](#results)); *Its results* opens the run in Results. *Make test
 pictures* makes them when ComfyUI was not running. A click on a picture shows it large.
 
 ## Where to start

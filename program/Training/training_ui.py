@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.271126"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -568,12 +568,12 @@ def _final_and_epochs(info) -> tuple[Path | None, dict]:
 
 
 def open_run(logname: str):
-    """Everything the one-run page shows: (head, try-first, plot, save points, cleanup text, this-run, log, dest,
-    state). The plot is a list of (epoch, loss)."""
+    """Everything the one-run page shows: (head, try-first, plot, save points, cleanup text, this-run, log, state).
+    The plot is a list of (epoch, loss)."""
     empty: list = []
     f = sg.LOG_DIR / (logname or "")
     if not logname or not f.is_file():
-        return ("", "", empty, "", "", "", "", "", {})
+        return ("", "", empty, "", "", "", "", {})
     hist = {r["log"]: r for r in runs()}
     r = hist.get(logname) or {"started": "", "dur": "", "result": "", "script": log_script(f), "info": None}
     info = r["info"] or (script_info(r["script"]) if r["script"] and Path(r["script"]).is_file() else None)
@@ -623,10 +623,9 @@ def open_run(logname: str):
             size = ""
         rows.append(f'<tr{" class=rs-best" if best is not None and ep == best else ""}><td class="rs-mono">{_esc(path.stem)}</td>'
                     f'<td>{ep}{tag}</td><td>{f"{loss:.4f}" if isinstance(loss, float) and math.isfinite(loss) else ""}</td>'
-                    f'<td>{size}</td><td>{copied}</td><td><button class="tr-btn tr-small" '
-                    f'onclick="lsSend(\'rs_box\', \'copy|{_esc(path.name)}\')">Copy</button></td></tr>')
+                    f'<td>{size}</td><td>{copied}</td></tr>')
     sp = ('<table class="rs-table"><thead><tr><th>File</th><th>Epoch</th><th>Loss</th><th>Size</th>'
-          '<th>In the LoRA folder</th><th></th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>") if rows else \
+          '<th>In the LoRA folder</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>") if rows else \
          '<p class="ls-empty">No save points in the model folder.</p>'
     # cleanup
     clean = ""
@@ -671,41 +670,10 @@ def open_run(logname: str):
         tail = "\n".join(tail.splitlines()[-40:])
     except OSError:
         pass
-    dest = ""
-    if info and sg.HK and (final or eps):
-        try:
-            tgt = sg.HK.copy_target(info["out_name"], sg.lora_dirs_setting(), info["type"])
-            dest = str(tgt["dir"] or "")
-        except Exception:                                # noqa: BLE001
-            dest = ""
     state = {"log": logname, "script": r.get("script") or "", "best": best,
              "final": str(final) if final else "", "out": info["out_name"] if info else "",
              "model": str(info["out_dir"]) if info else ""}
-    return head, try_first, plot, sp, clean, this, tail, dest, state
-
-
-def copy_file(state: dict, filename: str, dest: str, overwrite: bool = False) -> str:
-    if not state or not state.get("model"):
-        return "Open a run first."
-    src = Path(state["model"]) / filename
-    if not src.is_file():
-        return f"Not found: {filename}"
-    if not (dest or "").strip():
-        return "Enter the LoRA folder to copy to."
-    name = ""
-    m = re.search(r"-(\d{6})$", src.stem)
-    if m and state.get("out") and src.stem[:-7] == state["out"]:
-        name = f"{state['out']}-e{int(m.group(1))}.safetensors"
-    ok, msg = sg.HK.copy_lora(src, Path(os.path.expanduser(dest.strip())), bool(overwrite), name=name)
-    if ok and state.get("script"):
-        try:
-            copied = Path(os.path.expanduser(dest.strip())) / (name or src.name)
-            note = write_sidecar_for(copied, state["script"], int(m.group(1)) if m else None)
-            if note:
-                msg += f" · {note} (`{copied.stem}.metadata.json`)"
-        except Exception as e:                           # noqa: BLE001
-            msg += f" · LoRA Manager data not written: {e}"
-    return ("✔ " if ok else "❌ ") + msg
+    return head, try_first, plot, sp, clean, this, tail, state
 
 
 # --------------------------------------------------------------------------- LoRA Manager data (.metadata.json)
@@ -754,37 +722,6 @@ def _sidecar(lora_file: Path, script: str, epoch: int | None) -> dict:
     return data
 
 
-def write_sidecar_for(lora_file: Path, script: str, epoch: int | None = None) -> str:
-    """Write <lora>.metadata.json next to a LoRA file. An existing one keeps everything you filled in; only empty
-    fields (trigger word, notes, base model, tags) are filled. Returns a short note."""
-    import lora_library as ll
-    lora_file = Path(lora_file)
-    target = lora_file.with_name(lora_file.stem + ".metadata.json")
-    new = _sidecar(lora_file, script, epoch)
-    if target.is_file():
-        try:
-            old = json.loads(target.read_text(encoding="utf-8"))
-        except Exception:                                # noqa: BLE001
-            old = {}
-        merged = dict(old)
-        if not ((old.get("civitai") or {}).get("trainedWords")):
-            merged.setdefault("civitai", {})
-            merged["civitai"] = dict(merged.get("civitai") or {}, trainedWords=new["civitai"]["trainedWords"])
-        for k in ("notes", "tags"):
-            if not old.get(k):
-                merged[k] = new[k]
-        if not old.get("base_model") or str(old.get("base_model")).lower() == "unknown":
-            merged["base_model"] = new["base_model"]
-        for k in ("file_name", "file_path", "size", "modified", "sha256"):
-            merged[k] = new[k]
-        if merged == old:
-            return ""
-        ll.write_sidecar(target, merged)
-        return "LoRA Manager data completed"
-    ll.write_sidecar(target, new)
-    return "LoRA Manager data written"
-
-
 def sidecar_after_run(script: str):
     """After a finished run: the dataset's copy of the LoRA Manager data for the final file (Collection › Edit)."""
     info = script_info(script)
@@ -797,25 +734,6 @@ def sidecar_after_run(script: str):
     if tgt.is_file():
         return
     ll.write_sidecar(tgt, _sidecar(final, script, None) | {"file_path": str(final)})
-
-
-def copy_best(state, dest, overwrite):
-    if not state:
-        return "Open a run first."
-    best = state.get("best")
-    if best is None:
-        return copy_final(state, dest, overwrite)
-    md, out = Path(state["model"]), state["out"]
-    f = md / f"{out}-{int(best):06d}.safetensors"
-    if not f.is_file():
-        return copy_final(state, dest, overwrite)
-    return copy_file(state, f.name, dest, overwrite)
-
-
-def copy_final(state, dest, overwrite):
-    if not state or not state.get("final"):
-        return "This run has no final file."
-    return copy_file(state, Path(state["final"]).name, dest, overwrite)
 
 
 def cleanup(state, ok):
@@ -843,64 +761,6 @@ def run_again(state):
 
 
 # --------------------------------------------------------------------------- the pages
-
-
-def compare_html(st: dict) -> str:
-    """The test pictures of a run: one column per save point, one row per prompt."""
-    import comfytest as CT
-    if not st or not st.get("log"):
-        return ""
-    info = script_info(st["script"]) if st.get("script") and Path(st["script"]).is_file() else None
-    if not info:
-        return '<p class="ls-empty">The launch script of this run is gone.</p>'
-    fam = CT.family(info["tkey"])
-    cfg = CT.settings()
-    job = CT.JOBS.get(st["log"]) or {}
-    head = ""
-    if job.get("state") == "running":
-        head = (f'<div class="ls-note">⏳ Making test pictures in ComfyUI … {_esc(job.get("text") or "")}'
-                + (f' ({job["done"]} of {job["total"]})' if job.get("total") else "") + "</div>")
-    elif job.get("text"):
-        head = f'<div class="ls-note">{_esc(job["text"])}</div>'
-    elif st["log"] in CT.PENDING:
-        head = '<div class="ls-note">Waiting for ComfyUI: the test pictures are made as soon as it answers.</div>'
-    if not fam:
-        return head + '<p class="ls-empty">Test pictures are made for SDXL, Illustrious, Pony, NoobAI-XL and Anima LoRAs.</p>'
-    if not CT.workflow(cfg, fam)[0]:
-        return head + (f'<p class="ls-empty">No ComfyUI workflow for {_esc(CT.FAMILIES[fam])} yet: add it in '
-                       '<a href="#" onclick="lsSetNav(\'comfy\'); return false;">Settings › Test pictures</a>.</p>')
-    grid = CT.results(info)
-    if not grid:
-        return head + '<p class="ls-empty">No test pictures yet. Press <b>Make test pictures</b> (ComfyUI must be running).</p>'
-    labs = grid["labels"]
-    best = st.get("best")
-    kept = grid.get("kept")
-    prompts = grid.get("prompts") or []
-    heads = "".join(f'<th class="rs-cprompt" title="{_esc(pr.get("text", "")[:300])}">{i + 1}</th>'
-                    for i, pr in enumerate(prompts))
-    rows = []
-    for lab in labs:                                     # one row per save point: the overview reads left to right
-        mark = " rs-cbest" if best is not None and lab == f"epoch {best}" else ""
-        f = (grid.get("files") or {}).get(lab) or ""
-        if kept == lab:
-            act = '<div class="tr-ok">✔ kept</div>'
-        elif f and Path(f).is_file():
-            act = (f'<button class="tr-btn tr-small" onclick="lsSend(\'rs_box\', \'cmpkeep|{_esc(lab)}\')">Keep this '
-                   'one</button>')
-        else:
-            act = '<div class="tr-muted">file gone</div>'
-        pics = (grid.get("pics") or {}).get(lab) or []
-        cells = []
-        for i in range(len(prompts)):
-            pf = pics[i] if i < len(pics) else None
-            cells.append(f'<td>{"<img loading=lazy src=" + chr(39) + sg.DC.thumb_uri(Path(pf), 320) + chr(39) + ">" if pf else "<span class=tr-muted>—</span>"}</td>')
-        rows.append(f'<tr><th class="rs-chead{mark}"><div>{_esc(lab)}' + (" · try first" if mark else "")
-                    + f'</div>{act}</th>{"".join(cells)}</tr>')
-    return (head + f'<div class="rs-cwrap"><table class="rs-cgrid rs-crow"><thead><tr><th></th>{heads}</tr></thead>'
-            f'<tbody>{"".join(rows)}</tbody></table></div><p class="ls-note">Made {_esc(grid.get("at", ""))} · the same '
-            'prompt and seed in each column · hover a column number for its prompt. <b>Keep this one</b> makes that save '
-            'point the final file of the run, moves the other save points to the Trash and uses its first picture as '
-            'the LoRA card\'s preview.</p>')
 
 
 # --------------------------------------------------------------------------- comparing runs
@@ -1141,58 +1001,3 @@ def dataset_of_log(logname: str) -> str:
         return ""
     info = script_info(script) if Path(script).is_file() else None
     return info["dataset"] if info else Path(script).parent.name
-
-
-
-def keep_epoch(st: dict, label: str) -> str:
-    """Keep one save point of a run: it becomes the run's final file (<name>.safetensors); the other save points of
-    this run, its old final file and its resume states go to the Trash; a copy in your LoRA folder is replaced by the
-    kept file; the LoRA card gets its first test picture as preview."""
-    import comfytest as CT
-    import lorapage
-    if not st or not st.get("log"):
-        return "Open a run first."
-    if sg.RUN.running() and sg.RUN.logfile and Path(sg.RUN.logfile).name == st["log"]:
-        return "This run is still training."
-    facts = CT._run_facts(st["log"])
-    if not facts:
-        return "❌ The launch script of this run is gone."
-    info = facts["info"]
-    grid = CT.results(info)
-    f = Path((grid.get("files") or {}).get(label) or "")
-    if not f.is_file():
-        return "❌ That save point file is gone (kept or cleaned up already?)."
-    final = info["out_dir"] / f"{info['out_name']}.safetensors"
-    if sg.HK is None:
-        return "❌ housekeeping.py is missing."
-    size, moved = 0, 0
-    if f.resolve() != final.resolve():
-        if final.exists():
-            size += sg._size(final)
-            n, failed = sg.HK.trash([final])
-            if final.exists():
-                return f"❌ The old final file could not be moved to the Trash: {'; '.join(failed[:2])}"
-            moved += n
-        f.rename(final)
-    _, eps = _final_and_epochs(info)
-    trash = [p for p in eps.values() if p.exists()]
-    trash += [d for d in sg.scan_states(info["out_dir"]) if d.name.startswith(info["out_name"] + "-")]
-    replaced = ""
-    for c in sg.HK.lora_files(sg.lora_dirs_setting()):
-        if c.name == final.name and c.stat().st_size != final.stat().st_size:
-            sg.HK.trash([c])
-            if not c.exists():
-                import shutil
-                shutil.copy2(final, c)
-                replaced = f" Your LoRA folder's copy `{c.parent.name}/{c.name}` was replaced (the old one is in the Trash)."
-    size += sum(sg._size(p) for p in trash)
-    n, failed = sg.HK.trash(trash)
-    moved += n
-    grid["kept"] = label
-    grid["files"] = {k: (str(final) if k == label else "") for k in (grid.get("files") or {})}
-    CT._save_grid(CT.compare_dir(info), grid)
-    pics = [p for p in (grid.get("pics") or {}).get(label) or [] if p]
-    card = lorapage.write_card(final, Path(pics[0]) if pics else None, f"kept {label} of run {st['log']}")
-    _LEFT.clear()
-    return (f"✔ Kept **{label}** as `{final.name}`. {moved} other file(s), {_gb(size)}, moved to the Trash.{replaced} "
-            f"{card}" + (f" Could not move: {'; '.join(failed[:3])}" if failed else ""))
