@@ -147,7 +147,7 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   Qwen3 4B, ae; res_multistep, CFG 1, 8 steps, shift 3), Base LoRAs (`zimagebase`) are tested on Turbo. Workflows keep
   their loader nodes (`unet_node` / `clip_node`, GGUF) and shift (`ModelSamplingAuraFlow`). `check_models` finds
   renamed or moved model files (1.211126). Turbo recs v1.3: `shift` per purpose (3.0 character/concept, 2.0 style),
-  untested; the owner tries a test LoRA.
+  tried by the owner: works, at strength 1.3 (`comfytest.STRENGTH`).
 - **The look of the result** (`Data/lean.py`, 1.191126e): the sort asks Ollama the kind of each picture (photo,
   drawing, 3D, painting → `.lsflow/medium.json`); training adds words for that kind behind every caption
   (`--caption_suffix`, musubi `CAPTION_SUF`; Pony photos lose `source_anime`); per LoRA type a lean (step 7 card, step 9
@@ -166,6 +166,9 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   16 epochs, text encoders trained, no `--clip_skip` (does nothing for these LoRAs; `fix_flags` leaves a hand-written
   one alone); FLUX / Chroma characters rank 32/32, 1600-3000 steps; Z-Image Base is its own
   type (no adapter).
+- **Wrong VAE checks**: `model_guide.identify` calls a 5-D VAE `qwen_vae` only with 16 latent channels (the 64-channel
+  `qwen_image_2.1_vae` is "unknown", IDENT_VERSION 7); `sdgui.model_problem` (VAE_NEEDS) refuses an Anima run with any
+  other VAE before it starts (1.261126). musubi types check their files in stage 1 (1.211126c).
 - **Never sample without prompts:** sd-scripts crashes at the first sample when `--sample_every_n_epochs` has no
   `--sample_prompts`; `sdgui.fix_flags` removes it when saving, when a form field is applied and when a script runs.
 - **Training stops Ollama** to free video memory and does not start it again.
@@ -197,7 +200,8 @@ are gone. Keep it that way: build a step's controls when it is opened, redraw HT
   no loops). The plan and the task walk-throughs are in the owner's walkthrough document (Usability tab) and the
   "LoRA Studio flow" whiteboard.
 
-- amd-smi: values that stay empty on real hardware need the owner's `amd-smi metric --json` output.
-- WD tagger on Ubuntu 26.10: if it still fails, the error text it now shows is needed.
-- RPGAssistant (separate repo `druidican/rpgassistant`): 8 changes on branch `wip-8-changes`, built and
-  selftest passing, browser test and version stamp still to do, then merge to main.
+- Owner 2026-11-26: amd-smi values, the WD tagger, the Z-Image speed test and the hand-fixed LoRA folder all work; the
+  features of 1.191126-1.241126 (phone page, Compare settings, look, ROCm builds, own pictures, profiles, shutdown)
+  "work as the feature they are now". Z-Image Turbo: the current settings work, strength 1.3 is needed; no more
+  Turbo experiments (Base for characters, 3000 steps, mixed sizes) unless the owner asks. The old failed-run manual
+  picture stays as it is (owner: ignore). RPGAssistant is handled in its own thread, not with LoRA Studio.

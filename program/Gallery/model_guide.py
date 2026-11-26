@@ -15,7 +15,7 @@ Results of identify() are cached in model_ids.json (keyed by path, size and modi
 """
 
 from __future__ import annotations
-__version__ = "1.191126d"  # LoRA Studio version, see version.py
+__version__ = "1.261126"  # LoRA Studio version, see version.py
 
 import html
 import json
@@ -28,7 +28,7 @@ from pathlib import Path
 
 import lspaths as _LP  # noqa: E402  (program/lspaths.py: ROOT, PROG, USER)
 CACHE_FILE = _LP.USER / "model_ids.json"
-IDENT_VERSION = 6      # bump when identify() learns new kinds, so cached answers for old files are redone
+IDENT_VERSION = 7      # bump when identify() learns new kinds, so cached answers for old files are redone
 _CACHE: dict | None = None
 
 # What each kind is called in the UI
@@ -303,8 +303,12 @@ def _identify_head(head: dict, name: str) -> dict:
         or _shape(head, "vae.decoder.conv_in.weight") or _shape(head, "decoder.conv1.weight")
     if cin or has("decoder.up_blocks") or has("decoder.mid"):
         ch = cin[1] if cin and len(cin) > 1 else 0
-        if cin and len(cin) == 5:
+        if cin and len(cin) == 5 and ch == 16:         # Qwen-Image's (Wan 2.1 style) VAE: 16 latent channels
             out["kind"] = "qwen_vae"
+        elif cin and len(cin) == 5:                    # same build, other size (e.g. 64 channels): not Qwen-Image's
+            out["kind"] = "unknown"
+            out["note"] = (f"a video-style VAE with {ch} latent channels: NOT the Qwen-Image VAE (16), so Anima and "
+                           "Qwen-Image cannot use it; they need qwen_image_vae.safetensors")
         elif ch == 16 and re.search(r"sd3|sd_3|3\.5|35", low.replace("-", "_")) and "flux" not in low:
             out["kind"] = "sd3_vae"                     # same shape as the FLUX AE, other weights: only the name tells
             out["note"] = "identified by its name: SD3's VAE has the same layout as the FLUX AE"

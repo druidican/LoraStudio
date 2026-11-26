@@ -46,7 +46,7 @@ wrong, what it means and what to do, in the queue, the top bar and on the run's 
 | **The loss became NaN** | a lower learning rate, bf16 instead of fp16 |
 | **A model file is missing or broken** | check Settings › Model files, download a broken file again |
 | **A model file does not fit** (musubi types: Z-Image, Qwen-Image, FLUX.2) | stage 1 *Check files* names the file: a ComfyUI int8 / fp8 file (`…_int8_convrot`, `…_fp8_mixed`) cannot be trained on, use the full bf16 file; a Qwen3-VL text encoder cannot be used for Z-Image, use `qwen_3_4b.safetensors` |
-| **Size mismatch / missing keys while loading the VAE** | the wrong VAE for the type: Anima and Qwen-Image need `qwen_image_vae.safetensors` (a similar-looking `qwen_image_2.1_vae` is a different VAE); Z-Image the FLUX `ae.safetensors` |
+| **Not started: the VAE does not fit Anima** (or *size mismatch / missing keys* while loading a VAE) | the wrong VAE for the type: Anima and Qwen-Image need `qwen_image_vae.safetensors` (a similar-looking `qwen_image_2.1_vae` is a different VAE with 64 channels; an Anima run with it is stopped before it starts, and Settings › Model files no longer suggests it); Z-Image the FLUX `ae.safetensors` |
 | **The model does not fit this LoRA type** | pick the right base model for the type |
 | **No pictures to train on** | the repeat folder `<N>_<dataset name>` must hold the pictures |
 | **A picture is broken** | Datasets › 3 Usable scan finds it |

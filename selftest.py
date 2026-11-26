@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.241126"  # LoRA Studio version, see version.py
+__version__ = "1.261126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -487,6 +487,23 @@ def _comfy_names():
     need(CT.match_name("anima-base-v1.0.safetensors", names) == names[0], "moved file not found")
     need(CT.match_name("gone.safetensors", names) == "", "a missing file was matched")
     return "renamed, moved and missing files"
+
+
+@check("Anima: a wrong VAE stops the run before it starts")
+def _anima_vae():
+    import json, struct, tempfile
+    import sdgui as G
+    with tempfile.TemporaryDirectory() as d:
+        def mk(name, shape):
+            h = json.dumps({"decoder.conv_in.weight": {"dtype": "BF16", "shape": shape, "data_offsets": [0, 2]},
+                            "decoder.up_blocks.0.x": {"dtype": "BF16", "shape": [1], "data_offsets": [0, 2]}}).encode()
+            p = Path(d) / name
+            p.write_bytes(struct.pack("<Q", len(h)) + h + b"\0\0")
+            return p
+        good, bad = mk("qwen_image_vae.safetensors", [384, 16, 3, 3, 3]), mk("qwen_image_2.1_vae.safetensors", [1152, 64, 1, 3, 3])
+        need(G.model_problem(f'accelerate launch anima_train_network.py --vae "{good}"') == "", "right VAE refused")
+        need("qwen_image_vae" in G.model_problem(f'accelerate launch anima_train_network.py --vae "{bad}"'), "wrong VAE let through")
+    return "64-channel VAE refused, Qwen-Image VAE accepted"
 
 
 @check("settings profiles: import checks, apply, export")

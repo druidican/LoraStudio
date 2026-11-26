@@ -14,14 +14,14 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.241126b"
-VERSION = "1.241126b"
+__version__ = "1.261126"
+VERSION = "1.261126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.231126",
-    "version.py": "1.241126b",
+    "version.py": "1.261126",
     "program/lspaths.py": "1.201126e",
-    "program/Training/sdgui.py": "1.221126",
+    "program/Training/sdgui.py": "1.261126",
     "program/Training/sd_script.py": "1.241126",
     "program/Data/sd_prepare.py": "1.201126e",
     "program/Training/sd_settings.py": "1.221126",
@@ -57,7 +57,7 @@ RELEASE: dict = {
     "program/Data/trim.py": "1.111126g",
     "program/Data/housekeeping.py": "1.011126",
     "program/Gallery/completed.py": "1.131126b",
-    "program/Gallery/model_guide.py": "1.191126d",
+    "program/Gallery/model_guide.py": "1.261126",
     "program/Gallery/trainingcard.py": "1.221126",
     "program/Gallery/insights.py": "1.131126b",
     "program/UI/shell.py": "1.231126b",
@@ -92,7 +92,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.201126e",
-    "selftest.py": "1.241126",
+    "selftest.py": "1.261126",
     "program/Settings/machinecheck.py": "1.221126",
     "program/Settings/selfupdate.py": "1.201126e",
     "program/Training/failcodes.py": "1.131126b",
@@ -110,6 +110,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.261126", "Anima: a wrong VAE is caught. The 64-channel qwen_image_2.1_vae is no longer taken for the Qwen-Image VAE (Settings › Model files marks it as not fitting), and an Anima run with any other VAE than qwen_image_vae is stopped before it starts, with a plain message, instead of failing after loading the model."),
     ("1.241126b", "Manual brought up to date: the top-right buttons (⏻ shut down), starting from the applications menu, the Queue's left menu, musubi stages and the model-file checks, the right VAE and text encoder per type, Z-Image Turbo strength 1.3, settings profiles with Compare settings, new Do / Don't lines and words (text encoder, flow shift, training adapter, settings profile, int8 / fp8 / GGUF); Browse renamed Pictures and Status; new Home and top-bar pictures."),
     ("1.241126", "Settings profiles in step 9: export the training settings of a launch script (learning rates, rank, optimizer, scheduler, shift, steps, epochs …) as a .toml file to share, and import someone's under a name you choose. Original (LoRA Studio's own) always stays; the profile is chosen per dataset and LoRA type. Imported values are checked one by one; model files, memory settings, paths and tokens are never in a profile."),
     ("1.231126b", "A shut-down button (⏻) at the top right of every page: asks first; while a training run or the queue is running it says so and stops the run first (the save points written so far stay), then shuts LoRA Studio down. The same in Settings › Start and network."),

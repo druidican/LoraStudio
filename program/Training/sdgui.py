@@ -14,7 +14,7 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.221126"  # LoRA Studio version, see version.py
+__version__ = "1.261126"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
@@ -661,6 +661,34 @@ def inject_resume(body: str, state: str):
 
 
 # --------------------------------------------------------------------------- start / stop
+# The VAE a type needs, checked before a run starts (a wrong one fails only after loading everything else):
+# script → (the kind model_guide.identify must report, what to use)
+VAE_NEEDS = {"anima_train_network.py": ("qwen_vae", "Anima", "qwen_image_vae.safetensors")}
+
+
+def model_problem(body: str) -> str:
+    """'' or why the script's VAE does not fit its type (read from the file's header, cached)."""
+    for script, (kind, label, need) in VAE_NEEDS.items():
+        if script not in body:
+            continue
+        m = re.search(r'--vae[ =]+(?:"([^"]+)"|\'([^\']+)\'|(\S+))', body)
+        if not m:
+            return ""
+        path = os.path.expanduser(next(g for g in m.groups() if g))
+        if "$" in path or not Path(path).is_file():
+            return ""                                    # a variable or a missing file: the trainer says so
+        try:
+            import model_guide
+            info = model_guide.identify(path)
+        except Exception:                                # noqa: BLE001
+            return ""
+        if info.get("kind") != kind:
+            why = info.get("note") or f"it is a {info.get('kind') or 'different'} file"
+            return (f"❌ Not started: the VAE `{Path(path).name}` does not fit {label}: {why}. {label} needs "
+                    f"`{need}`: pick it in Settings › Model files (or in step 9's More settings) and save the script.")
+    return ""
+
+
 def _start_run(path, workdir, venv, trace, resume, warn, info):
     """Start one script. warn/info report problems; returns True when the process was started."""
     global RUN
@@ -681,6 +709,10 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
         return False
     body = src.read_text(encoding="utf-8", errors="ignore")      # always the saved file, never a stale copy
     body, fixed = fix_flags(body)
+    bad = model_problem(body)
+    if bad:
+        warn(bad)
+        return False
 
     resume = "" if resume in (None, "", NO_STATE) else resume
     if resume:
