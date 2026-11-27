@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.271126c"
-VERSION = "1.271126c"
+__version__ = "1.271126d"
+VERSION = "1.271126d"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.231126",
-    "version.py": "1.271126c",
+    "version.py": "1.271126d",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.271126b",
     "program/Training/sd_script.py": "1.261126b",
@@ -30,7 +30,7 @@ RELEASE: dict = {
     "program/Training/training_ui.py": "1.271126b",
     "program/Settings/settings_ui.py": "1.201126e",
     "program/Gallery/lora_library.py": "1.271126b",
-    "program/Training/comfytest.py": "1.271126c",
+    "program/Training/comfytest.py": "1.271126d",
     "program/Training/speedtest.py": "1.191126i",
     "program/Training/speedjobs.py": "1.221126",
     "program/Training/comfyupscale.py": "1.101126",
@@ -123,6 +123,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.271126d", "Test pictures: when ComfyUI refuses the workflow, its reason is shown (for example a model file that is not in its list), not only HTTP Error 400."),
     ("1.271126c", "Test pictures: what happens is now shown. Results and Review and export show while they are being made, when LoRA Studio waits for ComfyUI, and the reason when they could not be made (before, a failure showed nothing). Review and export also opens a run whose first test pictures are still being made."),
     ("1.271126b", "Clean-up stage 4: the three biggest program files (the Collection, the training engine and the dataset steps) are split by topic into smaller files, and every part now calls the file a function lives in, without go-betweens. Nothing you use changes."),
     ("1.271126", "Review and export: after the test pictures, pick the save point by its pictures and export it to LoRA Manager (file without the epoch in the name, data, preview, the row of test pictures as example pictures, Completed, checked). Fixed features in step 2: what must stay right, in your own words, taken out of the captions as part of the trigger; step 8 lists captions that still name one."),

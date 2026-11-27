@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.271126c"  # LoRA Studio version, see version.py
+__version__ = "1.271126d"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -25,6 +25,7 @@ import shutil
 import sys
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -363,9 +364,31 @@ def _req(url, path, data=None, timeout=30):
     full = url.rstrip("/") + path
     body = json.dumps(data).encode() if data is not None else None
     r = urllib.request.Request(full, data=body, headers={"Content-Type": "application/json"} if body else {})
-    with urllib.request.urlopen(r, timeout=timeout) as resp:
-        raw = resp.read()
+    try:
+        with urllib.request.urlopen(r, timeout=timeout) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as e:              # ComfyUI says why in the body (a model not in its list …)
+        why = refusal(e.read())
+        raise RuntimeError(f"ComfyUI refused it (HTTP {e.code}): {why}" if why else str(e)) from None
     return raw
+
+
+def refusal(raw: bytes) -> str:
+    """ComfyUI's reason for refusing a workflow, in short: the error and each node's problem."""
+    try:
+        d = json.loads(raw)
+    except ValueError:
+        return ""
+    out = []
+    err = d.get("error") or {}
+    if isinstance(err, dict) and err.get("message"):
+        out.append(str(err["message"]).rstrip("."))
+    for nid, ne in (d.get("node_errors") or {}).items():
+        for x in (ne.get("errors") or [])[:2]:
+            det = str(x.get("details") or "")
+            det = det if len(det) <= 160 else det[:160] + " …"
+            out.append(f"{ne.get('class_type', 'node ' + str(nid))}: {x.get('message', '')}" + (f" ({det})" if det else ""))
+    return "; ".join(out)[:600]
 
 
 def alive(url=None) -> bool:
@@ -488,7 +511,7 @@ def graph(wf: dict, lora_name: str, positive: str, seed: int, prefix: str) -> di
 def _run_one(url, g, dest: Path, timeout=900):
     r = json.loads(_req(url, "/prompt", {"prompt": g, "client_id": "lorastudio"}))
     if r.get("node_errors"):
-        raise RuntimeError("ComfyUI refused the graph: " + json.dumps(r["node_errors"])[:300])
+        raise RuntimeError("ComfyUI refused it: " + (refusal(json.dumps(r).encode()) or "node errors"))
     pid = r["prompt_id"]
     t0 = time.time()
     while time.time() - t0 < timeout:
