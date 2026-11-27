@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.271126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126e"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -624,6 +624,22 @@ def _token_strength():
                   "width": 64, "height": 64, "lora_strength": CT.lora_strength("zimage")}, "x", "p", 1, "t")
     need(g["5"]["inputs"]["strength_model"] == 1.3 and CT.lora_strength("sdxl") == 1.0, "strength")
     return "token read at run time, strength 1.3"
+
+
+@check("test pictures: a model loader's own settings are kept (an int8 loader)")
+def _loader_inputs():
+    import comfytest as CT
+    d = {"nodes": [{"id": 1, "type": "OTUNetLoaderW8A8", "widgets_values_named": {
+        "unet_name": "a.safetensors", "model_type": "anima", "lora_mode": "x", "weight_dtype": "int8"}},
+        {"id": 2, "type": "CLIPLoader", "widgets_values_named": {"clip_name": "q.safetensors", "type": "x"}},
+        {"id": 3, "type": "VAELoader", "widgets_values_named": {"vae_name": "v.safetensors"}}], "links": []}
+    wf = CT.read_workflow(d)
+    g = CT.graph(wf, "l", "p", 1, "t")
+    need(g["1"]["class_type"] == "OTUNetLoaderW8A8" and g["1"]["inputs"]["lora_mode"] == "x"
+         and g["1"]["inputs"]["unet_name"] == "a.safetensors" and "weight_dtype" in g["1"]["inputs"], g["1"])
+    g = CT.graph({**wf, "unet_node": "UNETLoader", "unet_inputs": {}}, "l", "p", 1, "t")
+    need(g["1"]["inputs"].get("weight_dtype") == "default", "UNETLoader without settings")
+    return "kept, UNETLoader default"
 
 
 @check("musubi scripts check the model files first (ComfyUI int8/fp8, Qwen3-VL)")

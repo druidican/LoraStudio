@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.271126d"  # LoRA Studio version, see version.py
+__version__ = "1.271126e"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -199,6 +199,11 @@ def _text_into(nodes, links, node, name, depth=0):
     return ""
 
 
+def _plain(w: dict, *leave: str) -> dict:
+    """A loader node's other settings (weight dtype, quantization …), kept for the test graph."""
+    return {k: v for k, v in w.items() if k not in leave and isinstance(v, (str, int, float, bool))}
+
+
 def read_workflow(d: dict) -> dict:
     """The settings of a ComfyUI workflow (the normal 'Save' format, not API) that matter for test pictures."""
     nodes = {n["id"]: n for n in d.get("nodes") or []}
@@ -216,10 +221,12 @@ def read_workflow(d: dict) -> dict:
             continue
         if "ckpt_name" in w and not out["ckpt"]:
             out["ckpt"] = w["ckpt_name"]
-        if "unet_name" in w and not out["unet"]:              # UNETLoader, or a GGUF loader (ComfyUI-GGUF)
+        if "unet_name" in w and not out["unet"]:    # UNETLoader, a GGUF loader, an int8 loader … with its own settings
             out["unet"], out["unet_node"] = w["unet_name"], t or "UNETLoader"
+            out["unet_inputs"] = _plain(w, "unet_name")
         if t in ("CLIPLoader", "CLIPLoaderGGUF") and w.get("clip_name"):
             out["clip"], out["clip_type"], out["clip_node"] = w["clip_name"], w.get("type") or "stable_diffusion", t
+            out["clip_inputs"] = _plain(w, "clip_name", "type")
         if t in ("ModelSamplingAuraFlow", "ModelSamplingSD3") and w.get("shift") not in (None, ""):
             out["shift"] = float(w["shift"])
         if t == "VAELoader" and w.get("vae_name"):
@@ -422,6 +429,28 @@ def model_names(url, what: str = "ckpt", node: str = "") -> list[str]:
         return []
 
 
+def node_defaults(url, node: str, leave: tuple = ()) -> dict:
+    """The settings a ComfyUI node needs, at their defaults (the first choice of a list), from ComfyUI's own list;
+    links (model, clip …) left out. {} when ComfyUI does not say."""
+    try:
+        d = json.loads(_req(url, f"/object_info/{node}", timeout=20))[node]["input"].get("required") or {}
+    except Exception:                                    # noqa: BLE001
+        return {}
+    out = {}
+    for name, spec in d.items():
+        if name in leave or not isinstance(spec, list) or not spec:
+            continue
+        kind, opt = spec[0], (spec[1] if len(spec) > 1 and isinstance(spec[1], dict) else {})
+        if isinstance(kind, list):
+            if kind:
+                out[name] = opt.get("default", kind[0])
+        elif kind in ("INT", "FLOAT", "BOOLEAN", "STRING") and "default" in opt:
+            out[name] = opt["default"]
+        elif kind == "COMBO" and opt.get("options"):
+            out[name] = opt.get("default", opt["options"][0])
+    return out
+
+
 def _key(name: str) -> str:
     """A file name without folder, extension, case and punctuation: novaFurryAM_v30 and NovaFurryAMV30 are one."""
     return re.sub(r"[^a-z0-9]", "", Path(name.replace("\\", "/")).stem.lower())
@@ -470,10 +499,10 @@ def graph(wf: dict, lora_name: str, positive: str, seed: int, prefix: str) -> di
     g = {}
     if wf["kind"] == "unet":
         un, cn = wf.get("unet_node") or "UNETLoader", wf.get("clip_node") or "CLIPLoader"
-        g["1"] = {"class_type": un, "inputs": {"unet_name": wf["unet"],
-                                               **({"weight_dtype": "default"} if un == "UNETLoader" else {})}}
-        g["2"] = {"class_type": cn, "inputs": {"clip_name": wf["clip"], "type": wf.get("clip_type") or
-                                               "stable_diffusion"}}
+        g["1"] = {"class_type": un, "inputs": {**({"weight_dtype": "default"} if un == "UNETLoader" else {}),
+                                               **(wf.get("unet_inputs") or {}), "unet_name": wf["unet"]}}
+        g["2"] = {"class_type": cn, "inputs": {**(wf.get("clip_inputs") or {}), "clip_name": wf["clip"],
+                                               "type": wf.get("clip_type") or "stable_diffusion"}}
         g["3"] = {"class_type": "VAELoader", "inputs": {"vae_name": wf["vae"]}}
         model, clip, vae = ["1", 0], ["2", 0], ["3", 0]
     else:
@@ -675,6 +704,10 @@ def prepare(dataset: str, tkey: str, type_label: str = "") -> tuple:
     if not alive(url):
         raise RuntimeError(f"ComfyUI does not answer at {url}. Start it; the test pictures are made when it answers.")
     wf = {**wf, "lora_strength": lora_strength(tkey)}
+    if wf.get("kind") == "unet":                        # the loaders get every setting they need (an int8 loader …)
+        un, cn = wf.get("unet_node") or "UNETLoader", wf.get("clip_node") or "CLIPLoader"
+        wf["unet_inputs"] = {**node_defaults(url, un, ("unet_name",)), **(wf.get("unet_inputs") or {})}
+        wf["clip_inputs"] = {**node_defaults(url, cn, ("clip_name", "type")), **(wf.get("clip_inputs") or {})}
     fixed_wf, missing = check_models(wf, url)
     if missing:
         raise RuntimeError("ComfyUI does not have the model file(s) of your workflow any more: " + ", ".join(missing)
