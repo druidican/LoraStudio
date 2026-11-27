@@ -11,7 +11,7 @@ listed in civitai.customImages). The dataset's own LoRA card gets the same data;
 Every step is checked at the end. The page is program/UI/ds_review.py.
 """
 from __future__ import annotations
-__version__ = "1.271126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126c"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -37,7 +37,8 @@ def _LL():
 
 # --------------------------------------------------------------------------- what the page shows
 def runs_of(ds: str) -> list[dict]:
-    """The finished runs of a dataset that have test pictures (newest first): [{"log", "name", "started"}]."""
+    """The finished runs of a dataset that have test pictures, or whose pictures are being made (newest first):
+    [{"log", "name", "started"}]."""
     T, CT = _T(), _CT()
     out = []
     for r in T.runs():
@@ -46,8 +47,8 @@ def runs_of(ds: str) -> list[dict]:
             continue
         if Path(info["path"]).parent.name == "_compare":
             continue
-        if not CT.results(info):
-            continue
+        if not CT.results(info) and r["log"] not in CT.JOBS and r["log"] not in CT.PENDING:
+            continue                                     # no test pictures, none being made
         out.append({"log": r["log"], "name": T.run_name(info), "started": r["started"]})
     return out
 

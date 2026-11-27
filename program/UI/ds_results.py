@@ -4,7 +4,7 @@ rating, report, TensorBoard) and comparing runs. The data and the HTML parts are
 come back as ls_rs_box events (open, best). Test pictures, keeping a save point and the export are on Review and export
 (ds_review.py)."""
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126c"  # LoRA Studio version, see version.py
 
 from nicegui import ui
 
@@ -52,7 +52,7 @@ class Results:
         self.this.content, self.tail.value = th, tl
         self.plot.options["series"] = _series(p)
         self.plot.update()
-        self.clean_msg.content = self.again_msg.content = ""
+        self.cmsg.content = self.clean_msg.content = self.again_msg.content = ""
         logdir = ""
         if st.get("script"):
             try:
@@ -83,6 +83,10 @@ class Results:
 
     def tick(self):
         import comfytest as CT
+        if self.one.visible and self.st.get("log") and self.cmsg.content:     # the test pictures being made
+            t = CT.job_text(self.st["log"])
+            if t and t != self.cmsg.content:
+                self.cmsg.content = t + ("" if t.startswith(("❌", "⏳")) else " They show on Review and export.")
         if self.cmp_col.visible and self.logs and any(
                 (CT.JOBS.get(ln) or {}).get("state") == "running" or ln in CT.PENDING for ln in self.logs):
             self.cmp_pics.content = T.compare_pics_html(self.logs, self.which.value)
@@ -113,7 +117,7 @@ class Results:
         import comfytest as CT
         if self.st.get("log"):
             CT.WHICH[self.st["log"]] = "best+final"
-            self.cmsg.content = CT.make_in_background(self.st["log"]) + " They show on Review and export."
+            self.cmsg.content = "⏳ " + CT.make_in_background(self.st["log"])
 
     def report(self):
         import report

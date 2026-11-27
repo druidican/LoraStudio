@@ -15,7 +15,7 @@ left out: the test pictures compare epochs, not finished pictures.
   pictures  <dataset>/model/compare/<name>/e<epoch>_p<n>.png
 """
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126c"  # LoRA Studio version, see version.py
 
 import contextlib
 import json
@@ -759,7 +759,12 @@ def make_in_background(logname: str) -> str:
     JOBS[logname] = {"state": "running", "done": 0, "total": 0, "text": "starting"}
 
     def work():
-        msg = make(logname)
+        try:
+            msg = make(logname)
+        except Exception as e:                           # noqa: BLE001  (shown on Results and Review and export)
+            import traceback
+            traceback.print_exc()
+            msg = f"❌ The test pictures stopped: {e!r}"
         JOBS[logname] = {"state": "done", "text": msg, "done": 0, "total": 0}
         if msg.startswith("❌ ComfyUI does not answer"):
             with _LOCK:
@@ -768,6 +773,17 @@ def make_in_background(logname: str) -> str:
             _kick()
     threading.Thread(target=work, daemon=True, name="comfy-test").start()
     return "Making the test pictures in ComfyUI …"
+
+
+def job_text(logname: str) -> str:
+    """One line on the test pictures of a run: being made, waiting for ComfyUI, or how the last try ended."""
+    job = JOBS.get(logname) or {}
+    if job.get("state") == "running":
+        return ("⏳ Making the test pictures in ComfyUI … " + (job.get("text") or "")
+                + (f" ({job['done']} of {job['total']})" if job.get("total") else ""))
+    if logname in PENDING:
+        return "⏳ Waiting for ComfyUI: the test pictures are made as soon as it answers."
+    return job.get("text") or ""
 
 
 def share_prompts(lognames: list[str]) -> str:
@@ -917,7 +933,12 @@ def _kick():
                 ln = PENDING.pop(0) if PENDING else None
             if ln:
                 JOBS[ln] = {"state": "running", "done": 0, "total": 0, "text": "starting"}
-                msg = _finish(ln)
+                try:
+                    msg = _finish(ln)
+                except Exception as e:                   # noqa: BLE001
+                    import traceback
+                    traceback.print_exc()
+                    msg = f"❌ The test pictures stopped: {e!r}"
                 JOBS[ln] = {"state": "done", "text": msg, "done": 0, "total": 0}
     if not any(t.name == "comfy-pending" for t in threading.enumerate()):
         threading.Thread(target=work, daemon=True, name="comfy-pending").start()

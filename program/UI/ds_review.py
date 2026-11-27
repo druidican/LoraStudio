@@ -3,7 +3,7 @@
 to keep, check what goes to LoRA Manager and export it (lmexport.py). The status strip and Home › Just trained open
 it after a run's test pictures are made."""
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126c"  # LoRA Studio version, see version.py
 
 
 from nicegui import run, ui
@@ -44,10 +44,9 @@ class Review:
         self.sub.text = (f"trained {v['started']}" + (f" · test pictures made {v['at']}" if v.get("at") else ""))
         job = CT.JOBS.get(v["log"]) or {}
         self.job = job.get("state")
-        self.busy.text = ("⏳ Making test pictures in ComfyUI … " + (job.get("text") or "")
-                          + (f" ({job['done']} of {job['total']})" if job.get("total") else "")) \
-            if job.get("state") == "running" else ("Waiting for ComfyUI: the test pictures are made as soon as it "
-                                                   "answers." if v["log"] in CT.PENDING else "")
+        msg = CT.job_text(v["log"])
+        self.busy.text = msg
+        self.busy.classes(replace="ls-note" + (" text-red-700 font-semibold" if msg.startswith("❌") else ""))
         with self.rows_box:
             for r in v["rows"]:
                 on = r["label"] == self.pick

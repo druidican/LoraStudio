@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.271126b"
-VERSION = "1.271126b"
+__version__ = "1.271126c"
+VERSION = "1.271126c"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
     "lora_studio.py": "1.231126",
-    "version.py": "1.271126b",
+    "version.py": "1.271126c",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.271126b",
     "program/Training/sd_script.py": "1.261126b",
@@ -30,7 +30,7 @@ RELEASE: dict = {
     "program/Training/training_ui.py": "1.271126b",
     "program/Settings/settings_ui.py": "1.201126e",
     "program/Gallery/lora_library.py": "1.271126b",
-    "program/Training/comfytest.py": "1.271126",
+    "program/Training/comfytest.py": "1.271126c",
     "program/Training/speedtest.py": "1.191126i",
     "program/Training/speedjobs.py": "1.221126",
     "program/Training/comfyupscale.py": "1.101126",
@@ -69,8 +69,8 @@ RELEASE: dict = {
     "program/UI/pg_datasets.py": "1.271126",
     "program/UI/ds_steps.py": "1.271126",
     "program/UI/ds_train.py": "1.241126",
-    "program/UI/ds_results.py": "1.271126",
-    "program/UI/ds_review.py": "1.271126",
+    "program/UI/ds_results.py": "1.271126c",
+    "program/UI/ds_review.py": "1.271126c",
     "program/Training/sdqueue.py": "0",
     "program/Training/sdloss.py": "0",
     "program/Data/dsfiles.py": "0",
@@ -81,7 +81,7 @@ RELEASE: dict = {
     "program/Gallery/libcards.py": "1.271126b",
     "program/Gallery/libpictures.py": "1.271126b",
     "program/Gallery/libsync.py": "1.271126b",
-    "program/Training/lmexport.py": "1.271126b",
+    "program/Training/lmexport.py": "1.271126c",
     "program/Data/fixedfeat.py": "1.271126b",
     "program/UI/pg_queue.py": "1.201126e",
     "program/UI/pg_collection.py": "1.271126b",
@@ -123,6 +123,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.271126c", "Test pictures: what happens is now shown. Results and Review and export show while they are being made, when LoRA Studio waits for ComfyUI, and the reason when they could not be made (before, a failure showed nothing). Review and export also opens a run whose first test pictures are still being made."),
     ("1.271126b", "Clean-up stage 4: the three biggest program files (the Collection, the training engine and the dataset steps) are split by topic into smaller files, and every part now calls the file a function lives in, without go-betweens. Nothing you use changes."),
     ("1.271126", "Review and export: after the test pictures, pick the save point by its pictures and export it to LoRA Manager (file without the epoch in the name, data, preview, the row of test pictures as example pictures, Completed, checked). Fixed features in step 2: what must stay right, in your own words, taken out of the captions as part of the trigger; step 8 lists captions that still name one."),
     ("1.261126b", "New dataset: a folder with only pictures that you put in the dataset folder becomes a dataset when you open it (10_<name>/ with the pictures and captions, _originals/, model/, log/), and the New dataset form is empty again after making one (an old 'folder somewhere else' no longer sticks). Cleanup: dead code removed (Gradio leftovers, the old caption writer, unused constants and imports), script options read and written by one set of helpers (Compare settings and profiles included), one model-file header reader. Measured at 80 datasets and 200 LoRAs: every page opens in under 0.3 s."),
