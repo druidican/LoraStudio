@@ -11,9 +11,13 @@ from nicegui import run, ui
 
 import datasets_ui as V
 import dsflow as F
+import dscaptions
 import features as FT
 import sd_settings as SSET
 import sdgui as S
+import sdqueue
+import sd_settings
+import sd_script
 from widgets import note
 
 PRIORITIES = {"balanced": "Balanced", "quality": "Best quality", "fast": "Fastest"}
@@ -27,10 +31,10 @@ class Train:
         self.types = m["types"]
         t = page.s.get("tkey")
         self.tkey = t if t in self.types else (self.types[0] if self.types else "")
-        self.script, self.text, self.plan = S.NEW, "", {}
+        self.script, self.text, self.plan = sd_script.NEW, "", {}
         self.newname, self.prompts_path, self.prompts_text = "", "", ""
         self.purpose = m["purpose"]
-        S.set_choice(self.purpose, S.CHOICE.get("priority"))
+        sd_script.set_choice(self.purpose, sd_script.CHOICE.get("priority"))
         self.busy = False                                # while the code fills the fields (no write-back)
 
     # ------------------------------------------------------------------ the editor follows a result dict
@@ -73,7 +77,7 @@ class Train:
         return (self.w_steps.value or 0, self.w_userep.value, False)
 
     def load(self):
-        self.apply(S.cs_ds_change(self.ds, self.tkey, *self.args()))
+        self.apply(sd_script.cs_ds_change(self.ds, self.tkey, *self.args()))
         self.draw_repeat()
 
     def draw_plan(self):
@@ -89,15 +93,15 @@ class Train:
 
     def model_vis(self):
         try:
-            used = {k for k, _ in S.type_slots(self.tkey)} if self.tkey else set()
+            used = {k for k, _ in sd_settings.type_slots(self.tkey)} if self.tkey else set()
         except Exception:                                # noqa: BLE001
             used = set()
-        names = [n for n, _ in S.FORM_GROUPS[3][1]]
+        names = [n for n, _ in sd_script.FORM_GROUPS[3][1]]
         for n, w in zip(names, self.fields[-len(names):]):
             w.set_visibility((not used) or n in used or bool((w.value or "").strip()))
 
     def draw_repeat(self):
-        r = S.rp_refresh(self.ds, self.tkey, self.w_steps.value or 0)
+        r = sd_settings.rp_refresh(self.ds, self.tkey, self.w_steps.value or 0)
         self.rp_folder.options = {v: lab for lab, v in r["choices"]}
         self.rp_folder.value = r["folder"]
         self.rp_folder.update()
@@ -109,7 +113,7 @@ class Train:
             return
         self.tkey = t
         self.page.s["tkey"] = t
-        self.apply(S.cs_retype(self.ds, self.script, t, self.text, *self.args()))
+        self.apply(sd_script.cs_retype(self.ds, self.script, t, self.text, *self.args()))
         self.draw_caps()
         self.draw_download()
         self.draw_repeat()
@@ -121,25 +125,25 @@ class Train:
     def set_script(self, v):
         if self.busy or not v or v == self.script:
             return
-        self.apply(S.cs_script_change(self.ds, v, self.tkey, *self.args()))
+        self.apply(sd_script.cs_script_change(self.ds, v, self.tkey, *self.args()))
         self.draw_look()
 
     def set_choice(self):
-        S.set_choice(self.purpose, self.w_prio.value)
-        self.apply(S.cs_retype(self.ds, self.script, self.tkey, self.text, *self.args()))
+        sd_script.set_choice(self.purpose, self.w_prio.value)
+        self.apply(sd_script.cs_retype(self.ds, self.script, self.tkey, self.text, *self.args()))
 
     def text_changed(self, v):
         if self.busy:
             return
         self.text = v or ""
-        r = S.cs_read(self.ds, self.tkey, self.script, self.text, self.plan)
+        r = sd_script.cs_read(self.ds, self.tkey, self.script, self.text, self.plan)
         r.pop("text", None)
         self.apply(r)
 
     def field_left(self):
         if self.busy:
             return
-        r = S.cs_apply_quiet(self.ds, self.tkey, self.script, self.text, self.plan, *[w.value for w in self.fields])
+        r = sd_script.cs_apply_quiet(self.ds, self.tkey, self.script, self.text, self.plan, *[w.value for w in self.fields])
         if r:
             self.apply(r)
 
@@ -149,24 +153,24 @@ class Train:
         new, msg = V.apply_settings(self.ds, self.tkey, self.text, *[w.value for w, _ in self.sets])
         self.w_amsg.content = msg
         if new != self.text:
-            self.apply({"text": new, "fields": S.read_form(new)})
+            self.apply({"text": new, "fields": sd_script.read_form(new)})
 
     def draw_caps(self):
-        sets = F.train_sets(self.ds, self.tkey) if self.tkey else []
+        sets = dscaptions.train_sets(self.ds, self.tkey) if self.tkey else []
         self.w_caps_row.set_visibility(len(sets) > 1)
         if len(sets) > 1:
             self.w_caps.options = {x["style"]: f"{'Tags' if x['style'] == 'tags' else 'Sentences'} (IMG{x['ext']})"
                                    for x in sets}
-            self.w_caps.value = F.train_style(self.ds, self.tkey)
+            self.w_caps.value = dscaptions.train_style(self.ds, self.tkey)
             self.w_caps.update()
 
     def pick_caps(self, style):
         if self.busy or not style:
             return
-        F.set_train_style(self.ds, self.tkey, style)
+        dscaptions.set_train_style(self.ds, self.tkey, style)
         import sd_script as SS
         if self.text.strip():
-            self.apply({"text": SS.set_caption_ext(self.text, F.caption_ext(self.ds, self.tkey))})
+            self.apply({"text": SS.set_caption_ext(self.text, dscaptions.caption_ext(self.ds, self.tkey))})
 
     def draw_look(self):
         """The look of the result for this type (the same choice as in step 7), and whether the script follows it."""
@@ -184,8 +188,8 @@ class Train:
             self.w_look_fix.set_visibility(L.differs(self.ds, self.tkey, self.text))
 
     def look_changed(self):
-        if self.script in (None, "", S.NEW):             # a new script: made again, with fitting sample prompts
-            self.apply(S.cs_retype(self.ds, self.script, self.tkey, self.text, *self.args()))
+        if self.script in (None, "", sd_script.NEW):             # a new script: made again, with fitting sample prompts
+            self.apply(sd_script.cs_retype(self.ds, self.script, self.tkey, self.text, *self.args()))
             self.w_look_fix.set_visibility(False)
         else:
             self.look_use()
@@ -216,10 +220,10 @@ class Train:
     async def save(self, how: str):
         mk = self.w_mk.value
         if how == "over":
-            msg = S.cs_save_over(self.ds, self.script, self.text, self.tkey, self.plan, mk)
+            msg = sd_script.cs_save_over(self.ds, self.script, self.text, self.tkey, self.plan, mk)
             self.w_status.content = self.w_msg.content = msg
         else:
-            r = S.cs_save_new(self.ds, self.w_newname.value, self.text, self.prompts_path, self.prompts_text,
+            r = sd_script.cs_save_new(self.ds, self.w_newname.value, self.text, self.prompts_path, self.prompts_text,
                               self.tkey, self.script, self.plan, mk)
             self.apply(r)
             msg = r.get("status", "")
@@ -229,35 +233,35 @@ class Train:
         return msg
 
     async def save_and_queue(self):
-        can_over = self.script not in (None, "", S.NEW) and Path(self.script).is_file()
+        can_over = self.script not in (None, "", sd_script.NEW) and Path(self.script).is_file()
         msg = await self.save("over" if can_over else "new")
         if not str(msg or "").lstrip().startswith(("✔", "**Saved")):
             return
         sc = F.launch_scripts(self.ds)
-        cur = Path(self.script) if self.script and self.script != S.NEW and Path(self.script).is_file() else None
+        cur = Path(self.script) if self.script and self.script != sd_script.NEW and Path(self.script).is_file() else None
         p = cur or (max(sc, key=lambda x: x.stat().st_mtime) if sc else None)
         if p is None:
             self.w_msg.content = "No launch script in this dataset yet: save one first."
             return
-        with S.QLOCK:
-            if any(i["path"] == str(p) and i["state"] in ("queued", "running") for i in S.QUEUE["items"]):
+        with sdqueue.QLOCK:
+            if any(i["path"] == str(p) and i["state"] in ("queued", "running") for i in sdqueue.QUEUE["items"]):
                 self.w_msg.content = f"{p.name} is already in the queue."
                 return
-            S.QUEUE["items"].append({"path": str(p), "resume": "", "state": "queued", "note": ""})
+            sdqueue.QUEUE["items"].append({"path": str(p), "resume": "", "state": "queued", "note": ""})
         out = f"✔ {p.name} added to the queue."
-        if self.w_auto.value and not S.QUEUE.get("running") and not S.RUN.running():
-            S.queue_start(S.QUEUE.get("stop_on_fail", True))
-            if S.QUEUE.get("running"):
+        if self.w_auto.value and not sdqueue.QUEUE.get("running") and not S.RUN.running():
+            sdqueue.queue_start(sdqueue.QUEUE.get("stop_on_fail", True))
+            if sdqueue.QUEUE.get("running"):
                 out += " Training starts now: the status strip at the top follows it."
         else:
-            waiting = sum(1 for i in S.QUEUE["items"] if i["state"] == "queued")
+            waiting = sum(1 for i in sdqueue.QUEUE["items"] if i["state"] == "queued")
             out += f" {waiting} waiting; the Queue tab starts the queue."
         self.w_msg.content = out
         self.w_queue.content = V.queue_card(self.ds)
 
     async def check(self):
         self.w_check.content = "Asking your trainer for its options …"
-        self.w_check.content = await run.io_bound(S.cs_check, self.text)
+        self.w_check.content = await run.io_bound(sd_script.cs_check, self.text)
 
     def autostart(self, v):
         import launchopts
@@ -295,8 +299,8 @@ class Train:
         PR.choose(self.ds, self.tkey, name or "")
         self.draw_profiles()
         p = PR.load(self.tkey, name)
-        if self.script in (None, "", S.NEW):             # a new script: made again, from scratch, with the profile
-            self.apply(S.cs_retype(self.ds, self.script, self.tkey, "", *self.args()))
+        if self.script in (None, "", sd_script.NEW):             # a new script: made again, from scratch, with the profile
+            self.apply(sd_script.cs_retype(self.ds, self.script, self.tkey, "", *self.args()))
         elif p:
             self.apply({"text": PR.apply_text(self.text, p, self.purpose),
                         "status": f"The script text now has the settings of **{p['name']}**: **Save** keeps it."})
@@ -406,9 +410,9 @@ class Train:
                     dl_msg.text = hfdownload.start_background([self.tkey])
                 ui.button("⬇ Download from Hugging Face", on_click=download).props("unelevated dense no-caps color=primary")
         with ui.row().classes("w-full items-end gap-3"):
-            self.w_script = ui.select({S.NEW: "+ New launch script"}, value=S.NEW, label="Launch script",
+            self.w_script = ui.select({sd_script.NEW: "+ New launch script"}, value=sd_script.NEW, label="Launch script",
                                       on_change=lambda e: self.set_script(e.value)).props("outlined dense").classes("w-96")
-            self.w_prio = ui.select(PRIORITIES, value=S.CHOICE.get("priority") or "balanced", label="Priority",
+            self.w_prio = ui.select(PRIORITIES, value=sd_script.CHOICE.get("priority") or "balanced", label="Priority",
                                     on_change=lambda: self.set_choice()).props("outlined dense").classes("w-48")
             self.w_prof = ui.select({"": "Original (LoRA Studio)"}, value="", label="Settings profile",
                                     on_change=lambda e: self.set_profile(e.value)).props("outlined dense").classes("w-64")
@@ -442,21 +446,21 @@ class Train:
                 self.w_steps = ui.number("Target total steps (0 = recommended for the type)", value=0, precision=0) \
                     .props("outlined dense").classes("w-72")
                 self.w_userep = ui.checkbox("Plan with the recommended repeat count", value=True)
-            self.w_steps.on("keydown.enter", lambda: self.apply(S.cs_retype(self.ds, self.script, self.tkey, self.text,
+            self.w_steps.on("keydown.enter", lambda: self.apply(sd_script.cs_retype(self.ds, self.script, self.tkey, self.text,
                                                                             *self.args())))
-            ui.markdown(S.recs_status()).classes("ls-note")
+            ui.markdown(sd_script.recs_status()).classes("ls-note")
             self.fields = []
-            for gname, flds in S.FORM_GROUPS:
+            for gname, flds in sd_script.FORM_GROUPS:
                 with ui.expansion(gname + (" (only the files this LoRA type uses)" if gname == "Model files" else "")) \
                         .classes("w-full"):
                     with ui.grid(columns=2 if gname == "Model files" else 4).classes("w-full gap-2"):
                         for name, label in flds:
                             w = ui.input(label).props(f'outlined dense hint="--{name}"').classes("w-full")
-                            w.set_visibility(name not in S.STUDIO_TABLE)
+                            w.set_visibility(name not in sd_script.STUDIO_TABLE)
                             w.on("blur", lambda: self.field_left())
                             self.fields.append(w)
             with ui.row().classes("gap-2"):
-                ui.button("Use model files from Settings", on_click=lambda: self.apply(S.cs_use_settings(
+                ui.button("Use model files from Settings", on_click=lambda: self.apply(sd_settings.cs_use_settings(
                     self.ds, self.tkey, self.script, self.text, self.plan))).props("outline dense no-caps")
             self.w_mk = ui.checkbox("Create missing folders when saving: the repeat folder (<N>_<name>), model and log. "
                                     "Images lying directly in the dataset folder are moved into a new repeat folder.",
@@ -474,20 +478,20 @@ class Train:
                 rp_msg = ui.markdown("")
 
                 def rename():
-                    msg, done = S.rp_rename(self.ds, self.rp_folder.value, self.rp_name.value, rp_ok.value)
+                    msg, done = sd_settings.rp_rename(self.ds, self.rp_folder.value, self.rp_name.value, rp_ok.value)
                     rp_msg.content = msg
                     if done:
                         rp_ok.value = False
                         self.draw_repeat()
 
                 def epochs():
-                    self.apply(S.cs_set_epochs(self.ds, self.tkey, self.script, self.text, self.plan,
+                    self.apply(sd_settings.cs_set_epochs(self.ds, self.tkey, self.script, self.text, self.plan,
                                                self.w_steps.value or 0))
                 with ui.row().classes("gap-2"):
                     ui.button("Rename / create repeat folder", on_click=rename).props("unelevated dense no-caps color=primary")
                     ui.button("Set epochs to hit the target steps", on_click=epochs).props("outline dense no-caps")
                     ui.button("Create missing folders now (repeat folder, model, log)", on_click=lambda: setattr(
-                        rp_msg, "content", S.rp_make(self.ds, self.tkey, self.text, self.plan))).props("outline dense no-caps")
+                        rp_msg, "content", sd_settings.rp_make(self.ds, self.tkey, self.text, self.plan))).props("outline dense no-caps")
         with ui.expansion("Why these settings: notes and checks before training").classes("w-full ls-card"):
             self.w_explain = ui.markdown("")
         with ui.expansion("The script text").classes("w-full ls-card"):
@@ -495,7 +499,7 @@ class Train:
             self.w_text.on_value_change(lambda e: self.text_changed(e.value))
         with ui.row().classes("w-full items-end gap-2"):
             ui.button("Fill with recommended settings", on_click=lambda: (
-                self.apply(S.cs_suggest(self.ds, self.script, self.tkey, *self.args())), self.draw_repeat())) \
+                self.apply(sd_script.cs_suggest(self.ds, self.script, self.tkey, *self.args())), self.draw_repeat())) \
                 .props("outline dense no-caps")
             ui.button("Check flags against my trainer", on_click=self.check).props("outline dense no-caps")
             self.w_save = ui.button("Save", on_click=lambda: self.save("over")).props("unelevated dense no-caps color=primary")

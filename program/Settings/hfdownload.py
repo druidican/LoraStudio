@@ -186,11 +186,6 @@ def _token() -> str:
         import sd_settings
         return sd_settings.read_hf_token() or ""
     except Exception:                                  # noqa: BLE001
-        pass
-    sg = sys.modules.get("sdgui")
-    try:
-        return sg.read_hf_token() if sg is not None else ""
-    except Exception:                                  # noqa: BLE001
         return ""
 
 

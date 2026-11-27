@@ -3,18 +3,19 @@
 all LoRAs, and freeing disk space (training leftovers, orphaned LoRA Manager files). Everything removed goes to the
 desktop Trash."""
 from __future__ import annotations
-__version__ = "1.131126c"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
 
 import lora_library as LL
+import libsync
 
 LIB = LL.LIB
 
 
 def sync() -> str:
-    msg = LL.personal_sync(LIB, None)
+    msg = libsync.personal_sync(LIB, None)
     return msg
 
 
@@ -36,14 +37,14 @@ def training_cards(force: bool) -> str:
 
 
 def find_leftovers() -> tuple[str, list[str]]:
-    return LL.leftovers_md(LIB)
+    return libsync.leftovers_md(LIB)
 
 
 def trash_leftovers(paths: list[str]) -> str:
     if not paths:
         return "Press Find leftovers first."
     HK = LL.HK
-    busy = LL.busy_datasets()
+    busy = libsync.busy_datasets()
     todo = [p for p in paths if not any(Path(p).is_relative_to(b) for b in busy)]
     size = sum(HK.size_of(Path(p)) for p in todo)
     moved, err = HK.trash(todo)
@@ -56,7 +57,7 @@ def trash_leftovers(paths: list[str]) -> str:
 
 
 def find_orphans() -> tuple[str, list[tuple[str, str]]]:
-    md, choices, _ = LL.orphans_list(LIB)
+    md, choices, _ = libsync.orphans_list(LIB)
     return md, choices
 
 

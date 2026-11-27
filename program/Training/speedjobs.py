@@ -165,7 +165,8 @@ def start(tkeys: list[str], depth: str = "quick") -> str:
         return "A speed test is already running."
     try:
         import sdgui as S
-        if S.RUN.running() or S.QUEUE.get("running"):
+        import sdqueue
+        if S.RUN.running() or sdqueue.QUEUE.get("running"):
             return "A training run or the queue is active: start the speed test when it has finished."
     except Exception:                                    # noqa: BLE001
         pass

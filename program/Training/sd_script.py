@@ -20,6 +20,9 @@ from pathlib import Path
 
 import notify
 import sdgui as S
+import dsfiles
+import sdqueue
+import sd_settings
 
 
 # --------------------------------------------------------------------------- LoRA types (architectures)
@@ -36,7 +39,7 @@ PRESETS_ERROR = {"msg": ""}  # why Lora_Datatypes.py could not be loaded (shown 
 def builtin_presets():
     """(module or None, {key: preset}): every LoRA type defined in Lora_Datatypes.py."""
     try:
-        sc = S.load_scan_module()
+        sc = dsfiles.load_scan_module()
         PRESETS_ERROR["msg"] = ""
     except Exception as e:
         PRESETS_ERROR["msg"] = f"{type(e).__name__}: {e}"
@@ -57,14 +60,14 @@ def custom_subtypes() -> dict:
     A subtype trains like its base type (SDXL or Anima) but has its own model files and file tag."""
     _, builtin = builtin_presets()
     out = {}
-    for sec, kv in S.read_settings().items():
+    for sec, kv in sd_settings.read_settings().items():
         if sec in RESERVED_TYPES or sec in builtin:
             continue
         base = (kv.get("base") or "").strip().lower()
         explicit = base in SUBTYPE_BASES
         if not explicit:
             base = "anima" if kv.get("qwen3") else "sdxl"          # hand-written section without `base =`
-        label = (kv.get("label") or S.SECTION_NAMES.get(sec, sec)).strip()
+        label = (kv.get("label") or sd_settings.SECTION_NAMES.get(sec, sec)).strip()
         tag = re.sub(r"[^A-Za-z0-9]", "", kv.get("tag") or label) or sec.upper()
         if not kv.get("tag"):
             tag = tag.upper()
@@ -407,7 +410,7 @@ def set_script_version(text: str, base: str, n: int) -> str:
 def _busy_scripts() -> set:
     busy = set()
     try:
-        busy |= {str(Path(i["path"]).resolve()) for i in S.QUEUE["items"] if i.get("state") in ("queued", "running")}
+        busy |= {str(Path(i["path"]).resolve()) for i in sdqueue.QUEUE["items"] if i.get("state") in ("queued", "running")}
     except Exception:                       # noqa: BLE001
         pass
     try:
@@ -478,7 +481,7 @@ def archive_all_datasets() -> int:
 
 
 def launch_scripts(ds):
-    d = S.lora_path(ds) if ds else None
+    d = dsfiles.lora_path(ds) if ds else None
     if not d or not d.is_dir():
         return []
     return sorted((p for p in d.glob("*.sh") if not p.name.startswith(".gui_run_")), key=lambda p: p.name.lower())
@@ -511,7 +514,7 @@ def main_repeat_folders(lora: Path, found=None) -> tuple[list, list]:
     """([(folder, repeats)] that are the dataset, [(folder, repeats)] other repeat folders). Only <N>_<dataset name>
     counts; a dataset without such a folder (an older or renamed one) uses its repeat folders directly in the
     dataset folder, as sd-scripts does."""
-    reps = [(f, r) for f, r in (found if found is not None else S.repeat_folders(lora)) if r is not None]
+    reps = [(f, r) for f, r in (found if found is not None else dsfiles.repeat_folders(lora)) if r is not None]
     main = [(f, r) for f, r in reps if is_main_folder(f, lora)]
     if not main:
         main = [(f, r) for f, r in reps if f.parent == lora]
@@ -522,27 +525,27 @@ def dataset_stats(ds):
     """The training pictures of a dataset: its own repeat folder <N>_<dataset name> only. Pictures anywhere else
     (_reserve/, other repeat folders, other folders, the dataset folder itself) are not part of it: they are listed
     in 'loose' / 'others' and only used when the usable scan is told to look at them (Datasets › 3)."""
-    lora = S.lora_path(ds)
+    lora = dsfiles.lora_path(ds)
     rows, loose = [], []
-    found = S.repeat_folders(lora)
+    found = dsfiles.repeat_folders(lora)
     main, others = main_repeat_folders(lora, found)
     for f, r in main:
-        imgs = S.list_images(f)
-        rows.append(dict(folder=f, repeats=r, n=len(imgs), captioned=sum(1 for im in imgs if S.read_caption(im))))
+        imgs = dsfiles.list_images(f)
+        rows.append(dict(folder=f, repeats=r, n=len(imgs), captioned=sum(1 for im in imgs if dsfiles.read_caption(im))))
     for f, r in found:
         if r is None:
-            loose.append((f, len(S.list_images(f))))
-    return dict(lora=lora, rows=rows, loose=loose, others=[(f, len(S.list_images(f))) for f, _ in others],
+            loose.append((f, len(dsfiles.list_images(f))))
+    return dict(lora=lora, rows=rows, loose=loose, others=[(f, len(dsfiles.list_images(f))) for f, _ in others],
                 total=sum(r["n"] for r in rows), captioned=sum(r["captioned"] for r in rows))
 
 
 def with_virtual_row(stats):
     """A dataset whose images sit directly in the LoRA folder has no <N>_name folder yet. Plan it as if
     the folder existed: one virtual row, which Save creates (and moves the images into)."""
-    root_imgs = S.list_images(stats["lora"])
+    root_imgs = dsfiles.list_images(stats["lora"])
     if stats["rows"] or not root_imgs:
         return stats
-    caps = sum(1 for im in root_imgs if S.read_caption(im))
+    caps = sum(1 for im in root_imgs if dsfiles.read_caption(im))
     row = dict(folder=stats["lora"], repeats=1, n=len(root_imgs), captioned=caps, virtual=True)
     return {**stats, "rows": [row], "loose": [(f, n) for f, n in stats["loose"] if f != stats["lora"]],
             "total": len(root_imgs), "captioned": caps}
@@ -585,8 +588,8 @@ def _speed(tkey, cfg) -> dict:
 def caption_ext_for(ds, tkey) -> str:
     """The caption set a new launch script of this type trains on (Datasets: step 2 and 9), else IMG.txt."""
     try:
-        import dsflow
-        return dsflow.caption_ext(ds, tkey) if ds else ".txt"
+        import dscaptions
+        return dscaptions.caption_ext(ds, tkey) if ds else ".txt"
     except Exception:                                  # noqa: BLE001
         return ".txt"
 
@@ -646,7 +649,7 @@ def ensure_folders(ds, text, plan, tkey):
     """Create what a training run needs inside the LoRA folder: the <N>_name repeat folder (if there is none),
     and the model and log folders the script writes to. Images lying directly in the LoRA folder are moved
     into a newly created repeat folder. Returns a list of what was done."""
-    lora = S.lora_path(ds)
+    lora = dsfiles.lora_path(ds)
     notes = []
     v = S.script_vars(text or "", lora)
 
@@ -674,14 +677,14 @@ def ensure_folders(ds, text, plan, tkey):
             notes.append(f"created repeat folder `{_rel(dest, lora)}`")
             if train_dir.resolve() == lora.resolve():
                 moved = 0
-                for im in S.list_images(lora):
+                for im in dsfiles.list_images(lora):
                     for src in [im] + [im.with_name(im.stem + e) for e in S.CAPTION_EXTS]:
                         if src.is_file():
                             shutil.move(str(src), str(dest / src.name))
                             moved += 1
                 if moved:
                     notes.append(f"moved {moved} files (images and captions) from the LoRA folder into `{name}/`")
-            if not S.list_images(dest):
+            if not dsfiles.list_images(dest):
                 notes.append(f"`{name}/` is empty: copy your images and .txt captions into it")
         left = [f for f, n in dataset_stats(ds)["loose"] if n]          # re-read: images may just have been moved
         if left:
@@ -750,7 +753,7 @@ def tuned_cfg(tkey, cfg, stats):
         cfg["rec_notes"] = [f"Recommendations not applied: {RECS_ERROR['msg']}"]
         return cfg
     files = {f: p for f, p in cfg.get("model_args", [])}
-    files.update({"--" + k: v for k, v in S.settings_models(tkey).items()})
+    files.update({"--" + k: v for k, v in sd_settings.settings_models(tkey).items()})
     try:
         bp = "concept" if CHOICE["purpose"] in ("object", "worn", "action", "concept") else CHOICE["purpose"]
         out, _ = recs.apply(tkey, cfg, bp, CHOICE["priority"], int(stats.get("total") or 0), files,
@@ -782,11 +785,11 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, samples=True):
     if tkey not in presets:
         raise ValueError(f"Unknown LoRA type: {tkey}")
     cfg = dict(presets[tkey])
-    ov = S.settings_models(tkey)                       # model files chosen in the Settings tab win over the preset
+    ov = sd_settings.settings_models(tkey)                       # model files chosen in the Settings tab win over the preset
     if ov:
         have = {f.lstrip("-") for f, _ in cfg["model_args"]}
         cfg["model_args"] = [(f, ov.get(f.lstrip("-"), pth)) for f, pth in cfg["model_args"]]
-        if S.vae_optional(tkey, presets) and "vae" not in have and ov.get("vae"):
+        if sd_settings.vae_optional(tkey, presets) and "vae" not in have and ov.get("vae"):
             cfg["model_args"].append(("--vae", ov["vae"]))
     musubi = S.is_musubi_cfg(cfg)
     if musubi:
@@ -825,10 +828,11 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, samples=True):
     if not musubi and not virtual and len(stats["rows"]) == 1:   # worn item: weight per kind (step 7)
         try:
             import dsflow as F
+            import dsworn
             if F.meta(ds).get("purpose") == "worn":
-                kinds = F.kinds_block(ds, cfg["caption_ext"])
+                kinds = dsworn.kinds_block(ds, cfg["caption_ext"])
                 if kinds:
-                    n_eff = F.kind_weights(ds, cfg["caption_ext"])["n_eff"]
+                    n_eff = dsworn.kind_weights(ds, cfg["caption_ext"])["n_eff"]
                     stats_w = {**stats, "total": n_eff, "rows": [{**stats["rows"][0], "n": n_eff}]}
         except Exception:                                # noqa: BLE001
             kinds = ""
@@ -854,7 +858,7 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, samples=True):
     extra = {"cfg": run_cfg, "bs": rec["bs"]} if musubi else {}
     text = sc.render_training_script(sc.under(S.trainer_root(cfg), S.HOME, "${HOME}"), sc.under(train_dir, lora, "${SCRIPT_DIR}"),
                                      sc.under(prompts_path, lora, "${SCRIPT_DIR}") if samples else None, plan_line, cmd,
-                                     S.vendor_env({**sc.ROCM_ENV, **cfg.get("env", {}), **S.env_saved()}), **extra)
+                                     sd_settings.vendor_env({**sc.ROCM_ENV, **cfg.get("env", {}), **sd_settings.env_saved()}), **extra)
     if kinds:
         text = text.replace('# Training code and venv live in sd-scripts\n', kinds + '\n# Training code and venv live in sd-scripts\n', 1)
         text = text.replace('--train_data_dir "${TRAIN_DIR}"', '--train_data_dir "${KINDS_VIEW}"', 1)
@@ -876,7 +880,7 @@ def make_plan(ds, tkey, steps_over=0, use_sug_rep=True, samples=True):
         print(f"[compare] {e}")
     if not musubi:
         text = add_logging(text)
-    text, _ = S.scrub_hf(text)                         # the token is passed when the script runs, never stored
+    text, _ = sd_settings.scrub_hf(text)                         # the token is passed when the script runs, never stored
     return dict(cfg=cfg, stats=stats, rec=rec, script_text=text, prompts_path=prompts_path,
                 prompts_text=prompts_text, prompts_new=prompts_new, out_name=out_name, musubi=musubi,
                 filename=unique_script_name(lora, f"{out_name}.sh"))
@@ -1138,7 +1142,7 @@ def explain_md(ds, tkey, cfg, stats, text, rec, existing, planned_repeats=None, 
         A.append("Not part of this dataset (only `<N>_" + stats["lora"].name + "` is): " + ", ".join(
             f"{p.name} ({n})" for p, n in top_others) + ". sd-scripts would train them too, so they are moved to `"
             + EXTRA_DIR + "/` when you save the launch script (nothing is deleted).")
-    for d in S.renamed_archives(stats["lora"]):
+    for d in dsfiles.renamed_archives(stats["lora"]):
         A.append(f"🔴 `{d.name}` is the Personal sync folder (LoRA previews and example images) renamed into a repeat folder: "
                  f"sd-scripts would TRAIN on those pictures and the Library no longer finds its data. Rename it back: "
                  f"`mv \"{d}\" \"{d.with_name('LoraManager')}\"` (it is left out of the plan above).")
@@ -1160,7 +1164,7 @@ def explain_md(ds, tkey, cfg, stats, text, rec, existing, planned_repeats=None, 
                 A.append(bad)
             elif S.GUIDE is not None:                       # right kind of file for this slot? (e.g. an SD3 VAE as FLUX AE)
                 try:
-                    kinds = S.GUIDE.requirements_for(tkey, S._type_base(tkey)).get(name, [])
+                    kinds = S.GUIDE.requirements_for(tkey, sd_settings._type_base(tkey)).get(name, [])
                     info = S.GUIDE.identify(v)
                     why = S.GUIDE.problems(info, name, kinds) if kinds and info.get("kind") not in ("unknown", "missing") else ""
                 except Exception:
@@ -1271,10 +1275,10 @@ def cs_load(ds, script, tkey, steps_over, use_rep, samples=True):
                           newname=plan["filename"], can_save_over=False,
                           status=_new_status(plan), plan=ps)
     text = Path(script).read_text(encoding="utf-8", errors="ignore")
-    text, filled = S.scrub_hf(text)
+    text, filled = sd_settings.scrub_hf(text)
     _, presets = merged_presets()
     tk = infer_type(text, presets, tkey)
-    pp = prompts_path_from_text(text, S.lora_path(ds))
+    pp = prompts_path_from_text(text, dsfiles.lora_path(ds))
     ptext = pp.read_text(encoding="utf-8", errors="ignore") if pp and pp.is_file() else ""
     label = presets.get(tk, {}).get("label", tk)
     return _cs_result(**upd, type=tk, text=text, fields=read_form(text),
@@ -1289,7 +1293,7 @@ def cs_load(ds, script, tkey, steps_over, use_rep, samples=True):
 
 
 def _next_name(ds, text, script) -> str:
-    lora = S.lora_path(ds)
+    lora = dsfiles.lora_path(ds)
     base, n = next_script_version(lora, text, script_home(script))
     return unique_script_name(lora, f"{base}V{n}.sh" if base else Path(script).stem + "_new.sh")
 
@@ -1415,8 +1419,8 @@ def cs_save_over(ds, script, text, tkey, plan, makedirs):
     p.write_text((text or "").rstrip("\n") + "\n", encoding="utf-8")
     msg = f"**Saved `{p.name}`** (previous version: `{p.name}.bak`). The queue always runs the saved file."
     if has_samples(text):                     # create the prompts file if the script points at a missing one
-        pp = prompts_path_from_text(text, S.lora_path(ds))
-        if pp and not pp.exists() and _inside(pp, S.lora_path(ds)):
+        pp = prompts_path_from_text(text, dsfiles.lora_path(ds))
+        if pp and not pp.exists() and _inside(pp, dsfiles.lora_path(ds)):
             try:
                 _, presets = merged_presets()
                 pp.write_text(build_prompts(merged_presets()[0], with_virtual_row(dataset_stats(ds)), presets[tkey])[1], encoding="utf-8")
@@ -1449,11 +1453,11 @@ def cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, pla
     if not name or not re.fullmatch(r"[\w][\w .\-]*\.sh", name):
         notify.warning("Enter a file name like MyCharacterFLUXtraining.sh (letters, digits, space, _ - . only).")
         return _cs_result(status="Invalid file name.", plan=plan)
-    dest = S.lora_path(ds) / name
+    dest = dsfiles.lora_path(ds) / name
     if dest.exists():
         notify.warning(f"{name} already exists. Pick another name, or select it and use Save (overwrite).")
         return _cs_result(status=f"`{name}` already exists. Choose another name.", plan=plan)
-    text, vnote = _bump_if_taken(S.lora_path(ds), S.fix_flags(text or "")[0])
+    text, vnote = _bump_if_taken(dsfiles.lora_path(ds), S.fix_flags(text or "")[0])
     if (plan or {}).get("rename") and (plan or {}).get("repeats"):
         r = _auto_rename(ds, plan["repeats"][0])
         if r:
@@ -1470,7 +1474,7 @@ def cs_save_new(ds, newname, text, prompts_path, prompts_text, tkey, script, pla
     msg += "."
     notes = ensure_folders(ds, text, plan, tkey) if makedirs else []
     msg += _folder_note(notes)
-    moved = archive_old_scripts(S.lora_path(ds), keep=dest)
+    moved = archive_old_scripts(dsfiles.lora_path(ds), keep=dest)
     if moved:
         msg += (f" The older script{'s' if len(moved) > 1 else ''} of this type ({', '.join(f'`{m}`' for m in moved)}) "
                 f"moved to `{OLD_RUNS}/`.")

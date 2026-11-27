@@ -2,7 +2,7 @@
 """The Settings panels, one function per group (panel_<key>), built when the group is opened. Each uses the logic
 of its own module (launchopts, features, lora_library, backup, selfupdate, updater, sd_settings, ollamactl, …)."""
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import os
 from pathlib import Path
@@ -10,6 +10,7 @@ from pathlib import Path
 from nicegui import run, ui
 
 import lora_library as LL
+import libcards
 import settings_ui as SU
 from widgets import confirm, note
 
@@ -232,11 +233,11 @@ def panel_look(page):
                 nsfw_level=LL.NSFW_LEVELS.get(level.value, 8), blur_unknown_nsfw=unknown.value))
         ui.button("Save settings and rescan", on_click=save).props("unelevated no-caps color=primary")
     with card():
-        pc = LL.purpose_colors(LIB)
+        pc = libcards.purpose_colors(LIB)
         on = ui.checkbox("Colour the Collection cards by purpose (border and label; off = all white)", value=pc["on"])
         picks = {}
         with ui.row().classes("gap-4"):
-            for k, lab in LL.PURPOSES:
+            for k, lab in libcards.PURPOSES:
                 with ui.column().classes("gap-0 items-center"):
                     ui.label(lab).classes("ls-note")
                     picks[k] = ui.color_input(value=pc[k]).props("dense outlined").classes("w-36")
@@ -244,12 +245,12 @@ def panel_look(page):
 
         def store():
             LIB.data["purpose_colors"] = {"on": bool(on.value),
-                                          **{k: (w.value or LL.PURPOSE_COLORS[k]) for k, w in picks.items()}}
+                                          **{k: (w.value or libcards.PURPOSE_COLORS[k]) for k, w in picks.items()}}
             LIB.save_data()
             pmsg.content = "✔ Saved: the cards are coloured by purpose." if on.value else "✔ Saved: the cards are white."
         with ui.row().classes("gap-2"):
             ui.button("Save colours", on_click=store).props("unelevated dense no-caps color=primary")
-            ui.button("Default colours", on_click=lambda: [w.set_value(LL.PURPOSE_COLORS[k]) for k, w in picks.items()]) \
+            ui.button("Default colours", on_click=lambda: [w.set_value(libcards.PURPOSE_COLORS[k]) for k, w in picks.items()]) \
                 .props("flat dense no-caps")
 
 
@@ -732,12 +733,14 @@ def panel_ai(page):
     import asyncio
     import features as FT
     import sdgui as S
+    import sd_settings
+    import sd_prepare
     oc = S.ollama_ctl()
     if not FT.have("ollama"):
         note("Ollama is not installed (Settings › Start and network › What is installed): the detailed sort and writing "
              f"captions by Ollama are hidden. Get it from {FT.ollama_guide()}, tick it there, "
              "restart.")
-    url0, _ = S.oc_settings()
+    url0, _ = sd_prepare.oc_settings()
     with card():
         ui.label("Ollama: reads pictures and writes captions").classes("font-semibold")
         with ui.row().classes("w-full items-end gap-2"):
@@ -782,7 +785,7 @@ def panel_ai(page):
             ms = oc.installed(u())
         except Exception:                                # noqa: BLE001
             ms = []
-        _, use = S.oc_settings()
+        _, use = sd_prepare.oc_settings()
         vision = [m["name"] for m in ms if m.get("vision")]
         table.content = S.ai_models_html(u())
         msg.content = text or ""
@@ -793,14 +796,14 @@ def panel_ai(page):
         rm.update()
 
     def set_default(name):
-        _, use = S.oc_settings()
+        _, use = sd_prepare.oc_settings()
         if name and name != use:
-            S.oc_save_settings(u(), name)
+            sd_prepare.oc_save_settings(u(), name)
             refresh(f"✔ {name} is now the default: used for captions, sorting and picture checks.")
 
     def test():
-        _, m = S.oc_settings()
-        S.oc_save_settings(u(), m)
+        _, m = sd_prepare.oc_settings()
+        sd_prepare.oc_save_settings(u(), m)
         ok = oc.running(u(), fresh=True) is not None
         tmsg.content = ("✔ Ollama answers at " if ok else "❌ Ollama does not answer at ") + u() + "."
         refresh()
@@ -808,7 +811,7 @@ def panel_ai(page):
     def action(v):
         act, _, name = (v or "").partition("|")
         if act == "use":
-            S.oc_save_settings(u(), name)
+            sd_prepare.oc_save_settings(u(), name)
             refresh(f"✔ {name} is used for captions, sorting and picture checks.")
         elif act == "start":
             refresh(oc.start(name, u()))
@@ -818,10 +821,10 @@ def panel_ai(page):
     refresh()
     with card():
         ui.label("Hugging Face token").classes("font-semibold")
-        note(f"Kept in {S.hf_path()} (readable only by you). It is never written into a launch script (they sit in "
+        note(f"Kept in {sd_settings.hf_path()} (readable only by you). It is never written into a launch script (they sit in "
              "your dataset folders, which may be synced): LoRA Studio passes it when it runs a script, and a script run "
              "in a terminal reads it from this file. The token is masked in the run log.")
-        cur = ui.input("Current token", value=S.read_hf_token(), password=True, password_toggle_button=True) \
+        cur = ui.input("Current token", value=sd_settings.read_hf_token(), password=True, password_toggle_button=True) \
             .props("outlined dense readonly").classes("w-full")
         with ui.row().classes("w-full items-end gap-2"):
             new = ui.input("Paste a new token", password=True, placeholder="hf_...").props("outlined dense").classes("grow")
@@ -831,7 +834,7 @@ def panel_ai(page):
                 m, _, _ = S.save_hf_token(new.value)
                 hmsg.content = m
                 new.value = ""
-                cur.value = S.read_hf_token()
+                cur.value = sd_settings.read_hf_token()
             ui.button("Save token", on_click=save_tok).props("unelevated dense no-caps color=primary")
 
 
@@ -840,7 +843,8 @@ def panel_trainers(page):
     import html as _h
     import sd_settings as SSET
     import sdgui as S
-    note(f"The two trainers and the GPU they run on. Saved in {Path(S.settings_path()).name} under [general].")
+    import sd_settings
+    note(f"The two trainers and the GPU they run on. Saved in {Path(sd_settings.settings_path()).name} under [general].")
     wd, venv, trace, sd, mu = S.runner_load()
     with card():
         with ui.row().classes("w-full no-wrap gap-3"):
@@ -960,11 +964,13 @@ def _path(v) -> str:
 def panel_models(page):
     import sd_settings as SSET
     import sdgui as S
+    import sd_settings
+    import sd_script
     from widgets import stream
     HD = SSET._hd()
-    types = dict((v, lab) for lab, v in S.type_choices())
+    types = dict((v, lab) for lab, v in sd_script.type_choices())
     st = {"tkey": next(iter(types), ""), "flags": [], "slots": []}
-    note(f"Model, VAE and text-encoder files for each LoRA type, saved in {Path(S.settings_path()).name}. Pick the type, "
+    note(f"Model, VAE and text-encoder files for each LoRA type, saved in {Path(sd_settings.settings_path()).name}. Pick the type, "
          "then for every file type paste a folder (press Enter) and pick a file. New launch scripts use these files "
          "instead of the preset defaults.")
     with ui.row().classes("w-full items-end gap-3"):
@@ -1085,7 +1091,7 @@ def panel_models(page):
         msg.content = SSET.st_save(st["tkey"], st["flags"] + [""] * pad, *dirs, *files)[0]
         raw.value = SSET.st_raw()
     with ui.row().classes("gap-2"):
-        ui.button(f"Save to {Path(S.settings_path()).name}", on_click=save).props("unelevated no-caps color=primary")
+        ui.button(f"Save to {Path(sd_settings.settings_path()).name}", on_click=save).props("unelevated no-caps color=primary")
         dl_all = ui.button("⬇ Download all missing files", on_click=download_all).props("outline no-caps")
         ui.button("Stop download", on_click=SSET.st_download_stop).props("flat no-caps color=negative")
     with ui.expansion("Download any file from Hugging Face (paste its link)").classes("w-full ls-card"):
@@ -1177,11 +1183,11 @@ def panel_models(page):
         smsg = ui.markdown("")
 
         def after_subs():
-            tsel.options = dict((v, lab) for lab, v in S.type_choices())
+            tsel.options = dict((v, lab) for lab, v in sd_script.type_choices())
             tsel.update()
             srm.options = dict((v, lab) for lab, v in SSET.sub_choices())
             srm.update()
-    with ui.expansion(f"{Path(S.settings_path()).name} as it is on disk").classes("w-full ls-card"):
+    with ui.expansion(f"{Path(sd_settings.settings_path()).name} as it is on disk").classes("w-full ls-card"):
         raw = ui.textarea(value=SSET.st_raw()).props("readonly outlined rows=14 input-style='font-family:monospace'") \
             .classes("w-full")
     async def first():

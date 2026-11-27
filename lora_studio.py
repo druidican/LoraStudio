@@ -66,7 +66,9 @@ def start_tasks(lo: dict):
     """The quiet jobs after the start: the Collection scan and thumbnails, the queue, old launch scripts, the
     program's own folders, the training venv check and the trainers' update check."""
     import lora_library as LL
-    import sdgui
+    import sdqueue
+    import sd_settings
+    import sd_script
     try:                                   # the pictures on the Datasets pages: links to small files, not inline data
         import time
         import datacheck
@@ -78,11 +80,11 @@ def start_tasks(lo: dict):
         pass
     threading.Thread(target=lambda: (LL.LIB.ensure_loaded(), LL.warm_thumbnails(LL.LIB)),
                      daemon=True, name="library-load").start()
-    note = sdgui.queue_restore(start=lo["resume_queue"])
+    note = sdqueue.queue_restore(start=lo["resume_queue"])
     if note:
         print(f"[Queue] {note}")
     try:                                   # no Hugging Face token in launch scripts (they sit in synced folders)
-        n_tok = sdgui.scrub_all_scripts()
+        n_tok = sd_settings.scrub_all_scripts()
         if n_tok:
             print(f"[Scripts] took the Hugging Face token out of {n_tok} launch script(s); it is passed when they run")
     except Exception as e:                 # noqa: BLE001
@@ -92,9 +94,9 @@ def start_tasks(lo: dict):
         shortcut.refresh()
     except Exception as e:                 # noqa: BLE001
         print(f"[Shortcut] {e!r}")
-    n_old = sdgui.archive_all_datasets()
+    n_old = sd_script.archive_all_datasets()
     if n_old:
-        print(f"[Scripts] {n_old} older launch script(s) moved to {sdgui.OLD_RUNS}/ (one script per LoRA type is shown)")
+        print(f"[Scripts] {n_old} older launch script(s) moved to {sd_script.OLD_RUNS}/ (one script per LoRA type is shown)")
     try:                                   # an update from before 1.251026d: bring the manual and the logo
         import selfupdate
         selfupdate.repair_dirs()
@@ -132,13 +134,15 @@ def main():
 
     import lora_library as LL
     import sdgui
+    import dsfiles
+    import sd_settings
     s = LL.LIB.settings
     apply_folders(s)
     LL.ON_SETTINGS_SAVED.append(apply_folders)
     use_own_config_folder()
     sdgui.DEFAULT_VENV = os.path.expanduser(args.venv) if args.venv else sdgui.detect_venv()
-    sdgui.SCAN_SCRIPT = sdgui.find_scan_script(args.scan_script)
-    sdgui.apply_gfx_env()
+    sdgui.SCAN_SCRIPT = dsfiles.find_scan_script(args.scan_script)
+    sd_settings.apply_gfx_env()
     sdgui.BIND_HOST = args.host
 
     def sd_dir_saved(path):                 # Settings › Trainers and GPU is the one place for the sd-scripts folder
@@ -163,7 +167,6 @@ def main():
         if not sep or not user or not pw:
             ap.error("--auth must look like user:password")
         login.install(user, pw)
-    import mobile_page  # noqa: F401  the phone page, /m (behind the same login)
 
     @ui.page("/")
     def index():

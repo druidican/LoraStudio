@@ -7,7 +7,7 @@ dataset is. The steps reuse sdgui's parts where they exist: the watermark choice
 is in dsflow.py.
 """
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import html
 import os
@@ -19,6 +19,10 @@ from pathlib import Path
 import datacheck as DC
 import detailscan as DSC
 import dsflow as F
+import dsworn
+import dscaptions
+import dsresize
+import dssort
 import features as FT
 
 PART_STEP = {"train": 9, "results": 10, "lora": 11, "review": 12}
@@ -218,7 +222,8 @@ def setup_card(types, purpose="character") -> tuple[str, bool]:
 
 def _repeat_folders(ds) -> list:
     """The repeat folders of a dataset (read once per page, not once per picture)."""
-    return [Path(x["folder"]) for x in F.sg().dataset_stats(ds)["rows"]]
+    import sd_script
+    return [Path(x["folder"]) for x in sd_script.dataset_stats(ds)["rows"]]
 
 
 def _where(ds, p, reps=None) -> str:
@@ -253,7 +258,7 @@ def s3_render(ds, sc, show):
 
 # --------------------------------------------------------------------------- 4 Sort
 def s4_html(ds) -> str:
-    r = F.sort_result(ds)
+    r = dssort.sort_result(ds)
     if not r:
         return '<p class="ls-empty">Not sorted yet. Press <b>Sort</b>.</p>'
     pics = r["pics"]
@@ -323,7 +328,7 @@ def s5_suggest_html(ds, n, rng, why) -> str:
         pass
     bal = ""
     if F.meta(ds).get("purpose") == "worn":              # a worn item: how the kinds are spread (from the captions)
-        bal = re.sub(r"\*\*", "", F.worn_balance(ds)) or ("Worn item: name the kinds in step 7 (Kinds and where they "
+        bal = re.sub(r"\*\*", "", dsworn.worn_balance(ds)) or ("Worn item: name the kinds in step 7 (Kinds and where they "
                                                            "are worn) to see how many pictures each kind has.")
     return (f'<div class="ds-sug"><span class="rs-label">SUGGESTED SIZE</span><div class="rs-big">{n} pictures '
             f'<span class="ls-note">({rng} works)</span></div><div class="ls-note">{esc(why)}</div>'
@@ -332,9 +337,9 @@ def s5_suggest_html(ds, n, rng, why) -> str:
 
 
 def s5_grid(ds, keep_n):
-    rows = F.rank(ds, int(keep_n or 0))
+    rows = dssort.rank(ds, int(keep_n or 0))
     k = sum(1 for r in rows if r["keep"])
-    mix = (f'<div class="ds-mix"><span class="rs-label">MIX OF THE SELECTION</span><div>{esc(F.mix_text(rows))}</div>'
+    mix = (f'<div class="ds-mix"><span class="rs-label">MIX OF THE SELECTION</span><div>{esc(dssort.mix_text(rows))}</div>'
            '<div class="ls-note">' + ("Picked for variety: what each picture adds (framing, outfit, place, a detail) "
                                        "counts as much as its quality." if F.meta(ds).get("select_mode") == "varied" else
                                        "Picked by quality first, then what each picture adds (framing, outfit, place).")
@@ -383,7 +388,7 @@ MODE_LABEL = {"scale": "Scale down", "none": "Unchanged", "keep": "Keep the orig
 
 
 def s6_html(ds, max_side):
-    rows = F.resize_plan(ds, int(max_side or 1536))
+    rows = dsresize.resize_plan(ds, int(max_side or 1536))
     big = [r for r in rows if r["mode"] == "scale"]
     crop = [r for r in rows if r["mode"] == "crop"]
     up = [r for r in rows if r["mode"] == "upscale"]
@@ -422,10 +427,10 @@ def s6_html(ds, max_side):
 
 # --------------------------------------------------------------------------- 7 Captions
 def s7_sets_html(ds) -> str:
-    sets = F.caption_sets(ds)
+    sets = dscaptions.caption_sets(ds)
     cards = []
     for s in sets:
-        c, t = F.set_count(ds, s["ext"])
+        c, t = dscaptions.set_count(ds, s["ext"])
         lab = "Tags" if s["style"] == "tags" else "Sentences"
         cards.append(f'<div class="ds-set"><div><b>{lab}</b> <span class="rs-mono">IMG{esc(s["ext"])}</span>'
                      f'<span class="ls-chip {"ok" if c == t and t else ""}">{c}/{t}</span></div>'
@@ -521,11 +526,13 @@ def _sec_per_step(tkey) -> float:
 
 def calc(ds, tkey, text):
     """(calculation html, effects html, values for the settings inputs)."""
+    import dsfiles
+    import sd_script
     S = sg()
     if not ds or not tkey or not text:
         return '<p class="ls-empty">Pick the LoRA type above.</p>', "", []
-    base = S.lora_path(ds)
-    stats = S.dataset_stats(ds)
+    base = dsfiles.lora_path(ds)
+    stats = sd_script.dataset_stats(ds)
     pics = stats["total"]
     reps = [r["repeats"] for r in stats["rows"]] or [1]
     rep = reps[0]
@@ -543,7 +550,7 @@ def calc(ds, tkey, text):
     except ValueError:
         ga = 1
     try:
-        plan = S.make_plan(ds, tkey)
+        plan = sd_script.make_plan(ds, tkey)
         rec = plan["rec"]
         tg = plan["cfg"]["targets"]
     except Exception:                                    # noqa: BLE001
@@ -631,7 +638,7 @@ def calc(ds, tkey, text):
                                                  f'<span class="ls-note">{esc(c)}</span></div>' for a, b, c in eff) + "</div>")
     recd = {}
     if plan and rec:
-        cf = S.form_dict(" ".join(plan["cfg"].get("flags", [])))
+        cf = sd_script.form_dict(" ".join(plan["cfg"].get("flags", [])))
         recd = {"max_train_epochs": rec["epochs"], "repeats": rec.get("want_repeats") or (rec["repeats"] or [""])[0],
                 "train_batch_size": rec["bs"], "learning_rate": plan["cfg"].get("lr"),
                 "network_dim": cf.get("network_dim"), "network_alpha": cf.get("network_alpha"),
@@ -660,7 +667,7 @@ def _same(a, b) -> bool:
 
 
 def apply_settings(ds, tkey, text, *vals):
-    S = sg()
+    import sd_settings
     if not ds or not text:
         return text, "Open a launch script first."
     new = text
@@ -675,7 +682,7 @@ def apply_settings(ds, tkey, text, *vals):
                 if r_:
                     msgs.append(r_)
             continue
-        new, changed, ok = S.set_arg(new, flag, v)
+        new, changed, ok = sd_settings.set_arg(new, flag, v)
         if not ok:
             msgs.append(f"{label}: no place for --{flag} in this script")
     return new, (("✔ Written into the script text. " if new != text else "") + "; ".join(msgs)
@@ -685,9 +692,9 @@ def apply_settings(ds, tkey, text, *vals):
 # --------------------------------------------------------------------------- 9 Train's queue card, 11 LoRA
 def queue_card(ds) -> str:
     """The queue items and the last run of this dataset (Train part)."""
-    S = sg()
+    import sdqueue
     home = F.root(ds)
-    mine = [i for i in S.QUEUE["items"] if Path(i["path"]).parent == home]
+    mine = [i for i in sdqueue.QUEUE["items"] if Path(i["path"]).parent == home]
     rows = [f'<div class="ds-qrow"><span class="ls-chip{" ok" if i["state"] == "done" else " warn" if i["state"] == "running" else ""}">'
             f'{esc(i["state"])}</span><b>{esc(Path(i["path"]).name)}</b><span class="ls-note">{esc(i.get("note") or "")}</span></div>'
             for i in mine[-8:]]

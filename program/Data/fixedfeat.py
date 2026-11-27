@@ -8,7 +8,7 @@ LoRA Studio never suggests features itself: you write them. Kept in the dataset'
 [{"word": "orange visor", "wrong": "goggles, visor"}].
 """
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import re
 from pathlib import Path
@@ -178,20 +178,22 @@ def strip(ds: str, text: str, style: str, trigger: str = "") -> str:
 
 
 def style_of_ext(ds: str, ext: str) -> str:
-    return next((x["style"] for x in _F().caption_sets(ds) if x["ext"] == ext), "sentences")
+    import dscaptions
+    return next((x["style"] for x in dscaptions.caption_sets(ds) if x["ext"] == ext), "sentences")
 
 
 # --------------------------------------------------------------------------- step 8
 def check(ds: str) -> list[dict]:
     """Captions that still name a fixed feature: [{"path", "ext", "caption", "hits"}]."""
+    import dscaptions
     ts = terms(ds)
     if not ts:
         return []
     F = _F()
     out = []
-    for s in F.caption_sets(ds):
+    for s in dscaptions.caption_sets(ds):
         for p in F.images(ds):
-            c = F.read_set(p, s["ext"])
+            c = dscaptions.read_set(p, s["ext"])
             hits = found(c, ts) if c else []
             if hits:
                 out.append({"path": str(p), "ext": s["ext"], "caption": c, "hits": hits})
@@ -200,13 +202,15 @@ def check(ds: str) -> list[dict]:
 
 def take_out(ds: str, path: str = "") -> str:
     """Take the fixed features out of the captions (one picture, or every one the check lists); undo with Undo."""
+    import sd_prepare
+    import dscaptions
     F = _F()
     items = [x for x in check(ds) if not path or x["path"] == path]
     if not items:
         return "No caption names a fixed feature."
-    files = {F.set_file(Path(x["path"]), x["ext"]): x for x in items}
+    files = {dscaptions.set_file(Path(x["path"]), x["ext"]): x for x in items}
     try:
-        F.sg().record_change(f"fixed features out of the captions of {ds}",
+        sd_prepare.record_change(f"fixed features out of the captions of {ds}",
                              {f: f.read_text(encoding="utf-8", errors="ignore") for f in files})
     except Exception:                                    # noqa: BLE001
         pass

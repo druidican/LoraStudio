@@ -14,11 +14,14 @@
   8 Review        the folder, the pictures and their captions, and checks
   9 Train         one launch script per LoRA type (sdgui's launch script page), then into the queue
 
+Here: the dataset's meta and pins, step 1 and 8, and the state of every step. Steps 3-5 are in dssort.py, step 6 in
+dsresize.py, step 7 in dscaptions.py (worn items: dsworn.py); the dataset folders and files in dsfiles.py.
+
 State lives in <dataset>/.lsflow/: dataset.json (setup and step times), scan.json, sort.json, select.json,
 resize.json. Nothing in there is needed by the trainers.
 """
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import json
 import os
@@ -27,13 +30,11 @@ import shutil
 import sys
 import threading
 import time
-from collections import Counter
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageOps
-
 import datacheck as DC
-import fixedfeat as FX
+import dssort
+import dscaptions
 
 FLOW_DIR = ".lsflow"
 ORIGINALS = "_originals"
@@ -62,7 +63,8 @@ def sg():
 
 
 def root(ds) -> Path:
-    return sg().lora_path(ds)
+    import dsfiles
+    return dsfiles.lora_path(ds)
 
 
 def _flow(ds) -> Path:
@@ -162,7 +164,8 @@ def mark_step(ds, key, info=None):
 
 def images(ds) -> list[Path]:
     """The training pictures: the dataset's own repeat folder <N>_<dataset name> only."""
-    return sg().oc_images(ds) if ds else []
+    import sd_prepare
+    return sd_prepare.oc_images(ds) if ds else []
 
 
 # Pictures outside the repeat folder (_reserve/, _extra/, other repeat folders, other folders, the dataset folder
@@ -210,7 +213,8 @@ def candidates(ds) -> list[Path]:
 
 def join_repeat_folder(ds, paths) -> tuple[int, list]:
     """Move pictures from outside the repeat folder into it (with their captions); a name that is taken gets _2, _3."""
-    rows = [x for x in sg().dataset_stats(ds)["rows"] if not x.get("virtual")]
+    import sd_script
+    rows = [x for x in sd_script.dataset_stats(ds)["rows"] if not x.get("virtual")]
     if not rows:
         return 0, ["there is no repeat folder yet"]
     dest = rows[0]["folder"]
@@ -236,23 +240,23 @@ def join_repeat_folder(ds, paths) -> tuple[int, list]:
 def script_saved(ds) -> str:
     """A launch script was saved: other repeat folders go to _extra/ (sd-scripts would train every <N>_name folder
     in the dataset folder), and the step-2 setting to look outside the repeat folder switches off. Returns a note."""
+    import sd_script
     if not ds:
         return ""
-    S = sg()
     notes = []
-    st = S.dataset_stats(ds)
+    st = sd_script.dataset_stats(ds)
     r = root(ds)
     for f, _ in st.get("others") or []:
         if f.parent != r:
             continue
-        dest = r / S.EXTRA_DIR / f.name
+        dest = r / sd_script.EXTRA_DIR / f.name
         if dest.exists():
-            notes.append(f"`{f.name}/` is not part of this dataset but `{S.EXTRA_DIR}/{f.name}` exists: move it yourself")
+            notes.append(f"`{f.name}/` is not part of this dataset but `{sd_script.EXTRA_DIR}/{f.name}` exists: move it yourself")
             continue
         try:
             dest.parent.mkdir(exist_ok=True)
             f.rename(dest)
-            notes.append(f"`{f.name}/` moved to `{S.EXTRA_DIR}/` (not part of this dataset, so not trained)")
+            notes.append(f"`{f.name}/` moved to `{sd_script.EXTRA_DIR}/` (not part of this dataset, so not trained)")
         except OSError as e:
             notes.append(f"could not move `{f.name}/`: {e}")
     if include_extra(ds):
@@ -266,14 +270,16 @@ def _sig(ps) -> str:
 
 
 def type_labels() -> dict:
+    import sd_script
     out = {}
-    for l, v in sg().type_choices():
+    for l, v in sd_script.type_choices():
         out[v] = re.sub(r"\s*[\(\[].*?[\)\]]", "", l).strip()
     return out
 
 
 def min_side(types) -> int:
-    return max([sg()._dc_min_side(t) for t in (types or [])] + [0])
+    import sd_prepare
+    return max([sd_prepare._dc_min_side(t) for t in (types or [])] + [0])
 
 
 def tools_ok() -> bool:
@@ -283,17 +289,6 @@ def tools_ok() -> bool:
         return pictools.ready() and not sg().RUN.running()
     except Exception:                                    # noqa: BLE001
         return False
-
-
-UPSCALE_FLOOR = 0.4          # with the picture tools, a short side down to 40 % of the type's size is upscaled in step 6
-
-
-def soften_small(issues, w, h, side, tools):
-    """With the picture tools, 'too small' between 40 % and 60 % of the type's size is a warning: step 6 upscales it."""
-    if not (tools and side and w and h and min(w, h) >= side * UPSCALE_FLOOR):
-        return issues
-    return [(DC.WARN, f"small: {w}x{h}, upscaled with Real-ESRGAN in step 6") if s == DC.BAD and t.startswith("too small")
-            else (s, t) for s, t in issues]
 
 
 def default_max_side(types) -> int:
@@ -310,6 +305,7 @@ def datasets_dir() -> Path | None:
 
 def candidate_folders() -> list[dict]:
     """Folders in the dataset folder: {'name', 'kind': 'pictures' | 'dataset' | 'empty', 'n'}."""
+    import dsfiles
     d = datasets_dir()
     out = []
     if not d:
@@ -319,7 +315,7 @@ def candidate_folders() -> list[dict]:
             continue
         reps = [x for x in f.iterdir() if x.is_dir() and sg().REPEAT_RE.match(x.name)] if f.is_dir() else []
         if reps:
-            n = sum(len(sg().list_images(r)) for r in reps)
+            n = sum(len(dsfiles.list_images(r)) for r in reps)
             out.append({"name": f.name, "kind": "dataset", "n": n})
         else:
             n = len([x for x in f.iterdir() if x.is_file() and x.suffix.lower() in DC.IMG_EXT])
@@ -342,11 +338,12 @@ def add_pictures(ds: str, folder: str, sub: bool) -> str:
     """Datasets › Add pictures from a folder: copy its pictures (and their captions) into the repeat folder and
     _originals/. Pictures that are already in the dataset (the same file) are left out; too small or blurry ones
     are found by the usable scan (step 3) as usual."""
+    import sd_script
     import hashlib
     src = Path(os.path.expanduser((folder or "").strip()))
     if not src.is_dir():
         return f"{folder or 'That'} is not a folder."
-    rows = sg().dataset_stats(ds)["rows"]
+    rows = sd_script.dataset_stats(ds)["rows"]
     if not rows:
         return "This dataset has no repeat folder yet."
     rep = Path(rows[0]["folder"])
@@ -449,10 +446,12 @@ def ensure_folders(ds) -> list[str]:
     untouched copy of every picture are made when they are missing (a dataset made by hand, or folders deleted). A
     folder with only pictures (opened from the dataset list) first gets its repeat folder 10_<name>/, the pictures and
     their captions moved in. Returns what was made."""
+    import dsfiles
+    import sd_script
     r = root(ds)
     if not r.is_dir():
         return []
-    rows = sg().dataset_stats(ds)["rows"]
+    rows = sd_script.dataset_stats(ds)["rows"]
     made = []
     if not rows:                                       # a folder with only pictures: make it a dataset where it is
         pics = _pictures_in(r, False)
@@ -471,7 +470,7 @@ def ensure_folders(ds) -> list[str]:
             m["trigger"] = m.get("trigger") or ds
             m["steps"]["folder"] = {"at": m["created"]}
             meta_save(ds, m)
-        rows = sg().dataset_stats(ds)["rows"]
+        rows = sd_script.dataset_stats(ds)["rows"]
     for sub in ("model", "log"):
         if not (r / sub).is_dir():
             (r / sub).mkdir(exist_ok=True)
@@ -481,15 +480,16 @@ def ensure_folders(ds) -> list[str]:
         orig = r / ORIGINALS / rep.name
         if not orig.is_dir():
             orig.mkdir(parents=True, exist_ok=True)
-            n = ensure_originals(ds, sg().list_images(rep))
+            n = ensure_originals(ds, dsfiles.list_images(rep))
             made.append(f"{ORIGINALS}/{rep.name}/ ({n} copies)")
     return made
 
 
 def folder_text(ds) -> str:
     """The folders of step 1, for the step list: '10_name · _originals · model · log'."""
+    import sd_script
     r = root(ds)
-    reps = [Path(x["folder"]).name for x in sg().dataset_stats(ds)["rows"]]
+    reps = [Path(x["folder"]).name for x in sd_script.dataset_stats(ds)["rows"]]
     have = [n for n in (ORIGINALS, "model", "log") if (r / n).is_dir()]
     return " · ".join(reps + have) or "no repeat folder"
 
@@ -512,52 +512,21 @@ def ensure_originals(ds, paths) -> int:
     return n
 
 
-# --------------------------------------------------------------------------- watermarks
-def main_person(persons, W, H):
-    """The box of the main person from the picture tools: the most certain, biggest one; None when unsure."""
-    ps = [p for p in persons or [] if len(p) >= 5 and p[4] >= 0.7]
-    if not ps or not W or not H:
-        return None
-    best = max(ps, key=lambda p: p[4] * (p[2] - p[0]) * (p[3] - p[1]))
-    if (best[2] - best[0]) * (best[3] - best[1]) < 0.06 * W * H:
-        return None
-    return [int(v) for v in best[:4]]
-
-
-def wm_done(ds) -> str:
-    """You are happy with the watermarks of this dataset (also when some could not be removed): the ones not decided
-    stay as they are, and the dataset no longer asks about watermarks."""
-    if not ds:
-        return ""
-    r = root(ds)
-    marks = DC.reconcile(r, DC.marks_load(r))
-    n = 0
-    for e in marks.values():
-        if (e.get("marks") or e.get("border")) and not e.get("choice"):
-            e["choice"] = "keep"
-            n += 1
-    DC.marks_save(r, marks)
-    m = meta(ds)
-    m["wm_done"] = True
-    meta_save(ds, m)
-    return ("✔ Watermarks marked as done" + (f": {n} undecided picture{'s' if n != 1 else ''} kept as they are." if n
-                                              else ".") + " Change any picture in the list above at any time.")
-
-
 # --------------------------------------------------------------------------- the repeat folder
 def rename_repeats(ds, want: int) -> str:
     """Give the dataset's one repeat folder the repeat count `want` (10_bob -> 20_bob), with its copies in _originals/,
     _reserve/ and _set_aside/originals/, and the paths LoRA Studio remembers for it. Returns what was done ('' if
     nothing), or a line starting with '⚠'."""
+    import sd_script
     S = sg()
     r = root(ds)
-    rows = [x for x in S.dataset_stats(ds)["rows"] if not x.get("virtual")]
+    rows = [x for x in sd_script.dataset_stats(ds)["rows"] if not x.get("virtual")]
     if len(rows) != 1 or not want or int(want) < 1:
         return ""
     f = rows[0]["folder"]
     if rows[0]["repeats"] == int(want):
         return ""
-    if S.RUN.running() and S.script_home(S.RUN.script or "/") == r:
+    if S.RUN.running() and sd_script.script_home(S.RUN.script or "/") == r:
         return "⚠ A training run of this dataset is active: the repeat folder was not renamed."
     new_name = S.REPEAT_RE.sub(f"{int(want)}_", f.name, count=1)
     dest = f.with_name(new_name)
@@ -586,1306 +555,18 @@ def rename_repeats(ds, want: int) -> str:
     return "; ".join(done)
 
 
-# --------------------------------------------------------------------------- 3 Usable scan
-CAT_WORDS = (("broken", "cannot be read"), ("small", "too small"), ("blurry", "blurry"))
-
-
-def usable_scan(ds, types, upscale: bool = True) -> dict:
-    imgs = candidates(ds)
-    side = min_side(types)
-    tech = DC.technical(imgs, side)
-    tools = tools_ok()
-    up = tools and upscale
-    pics = {}
-    counts = Counter()
-    for p, r in tech.items():
-        r["issues"] = soften_small(r["issues"], r.get("w"), r.get("h"), side, up)
-        bad = [t for s, t in r["issues"] if s == DC.BAD]
-        cat = "usable"
-        if bad:
-            cat = next((c for c, w in CAT_WORDS if any(w in b for b in bad)), "other")
-        counts[cat] += 1
-        pics[str(p)] = {"w": r.get("w"), "h": r.get("h"), "cat": cat,
-                        "why": "; ".join(t for _, t in r["issues"]), "bad": bool(bad)}
-    res = {"at": time.strftime("%Y-%m-%d %H:%M"), "min_side": side, "pics": pics, "counts": dict(counts),
-           "sig": _sig(imgs)}
-    _save(ds, "scan.json", res)
-    mark_step(ds, "scan", {"not_usable": len(pics) - counts["usable"]})
-    return res
-
-
-def move_to_reserve(ds, paths) -> tuple[int, list]:
-    import trim
-    return trim.move_to_reserve(root(ds), [Path(p) for p in paths])
-
-
-def back_from_reserve(ds) -> tuple[int, list]:
-    import trim
-    return trim.move_back(root(ds))
-
-
-def reserve_count(ds) -> int:
-    import trim
-    return len(trim.reserve_list(root(ds))) if ds else 0
-
-
-# --------------------------------------------------------------------------- 4 Sort
-def _content_cached(p: Path, model: str, cache: dict):
-    st = p.stat()
-    return cache.get(f"{p}|{st.st_size}|{int(st.st_mtime)}|{model}"), f"{p}|{st.st_size}|{int(st.st_mtime)}|{model}"
-
-
-def _norm(s) -> str:
-    return re.sub(r"\s+", " ", str(s or "").strip().lower())
-
-
-def sort_run(ds, types, purpose, wm_removed, url, model, upscale: bool = True):
-    """Generator: yields progress lines; the result is saved to sort.json (read it with sort_result)."""
-    S = sg()
-    STOP.clear()
-    imgs = candidates(ds)
-    if not imgs:
-        yield "No pictures in this dataset's repeat folders."
-        return
-    side = min_side(types)
-    t0 = time.time()
-    yield f"Pass 1 · quick: size, sharpness and duplicates of {len(imgs)} pictures …"
-    tech = DC.technical(imgs, side)
-    tools = tools_ok()
-    pics = {}
-    for p, r in tech.items():
-        r["issues"] = soften_small(r["issues"], r.get("w"), r.get("h"), side, tools and upscale)
-        bad = [t for s, t in r["issues"] if s == DC.BAD]
-        dup = next((t for s, t in r["issues"] if "near-duplicate" in t), "")
-        pics[str(p)] = {"w": r.get("w") or 0, "h": r.get("h") or 0, "sharp": r.get("sharp") or 0,
-                        "cat": "out" if bad else ("dup" if dup else "good"), "why": "; ".join(bad) or dup,
-                        "warn": [t for s, t in r["issues"] if s == DC.WARN and "near-duplicate" not in t]}
-    pass1_out = [p for p, e in pics.items() if e["cat"] == "out"]
-    rest = [Path(p) for p, e in pics.items() if e["cat"] != "out"]
-    # the picture tools (sd-scripts venv): a quality score, photo or drawing, person boxes, and look-alikes
-    tools_note = ""
-    det: dict = {}                                       # the detector's boxes per picture
-    borders = {}                                         # frames, black or white bars around the picture
-    for i, p in enumerate([] if wm_removed else rest):
-        if STOP.is_set():
-            break
-        if i % 20 == 0:
-            yield f"Pass 1 · looking for frames and bars: {i + 1} of {len(rest)}"
-        b = DC.border_box(p)
-        if b:
-            borders[str(p)] = b
-    if tools:
-        import pictools
-        A = {}
-        try:
-            for i in range(0, len(rest), 16):
-                if STOP.is_set():
-                    break
-                yield f"Pass 1 · rating quality and finding look-alikes: {min(i + 16, len(rest))} of {len(rest)}"
-                A.update(pictools.analyze(rest[i:i + 16]))
-        except Exception as e:                           # noqa: BLE001
-            tools, tools_note = False, f"picture tools: {e}"
-        for p, a in A.items():
-            if p in pics:
-                pics[p].update(aes=a["aes"], kind=a["kind"], persons=a.get("persons") or [])
-        if not wm_removed and tools:                     # watermarks and logos: an exact detector (OWLv2)
-            try:
-                for i in range(0, len(rest), 16):
-                    if STOP.is_set():
-                        break
-                    yield f"Pass 1 · looking for watermarks and logos: {min(i + 16, len(rest))} of {len(rest)}"
-                    det.update(pictools.find_marks(rest[i:i + 16]))
-            except Exception as e:                       # noqa: BLE001
-                tools_note = (tools_note + "; " if tools_note else "") + f"watermark finder: {e}"
-        if purpose == "worn" and tools:                  # a worn item: where is it, and how big?
-            words = worn_names(ds)[0] or KIND_WORDS.get(meta(ds).get("worn_kind") or "jewelry", [])
-            try:
-                for i in range(0, len(rest), 16):
-                    if STOP.is_set():
-                        break
-                    yield f"Pass 1 · looking for the worn item: {min(i + 16, len(rest))} of {len(rest)}"
-                    for k, e in pictools.find_items(rest[i:i + 16], words).items():
-                        if k in pics:
-                            pics[k]["item"] = item_judge(e)
-            except Exception as e:                       # noqa: BLE001
-                tools_note = (tools_note + "; " if tools_note else "") + f"item finder: {e}"
-        good = {p: A[p] for p in A if p in pics and pics[p]["cat"] == "good"}
-        for a, b, sim in sorted(pictools.lookalikes(good, 0.95) if tools else [], key=lambda t: -t[2]):
-            ea, eb = pics[a], pics[b]
-            if ea["cat"] != "good" or eb["cat"] != "good":
-                continue
-            worse, better = (a, b) if (ea.get("aes", 0), ea["sharp"]) < (eb.get("aes", 0), eb["sharp"]) else (b, a)
-            pics[worse]["cat"] = "dup"
-            pics[worse]["why"] = f"shows the same as {Path(better).name} ({sim:.0%} alike); that one rates higher"
-    url = (url or "").strip() or S.oc_settings()[0]
-    model = model or S.oc_settings()[1]
-    import features as FT
-    ai = FT.have("ollama") and bool(model) and S.CAP is not None and not S.RUN.running()
-    note = "" if ai else ("Ollama is not installed: quick pass only" if not FT.have("ollama") else
-                          "no Ollama model chosen (Settings › AI helpers)" if not model else
-                          "a training run is active" if S.RUN.running() else "Ollama is not available")
-    root_ = root(ds)
-    marks = DC.reconcile(root_, DC.marks_load(root_)) if not wm_removed else {}
-    crop_min = side or 512
-    done = 0
-    seen_marks: set = set()
-
-    def put_marks(p: Path, found: dict | None = None):
-        """The marks entry of a picture: Ollama's marks (when it was asked), the detector's and a frame / bars."""
-        rp = DC.rel(root_, p)
-        ent = marks.get(rp)
-        st = p.stat()
-        sig = f"{st.st_size}|{int(st.st_mtime)}"
-        if ent and ent.get("choice"):                     # you decided already (the file changed by your choice)
-            return
-        if ent and ent.get("sig") == sig and found is None and ent.get("v") == 2:
-            return
-        if found is None and ent and ent.get("sig") == sig:      # Ollama's marks from an earlier sort stay
-            found = {"W": ent.get("W"), "H": ent.get("H"), "subject": ent.get("subject"),
-                     "marks": [m for m in ent.get("marks") or [] if m.get("by") != "detector"]}
-        W, H = (found["W"], found["H"]) if found and found.get("W") else DC.shown_size(p)
-        subj = main_person(pics[str(p)].get("persons"), W, H) or (found or {}).get("subject")
-        allm = DC.merge_marks((found or {}).get("marks") or [], DC.detector_marks(det.get(str(p)), subj))
-        border = borders.get(str(p))
-        if border and subj:                              # a 'bar' that cuts into the person is a plain background
-            b, sb = border["box"], subj
-            inside = max(0, min(b[2], sb[2]) - max(b[0], sb[0])) * max(0, min(b[3], sb[3]) - max(b[1], sb[1]))
-            if inside < 0.97 * max(1, (sb[2] - sb[0]) * (sb[3] - sb[1])):
-                border = None
-        if not allm and not border:
-            if ent and not ent.get("choice"):
-                marks.pop(rp, None)
-            return
-        pics[str(p)]["wm"] = True
-        marks[rp] = {"W": W, "H": H, "marks": allm, "subject": subj, "sig": sig, "choice": "", "border": border,
-                     "v": 2, "options": DC.options_with_border(W, H, allm, subj, crop_min, border)}
-    pool = None
-    if ai:
-        cache = S._dc_cache_load()
-        import detailscan as DSC
-        with_detail = DSC.enabled(ds)                    # the detailed scan's questions in the same go
-        fresh = {}
-
-        def needs(p):
-            d0, _ = _content_cached(p, model, cache)
-            return d0 is None or "features_visible" not in d0   # none yet, or from before the usefulness check
-        todo = [p for p in rest if needs(p)]
-        if todo:                                         # several pictures at once: Ollama answers them together
-            from concurrent.futures import ThreadPoolExecutor
-            pool = ThreadPoolExecutor(max_workers=DC.PARALLEL)
-            futs = {str(p): pool.submit(DC.content, url, model, p, 600.0, with_detail) for p in todo}
-        t2 = time.time()
-        kinds_found = {}                                 # the kind of each picture (photo, drawing …): lean.py
-        for i, p in enumerate(rest, 1):
-            if STOP.is_set():
-                note = "stopped"
-                break
-            d, key = _content_cached(p, model, cache)
-            if str(p) in (futs if pool else {}):
-                eta = (f", about {S.fmt((time.time() - t2) / max(done, 1) * (len(todo) - done))} left"
-                       if done else "")
-                yield f"Pass 2 · detailed (Ollama, {DC.PARALLEL} at once): {done + 1} of {len(todo)}{eta}"
-                try:
-                    d = futs[str(p)].result()
-                except Exception as e:                   # noqa: BLE001
-                    S._dc_cache_save(cache)
-                    note = f"Ollama stopped answering: {e}"
-                    break
-                cache[key] = d
-                done += 1
-                if with_detail:
-                    fresh[str(p)] = d
-                if done % 5 == 0:
-                    S._dc_cache_save(cache)
-            e = pics[str(p)]
-            if d.get("medium"):
-                kinds_found[p] = d["medium"]
-            e["framing"] = _norm(d.get("framing")) or "other"
-            e["outfit"], e["place"] = _norm(d.get("outfit")), _norm(d.get("place"))
-            e["part"] = _norm(d.get("part_only"))
-            e["teaches"] = DC.teaches(d)
-            e["udetail"] = DC.unique_detail(d)
-            e["face"] = DC.face_size(d)
-            if e["part"] in ("none", "no", "n/a", "''"):
-                e["part"] = ""
-            issues = DC.content_issues(d, purpose)
-            if e["part"] and purpose != "style":         # a detail shot is not "no clear subject"
-                issues = [x for x in issues if not any(w in x[1] for w in ("no person", "no clear main subject",
-                                                                          "face not visible", "face partly", "teaches almost",
-                                                                          "shows little"))]
-                if e["cat"] == "good" and DC.plain_part(e["part"]) and not e.get("udetail"):
-                    e["cat"], e["why"] = "poor", f"only the {e['part']}: shows nothing that identifies the character"
-                elif e["cat"] == "good":
-                    e["cat"], e["why"] = "detail", f"only the {e['part']}: teaches a detail the full pictures show too small"
-            bad = [t for s, t in issues if s == DC.BAD and "watermark" not in t]
-            if bad and e["cat"] in ("good", "detail"):
-                e["cat"], e["why"] = "poor", "; ".join(bad)
-            e["warn"] += [t for s, t in issues if s == DC.WARN and "watermark" not in t]
-            if DC._true(d.get("text_or_watermark")) and not wm_removed:
-                e["wm"] = True
-                rp = DC.rel(root_, p)
-                ent = marks.get(rp)
-                st = p.stat()
-                sig = f"{st.st_size}|{int(st.st_mtime)}"
-                # a picture you already decided on is left alone (its file changed because of your choice)
-                if not (ent and ent.get("choice")) and (not ent or ent.get("sig") != sig or ent.get("v") != 2):
-                    yield f"Pass 2 · where are the watermarks in {p.name}?"
-                    try:
-                        put_marks(p, DC.find_marks(url, model, p))
-                        seen_marks.add(str(p))
-                    except Exception:                   # noqa: BLE001
-                        pass
-                else:
-                    seen_marks.add(str(p))
-        if pool:
-            pool.shutdown(wait=False, cancel_futures=True)
-        S._dc_cache_save(cache)
-        if kinds_found:
-            try:
-                import lean
-                lean.remember(ds, kinds_found)
-            except Exception:                            # noqa: BLE001
-                pass
-        if fresh:
-            try:
-                DSC.remember(ds, fresh, model)
-            except Exception:                            # noqa: BLE001
-                pass
-    if not wm_removed:                                   # the detector and frames also without Ollama's word
-        for p in rest:
-            if str(p) not in seen_marks and (det.get(str(p)) or str(p) in borders or DC.rel(root_, p) in marks):
-                try:
-                    put_marks(p)
-                except OSError:
-                    pass
-        DC.marks_save(root_, marks)
-    # quality: sharpness rank in this dataset, size against what the type needs, minus warnings
-    order = sorted(pics.values(), key=lambda e: e["sharp"])
-    for i, e in enumerate(order):
-        sharp = i / max(1, len(order) - 1)
-        size_ = min(1.0, min(e["w"], e["h"]) / max(side or 1024, 1))
-        # sharpness only decides between pictures that show the same much: a slightly soft picture that shows the
-        # character well beats a crisp one that shows little
-        if "aes" in e:                                   # the quality score of the picture tools leads
-            aes = max(0.0, min(1.0, (e["aes"] - 3.0) / 4.0))
-            e["q"] = 0.5 * aes + 0.15 * sharp + 0.2 * size_ - 0.05 * len(e["warn"])
-        else:
-            e["q"] = 0.4 * sharp + 0.4 * size_ - 0.05 * len(e["warn"])
-        if e.get("teaches"):                             # how much the picture shows of the subject
-            e["q"] += 0.12 * (e["teaches"] - 3) + (0.05 if e.get("udetail") else 0.0)
-        if purpose == "character" and e.get("face") in ("medium", "large"):
-            e["q"] += 0.05
-        e["q"] = round(e["q"], 3)
-    # too alike: the same framing, outfit and place more than a few times (the best ones are kept)
-    combos: dict = {}
-    for p, e in pics.items():
-        if e["cat"] in ("good", "detail") and e.get("framing"):
-            combos.setdefault((e["framing"], e["outfit"], e["place"]), []).append(p)
-    groups = []
-    for c, ps in combos.items():
-        if len(ps) > SAME_LIMIT:
-            ps.sort(key=lambda x: -pics[x]["q"])
-            for x in ps[2:]:
-                if pics[x]["cat"] == "good":
-                    pics[x]["cat"] = "alike"
-                    pics[x]["why"] = f"one of {len(ps)} alike: {' · '.join(v for v in c if v)}"
-            groups.append({"label": " · ".join(v for v in c if v), "n": len(ps)})
-    groups.sort(key=lambda g: -g["n"])
-    if purpose == "worn":                                # the item not found: set aside (pin it 📌 to keep it anyway)
-        for e in pics.values():
-            it = e.get("item")
-            if it and not it.get("seen") and e["cat"] in ("good", "detail", "alike"):
-                e["cat"], e["why"] = "poor", "the worn item was not found in it (item finder)"
-            elif it and it.get("small"):
-                e["warn"] = (e.get("warn") or []) + [
-                    "the item is small in it: Select adds a close-up of it" if it.get("crop") else
-                    "the item is small in it, and too small for a close-up"]
-    usable = [e for e in pics.values() if e["cat"] in ("good", "detail", "alike")]
-    fr = Counter(e.get("framing", "") for e in usable if e.get("framing"))
-    outfits = len({e["outfit"] for e in usable if e.get("outfit")})
-    places = len({e["place"] for e in usable if e.get("place")})
-    good_n = sum(1 for e in usable if e["cat"] in ("good", "detail"))
-    need = {"character": 15, "style": 20, "concept": 10}.get(DC.base_purpose(purpose), 15)
-    if good_n >= need and (purpose != "character" or fr.get("full body", 0) or not ai):
-        baseline = "good"
-    elif good_n >= need:
-        baseline = "thin"
-    else:
-        baseline = "weak"
-    notes = DC.balance({Path(p): {"content": {"framing": e.get("framing"), "outfit": e.get("outfit"),
-                                              "place": e.get("place"), "people": 1}}
-                        for p, e in pics.items() if e.get("framing") and e["cat"] != "out"}, purpose) if ai else []
-    res = {"at": time.strftime("%Y-%m-%d %H:%M"), "purpose": purpose, "types": list(types or []), "ai": ai,
-           "note": note, "pics": pics, "groups": groups, "framing": dict(fr), "outfits": outfits, "places": places,
-           "baseline": baseline, "notes": notes, "pass1_out": len(pass1_out), "sig": _sig(candidates(ds)),
-           "seconds": round(time.time() - t0, 1), "good": good_n, "tools": tools, "tools_note": tools_note}
-    _save(ds, "sort.json", res)
-    mark_step(ds, "sort", {"baseline": baseline})
-    yield "done"
-
-
-def sort_result(ds) -> dict | None:
-    return _load(ds, "sort.json")
-
-
-def sort_lookup(pics: dict):
-    """A finder for a picture's sort entry: by its path, else by its file name (and stem). The paths change when
-    the repeat folder is renamed, the dataset is reached by another path, or step 6 saves a picture as another
-    format; the picture is still the one that was sorted."""
-    by_name, by_stem = {}, {}
-    for k, v in (pics or {}).items():
-        by_name.setdefault(Path(k).name, v)
-        by_stem.setdefault(Path(k).stem, v)
-
-    def find(p):
-        p = str(p)
-        return (pics or {}).get(p) or by_name.get(Path(p).name) or by_stem.get(Path(p).stem)
-    return find
-
-
-# --------------------------------------------------------------------------- 5 Select
-QUOTA = {"close-up": 0.35, "upper body": 0.35, "full body": 0.2}
-
-
-def suggest_size(ds, res=None) -> tuple[int, str, str]:
-    """(number, range text, why)."""
-    res = res or sort_result(ds) or {}
-    m = meta(ds)
-    purpose = m["purpose"]
-    cands = [e for e in (res.get("pics") or {}).values() if e["cat"] in ("good", "detail", "alike")]
-    o, pl = res.get("outfits", 0), res.get("places", 0)
-    if purpose == "style":
-        n, rng = max(40, min(100, 40 + 2 * pl)), "40–100"
-    elif purpose in CONCEPT_KINDS:
-        n, rng = max(20, min(40, 15 + 2 * o + pl)), "20–40"
-    else:
-        n, rng = max(25, min(50, 20 + 2 * o + pl)), "30–50"
-    labels = type_labels()
-    tname = " + ".join(labels.get(t, t) for t in m["types"]) or "this"
-    why = ((f"{tname}, art style, {pl} different places and scenes: a style needs variety (people, objects, "
-            f"landscapes, light) more than a big number; about {n} pictures.") if purpose == "style" and (o or pl) else
-           (f"{tname}, {PURPOSE_LABEL.get(purpose, purpose).lower()}, {o} outfits and {pl} places: more than about "
-            f"{n} pictures mostly adds repeats of the same look.") if o or pl else
-           f"Without the detailed sort there is no outfit or place information; {n} is the usual size.")
-    if cands and len(cands) < n:
-        n = len(cands)
-        why += f" There are only {len(cands)} usable pictures, so all of them."
-    return n, rng, why
-
-
-def rank(ds, target: int, mode: str | None = None) -> list[dict]:
-    """Every picture with keep True/False and a reason. mode "safe": quality first, then what each picture adds;
-    "varied": what each picture adds counts as much as quality (more close-ups, angles, outfits, places, details)."""
-    mode = mode or meta(ds).get("select_mode") or "safe"
-    if mode == "varied":
-        return _rank_varied(ds, target)
-    res = sort_result(ds) or {}
-    pics = res.get("pics") or {}
-    find = sort_lookup(pics)
-    have = {str(p) for p in candidates(ds)}
-    rows = []
-    for p in sorted(have):
-        e = find(p)
-        if e is None:
-            rows.append({"path": p, "cat": "new", "q": 0.5, "framing": "", "outfit": "", "place": ""})
-        else:
-            rows.append({"path": p, **e})
-    cands = [r for r in rows if r["cat"] in ("good", "detail", "alike", "new")]
-    cands.sort(key=lambda r: (r["cat"] == "alike", -r["q"]))
-    pinned, cands = _apply_pins(ds, rows, cands)
-    purpose = meta(ds)["purpose"]
-    keep, fr_n, combo_n = list(pinned), Counter(), Counter()
-    for r in pinned:
-        f = r.get("framing") or "other"
-        fr_n[f] += 1
-        combo_n[(f, r.get("outfit"), r.get("place"))] += 1
-    quota = {k: max(1, round(v * target)) for k, v in QUOTA.items()} if purpose == "character" else {}
-    detail_max = max(1, round(0.12 * target))
-    for r in cands:
-        if len(keep) >= target:
-            break
-        f = r.get("framing") or "other"
-        c = (f, r.get("outfit"), r.get("place"))
-        if r["cat"] == "detail" and sum(1 for k in keep if k["cat"] == "detail") >= detail_max:
-            continue
-        if f in quota and fr_n[f] >= quota[f] and f != "full body":
-            continue
-        if r.get("framing") and combo_n[c] >= SAME_LIMIT - 1:
-            continue
-        keep.append(r)
-        fr_n[f] += 1
-        combo_n[c] += 1
-    for r in cands:                                      # fill up by quality when the quotas left room
-        if len(keep) >= target:
-            break
-        if r not in keep:
-            keep.append(r)
-    kept = {id(r) for r in keep}
-    for r in rows:
-        r["keep"] = id(r) in kept
-        f = r.get("framing") or ""
-        if r["keep"]:
-            if r["cat"] == "detail":
-                r["reason"] = r.get("why") or "detail shot"
-            elif r["cat"] == "new":
-                r["reason"] = "added after the sort"
-            else:
-                bits = [f] if f else []
-                if r.get("outfit"):
-                    bits.append(r["outfit"])
-                if r.get("udetail"):
-                    bits.append(f"shows {r['udetail']}")
-                r["reason"] = "kept: " + (" · ".join(bits) if bits else f"quality {r['q']:.2f}")
-        else:
-            if r["cat"] in ("out", "dup", "poor"):
-                r["reason"] = r.get("why") or r["cat"]
-            elif r["cat"] == "alike":
-                r["reason"] = r.get("why") or "too alike"
-            else:
-                r["reason"] = "lower quality, or adds the same framing, outfit and place again"
-    _pin_reasons(rows)
-    return rows
-
-
-def mix_text(rows) -> str:
-    k = [r for r in rows if r["keep"]]
-    fr = Counter((r.get("framing") or "unknown") for r in k if r["cat"] != "detail")
-    det = sum(1 for r in k if r["cat"] == "detail")
-    parts = [f"{n} {f}" for f, n in fr.most_common()]
-    if det:
-        parts.append(f"{det} detail shot{'s' if det != 1 else ''} (about {100 * det // max(1, len(k))} %)")
-    return " · ".join(parts)
-
-
-def apply_select(ds, keep_paths) -> str:
-    keep = {str(Path(p)) for p in keep_paths}
-    stems = {Path(p).stem for p in keep}               # a close-up stays with the picture it was made from
-    keep |= {str(p) for p in images(ds) if p.name.startswith("closeup_") and p.stem[8:] in stems}
-    drop = [p for p in images(ds) if str(p) not in keep]
-    n, err = move_to_reserve(ds, drop) if drop else (0, [])
-    joined = [p for p in extra_pictures(ds) if str(p) in keep] if include_extra(ds) else []
-    j, jerr = join_repeat_folder(ds, joined) if joined else (0, [])
-    err += jerr
-    close = add_closeups(ds, images(ds)) if meta(ds).get("purpose") == "worn" else []
-    kept = [str(p) for p in images(ds)]
-    mark_step(ds, "select", {"kept": len(kept), "reserve": reserve_count(ds)})
-    _save(ds, "select.json", {"at": time.strftime("%Y-%m-%d %H:%M"), "kept": sorted(kept)})
-    return (f"✔ {len(kept)} pictures in the repeat folder; {n} moved to `{RESERVE}/` (not deleted, with their captions)"
-            + (f"; {j} from outside it joined" if j else "")
-            + (f"; {len(close)} close-up(s) of the worn item added (closeup_*.png)" if close else "") + "."
-            + (f" Could not move: {'; '.join(err[:3])}" if err else ""))
-
-
-# --------------------------------------------------------------------------- 6 Watermarks and size
-def resize_overrides(ds) -> dict:
-    return (_load(ds, "resize.json", {}) or {}).get("over", {})
-
-
-def resize_save_over(ds, over: dict, max_side: int):
-    _save(ds, "resize.json", {"over": over, "max_side": int(max_side)})
-
-
-def resize_plan(ds, max_side: int, over: dict | None = None, upscale: bool = True) -> list[dict]:
-    over = over if over is not None else resize_overrides(ds)
-    rows = []
-    r = root(ds)
-    side = min_side(meta(ds)["types"])
-    tools = tools_ok() and upscale
-    for p in images(ds):
-        try:
-            w, h = DC.shown_size(p)
-        except Exception:                                # noqa: BLE001
-            continue
-        rel = str(p.relative_to(r))
-        o = over.get(rel) or {}
-        sugg = suggest_mode(w, h, max_side, side, tools)
-        mode = o.get("mode") or sugg
-        if mode == "upscale" and not tools:
-            mode = "none"
-        cw, ch = w, h
-        if mode == "crop" and o.get("box"):
-            l, t, rr, b = o["box"]
-            cw, ch = max(1, int((rr - l) * w)), max(1, int((b - t) * h))
-        if mode == "upscale":
-            f = min(max(1.0, side / max(1, min(cw, ch))), max_side / max(cw, ch), 4.0)
-        else:
-            f = min(1.0, max_side / max(cw, ch)) if mode in ("scale", "crop") else 1.0
-        rows.append({"path": str(p), "rel": rel, "w": w, "h": h, "mode": mode, "by_you": rel in over, "sugg": sugg,
-                     "new": (round(cw * f), round(ch * f)), "box": o.get("box")})
-    return rows
-
-
-def suggest_mode(w, h, max_side, side, tools) -> str:
-    if max(w, h) > max_side:
-        return "scale"
-    if tools and side and side * UPSCALE_FLOOR <= min(w, h) < side:
-        return "upscale"
-    return "none"
-
-
-def person_box(path: str, aspect: str = "free", run: bool = False) -> list[float] | None:
-    """A crop around the person(s) the picture tools found; run=False only uses what they already know."""
-    try:
-        import pictools
-        p = Path(path)
-        if run:
-            if not tools_ok():
-                return None
-            e = pictools.analyze([p]).get(str(p))
-        else:
-            e = pictools.cached(p)
-        if not e:
-            return None
-        w, h = DC.shown_size(p)
-        a = {"1:1": 1.0, "3:4": 0.75, "4:3": 4 / 3}.get(aspect)
-        return pictools.smart_box(e, w, h, a)
-    except Exception:                                    # noqa: BLE001
-        return None
-
-
-def crop_preview(path: str, box, side: int = 640) -> Image.Image | None:
-    try:
-        im = ImageOps.exif_transpose(Image.open(path)).convert("RGB")
-    except Exception:                                    # noqa: BLE001
-        return None
-    im.thumbnail((side, side))
-    if box:
-        w, h = im.size
-        l, t, r, b = box
-        shade = Image.new("RGBA", im.size, (0, 0, 0, 120))
-        d = ImageDraw.Draw(shade)
-        d.rectangle([int(l * w), int(t * h), int(r * w), int(b * h)], fill=(0, 0, 0, 0))
-        im = Image.alpha_composite(im.convert("RGBA"), shade).convert("RGB")
-        ImageDraw.Draw(im).rectangle([int(l * w), int(t * h), int(r * w) - 1, int(b * h) - 1], outline=(232, 163, 61),
-                                     width=3)
-    return im
-
-
-def fit_box(w, h, l, t, r, b, aspect: str):
-    """Make a box (fractions) follow an aspect ratio ('free', '1:1', '3:4', '4:3'), shrinking around its centre."""
-    l, t, r, b = [max(0.0, min(1.0, float(x))) for x in (l, t, r, b)]
-    if r - l < 0.05:
-        r = min(1.0, l + 0.05)
-    if b - t < 0.05:
-        b = min(1.0, t + 0.05)
-    if aspect in ("1:1", "3:4", "4:3"):
-        aw, ah = (int(x) for x in aspect.split(":"))
-        bw, bh = (r - l) * w, (b - t) * h
-        want = aw / ah
-        if bw / bh > want:
-            nbw = bh * want
-            cx = (l + r) / 2 * w
-            l, r = (cx - nbw / 2) / w, (cx + nbw / 2) / w
-        else:
-            nbh = bw / want
-            cy = (t + b) / 2 * h
-            t, b = (cy - nbh / 2) / h, (cy + nbh / 2) / h
-    return [round(max(0.0, l), 4), round(max(0.0, t), 4), round(min(1.0, r), 4), round(min(1.0, b), 4)]
-
-
-def apply_resize_steps(ds, max_side: int, upscale: bool = True):
-    """Generator: yields a progress line per picture; its return value is the message."""
-    over = resize_overrides(ds)
-    rows = resize_plan(ds, max_side, over, upscale)
-    todo = [x for x in rows if x["mode"] in ("scale", "crop", "upscale")
-            and (x["new"] != (x["w"], x["h"]) or x["mode"] == "crop")]
-    ensure_originals(ds, [x["path"] for x in todo])
-    n_s = n_c = n_u = 0
-    errs = []
-    t0 = time.time()
-    for i, x in enumerate(todo):
-        p = Path(x["path"])
-        left = ""
-        if i:
-            left = f" · about {int((time.time() - t0) / i * (len(todo) - i))} s left"
-        yield (f"⏳ {'Upscaling' if x['mode'] == 'upscale' else 'Cropping' if x['mode'] == 'crop' else 'Scaling'} "
-               f"{p.name} ({i + 1} of {len(todo)}){left}")
-        if x["mode"] == "upscale":
-            try:
-                import pictools
-                pictools.upscale(p, p, min(x["new"]), "photo")
-                n_u += 1
-            except Exception as e:                       # noqa: BLE001
-                errs.append(f"{p.name}: {e}")
-            continue
-        try:
-            with Image.open(p) as im0:
-                info = im0.info
-                fmt = im0.format
-                im = ImageOps.exif_transpose(im0)
-                im.load()
-            if x["mode"] == "crop" and x.get("box"):
-                l, t, r, b = x["box"]
-                w, h = im.size
-                im = im.crop((int(l * w), int(t * h), int(r * w), int(b * h)))
-                n_c += 1
-            if max(im.size) > max_side:
-                f = max_side / max(im.size)
-                im = im.resize((max(1, round(im.size[0] * f)), max(1, round(im.size[1] * f))), Image.LANCZOS)
-                n_s += 1 if x["mode"] == "scale" else 0
-            kw = {}
-            if fmt == "JPEG":
-                kw = {"quality": 95, "subsampling": 0}
-                if im.mode not in ("RGB", "L"):
-                    im = im.convert("RGB")
-            elif fmt == "PNG" and info.get("icc_profile"):
-                kw = {"icc_profile": info["icc_profile"]}
-            im.save(p, format=fmt or None, **kw)
-        except Exception as e:                           # noqa: BLE001
-            errs.append(f"{p.name}: {e}")
-    over = {k: v for k, v in over.items() if v.get("mode") == "keep"}  # done crops are part of the picture now
-    resize_save_over(ds, over, max_side)
-    mark_step(ds, "resize", {"scaled": n_s, "cropped": n_c, "upscaled": n_u, "max_side": int(max_side)})
-    return (f"✔ {n_s} picture{'s' if n_s != 1 else ''} scaled down, {n_c} cropped"
-            + (f", {n_u} upscaled" if n_u else "") + ". The untouched pictures are in "
-            f"`{ORIGINALS}/`." + (f" Could not change: {'; '.join(errs[:3])}" if errs else ""))
-
-
-def restore_originals(ds) -> str:
-    r = root(ds)
-    n = 0
-    for p in images(ds):
-        o = r / ORIGINALS / p.relative_to(r)
-        if o.is_file():
-            shutil.copy2(o, p)
-            n += 1
-    m = meta(ds)
-    m["steps"].pop("resize", None)
-    meta_save(ds, m)
-    return f"✔ {n} pictures put back from `{ORIGINALS}/`."
-
-
-# --------------------------------------------------------------------------- 7 Captions
-def style_of(tkey) -> str:
-    S = sg()
-    fam = S._oc_family(tkey)
-    return S.OC_FAMILY.get(fam, ("sentences",))[0]
-
-
-# Model families whose text encoder reads both booru tags and sentences: the dataset decides (step 2), and with both
-# caption sets the launch script picks one (step 9).
-BOTH_STYLES = {"anima", "flux", "chroma"}
-CAPTION_CHOICES = [("Each type's usual style", "auto"), ("Tags", "tags"), ("Sentences", "sentences"),
-                   ("Both: pick per run in step 9", "both")]
-
-
-def can_both(tkey) -> bool:
-    return sg()._oc_family(tkey) in BOTH_STYLES
-
-
-def styles_for(tkey, m: dict) -> list[str]:
-    """The caption styles this LoRA type gets in this dataset, its usual one first."""
-    base = style_of(tkey)
-    if not can_both(tkey):
-        return [base]
-    ch = m.get("caption_choice") or "auto"
-    if ch == "both":
-        return [base, "sentences" if base == "tags" else "tags"]
-    return [ch] if ch in ("tags", "sentences") else [base]
-
-
-def caption_sets(ds) -> list[dict]:
-    """[{'style', 'ext', 'types': [labels], 'tkeys'}]: the first LoRA type's style is IMG.txt."""
-    m = meta(ds)
-    labels = type_labels()
-    out = []
-    for t in m["types"] or []:
-        for st in styles_for(t, m):
-            e = next((x for x in out if x["style"] == st), None)
-            if e is None:
-                e = {"style": st, "ext": ".txt" if not out else f".{st}.txt", "types": [], "tkeys": []}
-                out.append(e)
-            e["types"].append(labels.get(t, t))
-            e["tkeys"].append(t)
-    if not out:
-        out.append({"style": "sentences", "ext": ".txt", "types": [], "tkeys": []})
-    return out
-
-
-def train_sets(ds, tkey) -> list[dict]:
-    """The caption sets a launch script of this type can train on."""
-    return [x for x in caption_sets(ds) if tkey in x["tkeys"]]
-
-
-def train_style(ds, tkey) -> str:
-    """The style a launch script of this type trains on: your pick in step 9, else the type's usual one."""
-    sets = train_sets(ds, tkey)
-    pick = (meta(ds).get("train_style") or {}).get(tkey)
-    if pick and any(x["style"] == pick for x in sets):
-        return pick
-    return sets[0]["style"] if sets else style_of(tkey)
-
-
-def caption_ext(ds, tkey) -> str:
-    """--caption_extension for a launch script of this type (".txt", ".sentences.txt", ...)."""
-    st = train_style(ds, tkey)
-    return next((x["ext"] for x in train_sets(ds, tkey) if x["style"] == st), ".txt")
-
-
-def set_train_style(ds, tkey, style):
-    m = meta(ds)
-    m.setdefault("train_style", {})[tkey] = style
-    meta_save(ds, m)
-
-
-def set_file(img: Path, ext: str) -> Path:
-    if ext == ".txt":
-        return sg().caption_file(img)
-    return img.with_name(img.stem + ext)
-
-
-def read_set(img: Path, ext: str):
-    f = set_file(img, ext)
-    if not f.is_file():
-        return None
-    return f.read_text(encoding="utf-8", errors="ignore").strip() or None
-
-
-def set_count(ds, ext) -> tuple[int, int]:
-    imgs = images(ds)
-    return sum(1 for p in imgs if read_set(p, ext)), len(imgs)
-
-
-def write_set(ds, url, model, trigger, leave_out, style, length, detail, ext, only_missing=False):
-    """Generator: writes a caption set (IMG.sentences.txt ...). Tag sets are written by the WD
-    tagger (wdtagger.py), sentence sets by Ollama."""
-    S = sg()
-    tell_fixed(ds, trigger)
-    if style == "tags":
-        yield from _write_set_wd(ds, trigger, leave_out, length, ext, only_missing)
-        return
-    import features as FT
-    if not FT.have("ollama"):
-        yield f"Sentences (`IMG{ext}`) need Ollama, which is not installed: write them in 8 Review, or install Ollama."
-        return
-    bad = S._oc_check(ds, url, model, trigger)
-    if bad:
-        yield bad
-        return
-    url = (url or "").strip() or S.CAP.DEFAULT_URL
-    imgs = images(ds)
-    if only_missing:
-        imgs = [p for p in imgs if not read_set(p, ext)]
-    if not imgs:
-        yield "Every picture already has a caption in this set."
-        return
-    S.record_change(f"captions {ext} of {ds}", {set_file(p, ext): (set_file(p, ext).read_text(encoding="utf-8", errors="ignore")
-                                                                 if set_file(p, ext).is_file() else None) for p in imgs})
-    STOP.clear()
-    done, failed, t0 = 0, [], time.time()
-    for i, p in enumerate(imgs, 1):
-        if STOP.is_set():
-            break
-        eta = f", about {S.fmt((time.time() - t0) / max(done, 1) * (len(imgs) - done))} left" if done else ""
-        yield f"⏳ {style} {i}/{len(imgs)}: {p.name}{eta}"
-        try:
-            r = S.CAP.caption(url, model, p, (trigger or ds).strip(), leave_out or "", style=style,
-                              length=int(length or 3), detail=int(detail or 3))
-        except S.CAP.OllamaError as e:
-            failed.append(f"{p.name}: {e}")
-            if "not reachable" in str(e):
-                break
-            continue
-        set_file(p, ext).write_text(FX.strip(ds, r["caption"], style, (trigger or ds).strip()) + "\n", encoding="utf-8")
-        done += 1
-    msg = f"{'■ Stopped' if STOP.is_set() else '✔ Done'}: {done} of {len(imgs)} captions written to `IMG{ext}`."
-    if failed:
-        msg += f" {len(failed)} failed: " + "; ".join(failed[:3])
-    yield msg
-
-
-def tell_fixed(ds, trigger=""):
-    """The caption writer (captioner.PURPOSE) gets the dataset's fixed features and its class word (none when the
-    gender is a fixed feature)."""
-    S = sg()
-    if S is not None and S.CAP is not None:
-        S.CAP.PURPOSE["fixed"] = FX.prompt_rule(ds, (trigger or meta(ds).get("trigger") or ds).strip())
-        S.CAP.PURPOSE["class"] = FX.class_word(ds)
-
-
-def _write_set_wd(ds, trigger, leave_out, length, ext, only_missing=False):
-    """A tag set with the WD tagger (no Ollama needed)."""
-    import wdtagger as WD
-    S = sg()
-    imgs = images(ds)
-    if only_missing:
-        imgs = [p for p in imgs if not read_set(p, ext)]
-    if not imgs:
-        yield "Every picture already has a caption in this set."
-        return
-    S.record_change(f"captions {ext} of {ds}", {set_file(p, ext): (set_file(p, ext).read_text(encoding="utf-8", errors="ignore")
-                                                                 if set_file(p, ext).is_file() else None) for p in imgs})
-    STOP.clear()
-    cap = S.CAP if S.CAP is not None else __import__("captioner")
-    max_tags = cap.TAG_COUNT.get(int(length or 3), 20)
-    traits: dict = {}
-    import datacheck as DC
-    purpose = meta(ds).get("purpose", "character")
-    character = DC.base_purpose(purpose) == "character"
-    # a character or a worn item: ALL tags are written; afterwards step 7 moves the character's own ones (or the
-    # item's own look) to the trigger words
-    write_leave = "" if character or purpose == "worn" else (leave_out or "")
-    last = ""
-    for last in WD.tag(imgs, (trigger or ds).strip(), write_leave, max_tags,
-                       lambda img, line: set_file(img, ext).write_text(
-                           FX.strip(ds, line, "tags", (trigger or ds).strip()) + "\n", encoding="utf-8"), STOP, traits,
-                       trait_leave=(leave_out or cap.DEFAULT_LEAVE_OUT) if character else
-                       ("" if purpose == "worn" else None)):
-        yield last
-    ok = str(last).startswith("✔") and traits.get("_n")      # only after captions were really written
-    m = meta(ds)
-    if traits.get("_n"):
-        m["trait_tags"] = traits                         # Character description › Suggest (step 7)
-    if (character or purpose == "worn") and traits.get("_n"):
-        m["wd_all"] = {"ext": ext, "at": time.strftime("%Y-%m-%d %H:%M")}
-        shutil.rmtree(_moved_dir(ds, ext), ignore_errors=True)    # new captions with all tags: nothing moved yet
-        (m.get("moved_tags") or {}).pop(ext, None)
-    meta_save(ds, m)
-    if ok and character:
-        yield (f"{last}\n\nEvery tag is in the captions now, also the character's own (hair, eyes ...). Next: "
-               "**Character tags → trigger words** below moves the ones you tick out of the captions and next to the "
-               "trigger word.")
-    elif ok and purpose == "worn":
-        yield (f"{last}\n\nEvery tag is in the captions now, also the item's own look (metal, stones, pattern ...). "
-               "Next: **Kinds and where they are worn** makes those words the same in every caption, and **Item tags "
-               "→ trigger words** moves the item's look out of the captions.")
-
-
-# ---- step 7, character tags: all tags are written first, then the ticked ones move to the trigger words
-def _moved_dir(ds, ext) -> Path:
-    return _flow(ds) / f"captions_alltags{ext.replace('.', '_')}"
-
-
-def tag_counts(ds, ext=".txt", trigger=""):
-    """[(tag, pictures)] of a caption set, most frequent first, and the number of pictures with a caption."""
-    trig = (trigger or ds or "").strip().lower()
-    counts, n = {}, 0
-    for p in images(ds):
-        t = read_set(p, ext)
-        if not t:
-            continue
-        n += 1
-        for x in dict.fromkeys(w.strip().lower() for w in re.split(r"[,\n]", t) if w.strip()):
-            if x != trig:
-                counts[x] = counts.get(x, 0) + 1
-    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])), n
-
-
-def default_ticks(rows, n, purpose="character", worn_kind="jewelry", kinds=None, places=None) -> list[str]:
-    """Pre-ticked: tags in at least 40 % of the pictures that describe the character (hair, eyes, freckles, build,
-    face, tattoos, makeup). Never ethnicity, skin or age: those you tick yourself if you want them.
-    A worn item: tags in at least 30 % of the pictures that describe the item's own look (metal, stones, pattern,
-    material ...), never the kind words or the places it is worn."""
-    import captioner as CAP
-    if purpose == "worn":
-        look = WORN_LOOK.get(worn_kind or "jewelry", WORN_LOOK["jewelry"])
-        own = {w.lower() for w in (kinds or []) + (places or [])}
-        out = []
-        for t, c in rows:
-            if c < max(2, 0.3 * n) or t in own:
-                continue
-            words = set(re.findall(r"[a-z]+", t))
-            if words & look or any(re.search(rf"\b{re.escape(k)}\b", t) for k in (kinds or [])):
-                out.append(t)
-        return out
-    out = []
-    for t, c in rows:
-        if c < max(2, 0.4 * n):
-            continue
-        hit = CAP.leaks(t, CAP.DEFAULT_LEAVE_OUT)
-        if hit and all(h in CAP.DESCRIBE_OK for h in hit):
-            out.append(t)
-    return out
-
-
-# ---- worn items: the look words, the kinds and where they are worn
-WORN_LOOK = {
-    "jewelry": {"gold", "golden", "silver", "metal", "gem", "gems", "gemstone", "jewel", "jewels", "diamond", "pearl",
-                "pearls", "ruby", "emerald", "sapphire", "amethyst", "crystal", "crystals", "ornate", "floral", "flower",
-                "engraved", "filigree", "chain", "beads", "beaded", "enamel", "platinum", "brass", "copper", "rhinestone",
-                "rhinestones", "sparkle", "shiny", "leaf", "star", "heart", "moon", "butterfly", "ribbon", "bow"},
-    "clothes": {"plaid", "striped", "stripes", "polka", "dot", "print", "floral", "lace", "frills", "frilled", "ruffles",
-                "leather", "denim", "silk", "satin", "wool", "knit", "knitted", "embroidered", "embroidery", "buttons",
-                "zipper", "pleated", "pattern", "checkered", "sequins", "fur", "velvet", "trim", "cutout", "ribbon", "bow"},
-    "equipment": {"metal", "leather", "plate", "plates", "straps", "strap", "buckle", "buckles", "pouch", "pouches",
-                  "rivets", "trim", "ornate", "engraved", "scratched", "worn", "brass", "steel", "chainmail", "padded",
-                  "gold", "silver", "emblem", "insignia", "glowing"},
-}
-KIND_WORDS = {
-    "jewelry": ["ring", "earrings", "necklace", "bracelet", "hair clip", "hair ornament", "brooch", "piercing",
-                "choker", "anklet", "pendant", "tiara", "hairpin", "ear clip", "nose ring", "cufflinks", "watch"],
-    "clothes": ["dress", "shirt", "jacket", "coat", "skirt", "pants", "shorts", "sweater", "hoodie", "boots", "shoes",
-                "gloves", "hat", "scarf", "socks", "thighhighs", "kimono", "uniform", "vest", "cape"],
-    "equipment": ["armor", "helmet", "gauntlets", "backpack", "bag", "belt", "holster", "shield", "goggles",
-                  "headphones", "pauldrons", "greaves", "harness", "quiver", "satchel"],
-}
-PLACE_WORDS = {
-    "jewelry": ["on finger", "on index finger", "on middle finger", "on ring finger", "on thumb", "in hair", "on ear",
-                "around neck", "on wrist", "on ankle"],
-    "clothes": ["upper body", "lower body", "full body"],
-    "equipment": ["on back", "on hip", "on head", "on arm", "on chest"],
-}
-
-
-ITEM_SMALL = 0.02                                        # the item covers less than 2 % of the picture: small
-ITEM_SURE = 0.12                                         # detector score from which the item counts as seen
-CLOSEUP_MIN = 384                                        # a close-up needs at least this many pixels a side
-
-
-def item_judge(e: dict) -> dict:
-    """{"seen", "kind", "box", "frac", "small", "crop"} from the item finder's boxes for one picture."""
-    W, H = e.get("W") or 0, e.get("H") or 0
-    best = max((m for m in e.get("marks") or [] if m.get("score", 0) >= ITEM_SURE), key=lambda m: m["score"],
-               default=None)
-    if not best or not W or not H:
-        return {"seen": False}
-    x0, y0, x1, y1 = best["box"]
-    frac = (x1 - x0) * (y1 - y0) / (W * H)
-    out = {"seen": True, "kind": best.get("label", ""), "box": best["box"], "frac": round(frac, 4),
-           "small": frac < ITEM_SMALL}
-    if out["small"]:
-        side = min(W, H, max(int(max(x1 - x0, y1 - y0) * 3), 512))
-        if side >= CLOSEUP_MIN:
-            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-            l = int(min(max(0, cx - side / 2), W - side))
-            t = int(min(max(0, cy - side / 2), H - side))
-            out["crop"] = [l, t, l + side, t + side]
-    return out
-
-
-def add_closeups(ds, paths) -> list[Path]:
-    """Select, a worn item: a close-up around the item as a new picture next to each kept picture where it is small
-    (closeup_<name>.png; the picture itself stays). Made once: an existing close-up is left alone."""
-    from PIL import Image, ImageOps
-    res = sort_result(ds) or {}
-    find = sort_lookup(res.get("pics") or {})
-    made = []
-    for p in map(Path, paths):
-        if p.name.startswith("closeup_"):
-            continue
-        it = (find(p) or {}).get("item") or {}
-        if not it.get("crop"):
-            continue
-        dest = p.with_name(f"closeup_{p.stem}.png")
-        if dest.exists():
-            continue
-        try:
-            with Image.open(p) as im:
-                ImageOps.exif_transpose(im).convert("RGB").crop(tuple(it["crop"])).save(dest)
-            made.append(dest)
-        except OSError:
-            continue
-    if made:
-        ensure_originals(ds, made)
-    return made
-
-
-def _rules(text):
-    """'ring = rings, band' lines -> [(name, [other words])]."""
-    out = []
-    for line in (text or "").splitlines():
-        if not line.strip() or line.strip().startswith("#"):
-            continue
-        name, _, rest = line.partition("=")
-        name = name.strip().lower()
-        if name:
-            out.append((name, [w.strip().lower() for w in rest.split(",") if w.strip() and w.strip().lower() != name]))
-    return out
-
-
-def worn_setup(ds) -> dict:
-    """{'kinds': 'ring = rings\nhair clip = hairclip', 'places': '...'} as typed in step 7."""
-    w = meta(ds).get("worn_items") or {}
-    return {"kinds": w.get("kinds", ""), "places": w.get("places", "")}
-
-
-def set_worn_setup(ds, kinds, places):
-    m = meta(ds)
-    m["worn_items"] = {"kinds": (kinds or "").strip(), "places": (places or "").strip()}
-    meta_save(ds, m)
-
-
-def suggest_worn(ds, ext=".txt", trigger=""):
-    """Kinds and places found in the captions, with the other words the tagger used for them."""
-    wk = meta(ds).get("worn_kind") or "jewelry"
-    rows, _ = tag_counts(ds, ext, trigger)
-    tags = [t for t, _ in rows]
-
-    def found(words):
-        lines = []
-        for w in words:
-            alts = [t for t in tags if t != w and (t == w + "s" or t.replace(" ", "") == w.replace(" ", ""))]
-            if w in tags or alts:
-                lines.append(w + (" = " + ", ".join(alts) if alts else ""))
-        return "\n".join(lines)
-    return found(KIND_WORDS.get(wk, [])), found(PLACE_WORDS.get(wk, []))
-
-
-def worn_names(ds):
-    w = worn_setup(ds)
-    return [n for n, _ in _rules(w["kinds"])], [n for n, _ in _rules(w["places"])]
-
-
-def same_words(ds, ext=".txt", trigger="") -> str:
-    """Make the kind and place words the same in every caption: the other words become the name, the name is added
-    when a tag mentions it ('gold ring' also gets 'ring'), and the order is trigger, kinds, places, the rest. Returns
-    the balance between the kinds."""
-    w = worn_setup(ds)
-    kinds, places = _rules(w["kinds"]), _rules(w["places"])
-    if not kinds:
-        return "Write the kinds first (one per line, for example `ring` or `hair clip = hairclip, hair ornament`)."
-    trig = (trigger or ds).strip().lower()
-    alias = {a: n for n, al in kinds + places for a in al}
-    names_k, names_p = [n for n, _ in kinds], [n for n, _ in places]
-    changed, n_pics, count, none = 0, 0, {k: 0 for k in names_k}, []
-    sg().record_change(f"kind words of {ds} {ext}", {set_file(p, ext): (read_set(p, ext) or "") + "\n"
-                                                     for p in images(ds) if read_set(p, ext)})
-    for p in images(ds):
-        text = read_set(p, ext)
-        if not text:
-            continue
-        n_pics += 1
-        parts = [alias.get(x.strip().lower(), x.strip().lower()) for x in re.split(r"[,\n]", text) if x.strip()]
-        have_k = [k for k in names_k if any(x == k or re.search(rf"\b{re.escape(k)}\b", x) for x in parts)]
-        have_p = [q for q in names_p if q in parts]
-        rest = [x for x in parts if x != trig and x not in have_k and x not in have_p]
-        new = ([trig] if trig else []) + have_k + have_p + list(dict.fromkeys(rest))
-        for k in have_k:
-            count[k] += 1
-        if not have_k:
-            none.append(p.name)
-        line = ", ".join(dict.fromkeys(new))
-        if line != text.strip():
-            set_file(p, ext).write_text(line + "\n", encoding="utf-8")
-            changed += 1
-    return f"✔ {changed} of {n_pics} captions changed. " + balance_text(count, n_pics, none)
-
-
-def balance_text(count, n, none=()):
-    if not n:
-        return ""
-    parts = " · ".join(f"**{k}** {c}" for k, c in sorted(count.items(), key=lambda kv: -kv[1]))
-    low = [k for k, c in count.items() if c < n / 3] if len(count) > 1 else []
-    out = f"Pictures per kind: {parts} (of {n})."
-    if low:
-        out += (f" ⚠ {', '.join(low)} {'is' if len(low) == 1 else 'are'} in fewer than a third of the pictures: the "
-                "trigger word will mostly mean the others. Add pictures of it, or turn on **Weight per kind** (step 7), "
-                "which gives its pictures more repeats.")
-    if none:
-        out += f" {len(none)} caption(s) name no kind ({', '.join(none[:4])}{' …' if len(none) > 4 else ''})."
-    return out
-
-
-def worn_balance(ds, ext=".txt"):
-    kinds, _ = worn_names(ds)
-    if not kinds:
-        return ""
-    count, n = {k: 0 for k in kinds}, 0
-    for p in images(ds):
-        t = (read_set(p, ext) or "").lower()
-        if not t:
-            continue
-        n += 1
-        for k in kinds:
-            if re.search(rf"\b{re.escape(k)}\b", t):
-                count[k] += 1
-    return balance_text(count, n)
-
-
-# ---- worn items: weight per kind (each kind its own repeat folder in the training view)
-MAX_WEIGHT = 5
-
-
-def _kind_of(text: str, order) -> str:
-    """The kind a caption names, rarest kind first (the same rule as the launch script's grep -iwF)."""
-    t = (text or "").lower()
-    for k in order:
-        if re.search(rf"(?<![\w]){re.escape(k)}(?![\w])", t):
-            return k
-    return ""
-
-
-def kind_weights(ds, ext=".txt") -> dict:
-    """{"on", "order": [kinds, rarest first], "rows": [(kind, pictures, weight, auto weight)], "none": pictures naming
-    no kind, "n", "n_eff"}: each picture counts for one kind (the rarest it names); a kind with fewer pictures gets a
-    weight (more repeats) so that every kind counts about the same, at most MAX_WEIGHT; your own numbers win."""
-    kinds, _ = worn_names(ds)
-    m = meta(ds).get("worn_weights") or {}
-    caps = [read_set(p, ext) or "" for p in images(ds)]
-    raw = {k: sum(1 for c in caps if re.search(rf"(?<![\w]){re.escape(k)}(?![\w])", c.lower())) for k in kinds}
-    order = sorted(kinds, key=lambda k: (raw[k], kinds.index(k)))
-    count = {k: 0 for k in kinds}
-    none = 0
-    for c in caps:
-        k = _kind_of(c, order)
-        if k:
-            count[k] += 1
-        else:
-            none += 1
-    top = max(count.values(), default=0)
-    rows, n_eff = [], none
-    for k in order:
-        auto = min(MAX_WEIGHT, max(1, round(top / count[k]))) if count[k] else 1
-        w = int((m.get("w") or {}).get(k) or auto)
-        rows.append((k, count[k], w, auto))
-        n_eff += count[k] * w
-    return {"on": bool(m.get("on")) and bool(kinds), "order": order, "rows": rows, "none": none, "n": len(caps),
-            "n_eff": n_eff}
-
-
-def set_kind_weights(ds, on: bool, weights: dict) -> str:
-    m = meta(ds)
-    m["worn_weights"] = {"on": bool(on), "w": {k: max(1, min(20, int(v or 1))) for k, v in (weights or {}).items()}}
-    meta_save(ds, m)
-    kw = kind_weights(ds)
-    if not kw["on"]:
-        return "✔ Saved. New launch scripts train every picture with its repeat folder's repeats, as before."
-    return ("✔ Saved. New launch scripts (step 9) give each kind its own repeat folder: "
-            + " · ".join(f"**{k}** {n} × {w}" for k, n, w, _ in kw["rows"])
-            + (f" · no kind {kw['none']} × 1" if kw["none"] else "")
-            + f" (counts as {kw['n_eff']} pictures instead of {kw['n']}). Make the launch script again in step 9.")
-
-
-def kinds_block(ds, ext: str) -> str:
-    """The launch script's part that builds the view: links to the pictures (nothing is moved), one repeat folder per
-    kind with the repeats × weight, made fresh at every run. '' when weights are off."""
-    kw = kind_weights(ds, ext)
-    if not kw["on"]:
-        return ""
-    def q(x):
-        return x.replace('"', "").replace("$", "").replace("`", "").replace("|", "")
-    entries = " ".join(f'"{q(k)}|{w}|{q(k)}"' for k, _, w, _ in kw["rows"])
-    return "\n".join([
-        "# Weight per kind (worn item, LoRA Studio › step 7): every kind gets its own repeat folder in a view made",
-        "# fresh at every run, with links to the pictures (nothing is moved). kind|weight|word, rarest kind first.",
-        'KINDS_VIEW="${TRAIN_DIR}/.lsflow/kinds_view"',
-        f"KINDS=({entries})",
-        'rm -rf "${KINDS_VIEW}" && mkdir -p "${KINDS_VIEW}"',
-        'for d in "${TRAIN_DIR}"/[0-9]*_*/; do',
-        '  rep="$(basename "$d")"; rep="${rep%%_*}"',
-        '  for f in "$d"*; do',
-        '    case "${f,,}" in *.png|*.jpg|*.jpeg|*.webp|*.bmp) ;; *) continue ;; esac',
-        '    base="${f%.*}"; dest="other"; w=1',
-        f'    if [ -f "${{base}}{ext}" ]; then',
-        '      for k in "${KINDS[@]}"; do',
-        '        IFS="|" read -r kn kw kword <<< "$k"',
-        f'        if grep -qiwF -- "$kword" "${{base}}{ext}"; then dest="$kn"; w="$kw"; break; fi',
-        '      done',
-        '    fi',
-        '    sub="${KINDS_VIEW}/$((rep * w))_${dest// /-}"',
-        '    mkdir -p "$sub"',
-        '    ln -s "$f" "$sub/"',
-        '    for c in "${base}".*txt "${base}".caption; do',
-        '      if [ -f "$c" ]; then ln -s "$c" "$sub/"; fi',
-        '    done',
-        '  done',
-        'done',
-        'echo "Weight per kind: $(ls "${KINDS_VIEW}" | tr \'\\n\' \' \')"',
-        "",
-    ])
-
-
-def moved_tags(ds, ext=".txt") -> list[str]:
-    return list((meta(ds).get("moved_tags") or {}).get(ext, {}).get("tags") or []) if ds else []
-
-
-def move_tags(ds, tags, ext=".txt", trigger="") -> str:
-    """Take the ticked tags out of every caption of the set and add them to the character description. The captions
-    with all tags are kept in .lsflow/ first, so put_back() can undo it."""
-    tags = [t.strip().lower() for t in tags or [] if t.strip()]
-    if not tags:
-        return "Tick the tags that belong to the character first."
-    trig = (trigger or ds).strip().lower()
-    tags = [t for t in tags if t != trig]
-    keep = _moved_dir(ds, ext)
-    kinds_keep = worn_names(ds)[0] if meta(ds).get("purpose") == "worn" else []
-    first = not keep.is_dir()
-    keep.mkdir(parents=True, exist_ok=True)
-    changed = 0
-    for p in images(ds):
-        f = set_file(p, ext)
-        if not f.is_file():
-            continue
-        text = f.read_text(encoding="utf-8", errors="ignore")
-        if first or not (keep / f.name).is_file():
-            shutil.copy2(f, keep / f.name)                # the version with all tags
-        parts = [w.strip() for w in re.split(r"[,\n]", text) if w.strip()]
-        new = []
-        for w in parts:
-            if w.lower() not in set(tags):
-                new.append(w)
-            else:                                        # 'gold ring' leaves 'ring' (a kind of a worn item)
-                new += [k for k in kinds_keep if re.search(rf"\b{re.escape(k)}\b", w.lower())]
-        new = list(dict.fromkeys(new))
-        if len(new) != len(parts):
-            f.write_text(", ".join(new) + "\n", encoding="utf-8")
-            changed += 1
-    m = meta(ds)
-    mv = m.setdefault("moved_tags", {}).setdefault(ext, {"tags": [], "desc_before": m.get("description", "")})
-    mv["tags"] = list(dict.fromkeys(mv["tags"] + tags))
-    meta_save(ds, m)
-    desc = set_description(ds, ", ".join([description(ds)] + tags))
-    return (f"✔ Moved {len(tags)} tag(s) out of {changed} caption(s) and next to the trigger word: *{desc}*. "
-            "The captions with all tags are kept: **Put them back** undoes it.")
-
-
-def put_back(ds, ext=".txt") -> str:
-    """Undo move_tags: the captions with all tags back, the moved tags out of the description again."""
-    keep = _moved_dir(ds, ext)
-    m = meta(ds)
-    mv = (m.get("moved_tags") or {}).get(ext)
-    if not keep.is_dir() or not mv:
-        return "Nothing was moved in this caption set, so there is nothing to put back."
-    n = 0
-    for p in images(ds):
-        f = set_file(p, ext)
-        if (keep / f.name).is_file():
-            shutil.copy2(keep / f.name, f)
-            n += 1
-    shutil.rmtree(keep, ignore_errors=True)
-    gone = {t.lower() for t in mv.get("tags") or []}
-    m = meta(ds)
-    m.get("moved_tags", {}).pop(ext, None)
-    meta_save(ds, m)
-    left = [w for w in re.split(r",", description(ds)) if w.strip() and w.strip().lower() not in gone]
-    set_description(ds, ", ".join(left))
-    return f"✔ Put back: {n} caption(s) have all their tags again; the moved tags are out of the description."
-
-
-def suggest_description(ds) -> str:
-    """The traits the WD tagger saw in at least 40 % of the pictures (left out of the captions): a starting point for
-    the character description. Only hair, eyes, build, freckles, tattoos and such: never ethnicity, skin or age."""
-    t = dict(meta(ds).get("trait_tags") or {})
-    n = t.pop("_n", 0)
-    if not n:
-        return ""
-    keep = [k for k, c in sorted(t.items(), key=lambda kv: -kv[1]) if c >= max(2, 0.4 * n)]
-    return ", ".join(keep[:10])
-
-
-def description(ds) -> str:
-    return (meta(ds).get("description") or "").strip() if ds else ""
-
-
-def set_description(ds, text: str) -> str:
-    words = [w.strip() for w in re.split(r"[,\n]", text or "") if w.strip()]
-    m = meta(ds)
-    m["description"] = ", ".join(dict.fromkeys(words))
-    meta_save(ds, m)
-    return m["description"]
-
-
 # --------------------------------------------------------------------------- 8 Review
 def review(ds) -> dict:
+    import dsfiles
+    import sd_script
     r = root(ds)
-    S = sg()
     m = meta(ds)
-    sets = caption_sets(ds)
+    sets = dscaptions.caption_sets(ds)
     imgs = images(ds)
     trig = (m.get("trigger") or ds).strip().lower()
     checks, problems = [], {}
     for st in sets:
-        miss = [p for p in imgs if not read_set(p, st["ext"])]
+        miss = [p for p in imgs if not dscaptions.read_set(p, st["ext"])]
         if miss:
             checks.append(("bad", f"{len(miss)} picture{'s' if len(miss) != 1 else ''} without a caption in IMG{st['ext']}",
                            "", ""))
@@ -1893,7 +574,7 @@ def review(ds) -> dict:
                 problems.setdefault(str(p), []).append(f"no caption ({st['ext']})")
         else:
             checks.append(("ok", f"{len(imgs)} pictures, each with a caption in IMG{st['ext']}", "", ""))
-        notrig = [p for p in imgs if read_set(p, st["ext"]) and not read_set(p, st["ext"]).lower().startswith(trig)]
+        notrig = [p for p in imgs if dscaptions.read_set(p, st["ext"]) and not dscaptions.read_set(p, st["ext"]).lower().startswith(trig)]
         if notrig:
             checks.append(("warn", f"The trigger word '{trig}' is not first in {len(notrig)} caption(s) of IMG{st['ext']}", "", ""))
             for p in notrig:
@@ -1902,7 +583,7 @@ def review(ds) -> dict:
             checks.append(("ok", f"Trigger word first in all captions of IMG{st['ext']}", "", ""))
         longs = []
         for p in imgs:
-            c = read_set(p, st["ext"]) or ""
+            c = dscaptions.read_set(p, st["ext"]) or ""
             n = len(c.split(",")) if st["style"] == "tags" else len(c.split())
             if c and n > (40 if st["style"] == "tags" else 160):
                 longs.append(p)
@@ -1911,11 +592,11 @@ def review(ds) -> dict:
             for p in longs:
                 problems.setdefault(str(p), []).append("very long caption")
     # caption files without a picture, and pictures outside the repeat folders
-    stats = S.dataset_stats(ds)
+    stats = sd_script.dataset_stats(ds)
     exts = [s["ext"] for s in sets]
     for row in stats["rows"]:
         folder = row["folder"]
-        stems = {p.stem for p in S.list_images(folder)}
+        stems = {p.stem for p in dsfiles.list_images(folder)}
         for f in sorted(folder.glob("*.txt")) + sorted(folder.glob("*.caption")):
             stem = f.name.split(".")[0] if f.name.count(".") > 1 else f.stem
             if stem not in stems:
@@ -1926,7 +607,7 @@ def review(ds) -> dict:
                               "(_reserve/ and other folders) are not part of the dataset and not trained", "", ""))
     tree = [(f"{ds}/", "")]
     for row in stats["rows"]:
-        caps = sum(1 for p in S.list_images(row["folder"]) if read_set(p, exts[0]))
+        caps = sum(1 for p in dsfiles.list_images(row["folder"]) if dscaptions.read_set(p, exts[0]))
         tree.append((f"  {row['folder'].name}/", f"{row['n']} pictures + {caps} captions"))
     for sub in (ORIGINALS, RESERVE, DC.SET_ASIDE):
         d = r / sub
@@ -1942,6 +623,7 @@ def review(ds) -> dict:
 
 
 def fix(ds, action, path) -> str:
+    import sd_script
     p = Path(path)
     S = sg()
     if action == "delete":
@@ -1950,7 +632,7 @@ def fix(ds, action, path) -> str:
             return f"✔ {p.name} moved to the Trash." if n else f"Could not move {p.name}: {'; '.join(err)}"
         return "housekeeping.py is missing."
     if action == "movein":
-        rows = S.dataset_stats(ds)["rows"]
+        rows = sd_script.dataset_stats(ds)["rows"]
         if not rows:
             return "There is no repeat folder yet."
         dest = rows[0]["folder"]
@@ -1984,30 +666,30 @@ def step_states(ds) -> dict:
                         + (" · watermarks removed" if m["wm_removed"] else ""))
     else:
         out["setup"] = ("todo", "LoRA type and purpose not set yet")
-    so = sort_result(ds)
+    so = dssort.sort_result(ds)
     if so:
-        find = sort_lookup(so.get("pics"))              # only NEW pictures ask for a new sort, removed ones do not
+        find = dssort.sort_lookup(so.get("pics"))              # only NEW pictures ask for a new sort, removed ones do not
         changed = any(find(p) is None for p in imgs)
         out["sort"] = ("warn" if changed else "done", f"done {so['at']} · baseline {so['baseline']}"
                        + (" · new pictures since" if changed else ""))
     else:
         out["sort"] = ("todo", "not sorted yet")
     sel = st.get("select")
-    res_n = reserve_count(ds)
+    res_n = dssort.reserve_count(ds)
     out["select"] = (("done", f"{n} kept · {res_n} in {RESERVE}/ (can be swapped back in)") if sel else
                      ("todo", f"{n} pictures, none set aside yet" + (f" · {res_n} in {RESERVE}/" if res_n else "")))
     rz = st.get("resize")
     out["resize"] = (("done", f"done · originals in {ORIGINALS}/") if rz else ("todo", "not resized yet"))
-    sets = caption_sets(ds)
+    sets = dscaptions.caption_sets(ds)
     miss = []
     for s in sets:
-        c, t = set_count(ds, s["ext"])
+        c, t = dscaptions.set_count(ds, s["ext"])
         if c < t:
             miss.append(f"{t - c} without a caption in IMG{s['ext']}")
     if not n:
         out["tags"] = ("todo", "no pictures")
     elif miss:
-        have_any = any(set_count(ds, s["ext"])[0] for s in sets)
+        have_any = any(dscaptions.set_count(ds, s["ext"])[0] for s in sets)
         out["tags"] = ("warn" if have_any else "todo", "; ".join(miss))
     else:
         out["tags"] = ("done", f"{n} captions" + (f" × {len(sets)} sets" if len(sets) > 1 else ""))
@@ -2093,83 +775,3 @@ def overview(ds_list) -> list[dict]:
     return out
 
 
-# --------------------------------------------------------------------------- what trains now
-def active_sort(ds) -> tuple[dict, list[Path]]:
-    """The sort's entries of the pictures that are in the repeat folder now ({path: entry}), and the pictures there
-    that the sort never saw (added later). The sort result itself describes the pictures it was run on, which after
-    Select (the rest went to _reserve/) or Add pictures is not the folder that will be trained."""
-    so = sort_result(ds) or {}
-    find = sort_lookup(so.get("pics") or {})
-    act, unsorted = {}, []
-    for p in images(ds):
-        e = find(p)
-        if e is not None:
-            act[str(p)] = e
-        else:
-            unsorted.append(p)
-    return act, unsorted
-
-
-def _rank_varied(ds, target: int) -> list[dict]:
-    res = sort_result(ds) or {}
-    pics = res.get("pics") or {}
-    find = sort_lookup(pics)
-    rows = []
-    for p in sorted(str(x) for x in candidates(ds)):
-        e = find(p)
-        rows.append({"path": p, "cat": "new", "q": 0.5, "framing": "", "outfit": "", "place": ""} if e is None
-                    else {"path": p, **e})
-    cands = [r for r in rows if r["cat"] in ("good", "detail", "alike", "new")]
-    embs = {}
-    try:
-        import pictools
-        for r in cands:
-            a = pictools.cached(r["path"])
-            if a and a.get("emb"):
-                embs[r["path"]] = pictools.emb(a)
-    except Exception:                                    # noqa: BLE001
-        embs = {}
-    detail_max = max(1, round(0.2 * target))
-    pinned, cands = _apply_pins(ds, rows, cands)
-    keep, seen = list(pinned), {"framing": Counter(), "outfit": Counter(), "place": Counter()}
-    for r in pinned:
-        for k in seen:
-            if r.get(k):
-                seen[k][r[k]] += 1
-    while len(keep) < target and cands:
-        best, best_s = None, -9.0
-        for r in cands:
-            if r["cat"] == "detail" and sum(1 for k in keep if k["cat"] == "detail") >= detail_max:
-                continue
-            s_ = 0.45 * r["q"] - (0.15 if r["cat"] == "alike" else 0.0)
-            for k, w in (("framing", 0.25), ("outfit", 0.15), ("place", 0.15)):
-                v = r.get(k) or ""
-                if v:
-                    s_ += w / (1 + seen[k][v])               # something not in the selection yet counts most
-            if r["cat"] == "detail":
-                s_ += 0.1
-            if embs.get(r["path"]) and keep:
-                sims = [sum(a * b for a, b in zip(embs[r["path"]], embs[k["path"]])) for k in keep if embs.get(k["path"])]
-                if sims:
-                    s_ -= 0.5 * max(0.0, max(sims) - 0.8)     # looks much like one already kept
-            if s_ > best_s:
-                best, best_s = r, s_
-        if best is None:
-            break
-        keep.append(best)
-        cands.remove(best)
-        for k in ("framing", "outfit", "place"):
-            if best.get(k):
-                seen[k][best[k]] += 1
-    kept = {id(r) for r in keep}
-    for r in rows:
-        r["keep"] = id(r) in kept
-        if r["keep"]:
-            bits = [b for b in (r.get("framing"), r.get("outfit"), r.get("place")) if b]
-            r["reason"] = ("detail shot" if r["cat"] == "detail" else "kept for variety: " + " · ".join(bits)
-                           if bits else f"quality {r['q']:.2f}")
-        else:
-            r["reason"] = r.get("why") or ("not needed: others show the same" if r["cat"] in ("good", "alike", "new")
-                                           else r["cat"])
-    _pin_reasons(rows)
-    return rows

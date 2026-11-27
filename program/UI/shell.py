@@ -7,7 +7,7 @@ the page is opened with shell.go(key, **kw), e.g. shell.go("datasets", ds="pip",
 The status strip is redrawn by a timer only when its text changed.
 """
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import importlib
 from pathlib import Path
@@ -88,10 +88,10 @@ def _strip(shell: Shell):
 
 def build_page():
     """The whole program for one browser tab."""
-    import lora_library as LL
+    import libcards
     import setup_page
     import studio_css
-    ui.add_head_html(f"<style>{LL.CSS}</style>")          # the cards, tiles and tables drawn as HTML
+    ui.add_head_html(f"<style>{libcards.CSS}</style>")          # the cards, tiles and tables drawn as HTML
     import sdgui
     ui.add_head_html(f"<style>{sdgui.CSS}</style>")       # the queue, run and results parts
     ui.add_head_html(f"<style>{studio_css.CSS}</style>")  # the shared page parts (+ your userdata/custom.css)
@@ -176,7 +176,8 @@ async def shutdown_dialog():
     queue runs, it says so and stops the run first (like Stop now: the last save point stays)."""
     import asyncio
     import sdgui as S
-    busy = S.RUN.running() or bool(S.QUEUE.get("running"))
+    import sdqueue
+    busy = S.RUN.running() or bool(sdqueue.QUEUE.get("running"))
     with ui.dialog() as d, ui.card().classes("gap-3"):
         ui.label("Shut down LoRA Studio?").classes("text-lg font-semibold")
         ui.label("A training run is going (or the queue is running). Shutting down stops it, like Stop now: the save "
@@ -190,7 +191,7 @@ async def shutdown_dialog():
     if not await d:
         return
     if busy:
-        S.QUEUE["stop_flag"] = True
+        sdqueue.QUEUE["stop_flag"] = True
         if S.RUN.running():
             S.stop_run()
         n = ui.notification("Stopping the training run …", spinner=True, timeout=None)

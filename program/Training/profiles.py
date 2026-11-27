@@ -227,7 +227,7 @@ def _sg():
 def from_script(text: str, purpose: str) -> dict:
     """The profile settings in a launch script's text, for one purpose: {key: value}. Read with the same helpers as
     step 9's form (sdgui.form_value)."""
-    S = _sg()
+    import sd_script
     out = {}
     for k, (where, kind, _, _) in KEYS.items():
         if where == "cfg:steps":
@@ -239,7 +239,7 @@ def from_script(text: str, purpose: str) -> dict:
         if kind is bool:
             out[k] = re.search(rf"(?<![\w-])--{name}(?![\w-])", text) is not None
             continue
-        v = S.form_value(text, name)
+        v = sd_script.form_value(text, name)
         if not v:
             continue
         try:
@@ -308,6 +308,7 @@ def apply_cfg(cfg: dict, p: dict | None, purpose: str) -> tuple[dict, list[str]]
 def apply_text(text: str, p: dict | None, purpose: str) -> str:
     """A saved script's text with the profile's values (target steps only change a new plan); written with the same
     helpers as step 9's form (sdgui.set_arg / set_switch)."""
+    import sd_settings
     S = _sg()
     vals = ((p or {}).get("settings") or {}).get(purpose_key(purpose)) or {}
     for k, v in vals.items():
@@ -315,7 +316,7 @@ def apply_text(text: str, p: dict | None, purpose: str) -> str:
         if where == "cfg:steps":
             continue
         name = TEXT_FLAG.get(where, where).lstrip("-")
-        text = S.set_switch(text, name, v)[0] if isinstance(v, bool) else S.set_arg(text, name, _fmt(v))[0]
+        text = S.set_switch(text, name, v)[0] if isinstance(v, bool) else sd_settings.set_arg(text, name, _fmt(v))[0]
     return mark(text, p)
 
 

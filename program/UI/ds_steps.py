@@ -16,8 +16,14 @@ import datacheck as DC
 import datasets_ui as V
 import detailscan as DSC
 import dsflow as F
+import dsworn
+import dscaptions
+import dsresize
+import dssort
 import features as FT
 import sdgui as S
+import sd_script
+import sd_prepare
 from widgets import CropPanel, PaintPanel, note, pic_url, stream
 
 
@@ -64,7 +70,7 @@ def save_setup(ds, types, purpose, wm, trig, words, worn, cls, caps) -> str:
 def step2(page):
     ds = page.s["ds"]
     m = F.meta(ds)
-    types = dict((v, lab) for lab, v in S.type_choices())
+    types = dict((v, lab) for lab, v in sd_script.type_choices())
     head("Set up the dataset")
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.card().props("flat bordered").classes("ls-card grow basis-3/5 gap-2"):
@@ -72,7 +78,7 @@ def step2(page):
                           label="LoRA types (one or more)").props("outlined dense use-chips").classes("w-full")
             note("Several types: sorting uses the strictest size, step 7 writes one caption set per caption style, "
                  "step 9 one launch script per type.")
-            caps = ui.radio(dict((v, lab) for lab, v in F.CAPTION_CHOICES), value=m.get("caption_choice") or "auto") \
+            caps = ui.radio(dict((v, lab) for lab, v in dscaptions.CAPTION_CHOICES), value=m.get("caption_choice") or "auto") \
                 .props("inline dense")
             caps_l = note("Captions for Anima, FLUX and Chroma: these read both tags and sentences. Both: step 7 writes "
                           "a tag set and a sentence set, and step 9 lets you pick which one a launch script trains on.")
@@ -100,7 +106,7 @@ def step2(page):
                 ch = DC.base_purpose(p) == "character"
                 cls.set_visibility(ch)
                 cls_l.set_visibility(ch)
-                both = any(F.can_both(x) for x in t.value or [])
+                both = any(dscaptions.can_both(x) for x in t.value or [])
                 caps.set_visibility(both)
                 caps_l.set_visibility(both)
                 card_html, missing = V.setup_card(t.value or [], p)
@@ -193,9 +199,9 @@ class FixedCard:
 
     def pick_tags(self, it):
         """The dataset's tags (from its captions), for you to tick the wrong words of this feature."""
-        sets = F.caption_sets(self.ds)
+        sets = dscaptions.caption_sets(self.ds)
         ext = next((x["ext"] for x in sets if x["style"] == "tags"), sets[0]["ext"] if sets else ".txt")
-        counts, n = F.tag_counts(self.ds, ext, self.trigger())
+        counts, n = dscaptions.tag_counts(self.ds, ext, self.trigger())
         have = [t.strip().lower() for t in (it["x"].value or "").split(",") if t.strip()]
         with ui.dialog() as d, ui.card().classes("w-[44rem] max-w-[95vw] gap-2"):
             ui.label(f"Wrong words for “{it['w'].value or 'this feature'}”").classes("font-semibold")
@@ -255,7 +261,7 @@ def step3(page):
 
     async def scan():
         md.content = "<p class='ls-note'>Scanning …</p>"
-        sc = await run.io_bound(F.usable_scan, ds, F.meta(ds)["types"])
+        sc = await run.io_bound(dssort.usable_scan, ds, F.meta(ds)["types"])
         draw(sc)
 
     def move():
@@ -268,7 +274,7 @@ def step3(page):
         if not bad:
             msg.content = "Nothing to move (only pictures in the repeat folder are moved)."
             return
-        n, err = F.move_to_reserve(ds, bad)
+        n, err = dssort.move_to_reserve(ds, bad)
         msg.content = f"✔ {n} moved to _reserve/." + (f" {'; '.join(err[:3])}" if err else "")
         draw()
 
@@ -310,14 +316,14 @@ def step4(page):
         if not mm["types"]:
             status.text = "Set the LoRA type first (step 2, Setup)."
             return
-        url, model = S.oc_settings()
+        url, model = sd_prepare.oc_settings()
 
         def lines():
-            for line in F.sort_run(ds, mm["types"], mm["purpose"], mm["wm_removed"], url, model):
+            for line in dssort.sort_run(ds, mm["types"], mm["purpose"], mm["wm_removed"], url, model):
                 if line == "done":
                     break
                 yield f"⏳ {line}"
-            if DSC.enabled(ds) and (F.sort_result(ds) or {}).get("ai") and not F.STOP.is_set():
+            if DSC.enabled(ds) and (dssort.sort_result(ds) or {}).get("ai") and not F.STOP.is_set():
                 for line in DSC.run(ds, url, model):
                     if line == "done":
                         r = DSC.result(ds) or {}
@@ -342,7 +348,7 @@ def step5(page):
     head("Select the best pictures",
          "📌 Always keeps a picture whatever the rules say (a unique detail the sort missed); ⛔ Never leaves one out "
          "(useless content the sort kept). Your pins are saved at once and stay after a new sort.")
-    n, rng, why = F.suggest_size(ds)
+    n, rng, why = dssort.suggest_size(ds)
     mode0 = F.meta(ds).get("select_mode") or "safe"
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.card().props("flat bordered").classes("ls-card grow basis-0 gap-2"):
@@ -350,7 +356,7 @@ def step5(page):
             with ui.row().classes("items-center gap-2"):
                 keep = ui.number("Keep", value=n, min=1, precision=0).props("outlined dense").classes("w-28")
                 async def use_suggestion():
-                    keep.set_value(F.suggest_size(ds)[0])
+                    keep.set_value(dssort.suggest_size(ds)[0])
                     await draw()
                 ui.button("Use the suggestion", on_click=use_suggestion).props("outline dense no-caps")
             mode = ui.radio({"safe": "Safe: the cleanest pictures first",
@@ -407,11 +413,11 @@ def step5(page):
         if not sel:
             msg.content = "Nothing is ticked."
             return
-        msg.content = await run.io_bound(F.apply_select, ds, sel)
+        msg.content = await run.io_bound(dssort.apply_select, ds, sel)
         page.go(step=6)
 
     async def back():
-        msg.content = f"✔ {(await run.io_bound(F.back_from_reserve, ds))[0]} pictures put back."
+        msg.content = f"✔ {(await run.io_bound(dssort.back_from_reserve, ds))[0]} pictures put back."
         await draw()
     mode.on_value_change(set_mode)
     keep.on("keydown.enter", draw)
@@ -480,7 +486,7 @@ def step6(page):
         if act == "paint":
             paint.show(pic_url(src, 1600))
         else:
-            wm_crop.set(box, F.crop_preview(str(src), box))
+            wm_crop.set(box, dsresize.crop_preview(str(src), box))
 
     async def do_paint():
         a = await paint.mask()
@@ -514,7 +520,7 @@ def step6(page):
     with ui.row().classes("items-center gap-2"):
         ms = ui.number("Longest side at most (px)", value=int(saved or F.default_max_side(F.meta(ds)["types"])),
                        min=256, precision=0).props("outlined dense").classes("w-56")
-        ui.button("Put the originals back", on_click=lambda: (setattr(msg, "content", F.restore_originals(ds)), draw())) \
+        ui.button("Put the originals back", on_click=lambda: (setattr(msg, "content", dsresize.restore_originals(ds)), draw())) \
             .props("outline dense no-caps")
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.column().classes("grow basis-3/5 min-w-0 gap-1"):
@@ -530,26 +536,26 @@ def step6(page):
                 from PIL import Image, ImageOps
                 with Image.open(p) as im:
                     w, h = ImageOps.exif_transpose(im).size
-                bx = F.fit_box(w, h, l, t, r, b, aspect)
-                return F.crop_preview(str(p), bx), f"result {int((bx[2] - bx[0]) * w)}×{int((bx[3] - bx[1]) * h)}"
+                bx = dsresize.fit_box(w, h, l, t, r, b, aspect)
+                return dsresize.crop_preview(str(p), bx), f"result {int((bx[2] - bx[0]) * w)}×{int((bx[3] - bx[1]) * h)}"
             crop = CropPanel(crop_change)
 
             def person():
-                bx = F.person_box(str(F.root(ds) / cur["rel"]), crop.aspect.value, run=True)
+                bx = dsresize.person_box(str(F.root(ds) / cur["rel"]), crop.aspect.value, run=True)
                 if not bx:
                     crop.note.text = ("No person found (or the picture tools are not installed: Settings › Trainers "
                                       "and GPU).")
                     return
-                crop.set(bx, F.crop_preview(str(F.root(ds) / cur["rel"]), bx), "suggested: around the person")
+                crop.set(bx, dsresize.crop_preview(str(F.root(ds) / cur["rel"]), bx), "suggested: around the person")
 
             def use():
                 p = F.root(ds) / cur["rel"]
                 from PIL import Image, ImageOps
                 with Image.open(p) as im:
                     w, h = ImageOps.exif_transpose(im).size
-                over = F.resize_overrides(ds)
-                over[cur["rel"]] = {"mode": "crop", "box": F.fit_box(w, h, *crop.box(), crop.aspect.value)}
-                F.resize_save_over(ds, over, int(ms.value or 1536))
+                over = dsresize.resize_overrides(ds)
+                over[cur["rel"]] = {"mode": "crop", "box": dsresize.fit_box(w, h, *crop.box(), crop.aspect.value)}
+                dsresize.resize_save_over(ds, over, int(ms.value or 1536))
                 crop_card.set_visibility(False)
                 draw()
             with ui.row().classes("gap-2"):
@@ -568,27 +574,27 @@ def step6(page):
     def pick(path):
         rel = str(Path(path).relative_to(F.root(ds)))
         cur["rel"] = rel
-        o = F.resize_overrides(ds).get(rel) or {}
-        auto = None if o.get("box") else F.person_box(str(F.root(ds) / rel))
+        o = dsresize.resize_overrides(ds).get(rel) or {}
+        auto = None if o.get("box") else dsresize.person_box(str(F.root(ds) / rel))
         box = o.get("box") or auto or [0, 0, 1, 1]
         crop_card.set_visibility(True)
         cname.text = "Crop " + Path(rel).name
-        crop.set(box, F.crop_preview(str(F.root(ds) / rel), box), "suggested: around the person" if auto else "")
+        crop.set(box, dsresize.crop_preview(str(F.root(ds) / rel), box), "suggested: around the person" if auto else "")
 
     def rmode(arg):
         rel, _, mode = arg.rpartition("|")
-        over = F.resize_overrides(ds)
+        over = dsresize.resize_overrides(ds)
         if mode in ("scale", "none", "upscale"):
             over.pop(rel, None)
         elif mode == "keep":
             over[rel] = {"mode": mode}
         elif mode == "crop":
             return pick(str(F.root(ds) / rel))
-        F.resize_save_over(ds, over, int(ms.value or 1536))
+        dsresize.resize_save_over(ds, over, int(ms.value or 1536))
         draw()
 
     async def resize():
-        r = await stream(F.apply_resize_steps(ds, int(ms.value or 1536)), lambda line: setattr(msg, "content", line))
+        r = await stream(dsresize.apply_resize_steps(ds, int(ms.value or 1536)), lambda line: setattr(msg, "content", line))
         msg.content = r or ""
         page.go(step=7)
     page.on_pick = pick
@@ -598,7 +604,7 @@ def step6(page):
     with ui.row().classes("items-center gap-2"):
         ui.button("Recommended for the undecided", on_click=lambda: wm_apply(True)).props("outline dense no-caps")
         ui.button("Apply the watermark choices", on_click=lambda: wm_apply(False)).props("outline dense no-caps")
-        ui.button("Watermarks are done", on_click=lambda: (setattr(msg, "content", F.wm_done(ds)),
+        ui.button("Watermarks are done", on_click=lambda: (setattr(msg, "content", dsresize.wm_done(ds)),
                                                            setattr(page.bar, "content", V.bar_html(page.s)))) \
             .props("outline dense no-caps")
         go_b = ui.button("Resize →", on_click=resize).props("unelevated no-caps color=primary")
@@ -652,7 +658,7 @@ def look_card(ds, types):
     """Step 7: the kind of the pictures (Ollama) and, per LoRA type, what the result should look like."""
     import lean as L
     labels = F.type_labels()
-    url0, model0 = S.oc_settings()
+    url0, model0 = sd_prepare.oc_settings()
     with ui.card().props("flat bordered").classes("ls-card w-full gap-2"):
         ui.label("The look of the result").classes("font-semibold")
         note("Captions say what is in a picture, not what kind of picture it is, so a LoRA made from photos ties the "
@@ -693,9 +699,9 @@ def step7(page):
     purpose = m["purpose"]
     if S.CAP is not None:
         S.CAP.PURPOSE.update(value=purpose, words=m.get("concept_words") or "")
-        F.tell_fixed(ds)
+        dscaptions.tell_fixed(ds)
     tkey = page.s.get("tkey") if page.s.get("tkey") in m["types"] else (m["types"] or [""])[0]
-    url0, model0 = S.oc_settings()
+    url0, model0 = sd_prepare.oc_settings()
     head("Tag every picture",
          "Tags (Illustrious, Pony, SDXL anime, Anima) are written by the WD tagger (run by sd-scripts; the first time it "
          "downloads about 1.2 GB). Only general tags: no character names, so the trigger word stands for them; the Never "
@@ -761,14 +767,14 @@ def step7(page):
 
     async def write(only_missing=False):
         keep_leave()
-        sets = F.caption_sets(ds)
+        sets = dscaptions.caption_sets(ds)
         msg = ""
 
         def lines():
             nonlocal msg
             for st_ in sets:
                 last = ""
-                for line in F.write_set(ds, url0, model0, trig.value or ds, leave.value, st_["style"], length.value,
+                for line in dscaptions.write_set(ds, url0, model0, trig.value or ds, leave.value, st_["style"], length.value,
                                         detail.value, st_["ext"], only_missing=only_missing):
                     last = line
                     yield (msg + "\n\n" if msg else "") + line
@@ -779,11 +785,11 @@ def step7(page):
         if is_char or worn:
             mv_draw()
         if worn:
-            kind_msg.content = F.worn_balance(ds)
+            kind_msg.content = dsworn.worn_balance(ds)
     with ui.row().classes("items-center gap-2"):
         ui.button("Write the captions", on_click=lambda: write(False)).props("unelevated dense no-caps color=primary")
         ui.button("Only pictures without a caption", on_click=lambda: write(True)).props("outline dense no-caps")
-        ui.button("Stop", on_click=lambda: (F.STOP.set(), S.OC_STOP.update(flag=True))).props("flat dense no-caps color=negative")
+        ui.button("Stop", on_click=lambda: (F.STOP.set(), sd_prepare.OC_STOP.update(flag=True))).props("flat dense no-caps color=negative")
 
     worn = purpose == "worn"
     is_char = DC.base_purpose(purpose) == "character"
@@ -794,16 +800,16 @@ def step7(page):
              "after = (for example hair clip = hairclip, hair ornament), and the same for where they are worn (on index "
              "finger, in hair). Make the words the same turns the other words into the kind's name in every caption and "
              "puts the trigger word, the kinds and the places first. It also counts the pictures per kind.")
-        w = F.worn_setup(ds)
+        w = dsworn.worn_setup(ds)
         with ui.row().classes("w-full no-wrap gap-2"):
             kinds = ui.textarea("Kinds (one per line: name = other words)", value=w["kinds"],
                                 placeholder="ring = rings\nhair clip = hairclip, hair ornament").props("outlined").classes("grow")
             places = ui.textarea("Where they are worn (one per line: name = other words)", value=w["places"],
                                  placeholder="on index finger\nin hair = hair clip in hair").props("outlined").classes("grow")
-        kind_msg = ui.markdown(F.worn_balance(ds) if worn else "")
+        kind_msg = ui.markdown(dsworn.worn_balance(ds) if worn else "")
 
         def kind_suggest():
-            k, pl = F.suggest_worn(ds, ".txt", trig.value or ds)
+            k, pl = dsworn.suggest_worn(ds, ".txt", trig.value or ds)
             if not (k or pl):
                 kind_msg.content = "No kinds found in the captions yet: write the tag captions first."
                 return
@@ -814,12 +820,12 @@ def step7(page):
                                 "rest, then Make the words the same.")
 
         def kind_save():
-            F.set_worn_setup(ds, kinds.value, places.value)
-            kind_msg.content = "✔ Saved. " + F.worn_balance(ds)
+            dsworn.set_worn_setup(ds, kinds.value, places.value)
+            kind_msg.content = "✔ Saved. " + dsworn.worn_balance(ds)
 
         def kind_go():
-            F.set_worn_setup(ds, kinds.value, places.value)
-            kind_msg.content = F.same_words(ds, ".txt", trig.value or ds)
+            dsworn.set_worn_setup(ds, kinds.value, places.value)
+            kind_msg.content = dsworn.same_words(ds, ".txt", trig.value or ds)
             mv_draw()
             w_draw()
         with ui.row().classes("gap-2"):
@@ -839,7 +845,7 @@ def step7(page):
         w_nums = {}
 
         def w_draw():
-            kw = F.kind_weights(ds)
+            kw = dsworn.kind_weights(ds)
             w_on.value = kw["on"]
             w_box.clear()
             w_nums.clear()
@@ -854,10 +860,10 @@ def step7(page):
                     ui.label(f"no kind named: {kw['none']} pictures (weight 1)").classes("ls-note")
 
         def w_save():
-            w_msg.content = F.set_kind_weights(ds, w_on.value, {k: int(x.value or 1) for k, x in w_nums.items()})
+            w_msg.content = dsworn.set_kind_weights(ds, w_on.value, {k: int(x.value or 1) for k, x in w_nums.items()})
 
         def w_auto():
-            F.set_kind_weights(ds, w_on.value, {})
+            dsworn.set_kind_weights(ds, w_on.value, {})
             w_draw()
             w_msg.content = "Weights worked out again from the captions."
         with ui.row().classes("gap-2"):
@@ -882,30 +888,30 @@ def step7(page):
         mv_msg = ui.markdown("")
 
         def mv_draw(msg=""):
-            rows, n = F.tag_counts(ds, ".txt", trig.value or ds)
+            rows, n = dscaptions.tag_counts(ds, ".txt", trig.value or ds)
             if not n:
                 mv_tags.options, mv_tags.value = {}, []
                 mv_tags.update()
                 mv_msg.content = msg or "No captions yet: write the tag captions above first."
                 return
             mm = F.meta(ds)
-            kk, pp = F.worn_names(ds)
+            kk, pp = dsworn.worn_names(ds)
             mv_tags.options = {t: f"{t} ({c})" for t, c in rows[:120]}
-            mv_tags.value = F.default_ticks(rows, n, mm["purpose"], mm.get("worn_kind"), kk, pp)
+            mv_tags.value = dscaptions.default_ticks(rows, n, mm["purpose"], mm.get("worn_kind"), kk, pp)
             mv_tags.update()
-            moved = F.moved_tags(ds)
+            moved = dscaptions.moved_tags(ds)
             mv_msg.content = msg or (f"{n} captions, {len(rows)} different tags."
                                      + (f" Moved already: {', '.join(moved)}." if moved else ""))
 
         def mv_go():
-            msg = F.move_tags(ds, mv_tags.value or [], ".txt", trig.value or ds)
+            msg = dscaptions.move_tags(ds, mv_tags.value or [], ".txt", trig.value or ds)
             mv_draw(msg)
-            desc.value = F.description(ds)
+            desc.value = dscaptions.description(ds)
 
         def mv_back():
-            msg = F.put_back(ds, ".txt")
+            msg = dscaptions.put_back(ds, ".txt")
             mv_draw(msg)
-            desc.value = F.description(ds)
+            desc.value = dscaptions.description(ds)
         with ui.row().classes("gap-2"):
             ui.button("Read the tags", on_click=lambda: mv_draw()).props("outline dense no-caps")
             ui.button("Move the ticked tags", on_click=mv_go).props("unelevated dense no-caps color=primary")
@@ -918,20 +924,20 @@ def step7(page):
              "them here too: they are added to the LoRA's trigger words in its LoRA Manager data, so ComfyUI offers them "
              "next to the trigger word. The captions do not change. Suggest takes the traits the WD tagger saw in most "
              "pictures (never ethnicity, skin or age).")
-        desc = ui.input("Item description" if worn else "Character description", value=F.description(ds),
+        desc = ui.input("Item description" if worn else "Character description", value=dscaptions.description(ds),
                         placeholder="silver, leaf design, small green stones" if worn else
                         "round glasses, red scarf, silver earrings").props("outlined dense").classes("w-full")
         desc_msg = ui.markdown("")
 
         def desc_save():
-            d = F.set_description(ds, desc.value)
+            d = dscaptions.set_description(ds, desc.value)
             desc.value = d
             desc_msg.content = ((f"✔ Saved. The LoRAs of this dataset get {d} next to their trigger word when they are "
                                  "scanned (Collection › Maintenance › Sync now passes it on to LoRA Manager).") if d
                                 else "✔ No description: only the trigger word.")
 
         def desc_suggest():
-            sug = F.suggest_description(ds)
+            sug = dscaptions.suggest_description(ds)
             if not sug:
                 desc_msg.content = ("Nothing to suggest yet: write the tag captions with the WD tagger first (tags only; "
                                     "for sentence captions type the description yourself).")
@@ -955,7 +961,7 @@ def step7(page):
 def step8(page):
     ds = page.s["ds"]
     head("Review")
-    sets = F.caption_sets(ds)
+    sets = dscaptions.caption_sets(ds)
     fixed_draw = fixed_check_card(page, ds, lambda: draw())
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.card().props("flat bordered").classes("ls-card w-72 flex-none gap-1"):
@@ -982,9 +988,9 @@ def step8(page):
                     msg.content = "Click a picture first."
                     return
                 p = Path(cur["p"])
-                F.set_file(p, sets[0]["ext"]).write_text((cap1.value or "").strip() + "\n", encoding="utf-8")
+                dscaptions.set_file(p, sets[0]["ext"]).write_text((cap1.value or "").strip() + "\n", encoding="utf-8")
                 if len(sets) > 1 and (cap2.value or "").strip():
-                    F.set_file(p, sets[1]["ext"]).write_text(cap2.value.strip() + "\n", encoding="utf-8")
+                    dscaptions.set_file(p, sets[1]["ext"]).write_text(cap2.value.strip() + "\n", encoding="utf-8")
                 msg.content = f"✔ Saved the caption of {p.name}."
             ui.button("Save caption changes", on_click=save).props("outline dense no-caps")
 
@@ -998,8 +1004,8 @@ def step8(page):
         img.set_source(pic_url(p, 900))
         img.set_visibility(True)
         name.text = p.name
-        cap1.value = F.read_set(p, sets[0]["ext"]) or ""
-        cap2.value = (F.read_set(p, sets[1]["ext"]) or "") if len(sets) > 1 else ""
+        cap1.value = dscaptions.read_set(p, sets[0]["ext"]) or ""
+        cap2.value = (dscaptions.read_set(p, sets[1]["ext"]) or "") if len(sets) > 1 else ""
         msg.content = ""
 
     def fix(arg):

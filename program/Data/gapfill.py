@@ -19,7 +19,7 @@ ones Ollama looks at (own_scan: usable or not, and what each shows), then which 
 copies named own_<framing>_N, pinned 'always keep').
 """
 from __future__ import annotations
-__version__ = "1.201126f"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import json
 import random
@@ -30,6 +30,7 @@ from pathlib import Path
 
 import detailscan as DSC
 import dsflow as F
+import dssort
 
 PHRASE = {
     ("framing", "close-up"): "close-up portrait, face in focus",
@@ -149,9 +150,10 @@ def prompt(ds, dim: str, value: str) -> str:
 # --------------------------------------------------------------------------- looking in your own pictures
 def _ollama() -> tuple[str, str]:
     """(url, vision model); the model is '' when Ollama cannot look at pictures here."""
+    import sd_prepare
     import features as FT
     S = F.sg()
-    url, model = S.oc_settings()
+    url, model = sd_prepare.oc_settings()
     if FT.have("ollama") and S.CAP is not None and not model:   # no default chosen: the first vision model
         try:
             model = next((m["name"] for m in S.CAP.list_models(url) if m["vision"]), "")
@@ -187,12 +189,13 @@ def candidates(ds) -> list[dict]:
     """Your ComfyUI pictures made with this dataset's LoRA and no other LoRA, not offered before: newest version,
     highest strength and newest picture first. [{"path", "lora", "strength"}]"""
     import lora_library as LL
+    import libpictures
     seen = set(state(ds).get("seen") or [])
     out = []
     for gid in _groups(ds):
         members = LL.LIB.groups[gid]
         order = {m.key: i for i, m in enumerate(members)}
-        for x in LL.group_pictures(gid):
+        for x in libpictures.group_pictures(gid):
             loras = (x["e"].get("loras") or {})
             if len(loras) != 1 or str(x["path"]) in seen or not Path(x["path"]).is_file():
                 continue
@@ -214,7 +217,7 @@ def _what(url, model, p: Path, purpose: str) -> dict:
     if bad:
         return {"bad": bad[0]}
     x = DSC.parse(d, *DC._sent_size(p, DC.SENT_SIDE))
-    return {"framing": F._norm(d.get("framing")), "outfit": F._norm(d.get("outfit")), "place": F._norm(d.get("place")),
+    return {"framing": dssort._norm(d.get("framing")), "outfit": dssort._norm(d.get("outfit")), "place": dssort._norm(d.get("place")),
             **{k: x.get(k) or "" for k in ("angle", "pose", "expression", "lighting")}}
 
 
@@ -290,7 +293,8 @@ def search(ds, jobs: list[tuple[str, str, int]], say=None) -> tuple[dict, str]:
 
 def lora_made_share(ds) -> tuple[int, int]:
     """(LoRA-made pictures in the repeat folder: found and made ones, all pictures there)."""
-    rows = F.sg().dataset_stats(ds)["rows"]
+    import sd_script
+    rows = sd_script.dataset_stats(ds)["rows"]
     if not rows:
         return 0, 0
     rep = Path(rows[0]["folder"])
@@ -390,10 +394,11 @@ def own_pictures(ds) -> list[dict]:
     added = set(state(ds).get("own_added") or [])
     out = []
     import lora_library as LL
+    import libpictures
     for gid in _groups(ds):
         members = LL.LIB.groups[gid]
         order = {m.key: i for i, m in enumerate(members)}
-        for x in LL.group_pictures(gid):
+        for x in libpictures.group_pictures(gid):
             p = Path(x["path"])
             if len((x["e"].get("loras") or {})) != 1 or not p.is_file():
                 continue
@@ -454,7 +459,8 @@ def own_scan(ds, paths: list[str]):
 def own_add(ds, paths: list[str]) -> str:
     """Copies the ticked pictures into the repeat folder as own_<framing>_N (pinned 'always keep'); your originals stay
     where they are. Only scanned pictures: the scan says whether a picture is usable."""
-    rows = F.sg().dataset_stats(ds)["rows"]
+    import sd_script
+    rows = sd_script.dataset_stats(ds)["rows"]
     if not rows:
         return "This dataset has no repeat folder."
     rep = Path(rows[0]["folder"])
@@ -494,9 +500,10 @@ def own_add(ds, paths: list[str]) -> str:
 # --------------------------------------------------------------------------- picking
 def add(ds, files: list[str]) -> str:
     """The ticked pictures join the repeat folder (made_<kind>_N.png, pinned 'always keep'); the rest go to the Trash."""
+    import sd_script
     import housekeeping as HK
     st = state(ds)
-    rows = F.sg().dataset_stats(ds)["rows"]
+    rows = sd_script.dataset_stats(ds)["rows"]
     if not rows:
         return "This dataset has no repeat folder."
     rep = Path(rows[0]["folder"])
@@ -546,7 +553,7 @@ def set_aside(ds, dim: str, value: str, keep_share: float = 0.5) -> str:
     framing is stored per picture by the sort; angle, pose and expression are outweighed by making others.)"""
     r = DSC.result(ds) or {}
     tot = sum((r.get("counts") or {}).get(dim, {}).values())
-    sr = F.sort_result(ds) or {}
+    sr = dssort.sort_result(ds) or {}
     pins = F.pins(ds)
     pics = [(p, e) for p, e in (sr.get("pics") or {}).items()
             if (e.get(dim) or "") == value and e.get("cat") in DSC.KEPT and F.pin_of(pins, p) != "keep" and Path(p).is_file()]

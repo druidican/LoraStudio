@@ -60,6 +60,9 @@ class _Skip(Exception):
 
 def checks() -> list[dict]:
     """[{state: ok|warn|bad, title, detail, fix, fix_label}]"""
+    import dsfiles
+    import sd_script
+    import sd_settings
     out = []
     sg, ll = _sg(), _ll()
 
@@ -74,7 +77,7 @@ def checks() -> list[dict]:
     elif not ds_dirs[0].is_dir():
         add("bad", "Dataset folder", f"{_tilde(ds_dirs[0])} does not exist", "folders")
     else:
-        n = len(sg.list_lora_dirs()) if sg else 0
+        n = len(dsfiles.list_lora_dirs()) if sg else 0
         add("ok", "Dataset folder", f"{_tilde(ds_dirs[0])} · {n} datasets", "folders")
     lora_dirs = [Path(os.path.expanduser(d)) for d in s.get("lora_dirs") or []]
     missing = [d for d in lora_dirs if not d.is_dir()]
@@ -176,20 +179,20 @@ def checks() -> list[dict]:
     # model files: the LoRA types you use (launch scripts) or started to set up
     if sg:
         try:
-            labels = dict((v, l) for l, v in sg.type_choices())
+            labels = dict((v, l) for l, v in sd_script.type_choices())
             used = {sg.script_type(p) for _, p in sg.list_scripts()}
-            used |= {k for k in sg.read_settings() if k in labels and sg.settings_models(k)}
+            used |= {k for k in sd_settings.read_settings() if k in labels and sd_settings.settings_models(k)}
             full = []
             for t in sorted(u for u in used if u in labels):
-                saved = sg.settings_models(t)
-                _, presets = sg.merged_presets()
+                saved = sd_settings.settings_models(t)
+                _, presets = sd_script.merged_presets()
                 gaps = []
-                for flag, default in sg.type_slots(t):
-                    if flag in ("vae",) and sg.vae_optional(t, presets):
+                for flag, default in sd_settings.type_slots(t):
+                    if flag in ("vae",) and sd_settings.vae_optional(t, presets):
                         continue
-                    have = saved.get(flag) or ("" if (not default or sg._PH in default) else default)
+                    have = saved.get(flag) or ("" if (not default or sd_script._PH in default) else default)
                     if not have:
-                        gaps.append(sg.slot_label(flag))
+                        gaps.append(sd_settings.slot_label(flag))
                 if gaps:
                     add("warn", "Model files", f"{labels[t]}: {', '.join(gaps)} not chosen", "models")
                 else:
@@ -198,8 +201,8 @@ def checks() -> list[dict]:
                 add("ok", "Model files", ", ".join(full) + ": all slots filled", "models")
         except Exception as e:                           # noqa: BLE001
             add("warn", "Model files", f"could not check: {e}", "models")
-        add("ok" if sg.read_hf_token() else "warn", "Hugging Face token",
-            "saved" if sg.read_hf_token() else "not saved: launch scripts that download models will fail", "ai")
+        add("ok" if sd_settings.read_hf_token() else "warn", "Hugging Face token",
+            "saved" if sd_settings.read_hf_token() else "not saved: launch scripts that download models will fail", "ai")
     # backup
     try:
         import backup
@@ -357,9 +360,10 @@ MC = {"proc": None}
 
 def machine_check(train: bool):
     """Run selftest.py --machine in its own process and show its output as it comes (generator)."""
+    import sdqueue
     import subprocess
     sg = sys.modules.get("sdgui")
-    if train and sg is not None and (sg.RUN.running() or (sg.QUEUE.get("running") if hasattr(sg, "QUEUE") else False)):
+    if train and sg is not None and (sg.RUN.running() or sdqueue.QUEUE.get("running")):
         yield "A training run or the queue is active: the tiny training would compete for the GPU. Try again when it is done."
         return
     if MC["proc"] is not None and MC["proc"].poll() is None:

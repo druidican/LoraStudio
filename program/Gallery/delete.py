@@ -12,12 +12,13 @@ and, for the LoRA as a whole, the dataset folder (pictures, captions, everything
 good: everything goes to the Trash, so it can be put back from the file manager.
 """
 from __future__ import annotations
-__version__ = "1.141126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import re
 from pathlib import Path
 
 import lora_library as LL
+import libsync
 
 LIB = LL.LIB
 PARTS = [("lora", "LoRA folder: the file ComfyUI uses and its LoRA Manager files"),
@@ -131,10 +132,10 @@ def plan(gids) -> list[dict]:
 
 def run(plan_: list[dict], picks: dict) -> str:
     """Move the ticked parts to the Trash. picks = {gid: {"versions": [keys], "parts": [part names], "dataset": bool}}."""
-    import sdgui as sg
+    import sdqueue
     HK = LL.HK
-    busy = LL.busy_datasets()
-    queued = {str(Path(it.get("path", ""))) for it in sg.QUEUE["items"] if it.get("state") == "queued"}
+    busy = libsync.busy_datasets()
+    queued = {str(Path(it.get("path", ""))) for it in sdqueue.QUEUE["items"] if it.get("state") == "queued"}
     todo, skipped, gone_ds, done_gids = [], [], [], []
     ds_out = {e["dataset"] for e in plan_ if e["dataset"] and (picks.get(e["gid"]) or {}).get("dataset")}
     for e in plan_:

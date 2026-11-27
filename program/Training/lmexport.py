@@ -11,7 +11,7 @@ listed in civitai.customImages). The dataset's own LoRA card gets the same data;
 Every step is checked at the end. The page is program/UI/ds_review.py.
 """
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -149,6 +149,7 @@ def lm_root() -> str:
 def export(log: str, label: str, form: dict, say=None) -> list[tuple[str, str, str]]:
     """Export one save point of a run to LoRA Manager. form: dest, trigger, strength, preview, note, rating, done,
     cleanup. Returns the steps [(state ✔ / ! / ❌, title, detail)]; the last one is the check."""
+    import libsync
     say = say or (lambda t: None)
     T, CT, LL = _T(), _CT(), _LL()
     import sdgui as sg
@@ -278,7 +279,7 @@ def export(log: str, label: str, form: dict, say=None) -> list[tuple[str, str, s
         civ["customImages"] = list(civ.get("customImages") or []) + entries
         ex_state, ex_text = "✔", f"LoRA Manager's example picture folder › {sha[:4]}…{sha[-4:]}/ (the LoRA's hash)"
     if lo is not None and lo.sidecar_path is not None:      # the dataset's card (Collection)
-        LL.write_sidecar(lo.sidecar_path, data)
+        libsync.write_sidecar(lo.sidecar_path, data)
         lo.sidecar = data
     c_data = dict(data, file_name=copy.stem, file_path=str(copy), size=copy.stat().st_size,
                   modified=copy.stat().st_mtime)
@@ -287,7 +288,7 @@ def export(log: str, label: str, form: dict, say=None) -> list[tuple[str, str, s
         shutil.copy2(preview, prev)
         c_data["preview_url"] = str(prev)
         c_data["preview_nsfw_level"] = 0
-    LL.write_sidecar(copy.with_name(copy.stem + ".metadata.json"), c_data)
+    libsync.write_sidecar(copy.with_name(copy.stem + ".metadata.json"), c_data)
     steps.append(("✔", "LoRA Manager data written",
                   f"{copy.stem}.metadata.json: trigger {', '.join(words) or '(none)'}, base model "
                   f"{data.get('base_model', '?')}, the training in the notes, strength {tips['strength']}"))

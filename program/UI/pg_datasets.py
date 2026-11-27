@@ -17,7 +17,8 @@ from nicegui import run, ui
 
 import datasets_ui as V
 import dsflow as F
-import sdgui as S
+import dscaptions
+import dsfiles
 from widgets import note
 
 NAMES = {2: "Setup", 3: "Usable scan", 4: "Sort", 5: "Select", 6: "Watermarks and size", 7: "Captions", 8: "Review",
@@ -81,12 +82,12 @@ class Datasets:
             return self.go(view="flow", step=n)
         if act == "dspart":
             ds, _, n = arg.rpartition("|")
-            if ds in S.list_lora_dirs():
+            if ds in dsfiles.list_lora_dirs():
                 self.go(view="flow", mode="edit", ds=ds, step=int(n or 11))
             return
         if act in ("run", "review"):                     # a run in Results, or its Review and export
             import training_ui as TU
-            have = S.list_lora_dirs()
+            have = dsfiles.list_lora_dirs()
             ds = TU.dataset_of_log(arg)
             ds = ds if ds in have else (s.get("ds") or (have[0] if have else ""))
             if ds:
@@ -135,7 +136,7 @@ class Datasets:
 
     def open_ds(self, ds: str):
         """A dataset's page, at the step you were at (or its next step)."""
-        if ds not in S.list_lora_dirs():
+        if ds not in dsfiles.list_lora_dirs():
             return
         s = self.s
         try:                                               # a folder with only pictures becomes a dataset here
@@ -149,7 +150,7 @@ class Datasets:
         self.go(view="flow", mode="edit", ds=ds, step=int(step))
 
     def draw_list(self):
-        rows = F.overview(S.list_lora_dirs())
+        rows = F.overview(dsfiles.list_lora_dirs())
         find = (self.m_find.value or "").strip().lower()
         only_new = self.m_new.value
         out = []
@@ -239,7 +240,7 @@ class Datasets:
             return hit[1]
         n = 0
         try:
-            d = S.lora_path(ds) / "model"
+            d = dsfiles.lora_path(ds) / "model"
             n = sum(1 for f in d.glob("*.safetensors") if not re.search(r"-\d{6}$", f.stem)) if d.is_dir() else 0
         except OSError:
             pass
@@ -251,7 +252,7 @@ class Datasets:
         view, ds, step = s.get("view", "edit"), s.get("ds"), s.get("step") or 2
         self.m_all.active(view == "edit")
         self.m_newds.active(view == "new")
-        self.m_all.set_right(str(len(S.list_lora_dirs())))
+        self.m_all.set_right(str(len(dsfiles.list_lora_dirs())))
         self.m_filters.set_visibility(view == "edit")
         flow = view == "flow" and bool(ds)
         self.m_ds.set_visibility(flow)
@@ -268,7 +269,7 @@ class Datasets:
             st = states.get(key, ("todo", ""))[0] if n > 1 else "done"
             it = self.m_steps[n]
             it.active(step == n)
-            off = key == "tags" and not FT.have("ollama") and any(x["style"] != "tags" for x in F.caption_sets(ds))
+            off = key == "tags" and not FT.have("ollama") and any(x["style"] != "tags" for x in dscaptions.caption_sets(ds))
             if st == "done" and step != n:
                 it.set_icon("check_circle", "ok")
                 it.set_right("✓")

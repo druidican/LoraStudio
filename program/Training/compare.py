@@ -46,12 +46,13 @@ def _sg():
 
 # --------------------------------------------------------------------------- the settings in a launch script
 def lr_of(text: str) -> str:
-    return _sg().form_value(text or "", "learning_rate")
+    import sd_script
+    return sd_script.form_value(text or "", "learning_rate")
 
 
 def rank_of(text: str) -> tuple[int, int] | None:
-    S = _sg()
-    d, a = S.form_value(text or "", "network_dim"), S.form_value(text or "", "network_alpha")
+    import sd_script
+    d, a = sd_script.form_value(text or "", "network_dim"), sd_script.form_value(text or "", "network_alpha")
     try:
         return (int(float(d)), int(float(a))) if d and a else None
     except ValueError:
@@ -73,20 +74,23 @@ def _same_lr(a: str, b: str) -> bool:
 
 
 def set_lr(text: str, v: str) -> str:
-    return _sg().set_arg(text, "learning_rate", v)[0]
+    import sd_settings
+    return sd_settings.set_arg(text, "learning_rate", v)[0]
 
 
 def set_rank(text: str, d: int, a: int) -> str:
-    S = _sg()
-    return S.set_arg(S.set_arg(text, "network_dim", str(d))[0], "network_alpha", str(a))[0]
+    import sd_settings
+    return sd_settings.set_arg(sd_settings.set_arg(text, "network_dim", str(d))[0], "network_alpha", str(a))[0]
 
 
 def set_te(text: str, on: bool, lr: str = "5e-5") -> str:
     """on: the text encoders learn (at lr, unless the script has its own); off: the image model only."""
+    import sd_settings
+    import sd_script
     S = _sg()
     text = S.set_switch(text, "network_train_unet_only", not on)[0]
-    if on and not S.form_value(text, "text_encoder_lr"):
-        text = S.set_arg(text, "text_encoder_lr", lr)[0]
+    if on and not sd_script.form_value(text, "text_encoder_lr"):
+        text = sd_settings.set_arg(text, "text_encoder_lr", lr)[0]
     return text
 
 
@@ -197,6 +201,8 @@ def hours(tkey: str, steps: int, runs: int) -> float | None:
 
 def start(ds: str, tkey: str, groups: list[str]) -> str:
     """Write the scripts of a comparison, put them in the queue (as one group) and start it when nothing runs."""
+    import dsfiles
+    import sdqueue
     import sd_script as SS
     S = _sg()
     if not ds or not tkey:
@@ -212,7 +218,7 @@ def start(ds: str, tkey: str, groups: list[str]) -> str:
     if len(vs) < 2 and "epochs" not in groups:
         return "❌ This type has none of these settings to change."
     cid = time.strftime("%Y%m%d_%H%M%S")
-    home = S.lora_path(ds)
+    home = dsfiles.lora_path(ds)
     sub = home / SUB
     sub.mkdir(exist_ok=True)
     rec = plan.get("rec") or {}
@@ -242,16 +248,16 @@ def start(ds: str, tkey: str, groups: list[str]) -> str:
     exp = {"id": cid, "ds": ds, "tkey": tkey, "groups": groups, "base": bl, "runs": runs, "created": time.time(),
            "prompts": [], "pics": {}, "rows": [], "state": "training"}
     save(exp)
-    with S.QLOCK:
+    with sdqueue.QLOCK:
         for r in runs:
-            S.QUEUE["items"].append({"path": r["script"], "resume": "", "state": "queued",
+            sdqueue.QUEUE["items"].append({"path": r["script"], "resume": "", "state": "queued",
                                      "note": f"comparison {cid[-6:]}: {r['label']}"})
     msg = f"✔ Comparison started: {len(runs)} run(s) in the queue ({', '.join(r['label'] for r in runs)})."
     if "epochs" in groups:
         msg += " The save points of your standard script are compared too."
-    if not S.QUEUE.get("running") and not S.RUN.running():
-        S.queue_start(S.QUEUE.get("stop_on_fail", True))
-        if S.QUEUE.get("running"):
+    if not sdqueue.QUEUE.get("running") and not S.RUN.running():
+        sdqueue.queue_start(sdqueue.QUEUE.get("stop_on_fail", True))
+        if sdqueue.QUEUE.get("running"):
             msg += " Training starts now."
     else:
         msg += " They train after what is in the queue now."
@@ -269,8 +275,8 @@ def _files(script: str):
 
 def run_states(exp: dict) -> dict:
     """{key: queued | running | done | failed | gone}."""
-    S = _sg()
-    q = {i["path"]: i["state"] for i in S.QUEUE["items"]}
+    import sdqueue
+    q = {i["path"]: i["state"] for i in sdqueue.QUEUE["items"]}
     out = {}
     for r in exp["runs"]:
         st = q.get(r["script"])
@@ -309,13 +315,13 @@ def entries(exp: dict) -> list[dict]:
 
 def _prompts(exp: dict) -> list[dict]:
     """3 captions of the dataset (picked once and kept) × 2 seeds: [{"text", "seed"}]."""
+    import dsfiles
     if exp.get("prompts"):
         return exp["prompts"]
     import dsflow as F
-    S = _sg()
     caps = []
     for im in F.images(exp["ds"]):
-        c = S.read_caption(im)
+        c = dsfiles.read_caption(im)
         if c:
             caps.append(c)
     rnd = random.Random(exp["id"])
@@ -327,7 +333,8 @@ def _prompts(exp: dict) -> list[dict]:
 
 
 def pic_dir(exp: dict) -> Path:
-    return _sg().lora_path(exp["ds"]) / SUB / "pictures" / exp["id"]
+    import dsfiles
+    return dsfiles.lora_path(exp["ds"]) / SUB / "pictures" / exp["id"]
 
 
 def make_pictures(cid: str, say=None) -> str:
@@ -603,14 +610,14 @@ def apply(tkey: str, text: str) -> tuple[str, list]:
 
 def delete(cid: str) -> str:
     """A comparison's scripts, LoRA files (and save points), sample pictures and test pictures to the Trash."""
+    import sdqueue
     import housekeeping as HK
     exp = load(cid)
     if not exp:
         return "This comparison is gone already."
-    S = _sg()
     if any(v in ("queued", "running") for v in run_states(exp).values()):
-        with S.QLOCK:                                    # its waiting runs leave the queue; a running one goes on
-            S.QUEUE["items"] = [i for i in S.QUEUE["items"]
+        with sdqueue.QLOCK:                                    # its waiting runs leave the queue; a running one goes on
+            sdqueue.QUEUE["items"] = [i for i in sdqueue.QUEUE["items"]
                                 if not (i["state"] == "queued" and i["path"] in {r["script"] for r in exp["runs"]})]
     paths = []
     for r in exp["runs"]:

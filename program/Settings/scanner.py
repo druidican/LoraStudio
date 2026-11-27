@@ -171,8 +171,8 @@ def model_picks(models) -> dict:
     sure = False when the best base model is only a file of the same architecture (another SDXL family's model)."""
     import model_guide as G
     import sd_settings as SS
-    import sdgui as S
-    _, presets = S.merged_presets()
+    import sd_script
+    _, presets = sd_script.merged_presets()
     out = {}
     for tkey in presets:
         req = G.requirements_for(tkey, SS._type_base(tkey))

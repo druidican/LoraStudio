@@ -123,13 +123,14 @@ def advice(model_dir, log_dir, name: str) -> dict | None:
 
 def for_script(script: str) -> dict | None:
     """Advice for a launch script's newest run (its model and log folders, its output name)."""
+    import sd_script
     import sys
     sg = sys.modules.get("sdgui")
     if sg is None or not script or not Path(script).is_file():
         return None
     model, log = sg.script_paths(script)
     text = Path(script).read_text(encoding="utf-8", errors="ignore")
-    name = sg.script_arg(text, "output_name", sg.script_home(script))   # the dataset folder, also for a script in _old_runs/
+    name = sg.script_arg(text, "output_name", sd_script.script_home(script))   # the dataset folder, also for a script in _old_runs/
     if not name:
         m = re.search(r'^OUTPUT_NAME="?([^"\n]+)"?', text, re.M)
         name = m.group(1) if m else ""

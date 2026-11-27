@@ -14,6 +14,8 @@ from nicegui import ui
 
 import features as FT
 import sdgui as sg
+import sdloss
+import sdqueue
 import training_ui as T
 from widgets import note
 
@@ -63,11 +65,11 @@ class Queue:
             SM.Item("description", "Launch scripts", on_click=jump("tr_scripts"))
             SM.header("Controls")
             self.m_start = SM.Item("play_circle", "Start the queue",
-                                   on_click=lambda: (T.start_queue(sg.QUEUE.get("stop_on_fail", True)), self.draw_lists()))
-            self.m_after = SM.Item("stop_circle", "Stop after this run", on_click=sg.queue_stop_after_current)
+                                   on_click=lambda: (T.start_queue(sdqueue.QUEUE.get("stop_on_fail", True)), self.draw_lists()))
+            self.m_after = SM.Item("stop_circle", "Stop after this run", on_click=sdqueue.queue_stop_after_current)
 
     def draw_menu(self):
-        items = sg.QUEUE["items"]
+        items = sdqueue.QUEUE["items"]
         n = {k: sum(1 for i in items if i.get("state") == k) for k in ("queued", "done")}
         n["failed"] = sum(1 for i in items if i.get("state") in ("failed", "stopped"))
         n["running"] = 1 if sg.RUN.running() else 0
@@ -76,8 +78,8 @@ class Queue:
         self.m["running"].active(bool(n["running"]))
         self.m["failed"].set_icon("error", "warn" if n["failed"] else "")
         self.m["done"].set_icon("check_circle", "ok" if n["done"] else "")
-        self.m_start.show(bool(n["queued"]) and not sg.QUEUE.get("running") and not n["running"])
-        self.m_after.show(bool(sg.QUEUE.get("running")) and not sg.QUEUE.get("stop_flag"))
+        self.m_start.show(bool(n["queued"]) and not sdqueue.QUEUE.get("running") and not n["running"])
+        self.m_after.show(bool(sdqueue.QUEUE.get("running")) and not sdqueue.QUEUE.get("stop_flag"))
 
     def tick(self):
         self.draw_menu()
@@ -88,7 +90,7 @@ class Queue:
         if now:
             self.pics_lbl.text = "🖼 " + CT.now_text()
             self.pics_bar.value = (now["done"] / now["total"]) if now.get("total") else None
-            w = sum(1 for it in sg.QUEUE["items"] if it.get("state") == "queued")
+            w = sum(1 for it in sdqueue.QUEUE["items"] if it.get("state") == "queued")
             self.pics_note.text = (f"The next run ({w} waiting) starts when the pictures are done and ComfyUI's memory is "
                                    "freed." if w else "The queue is done after these pictures.")
         run = sg.RUN
@@ -98,7 +100,7 @@ class Queue:
         self.set_html(self.head, "head", T.live_head())
         self.set_html(self.stage, "stage", sg.stage_html())
         self.set_html(self.prog, "prog", sg.progress_html())
-        self.set_html(self.loss, "loss", sg.loss_html())
+        self.set_html(self.loss, "loss", sdloss.loss_html())
         self.set_html(self.sp, "sp", T.savepoints_html())
         if run.version != self.log_version:
             self.log_version = run.version
@@ -139,8 +141,8 @@ class Queue:
                     ui.label("Queue").classes("text-lg font-semibold")
                     self.queue = ui.html("", sanitize=False).props('id="tr_queue"').classes("w-full")
                     with ui.row().classes("items-center gap-2"):
-                        fail = ui.checkbox("Stop the queue when a run fails", value=sg.QUEUE.get("stop_on_fail", True),
-                                           on_change=lambda e: sg.queue_failstop(e.value))
+                        fail = ui.checkbox("Stop the queue when a run fails", value=sdqueue.QUEUE.get("stop_on_fail", True),
+                                           on_change=lambda e: sdqueue.queue_failstop(e.value))
                         ui.button("Clear finished", on_click=lambda: (T.clear_queue(True), self.draw_lists())) \
                             .props("flat dense no-caps")
                         ui.button("Clear the queue", on_click=lambda: (T.clear_queue(False), self.draw_lists())) \
@@ -158,7 +160,7 @@ class Queue:
             with ui.card().props('flat bordered id="q_live"').classes("ls-card w-full gap-2") as self.live:
                 with ui.row().classes("w-full items-center gap-3"):
                     self.head = ui.html("", sanitize=False).classes("grow")
-                    ui.button("Stop after this run", on_click=sg.queue_stop_after_current).props("outline dense no-caps")
+                    ui.button("Stop after this run", on_click=sdqueue.queue_stop_after_current).props("outline dense no-caps")
                     ui.button("Stop now", on_click=sg.stop_run).props("unelevated dense no-caps color=negative")
                 self.stage = ui.html("", sanitize=False).classes("w-full").props('id="stage_box"')
                 self.prog = ui.html("", sanitize=False).classes("w-full")

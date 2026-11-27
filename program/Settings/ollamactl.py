@@ -24,10 +24,11 @@ PULL = {"name": "", "status": "", "done": True, "error": ""}
 
 def settings() -> tuple[str, str]:
     """(url, model chosen for pictures) from Settings › AI helpers."""
+    import sd_prepare
     sg = sys.modules.get("sdgui")
     if sg is not None:
         try:
-            return sg.oc_settings()
+            return sd_prepare.oc_settings()
         except Exception:                                # noqa: BLE001
             pass
     return DEFAULT_URL, ""

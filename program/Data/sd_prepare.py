@@ -15,6 +15,9 @@ from datetime import datetime
 from pathlib import Path
 
 import sdgui as S
+import dsfiles
+import sd_script
+import sd_settings
 
 
 # --------------------------------------------------------------------------- review tab
@@ -35,18 +38,18 @@ OC_STOP = {"flag": False}
 
 
 def oc_settings():
-    g = S.read_settings().get("general", {})
+    g = sd_settings.read_settings().get("general", {})
     return (g.get("OLLAMA_URL") or (S.CAP.DEFAULT_URL if S.CAP else "http://127.0.0.1:11434")), (g.get("OLLAMA_MODEL") or "")
 
 
 def oc_save_settings(url, model):
-    data = S.read_settings()
+    data = sd_settings.read_settings()
     sec = data.setdefault("general", {})
     if sec.get("OLLAMA_URL") == url and sec.get("OLLAMA_MODEL") == model:
         return
     sec["OLLAMA_URL"], sec["OLLAMA_MODEL"] = url, model
     try:
-        S.write_settings(data)
+        sd_settings.write_settings(data)
     except OSError:
         pass
 
@@ -71,8 +74,8 @@ OC_FAMILY = {
 def _oc_family(tkey):
     fam = ""
     try:
-        recs = S.load_recs()
-        fam = (recs.FAMILY.get(tkey) or recs.FAMILY.get(S._type_base(tkey)) or "") if recs else ""
+        recs = sd_script.load_recs()
+        fam = (recs.FAMILY.get(tkey) or recs.FAMILY.get(sd_settings._type_base(tkey)) or "") if recs else ""
     except Exception:
         pass
     return fam or tkey or ""
@@ -82,7 +85,7 @@ def oc_recommend(tkey, purpose):
     """(markdown, style, length, detail) recommended for this LoRA type and purpose."""
     fam = _oc_family(tkey)
     style, enc, why = OC_FAMILY.get(fam, ("sentences", "its text encoder", "no table entry for this type: sentences are the safe choice"))
-    _, presets = S.merged_presets()
+    _, presets = sd_script.merged_presets()
     label = ((presets or {}).get(tkey) or {}).get("label", tkey or "this type")
     length, detail = 3, 3
     if purpose == "style":
@@ -135,8 +138,8 @@ def oc_example(style, length, detail, trigger, tkey):
 
 def oc_images(ds):
     """Images of the dataset's repeat folders (the same images the trainers use)."""
-    stats = S.with_virtual_row(S.dataset_stats(ds))
-    return [im for r in stats["rows"] for im in S.list_images(r["folder"])]
+    stats = sd_script.with_virtual_row(sd_script.dataset_stats(ds))
+    return [im for r in stats["rows"] for im in dsfiles.list_images(r["folder"])]
 
 
 def _oc_check(ds, url, model, trigger):
@@ -155,7 +158,7 @@ def _oc_check(ds, url, model, trigger):
 
 
 def _oc_hint(old: str) -> str:
-    return ", ".join(t for t in S.split_tags(old or "")[1:40]) if old else ""
+    return ", ".join(t for t in dsfiles.split_tags(old or "")[1:40]) if old else ""
 
 
 def oc_preview(ds, url, model, trigger, leave_out, hints, style="sentences", length=3, detail=3, n=3):
@@ -172,14 +175,14 @@ def oc_preview(ds, url, model, trigger, leave_out, hints, style="sentences", len
         return
     step = max(1, len(imgs) // n)
     pick = imgs[::step][:n]
-    import dsflow as F
+    import dscaptions
     import fixedfeat as FX
-    F.tell_fixed(ds, trigger)
+    dscaptions.tell_fixed(ds, trigger)
     out = [f"### Preview: {len(pick)} of {len(imgs)} images, nothing written\n"
            "The first image also loads the model into VRAM, so it takes longer.\n"]
     yield "\n".join(out) + f"\n⏳ {pick[0].name} ..."
     for i, im in enumerate(pick, 1):
-        old = S.read_caption(im)
+        old = dsfiles.read_caption(im)
         t0 = time.time()
         try:
             r = S.CAP.caption(url, model, im, trigger.strip(), leave_out, _oc_hint(old) if hints else "",
@@ -221,12 +224,12 @@ def _dc_cache_save(c: dict):
 
 
 def _dc_min_side(tkey) -> int:
-    _, presets = S.merged_presets()
+    _, presets = sd_script.merged_presets()
     side = int(((presets or {}).get(tkey) or {}).get("min_side") or 0)
     if not side:
         try:
-            recs = S.load_recs()
-            side = int(recs.MIN_SIDE.get(recs.FAMILY.get(tkey) or recs.FAMILY.get(S._type_base(tkey)) or "", 0)) if recs else 0
+            recs = sd_script.load_recs()
+            side = int(recs.MIN_SIDE.get(recs.FAMILY.get(tkey) or recs.FAMILY.get(sd_settings._type_base(tkey)) or "", 0)) if recs else 0
         except Exception:                   # noqa: BLE001
             side = 0
     return side
@@ -273,7 +276,7 @@ def wm_render(ds):
     """(summary markdown, review HTML) from <dataset>/_set_aside/marks.json."""
     if S.DC is None or not ds:
         return "", ""
-    root = S.lora_path(ds)
+    root = dsfiles.lora_path(ds)
     marks = S.DC.reconcile(root, S.DC.marks_load(root))
     rows = [(rp, e) for rp, e in sorted(marks.items()) if e.get("marks") or e.get("border")]
     if not rows:
@@ -351,33 +354,33 @@ def _wm_source(root, rp, e):
 
 
 def _wm_box(ds, rp, l, r, t, b, aspect):
-    root = S.lora_path(ds)
+    root = dsfiles.lora_path(ds)
     e = S.DC.marks_load(root).get(rp) or {}
     src = _wm_source(root, rp, e)
     import datacheck as DC
     W, H = DC.shown_size(src)
-    import dsflow as F
-    fr = F.fit_box(W, H, l / 100, t / 100, r / 100, b / 100, aspect)
+    import dsresize
+    fr = dsresize.fit_box(W, H, l / 100, t / 100, r / 100, b / 100, aspect)
     return src, W, H, fr, [round(fr[0] * W), round(fr[1] * H), round(fr[2] * W), round(fr[3] * H)]
 
 
 def wm_crop_show(ds, rp, l, r, t, b, aspect):
     if not ds or not rp:
         return None, ""
-    import dsflow as F
+    import dsresize
     src, W, H, fr, px = _wm_box(ds, rp, l, r, t, b, aspect)
-    e = S.DC.marks_load(S.lora_path(ds)).get(rp) or {}
+    e = S.DC.marks_load(dsfiles.lora_path(ds)).get(rp) or {}
     inside = [m for m in e.get("marks") or []
               if not (m["box"][2] <= px[0] or m["box"][0] >= px[2] or m["box"][3] <= px[1] or m["box"][1] >= px[3])]
     note = f"result {px[2] - px[0]}×{px[3] - px[1]}" + (" · ⚠ a found mark is still inside the box" if inside else "")
-    return F.crop_preview(str(src), fr), note
+    return dsresize.crop_preview(str(src), fr), note
 
 
 def wm_crop_apply(ds, rp, l, r, t, b, aspect):
     """(message, done)."""
     if not ds or not rp:
         return "Pick a picture first.", False
-    root = S.lora_path(ds)
+    root = dsfiles.lora_path(ds)
     marks = S.DC.marks_load(root)
     e = marks.get(rp)
     if e is None:
@@ -394,7 +397,7 @@ def wm_crop_apply(ds, rp, l, r, t, b, aspect):
 
 def wm_tool_info(ds, rp) -> tuple:
     """(picture to show, crop box as fractions) for the paint and crop tools of one picture."""
-    root = S.lora_path(ds)
+    root = dsfiles.lora_path(ds)
     e = S.DC.marks_load(root).get(rp) or {}
     src = _wm_source(root, rp, e)
     import datacheck as DC
@@ -409,7 +412,7 @@ def wm_paint_mask(ds, rp, a) -> str:
         return "A training run is using the GPU: paint over it when the run has finished."
     if a is None or not a.getbbox():
         return "Paint over the mark first."
-    root = S.lora_path(ds)
+    root = dsfiles.lora_path(ds)
     marks = S.DC.marks_load(root)
     e = marks.get(rp)
     if e is None:
@@ -451,8 +454,8 @@ def wm_apply_steps(ds, choices_json, only_pending=False):
     """Generator behind wm_apply: yields a progress line before each picture; returns the message."""
     if S.DC is None or not ds:
         return "Pick a LoRA folder first."
-    root = S.lora_path(ds)
-    if S.RUN.running() and S.script_home(S.RUN.script or "/") == root:
+    root = dsfiles.lora_path(ds)
+    if S.RUN.running() and sd_script.script_home(S.RUN.script or "/") == root:
         return "A training run of this dataset is active: change the pictures when it has finished."
     marks = S.DC.reconcile(root, S.DC.marks_load(root))
     try:

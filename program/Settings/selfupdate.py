@@ -170,11 +170,12 @@ def _same_file(path, info, name) -> bool:
 
 
 def busy_reason() -> str:
+    import sdqueue
     sg = sys.modules.get("sdgui")
     try:
         if sg is not None and sg.RUN.running():
             return "a training run is active"
-        if sg is not None and sg.QUEUE.get("running"):
+        if sg is not None and sdqueue.QUEUE.get("running"):
             return "the training queue is running"
     except Exception:                                    # noqa: BLE001
         pass

@@ -26,10 +26,11 @@ LOG_LINES = 200
 
 
 def redact(text: str) -> str:
+    import sd_settings
     text = TOKEN_RE.sub("[token removed]", text or "")
     sg = sys.modules.get("sdgui")
     try:
-        tok = sg.read_hf_token() if sg else ""
+        tok = sd_settings.read_hf_token() if sg else ""
         if tok and len(tok) > 6:
             text = text.replace(tok, "[token removed]")
     except Exception:                                    # noqa: BLE001
@@ -65,6 +66,7 @@ def _log_end(path: Path, n: int = LOG_LINES) -> str:
 
 
 def _machine() -> list[str]:
+    import sd_settings
     lines = [f"- System: {platform.platform()} · Python {platform.python_version()}"]
     try:
         import nicegui
@@ -80,7 +82,7 @@ def _machine() -> list[str]:
     sg = sys.modules.get("sdgui")
     if sg is not None:
         try:
-            env = sg.env_saved()
+            env = sd_settings.env_saved()
             if env:
                 lines.append("- GPU settings: " + ", ".join(f"{k}={v}" for k, v in env.items()))
         except Exception:                                # noqa: BLE001
@@ -110,6 +112,7 @@ def _newest_install() -> str:
 
 
 def make(logname: str = "", note: str = "") -> tuple[Path, str]:
+    import sd_script
     import version
     parts = []
     parts.append(f"# LoRA Studio report · {time.strftime('%Y-%m-%d %H:%M')}")
@@ -142,7 +145,7 @@ def make(logname: str = "", note: str = "") -> tuple[Path, str]:
                     parts.append(f"- The line it found: `{fc['line']}`")
             if info:
                 try:
-                    st = sg.dataset_stats(info["dataset"])
+                    st = sd_script.dataset_stats(info["dataset"])
                     parts.append("- Dataset: " + " + ".join(f"{x['folder'].name}: {x['n']} pictures, "
                                                            f"{x['captioned']} captions" for x in st["rows"]))
                 except Exception:                        # noqa: BLE001

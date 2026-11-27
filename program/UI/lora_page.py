@@ -2,12 +2,15 @@
 """Collection › LoRA page: one LoRA (all its versions) in four parts: Overview, Pictures (made with it), Training and
 Edit. The data and the actions are in Gallery/lorapage.py; this file only draws them."""
 from __future__ import annotations
-__version__ = "1.201126e"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
 import lora_library as LL
+import libsync
+import libpictures
 import lorapage as LP
+import picgallery
 from widgets import note, pic_url
 
 LIB = LL.LIB
@@ -55,7 +58,7 @@ class LoraPage:
         if lora is None:
             return
         try:
-            changed = await run.io_bound(LL.sync_lora, LIB, lora)
+            changed = await run.io_bound(libsync.sync_lora, LIB, lora)
         except Exception:                                # noqa: BLE001
             return
         if changed:
@@ -104,7 +107,7 @@ class LoraPage:
     def fill_pictures(self, page: int = 1):
         folder, n = LP.picture_folder_note(self.gid)
         self.pf.value, self.pf_note.text = folder, n
-        self.pver.options = {v: label for label, v in LL.picture_versions(self.gid)}
+        self.pver.options = {v: label for label, v in libpictures.picture_versions(self.gid)}
         self.pver.value = ""
         self.pver.update()
         ch, linked = LP.old_names(self.gid)
@@ -114,7 +117,7 @@ class LoraPage:
         self.draw_pictures(page)
 
     def draw_pictures(self, page: int):
-        html_, self.pic_page, pages = LL.render_pictures(self.gid, self.pver.value or "", page)
+        html_, self.pic_page, pages = libpictures.render_pictures(self.gid, self.pver.value or "", page)
         self.pgrid.content = html_
         self.ppages.text = f"page {self.pic_page} of {pages}" if pages > 1 else ""
         self.pprev.set_enabled(self.pic_page > 1)
@@ -127,7 +130,7 @@ class LoraPage:
         dlg.open()
 
     def open_picture(self, path: str):
-        img, info, prompt = LL.picture_details(path, self.gid)
+        img, info, prompt = libpictures.picture_details(path, self.gid)
         self.pv_img.set_source(pic_url(path, 1200) if img is not None else "")
         self.pv_img.set_visibility(img is not None)
         self.pv_img.classes(add="ls-blur" if self.d and self.d["blur"] else "")
@@ -249,7 +252,7 @@ class LoraPage:
                 .props("outlined dense").classes("grow")
             ui.button("Scan for new pictures", on_click=self.scan).props("unelevated no-caps color=primary")
             ui.button("Scan all picture folders", on_click=self.scan_all).props("outline no-caps")
-            ui.button("Stop", on_click=lambda: (LL.PG.stop(), setattr(self.pf_note, "text", "Stopping … (what was read is kept)"))) \
+            ui.button("Stop", on_click=lambda: (picgallery.stop(), setattr(self.pf_note, "text", "Stopping … (what was read is kept)"))) \
                 .props("flat no-caps color=negative")
         self.pf_note = note("")
         with ui.expansion("Old names of this LoRA (pictures made before a rename)").classes("w-full ls-card"):

@@ -8,11 +8,13 @@ that send an event back here (emitEvent): a tile opens its dataset page, a type 
 Select mode is kept in the browser (picked cards get the class ll-picked) and read when a button needs it.
 """
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 from nicegui import run, ui
 
 import lora_library as LL
+import libsync
+import libcards
 from widgets import note
 
 LIB = LL.LIB
@@ -62,9 +64,9 @@ class Collection:
     def browse_html(self) -> str:
         f = self.f
         if f["look"] == "Pictures":
-            return LL.render_gallery(LIB, f["search"], f["base"], f["sort"], f["only_preview"], f["favorites"])
+            return libcards.render_gallery(LIB, f["search"], f["base"], f["sort"], f["only_preview"], f["favorites"])
         bases = LIB.base_names() + ["Unknown"] if f["base"] in ("", "All") else [f["base"]]
-        return LL.render_library(LIB, f["search"], bases, f["status"], f["group"])
+        return libcards.render_library(LIB, f["search"], bases, f["status"], f["group"])
 
     def redraw(self):
         self.view.content = self.browse_html()
@@ -156,9 +158,9 @@ class Collection:
                 ui.checkbox("Favorites only", on_change=lambda e: self.set(favorites=e.value)).props("dense")
                 with ui.column().classes("gap-1") as self.status_box:
                     ui.label("Status").classes("ls-note")
-                    for s in LL.STATUS_CHOICES:
+                    for s in libcards.STATUS_CHOICES:
                         ui.checkbox(s, value=s in self.f["status"],
-                                    on_change=lambda e, s=s: self.set(status=[x for x in LL.STATUS_CHOICES
+                                    on_change=lambda e, s=s: self.set(status=[x for x in libcards.STATUS_CHOICES
                                                                               if (x == s and e.value) or
                                                                               (x != s and x in self.f["status"])])).props("dense")
                     ui.label("Group by").classes("ls-note mt-2")
@@ -228,7 +230,7 @@ class Collection:
     def on_show(self, **kw):
         async def lm_check():                            # LoRA Manager changes (a preview you set there) come in
             try:
-                n = await run.io_bound(LL.quick_sync, LIB)
+                n = await run.io_bound(libsync.quick_sync, LIB)
             except Exception:                            # noqa: BLE001
                 return
             if n:

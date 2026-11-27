@@ -99,10 +99,10 @@ def continue_items() -> list[dict]:
     """[{"ds", "step", "label"}] of the datasets opened last that still exist."""
     try:
         import dsflow as F
-        import sdgui as S
+        import dsfiles
         labels = {n: lab for n, _, lab in F.STEPS}
         labels.update({10: "Results", 11: "LoRA"})
-        have = set(S.list_lora_dirs())
+        have = set(dsfiles.list_lora_dirs())
     except Exception:                                    # noqa: BLE001
         labels, have = {}, set()
     out = []

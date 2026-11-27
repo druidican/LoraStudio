@@ -18,7 +18,7 @@ model when empty and the clip skip (usage_tips; 1 when nothing says otherwise). 
 sync: LoRA Manager's when LoRA Studio has none, the dataset's trigger word when neither has any.
 """
 from __future__ import annotations
-__version__ = "1.221126"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import copy
 import json
@@ -134,8 +134,8 @@ def _desc(lora) -> str:
     if lora.dataset is None:
         return ""
     try:
-        import dsflow
-        return dsflow.description(lora.dataset.name)
+        import dscaptions
+        return dscaptions.description(lora.dataset.name)
     except Exception:                                  # noqa: BLE001
         return ""
 
@@ -222,6 +222,7 @@ def _folders_now(ds_root: Path) -> list[tuple[str, int, int]]:
 
 def build(lib, lora) -> dict:
     """{field: text} for every field that is known (unknown ones are left out)."""
+    import sd_script
     sg = _sg()
     m = lora.meta or {}
     script, text = find_script(lora)
@@ -247,7 +248,7 @@ def build(lib, lora) -> dict:
     if t:
         c["_tkey"] = t
         try:
-            lab = {k: v for v, k in sg.type_choices()}.get(t, t)
+            lab = {k: v for v, k in sd_script.type_choices()}.get(t, t)
             c["lora_type"] = re.sub(r"\s*\[template\]", "", lab)
         except Exception:                              # noqa: BLE001
             c["lora_type"] = t
@@ -461,7 +462,7 @@ def usage_tips(sc: dict) -> dict:
 
 def scan_one(lib, lora, force=False) -> str:
     """'' when the card was already up to date, else 'scanned' (the dataset copy of the LoRA Manager file is written)."""
-    import lora_library as LL
+    import libsync
     if lora.dataset is None:
         return "no dataset"
     if not force and is_scanned(lora):
@@ -473,7 +474,7 @@ def scan_one(lib, lora, force=False) -> str:
         base["base_model"] = lora.base
     new = apply(base, card, file_sig(lora))
     path = lora.sidecar_path or (lora.dataset.archive_dir / (lora.stem + ".metadata.json"))
-    LL.write_sidecar(path, new)
+    libsync.write_sidecar(path, new)
     lora.sidecar, lora.sidecar_path = new, path
     return "scanned"
 

@@ -17,9 +17,13 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
 - `program/UI/`: the NiceGUI pages (`shell.py` header/tabs/strip/manual, `pg_home.py`, `pg_datasets.py` + `ds_steps.py`
   `ds_train.py` `ds_results.py` `ds_gapfill.py`, `pg_queue.py`, `pg_collection.py` + `lora_page.py`, `pg_settings.py` +
   `set_panels.py`, `setup_page.py`, `login.py`, `widgets.py`, `theme.css`). No logic in them.
-- `program/`: `Data/` (datasets, the nine steps: `dsflow.py`, `datasets_ui.py` (HTML renderers), `captioner.py`, `wdtagger.py`), `Training/` (`sdgui.py` runner/queue, `sd_script.py` launch scripts, `Lora_Datatypes.py`
-  presets per LoRA type, `Training_Recommendations.py` numbers per type and purpose), `Gallery/` (Collection,
-  `lora_library.py`), `Settings/` (`settings_ui.py`, `ghupdate.py` updater), `Other/` (`gpusmi.py`, `lspaths.py` …),
+- `program/`: `Data/` (datasets, the nine steps: `dsflow.py` meta, pins, steps 1 and 8, step states; `dssort.py`
+  steps 3-5; `dsresize.py` step 6; `dscaptions.py` step 7; `dsworn.py` worn items; `dsfiles.py` dataset folders and
+  files; `datasets_ui.py` (HTML renderers), `captioner.py`, `wdtagger.py`), `Training/` (`sdgui.py` one run, script
+  options, monitor; `sdqueue.py` the queue; `sdloss.py` the loss; `sd_script.py` launch scripts, `sd_settings.py`,
+  `Lora_Datatypes.py` presets per LoRA type, `Training_Recommendations.py` numbers per type and purpose), `Gallery/`
+  (Collection: `lora_library.py` data and scan, `libcards.py` HTML + CSS, `libpictures.py` your pictures, `libsync.py`
+  LoRA Manager files), `Settings/` (`settings_ui.py`, `ghupdate.py` updater), `Other/` (`gpusmi.py`, `lspaths.py` …),
   `manual/` (the built-in manual, Markdown + `img/`).
 - `version.py`: VERSION, PARTS (every program file), RELEASE (version of each part), CHANGES (release notes).
 - `selftest.py`: checks that must pass before every release (`python selftest.py`).
@@ -91,7 +95,7 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   ticked ones into the description (undo: *Put them back*). Earlier versions left trait tags out, which hid
   information and errors. A failing WD tagger must always show its error, never "done".
 - **Caption sets:** one per caption style (`IMG.txt`, `IMG.<style>.txt`); every launch script gets
-  `--caption_extension` of its own set (`dsflow.caption_ext`). Anima, FLUX and Chroma read both styles: step 2
+  `--caption_extension` of its own set (`dscaptions.caption_ext`). Anima, FLUX and Chroma read both styles: step 2
   chooses tags / sentences / both, step 9 picks the set per script (`train_style` in the dataset's meta).
   musubi pairs captions by cutting ONE extension (IMG.sentences.txt never matches IMG.png), so musubi scripts link
   the pictures into `cache/<name>/images/<repeat folder>` with the chosen captions as IMG.txt (`CAPTION_EXT`).
@@ -129,8 +133,8 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   It replaced Results' Keep this one / Copy a file (removed).
 - **Fixed features** (1.271126, `Data/fixedfeat.py`, step 2 card `ds_steps.FixedCard`, step 8 `fixed_check_card`):
   your word + wrong words, meta `fixed`; always "part of the trigger": taken out of every caption when written
-  (`dsflow.write_set` / WD write via `FX.strip`, `sd_prepare.oc_preview`), Ollama told (`captioner.PURPOSE["fixed"]`,
-  `dsflow.tell_fixed`); a gender word among them drops the class word (`FX.class_word`). Never suggest features.
+  (`dscaptions.write_set` / WD write via `FX.strip`, `sd_prepare.oc_preview`), Ollama told (`captioner.PURPOSE["fixed"]`,
+  `dscaptions.tell_fixed`); a gender word among them drops the class word (`FX.class_word`). Never suggest features.
 - `tools/make_test_world.py` makes an invented world with a pretend sd-scripts (runs end to end in seconds, writes a
   loss log, so Results and the manual pictures look real).
 - **Class word** (step 2, characters): sentence captions begin "trigger, a <class word>, …" (`captioner.with_class`).
@@ -150,8 +154,8 @@ with kohya-ss **sd-scripts** (SD 1.5, SDXL, Illustrious, Pony, Anima, FLUX, SD3,
   unbuffered (`PYTHONUNBUFFERED`) and each variant's log flushed.
 - **Worn item** purpose (clothes / equipment / jewelry): kinds and places, *Make the words the same*, balance check;
   the sort finds the item with OWLv2 (`pictools.find_items`, kind words), Select adds `closeup_*.png` where it is
-  small (`dsflow.add_closeups`), *Weight per kind* links the pictures into `.lsflow/kinds_view/<rep×w>_<kind>` in the
-  launch script (`dsflow.kinds_block`, plan counts `n_eff`).
+  small (`dsworn.add_closeups`), *Weight per kind* links the pictures into `.lsflow/kinds_view/<rep×w>_<kind>` in the
+  launch script (`dsworn.kinds_block`, plan counts `n_eff`).
 - **Test-picture workflows** per family (`comfytest.FAMILIES`: sdxl, illustrious, pony, noobai, vpred, anima, zimage;
   Illustrious/Pony fall back to the SDXL one; built-ins in `Training/workflows/`, written by `tools/make_workflows.py`).
   NoobAI-XL types `noobai` (EPS) and `noobai_vpred`. The caption consistency check was removed (1.151126h).
@@ -193,16 +197,25 @@ NiceGUI updates only the elements that change, so the old Gradio tricks (joined 
 are gone. Keep it that way: build a step's controls when it is opened, redraw HTML parts only when their HTML changed
 (`set_html` in the pages), and run slow work with `run.io_bound` or `widgets.stream`. `script_type` is cached per file.
 
-## Cleanup (1.261126b)
+## Cleanup (1.261126b, 1.271126b)
 
 Stage 1-3 of the owner's cleanup (2026-11-26): dead code removed (Gradio leftovers, the old caption writer `oc_run`,
-unused constants and imports; the remaining "unused imports" in `sdgui.py` are its re-exports, used as `S.x`), script
-options read and written only through `sdgui.form_value` / `set_arg` / `set_switch` / `drop_arg` / `append_args`
+unused constants and imports), script options read and written only through `sd_script.form_value` /
+`sd_settings.set_arg` / `sdgui.set_switch` / `drop_arg` / `append_args`
 (compare.py and profiles.py had their own regexes), one safetensors header reader (`model_guide.read_header`; the
 copies inside generated bash scripts stay, they run in the trainers' venvs). The `_sg()` helpers differ on purpose
 (some return None when sdgui is not loaded). Measured at the owner's size (80 datasets, 200 LoRAs): start 1.4 s, every
-page under 0.3 s, 0.2 % of a core idle: no speed work needed. Stage 4 (splitting lora_library / sdgui / dsflow) not
-done (owner chose 1-3).
+page under 0.3 s, 0.2 % of a core idle: no speed work needed.
+
+Stage 4 (1.271126b, owner 2026-11-27): lora_library, sdgui and dsflow split by topic (see the file list above) with
+EVERY caller rewritten: no re-exports, a name lives in one module and is used as `<module>.<name>` (sdgui's old
+re-exports of sd_script / sd_prepare / sd_settings are gone too). Done with an AST tool that follows imports, getters
+(`_sg()`, `sg()`, `_F()`, `_LL()` …, also `F.sg()`) and names assigned from them; modules passed as parameters
+(machinecheck's `G`, mobile/statusbar's `sg`) were fixed by hand. Lazy `import x` inside functions where the caller
+used a getter (kept: those files avoid importing sdgui at their top). New modules import their source module as `F` /
+`S` / `LL` at the top; sdgui imports sd_script / sd_prepare / sd_settings / sdqueue after its own names (they import
+sdgui). Check after such work: pyflakes on every file, and that every `<module>.<name>` in the repo exists. The tool:
+`tools/refactor/` (split.py move / unexport, check_attrs.py, cleanup.py; not shipped).
 
 ## Testing
 

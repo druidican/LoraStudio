@@ -113,8 +113,9 @@ def machine_html() -> str:
     return "".join(parts)
 
 
-def _waiting(sg) -> int:
-    return sum(1 for i in sg.QUEUE["items"] if i["state"] == "queued")
+def _waiting() -> int:
+    import sdqueue
+    return sum(1 for i in sdqueue.QUEUE["items"] if i["state"] == "queued")
 
 
 def run_html() -> tuple[str, str]:
@@ -131,13 +132,13 @@ def run_html() -> tuple[str, str]:
         loss = f" · loss {run.loss[-1][1]:.3f}" if run.loss else ""
         left = f" · {eta.group(1)} left" if eta else ""
         nan = " · ⚠ loss is NaN" if run.nan_at else ""
-        waiting = _waiting(sg)
+        waiting = _waiting()
         more = f" · {waiting} more in the queue" if waiting else ""
         return f"● Training {html.escape(run.name)}{step}{loss}{left}{nan}{more}", "run"
     ct = sys.modules.get("comfytest")
     pics = ct.now_text() if ct is not None else ""
     if pics:
-        waiting = _waiting(sg)
+        waiting = _waiting()
         more = f" · then {waiting} more in the queue" if waiting else ""
         return f"🖼 {html.escape(pics)}{more}", "run"
     sj = sys.modules.get("speedjobs")                    # Settings › Speed test
@@ -159,7 +160,7 @@ def run_html() -> tuple[str, str]:
                         + " → Review and export")
         else:
             bits.append(f"✕ {html.escape(ev['name'])} failed {when}" + (f": {html.escape(ev['advice'])}" if ev.get("advice") else ""))
-    waiting = _waiting(sg)
+    waiting = _waiting()
     bits.append(f"queue: {waiting} waiting" if waiting else "queue empty")
     return ("○ Idle · " if state == "idle" else "") + " · ".join(bits), state
 

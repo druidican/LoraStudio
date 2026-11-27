@@ -18,10 +18,11 @@ def _sg():
     return sys.modules.get("sdgui")
 
 
-def _queue(sg) -> dict:
-    items = list(sg.QUEUE["items"])
+def _queue() -> dict:
+    import sdqueue
+    items = list(sdqueue.QUEUE["items"])
     waiting = [i for i in items if i.get("state") == "queued"]
-    return {"waiting": len(waiting), "running": bool(sg.QUEUE["running"]), "stop_after": bool(sg.QUEUE["stop_flag"]),
+    return {"waiting": len(waiting), "running": bool(sdqueue.QUEUE["running"]), "stop_after": bool(sdqueue.QUEUE["stop_flag"]),
             "next": [Path(i["path"]).stem for i in waiting[:6]]}
 
 
@@ -55,7 +56,7 @@ def status() -> dict:
     if sg is None:
         return out
     run = sg.RUN
-    out["queue"] = _queue(sg)
+    out["queue"] = _queue()
     ct = sys.modules.get("comfytest")
     out["pics"] = ct.now_text() if ct is not None else ""
     if run.running():
@@ -129,22 +130,24 @@ def stop_now() -> str:
 
 
 def stop_after() -> str:
+    import sdqueue
     sg = _sg()
-    if sg is None or not sg.QUEUE["running"]:
+    if sg is None or not sdqueue.QUEUE["running"]:
         return "The queue is not running."
-    sg.queue_stop_after_current()
+    sdqueue.queue_stop_after_current()
     return "The queue stops after the current run."
 
 
 def start_queue() -> str:
+    import sdqueue
     sg = _sg()
     if sg is None:
         return "Not ready."
-    if sg.QUEUE["running"] or sg.RUN.running():
+    if sdqueue.QUEUE["running"] or sg.RUN.running():
         return "Something is running already."
-    if not any(i["state"] == "queued" for i in sg.QUEUE["items"]):
+    if not any(i["state"] == "queued" for i in sdqueue.QUEUE["items"]):
         return "No waiting items in the queue."
-    sg.queue_start(sg.QUEUE.get("stop_on_fail", True))
+    sdqueue.queue_start(sdqueue.QUEUE.get("stop_on_fail", True))
     return "The queue is started."
 
 

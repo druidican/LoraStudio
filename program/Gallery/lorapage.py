@@ -5,7 +5,7 @@ fields, Completed, accepting warnings, copying to the LoRA folder, reading the t
 (head, training card, versions, picture grid) come from lora_library.
 """
 from __future__ import annotations
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import copy
 import json
@@ -15,6 +15,10 @@ import re
 from pathlib import Path
 
 import lora_library as LL
+import libsync
+import libpictures
+import libcards
+import picgallery
 
 LIB = LL.LIB
 
@@ -40,7 +44,7 @@ def details(key: str) -> dict | None:
             TC.scan_one(LIB, lora)
         except Exception as e:                   # noqa: BLE001
             print(f"[LoRA page] training card of {lora.stem}: {e!r}")
-    head, settings = LL.details_html(LIB, lora)
+    head, settings = libcards.details_html(LIB, lora)
     tips = LL.usage_tips(lora)
     level, _ = lora.nsfw_level()
     ov = LIB.overrides(lora.key)
@@ -89,7 +93,7 @@ def details(key: str) -> dict | None:
     return {
         "lora": lora, "key": lora.key, "gid": lora.gid, "preview": lora.preview, "blur": bool(LIB.blur(lora)),
         "examples": list(lora.examples[:40]), "head": head, "settings": settings, "loss": pts,
-        "versions": [(label, k) for label, k in LL.version_choices(lora)], "versions_html": LL.versions_html(lora),
+        "versions": [(label, k) for label, k in libcards.version_choices(lora)], "versions_html": libcards.versions_html(lora),
         "types": siblings(lora), "title": lora.character or lora.display_name, "subtitle": lora.display_name,
         "done": done, "look": TC.stored(lora.sidecar).get("look") or "",
         "edit": {"name": lora.display_name, "character": char, "trigger": trig,
@@ -120,7 +124,7 @@ def save_edits(key: str, e: dict) -> str:
     lora = LIB.loras.get(key)
     if not lora:
         return "Open a LoRA first."
-    data = copy.deepcopy(lora.sidecar) if lora.sidecar else LL.new_sidecar(LIB, lora)
+    data = copy.deepcopy(lora.sidecar) if lora.sidecar else libsync.new_sidecar(LIB, lora)
     data["model_name"] = (e.get("name") or lora.stem).strip()
     civ = data.get("civitai") or {}
     data["civitai"] = civ
@@ -141,7 +145,7 @@ def save_edits(key: str, e: dict) -> str:
     target = lora.sidecar_path        # <dataset>/LoraManager/<model file>.metadata.json (the LoRA folder is untouched)
     if target is None:
         return "No place to save: this LoRA has no dataset."
-    LL.write_sidecar(target, data)
+    libsync.write_sidecar(target, data)
     ov = LIB.overrides(key)
     char = (e.get("character") or "").strip()
     if char and char != lora.character:
@@ -243,9 +247,9 @@ def picture_folder_note(gid: str) -> tuple[str, str]:
     base = n.base if n else ""
     if not base:
         return "", ""
-    folder, how = LL.picture_folder(base)
+    folder, how = libpictures.picture_folder(base)
     if folder:
-        done = LL.PG.index()["folders"].get(str(Path(folder).resolve()))
+        done = picgallery.index()["folders"].get(str(Path(folder).resolve()))
         when = (f" Last scanned {done['scanned']} ({done['pictures']} pictures)." if done
                 else " Not scanned yet: press Scan for new pictures.")
         return folder, f"{base} pictures: {how}.{when}"
@@ -264,13 +268,13 @@ def scan_pictures(gid: str, folder: str) -> tuple[str, str]:
         return f"Where does ComfyUI save your {base} pictures? Enter the folder, then press the button again.", folder
     if not Path(folder).is_dir():
         return f"❌ The folder {folder} does not exist.", folder
-    auto, _ = LL.picture_folder(base)
+    auto, _ = libpictures.picture_folder(base)
     saved = ""
     if not auto or Path(auto).resolve() != Path(folder).resolve():
         LL.set_picture_dir(base, folder)
         LIB.settings["picture_dirs"] = LL.load_settings().get("picture_dirs") or {}
         saved = f" The folder is remembered for {base}."
-    st = LL.PG.scan(folder, None)
+    st = picgallery.scan(folder, None)
     if st["stopped"]:
         return (f"⏸ Stopped after {st['seconds']} s: {st['read']} pictures read and kept. Scan again to continue.{saved}",
                 folder)
@@ -291,7 +295,7 @@ def scan_all_pictures() -> str:
                 "press Scan for new pictures.")
     lines, total = [], 0
     for r in keep:
-        st = LL.PG.scan(r, None)
+        st = picgallery.scan(r, None)
         if st["stopped"]:
             lines.append(f"{r}: stopped, {st['read']} read so far (press again to continue)")
             break
@@ -302,8 +306,8 @@ def scan_all_pictures() -> str:
 
 def old_names(gid: str) -> tuple[list[tuple[str, str]], list[str]]:
     """(suggestions [(label, name)], linked names)."""
-    ch = LL.alias_suggestions(gid) if gid in LIB.groups else []
-    linked = set(LL.picture_aliases(gid))
+    ch = libpictures.alias_suggestions(gid) if gid in LIB.groups else []
+    linked = set(libpictures.picture_aliases(gid))
     return ch, [n for _, n in ch if n in linked]
 
 
@@ -311,8 +315,8 @@ def save_old_names(gid: str, picked: list, typed: str) -> str:
     if gid not in LIB.groups:
         return "Open a LoRA first."
     names = list(picked or []) + [t for t in re.split(r"[,\n]", typed or "") if t.strip()]
-    LL.set_picture_aliases(gid, names)
-    n = len(LL.picture_aliases(gid))
+    libpictures.set_picture_aliases(gid, names)
+    n = len(libpictures.picture_aliases(gid))
     return f"✔ {n} old name{'s' if n != 1 else ''} linked to this LoRA." if n else "No old names linked."
 
 
@@ -340,7 +344,7 @@ def write_card(final: Path, preview: Path | None, note: str = "") -> str:
     lo = _lora_of(final) if final.is_file() else None
     if lo is None or lo.sidecar_path is None:
         return ""
-    data = copy.deepcopy(lo.sidecar) if lo.sidecar else LL.new_sidecar(LIB, lo)
+    data = copy.deepcopy(lo.sidecar) if lo.sidecar else libsync.new_sidecar(LIB, lo)
     st = final.stat()
     LIB.hash_cache.pop(str(final), None)
     data.update({"file_name": lo.stem, "file_path": str(final), "size": st.st_size, "modified": st.st_mtime,
@@ -362,7 +366,7 @@ def write_card(final: Path, preview: Path | None, note: str = "") -> str:
         prev.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(preview, prev)
         data["preview_url"] = str(prev)
-    LL.write_sidecar(lo.sidecar_path, data)
+    libsync.write_sidecar(lo.sidecar_path, data)
     LIB.save_hash_cache()
     lo.sidecar = data
     if data.get("preview_url"):

@@ -24,7 +24,8 @@ class Home:
     # ------------------------------------------------------------------ Training now
     def training(self):
         import sdgui as S
-        waiting = sum(1 for i in S.QUEUE["items"] if i["state"] == "queued")
+        import sdqueue
+        waiting = sum(1 for i in sdqueue.QUEUE["items"] if i["state"] == "queued")
         if S.RUN.running():
             return f"● {S.RUN.name or 'training'}", S.progress_text(), f"{waiting} more waiting in the queue"
         return "Nothing is training", (f"{waiting} waiting in the queue." if waiting else "The queue is empty."), ""

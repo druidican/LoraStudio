@@ -17,6 +17,8 @@ from pathlib import Path
 
 import notify
 import sdgui as S
+import dsfiles
+import sd_script
 
 
 # --------------------------------------------------------------------------- Hugging Face token
@@ -109,8 +111,8 @@ def scrub_all_scripts() -> int:
     """Takes the token out of every saved launch script of every dataset (also archived and compare ones). Returns
     how many scripts held one."""
     n = 0
-    for ds in S.list_lora_dirs():
-        root = S.lora_path(ds)
+    for ds in dsfiles.list_lora_dirs():
+        root = dsfiles.lora_path(ds)
         for f in list(root.glob("*.sh")) + list(root.glob("*/*.sh")) + list(root.glob("*/*/*.sh")):
             try:
                 t = f.read_text(encoding="utf-8", errors="ignore")
@@ -131,11 +133,11 @@ def base_name(name: str) -> str:
 
 
 def folder_rows(ds):
-    return [(f, r, len(S.list_images(f))) for f, r in S.repeat_folders(S.lora_path(ds))]
+    return [(f, r, len(dsfiles.list_images(f))) for f, r in dsfiles.repeat_folders(dsfiles.lora_path(ds))]
 
 
 def rp_choices(ds):
-    lora, out = S.lora_path(ds), []
+    lora, out = dsfiles.lora_path(ds), []
     for f, r, n in folder_rows(ds):
         if f == lora:
             label = f"(images directly in {lora.name}/)  {n} images, no repeat folder"
@@ -148,7 +150,7 @@ def rp_choices(ds):
 def rp_new_name(ds, folder, repeats):
     if not ds or not folder:
         return ""
-    lora, f = S.lora_path(ds), Path(folder)
+    lora, f = dsfiles.lora_path(ds), Path(folder)
     base = lora.name.lower() if f == lora else base_name(f.name)
     try:
         r = int(repeats)
@@ -158,7 +160,7 @@ def rp_new_name(ds, folder, repeats):
 
 
 def rp_refresh(ds, tkey, steps_over):
-    if not ds or not S.lora_path(ds).is_dir():
+    if not ds or not dsfiles.lora_path(ds).is_dir():
         return {"choices": [], "folder": None, "repeats": 0, "newname": "", "info": ""}
     rows = folder_rows(ds)
     if not rows:
@@ -166,9 +168,9 @@ def rp_refresh(ds, tkey, steps_over):
     n_total = sum(n for _, _, n in rows)
     rec, label = None, tkey
     try:
-        sc, presets = S.merged_presets()
+        sc, presets = sd_script.merged_presets()
         cfg = dict(presets[tkey])
-        so = S._num(steps_over)
+        so = sd_script._num(steps_over)
         if so:
             cfg["steps"] = so
         label = cfg["label"]
@@ -183,7 +185,7 @@ def rp_refresh(ds, tkey, steps_over):
     if pick is None:
         pick = rows[0][0]
     repeats = rec or next((r for f, r, n in rows if f == pick and r), 0)
-    lora = S.lora_path(ds)
+    lora = dsfiles.lora_path(ds)
     lines = [f"Recommended repeats for {label} with {n_total} images: **{rec}**." if rec else f"{n_total} images."]
     for f, r, n in rows:
         nm = "(LoRA folder itself)" if f == lora else f"`{f.relative_to(lora)}`"
@@ -199,7 +201,7 @@ def rp_rename(ds, folder, newname, move_ok):
     if not ds or not folder:
         notify.warning("Pick a folder first.")
         return "Pick a folder first.", keep
-    lora, f, name = S.lora_path(ds), Path(folder), (newname or "").strip()
+    lora, f, name = dsfiles.lora_path(ds), Path(folder), (newname or "").strip()
     if not re.fullmatch(r"\d+_[^/\\\x00]+", name):
         notify.warning("The name must look like 4_name (a repeat count, an underscore, then a name).")
         return "The name must look like `4_name`.", keep
@@ -213,7 +215,7 @@ def rp_rename(ds, folder, newname, move_ok):
             return f"`{name}` already exists.", keep
         dest.mkdir()
         moved = 0
-        for im in S.list_images(lora):
+        for im in dsfiles.list_images(lora):
             for src in [im] + [im.with_name(im.stem + e) for e in S.CAPTION_EXTS]:
                 if src.is_file():
                     shutil.move(str(src), str(dest / src.name))
@@ -235,7 +237,7 @@ def rp_make(ds, tkey, text, plan):
     if not ds:
         notify.warning("Pick a LoRA folder first.")
         return "Pick a LoRA folder first."
-    notes = S.ensure_folders(ds, text or "", plan, tkey)
+    notes = sd_script.ensure_folders(ds, text or "", plan, tkey)
     notify.info("Folders checked.")
     return ("Done: " + "; ".join(notes) + ".") if notes else "Nothing to create: the repeat folder, `model` and `log` already exist."
 
@@ -243,11 +245,11 @@ def rp_make(ds, tkey, text, plan):
 def cs_set_epochs(ds, tkey, script, text, plan, steps_over):
     """Set epochs so the run lands on the target step count with the script's batch/accum and the folder's repeats."""
     try:
-        _, presets = S.merged_presets()
+        _, presets = sd_script.merged_presets()
         cfg = dict(presets[tkey])
-        steps = S._num(steps_over) or cfg["steps"]
-        stats = S.dataset_stats(ds)
-        f = S.form_dict(text or "")
+        steps = sd_script._num(steps_over) or cfg["steps"]
+        stats = sd_script.dataset_stats(ds)
+        f = sd_script.form_dict(text or "")
         bs = max(1, int(float(f.get("train_batch_size") or 1)))
         ga = max(1, int(float(f.get("gradient_accumulation_steps") or 1)))
         reps = (plan or {}).get("repeats") or [r["repeats"] for r in stats["rows"]]
@@ -256,11 +258,11 @@ def cs_set_epochs(ds, tkey, script, text, plan, steps_over):
         ep = max(1, round(steps / spe))
     except Exception as e:
         notify.warning(f"Could not calculate epochs: {e}")
-        return S._cs_result(status=f"Could not calculate epochs: {e}", plan=plan)
-    vals = [""] * len(S.FORM_FIELDS)
-    vals[[n for n, _ in S.FORM_FIELDS].index("max_train_epochs")] = str(ep)
-    new, _, _ = S.apply_form(text or "", vals)
-    return S._cs_result(text=new, fields=S.read_form(new), explain=S.explain_for(ds, tkey, script, new, plan),
+        return sd_script._cs_result(status=f"Could not calculate epochs: {e}", plan=plan)
+    vals = [""] * len(sd_script.FORM_FIELDS)
+    vals[[n for n, _ in sd_script.FORM_FIELDS].index("max_train_epochs")] = str(ep)
+    new, _, _ = sd_script.apply_form(text or "", vals)
+    return sd_script._cs_result(text=new, fields=sd_script.read_form(new), explain=sd_script.explain_for(ds, tkey, script, new, plan),
                       status=f"Epochs set to {ep}: {spe} steps/epoch × {ep} = ~{spe * ep} steps (target {steps}). Not saved yet.",
                       plan=plan)
 
@@ -336,11 +338,11 @@ def write_settings(data: dict):
 
 def settings_models(tkey) -> dict:
     """{flag_without_dashes: path} saved for a LoRA type (used for new launch scripts)."""
-    return {k: v for k, v in read_settings().get(tkey, {}).items() if v and not k.endswith(".dir") and k not in S.META_KEYS}
+    return {k: v for k, v in read_settings().get(tkey, {}).items() if v and not k.endswith(".dir") and k not in sd_script.META_KEYS}
 
 
 def type_slots(tkey):
-    _, presets = S.merged_presets()
+    _, presets = sd_script.merged_presets()
     cfg = presets.get(tkey) or {}
     slots = [(f.lstrip("-"), path) for f, path in cfg.get("model_args", [])]
     if vae_optional(tkey, presets) and not any(k in ("vae", "ae") for k, _ in slots):
@@ -389,7 +391,7 @@ def _slot_dir(path, saved_dir):
 
 
 def _type_base(tkey):
-    _, presets = S.merged_presets()
+    _, presets = sd_script.merged_presets()
     return (presets.get(tkey) or {}).get("base", "")
 
 
@@ -462,7 +464,7 @@ def st_save(tkey, flags, *args):
         ok = bool(f) and Path(os.path.expanduser(f)).is_file()
         rows.append(f"| {slot_label(key)} | `{f or '(not set: the preset default is used)'}` | "
                     + ("found" if ok else ("**file not found**" if f else "")) + " |")
-    meta = S.custom_subtypes().get(tkey)
+    meta = sd_script.custom_subtypes().get(tkey)
     if meta:                                          # keep (and make explicit) what defines a subtype
         sec = {"base": meta["base"], "label": meta["label"], "tag": meta["tag"], **sec}
     data[tkey] = sec
@@ -479,19 +481,19 @@ def st_save(tkey, flags, *args):
 
 # ---- LoRA subtypes (e.g. Pony or another SDXL / Anima variant), stored as their own section in settings.txt
 def sub_list_md() -> str:
-    subs = S.custom_subtypes()
+    subs = sd_script.custom_subtypes()
     if not subs:
         return ("No subtypes yet. **Illustrious** is already built in. Add others (for example Pony) below, "
                 "or write a section like `[pony]` with `base = sdxl` in settings.txt.")
     rows = ["| Name | Based on | File tag | Section |", "|---|---|---|---|"]
     for k, c in subs.items():
-        rows.append(f"| {c['label']} | {S.SUBTYPE_BASES[c['base']]} | `{c['tag']}` | `[{SECTION_NAMES.get(k, k)}]`"
+        rows.append(f"| {c['label']} | {sd_script.SUBTYPE_BASES[c['base']]} | `{c['tag']}` | `[{SECTION_NAMES.get(k, k)}]`"
                     + ("" if c["explicit"] else " (found in settings.txt, base guessed from its keys)") + " |")
     return "\n".join(rows)
 
 
 def sub_choices():
-    return [(f"{c['label']} ({S.SUBTYPE_BASES[c['base']]})", k) for k, c in S.custom_subtypes().items()]
+    return [(f"{c['label']} ({sd_script.SUBTYPE_BASES[c['base']]})", k) for k, c in sd_script.custom_subtypes().items()]
 
 
 def sub_add(name, base, tag):
@@ -500,14 +502,14 @@ def sub_add(name, base, tag):
     if not key:
         notify.warning("Give the subtype a name, for example Pony.")
         return "Give the subtype a name, for example **Pony**."
-    _, builtin = S.builtin_presets()
-    if key in S.RESERVED_TYPES or key in builtin:
+    _, builtin = sd_script.builtin_presets()
+    if key in sd_script.RESERVED_TYPES or key in builtin:
         notify.warning(f"'{name}' is already a built-in type.")
         return f"`{key}` is already a built-in type, so it cannot be added again. Pick it in the LoRA type list below."
-    if key in S.custom_subtypes():
+    if key in sd_script.custom_subtypes():
         notify.warning(f"The subtype '{name}' already exists.")
         return f"The subtype `{key}` already exists. Pick it in the LoRA type list below."
-    if base not in S.SUBTYPE_BASES:
+    if base not in sd_script.SUBTYPE_BASES:
         notify.warning("Pick SDXL or Anima as the base.")
         return "Pick SDXL or Anima as the base."
     tag = re.sub(r"[^A-Za-z0-9]", "", tag or "") or re.sub(r"[^A-Za-z0-9]", "", name).upper()
@@ -519,7 +521,7 @@ def sub_add(name, base, tag):
     except OSError as e:
         return f"Could not write `{settings_path()}`: {e}"
     notify.info(f"Subtype {name} added")
-    return (f"Added **{name}** (based on {S.SUBTYPE_BASES[base]}, file tag `{tag}`). It is now in the LoRA type "
+    return (f"Added **{name}** (based on {sd_script.SUBTYPE_BASES[base]}, file tag `{tag}`). It is now in the LoRA type "
             f"lists. Choose its model files below and press **Save to settings.txt**.")
 
 
@@ -531,7 +533,7 @@ def sub_remove(key, confirm):
         notify.warning("Tick the confirmation box first.")
         return "Tick the confirmation box first."
     data = read_settings()
-    if key not in S.custom_subtypes() or key not in data:
+    if key not in sd_script.custom_subtypes() or key not in data:
         return "That subtype does not exist any more."
     del data[key]
     try:
@@ -727,7 +729,7 @@ def env_update_scripts(confirm):
 
 def set_arg(text: str, name: str, value: str):
     """Set --name to value in the script text. Returns (text, changed, ok)."""
-    m = S._arg_re(name).search(text)
+    m = sd_script._arg_re(name).search(text)
     if m:
         old = m.group(2)
         q = old[0] if old[0] in "\"'" else ""
@@ -745,7 +747,7 @@ def cs_use_settings(ds, tkey, script, text, plan):
     ov = settings_models(tkey)
     if not ov and not env_saved():
         notify.warning("No saved model files for this LoRA type: set them in Settings › Model files first.")
-        return S._cs_result(status="No saved model files for this LoRA type: set them in the **Settings** tab first.", plan=plan)
+        return sd_script._cs_result(status="No saved model files for this LoRA type: set them in the **Settings** tab first.", plan=plan)
     new, changed, failed = text or "", [], []
     for key, val in ov.items():
         new, ch, ok = set_arg(new, key, val)
@@ -761,4 +763,4 @@ def cs_use_settings(ds, tkey, script, text, plan):
            if changed else "The script already uses the model files from settings.txt.")
     if failed:
         msg += f" No training command found to add: {', '.join(failed)}."
-    return S._cs_result(text=new, fields=S.read_form(new), explain=S.explain_for(ds, tkey, script, new, plan), status=msg, plan=plan)
+    return sd_script._cs_result(text=new, fields=sd_script.read_form(new), explain=sd_script.explain_for(ds, tkey, script, new, plan), status=msg, plan=plan)

@@ -15,7 +15,7 @@
 It judges how well a picture shows things (visible, sharp, big enough, which angle), never whose face it is.
 """
 from __future__ import annotations
-__version__ = "1.151126j"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import json
 import re
@@ -27,6 +27,7 @@ from PIL import Image, ImageOps
 
 import datacheck as DC
 import dsflow as F
+import dssort
 
 DIMS = {"framing": ("Framing", ["close-up", "upper body", "full body"]),
         "angle": ("Angle", ["front", "three-quarter", "side", "back"]),
@@ -89,7 +90,7 @@ def ask(url: str, model: str, img: Path, timeout: float = 600.0) -> dict:
 def parse(d: dict, W: int, H: int, w: int, h: int) -> dict:
     """The scan's answer from the model's JSON (boxes from the sent w×h copy to the picture's W×H)."""
     sx, sy = W / w, H / h
-    out = {k: F._norm(d.get(k)) for k in ("angle", "pose", "expression", "lighting")}
+    out = {k: dssort._norm(d.get(k)) for k in ("angle", "pose", "expression", "lighting")}
     for k in ("face_box", "detail_box"):
         b = DC._box(d.get(k), w, h)
         out[k] = [round(b[0] * sx), round(b[1] * sy), round(b[2] * sx), round(b[3] * sy)] if b else None
@@ -206,7 +207,7 @@ def active(ds) -> tuple[dict, list[str], dict, int]:
     by = {}
     for k, v in cache.items():
         by.setdefault(k.rsplit("|", 1)[0], v)            # name|size|mtime (any model)
-    act, _ = F.active_sort(ds)
+    act, _ = dssort.active_sort(ds)
     pins = F.pins(ds)
     entries = []
     for p, e in act.items():
@@ -228,13 +229,14 @@ def active(ds) -> tuple[dict, list[str], dict, int]:
 
 def run(ds, url: str | None = None, model: str | None = None):
     """Generator: progress lines, then 'done'. Needs the sort result (step 4) and Ollama."""
+    import sd_prepare
     S = F.sg()
-    sr = F.sort_result(ds)
+    sr = dssort.sort_result(ds)
     if not sr or not sr.get("pics"):
         yield "The detailed scan needs the sort first."
         return
-    url = (url or "").strip() or S.oc_settings()[0]
-    model = model or S.oc_settings()[1]
+    url = (url or "").strip() or sd_prepare.oc_settings()[0]
+    model = model or sd_prepare.oc_settings()[1]
     m = F.meta(ds)
     need = F.min_side(m["types"]) or 896                  # smaller than this is too small for the LoRA type
     side = 512 if need < 600 else 1024                     # what an upscale aims at: the size the type trains at

@@ -10,6 +10,7 @@ from nicegui import ui
 
 import features as FT
 import sdgui as sg
+import dsfiles
 import training_ui as T
 from widgets import note
 
@@ -123,14 +124,14 @@ class Results:
 
     def new_version(self):
         ds = T.dataset_of_log(self.st.get("log", "")) if self.st else ""
-        self.page.go(view="flow", mode="edit", ds=ds if ds in sg.list_lora_dirs() else self.ds, step=9)
+        self.page.go(view="flow", mode="edit", ds=ds if ds in dsfiles.list_lora_dirs() else self.ds, step=9)
 
     # ------------------------------------------------------------------ build
     def build(self):
         ui.label("Results: the runs of this dataset").classes("text-lg font-semibold")
         with ui.column().classes("w-full gap-2") as self.list_col:
             with ui.row().classes("w-full items-end gap-3"):
-                ch = ["All"] + sg.list_lora_dirs()
+                ch = ["All"] + dsfiles.list_lora_dirs()
                 self.f_ds = ui.select(ch, value=self.ds if self.ds in ch else "All", label="Runs of",
                                       on_change=lambda: self.draw_list()).props("outlined dense").classes("w-56")
                 self.f_res = ui.toggle(["All", "Done", "Failed", "Stopped"], value="All",

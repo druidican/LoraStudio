@@ -8,7 +8,7 @@ Results  every finished run from the run logs, newest first. Opening one shows t
          its log. TensorBoard is tucked away in a fold-out there.
 """
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import hashlib
 import html
@@ -22,6 +22,8 @@ from pathlib import Path
 
 
 import sdgui as sg
+import sdqueue
+import sd_script
 import features as FT
 
 REG: dict = {}             # short key -> {"path", "state"} for the buttons in the script list
@@ -40,7 +42,7 @@ def _esc(s) -> str:
 def type_label(tkey: str) -> str:
     if not TYPE_LABEL:
         try:
-            TYPE_LABEL.update({v: re.sub(r"\s*[\(\[].*?[\)\]]", "", l).strip() for l, v in sg.type_choices()})
+            TYPE_LABEL.update({v: re.sub(r"\s*[\(\[].*?[\)\]]", "", l).strip() for l, v in sd_script.type_choices()})
         except Exception:                                # noqa: BLE001
             pass
     return TYPE_LABEL.get(tkey, tkey or "unknown type")
@@ -71,7 +73,7 @@ def _script_info(path: str) -> dict:
         text = p.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         text = ""
-    home = sg.script_home(p)
+    home = sd_script.script_home(p)
     out_dir, out_name = sg.script_args(text, home)
     tkey = sg.script_type(path, text)
     m = re.search(r"[vV](\d{1,3})$", out_name or "")
@@ -104,7 +106,7 @@ def _log_script(logfile: Path) -> str:
         with open(logfile, encoding="utf-8", errors="replace") as fh:
             first = fh.readline()
         if first.startswith("##LS_SCRIPT "):
-            return sg.find_script(first[len("##LS_SCRIPT "):].strip())
+            return sd_script.find_script(first[len("##LS_SCRIPT "):].strip())
     except OSError:
         pass
     m = sg.RUN_LOG_RE.match(logfile.name)
@@ -234,8 +236,8 @@ def scripts_html(show_done: bool = False) -> str:
     last = {}
     for r in hist:
         last.setdefault(r["script"], r)
-    with sg.QLOCK:
-        queued = {i["path"] for i in sg.QUEUE["items"] if i["state"] in ("queued", "running")}
+    with sdqueue.QLOCK:
+        queued = {i["path"] for i in sdqueue.QUEUE["items"] if i["state"] in ("queued", "running")}
     done_data = sg.COMPLETED.load() if sg.COMPLETED else {}
     rows, hidden = [], 0
     REG.clear()
@@ -299,9 +301,9 @@ def scripts_html(show_done: bool = False) -> str:
 
 
 def queue_html() -> str:
-    with sg.QLOCK:
-        items = [dict(i) for i in sg.QUEUE["items"]]
-        running_q = sg.QUEUE["running"]
+    with sdqueue.QLOCK:
+        items = [dict(i) for i in sdqueue.QUEUE["items"]]
+        running_q = sdqueue.QUEUE["running"]
     hist = runs()
     waiting = [i for i in items if i["state"] == "queued"]
     total = sum(estimate(i["path"], hist) for i in waiting)
@@ -345,8 +347,8 @@ def tr_action(v, show_done):
         elif not FT.can_train_text(script_info(it["path"]).get("text", "")):
             msg = "Its trainer is not installed here (Settings › Start and network › What is installed)."
         else:
-            with sg.QLOCK:
-                sg.QUEUE["items"].append({"path": it["path"], "resume": it["state"], "state": "queued", "note": ""})
+            with sdqueue.QLOCK:
+                sdqueue.QUEUE["items"].append({"path": it["path"], "resume": it["state"], "state": "queued", "note": ""})
             msg = f"Added {run_name(script_info(it['path']))}" + (" (resume)" if it["state"] else "") + " to the queue."
     elif act == "mark":
         it = REG.get(arg)
@@ -364,8 +366,8 @@ def tr_action(v, show_done):
             i = int(arg)
         except ValueError:
             i = -1
-        with sg.QLOCK:
-            items = sg.QUEUE["items"]
+        with sdqueue.QLOCK:
+            items = sdqueue.QUEUE["items"]
             if 0 <= i < len(items):
                 if act == "rm":
                     if items[i]["state"] == "running":
@@ -386,14 +388,14 @@ def add_many(keys_json, show_done):
     except ValueError:
         keys = []
     added, skipped = [], 0
-    with sg.QLOCK:
-        queued = {i["path"] for i in sg.QUEUE["items"] if i["state"] in ("queued", "running")}
+    with sdqueue.QLOCK:
+        queued = {i["path"] for i in sdqueue.QUEUE["items"] if i["state"] in ("queued", "running")}
         for k in keys:
             it = REG.get(k)
             if not it or it["path"] in queued:
                 skipped += 1
                 continue
-            sg.QUEUE["items"].append({"path": it["path"], "resume": "", "state": "queued", "note": ""})
+            sdqueue.QUEUE["items"].append({"path": it["path"], "resume": "", "state": "queued", "note": ""})
             queued.add(it["path"])
             added.append(it["path"])
     if not keys:
@@ -405,14 +407,14 @@ def add_many(keys_json, show_done):
 
 
 def clear_queue(finished_only: bool):
-    with sg.QLOCK:
-        sg.QUEUE["items"] = [i for i in sg.QUEUE["items"]
+    with sdqueue.QLOCK:
+        sdqueue.QUEUE["items"] = [i for i in sdqueue.QUEUE["items"]
                              if i["state"] == "running" or (finished_only and i["state"] == "queued")]
     return queue_html()
 
 
 def start_queue(stop_on_fail):
-    sg.queue_start(stop_on_fail)
+    sdqueue.queue_start(stop_on_fail)
     return queue_html()
 
 
@@ -445,8 +447,8 @@ def savepoints_html() -> str:
     eps.sort()
     total = run.epochs_total or None
     chips = "".join(f'<span class="ls-chip ok">epoch {e}</span>' for e in eps) or '<span class="tr-muted">none yet</span>'
-    with sg.QLOCK:
-        nxt = next((i for i in sg.QUEUE["items"] if i["state"] == "queued"), None)
+    with sdqueue.QLOCK:
+        nxt = next((i for i in sdqueue.QUEUE["items"] if i["state"] == "queued"), None)
     nxt_html = ""
     if nxt:
         ni = script_info(nxt["path"])
@@ -654,7 +656,7 @@ def open_run(logname: str):
         def arg(n):
             return sg.script_arg(t, n, base) or "?"
         try:
-            st = sg.dataset_stats(info["dataset"])
+            st = sd_script.dataset_stats(info["dataset"])
             pics = " + ".join(f'{x["n"]} × {x["repeats"]}' for x in st["rows"]) or "?"
         except Exception:                                # noqa: BLE001
             pics = "?"
@@ -679,7 +681,7 @@ def open_run(logname: str):
 # --------------------------------------------------------------------------- LoRA Manager data (.metadata.json)
 def _training_facts(script: str) -> dict:
     info = script_info(script)
-    text, home = info["text"], sg.script_home(script)
+    text, home = info["text"], sd_script.script_home(script)
     arg = lambda n: sg.script_arg(text, n, home) or ""
     try:
         import dsflow
@@ -687,7 +689,7 @@ def _training_facts(script: str) -> dict:
     except Exception:                                    # noqa: BLE001
         m = {}
     try:
-        stats = sg.dataset_stats(info["dataset"])
+        stats = sd_script.dataset_stats(info["dataset"])
         pics, reps = stats["total"], "/".join(str(r["repeats"]) for r in stats["rows"])
     except Exception:                                    # noqa: BLE001
         pics, reps = 0, ""
@@ -700,9 +702,10 @@ def _training_facts(script: str) -> dict:
 def _sidecar(lora_file: Path, script: str, epoch: int | None) -> dict:
     """LoRA Manager data for a LoRA LoRA Studio trained: trigger word, base model and the training in the notes."""
     import lora_library as ll
+    import libsync
     f = _training_facts(script)
     info = f["info"]
-    data = ll.new_sidecar(ll.LIB, type("L", (), {"stem": lora_file.stem, "path": lora_file, "preview": None,
+    data = libsync.new_sidecar(ll.LIB, type("L", (), {"stem": lora_file.stem, "path": lora_file, "preview": None,
                                                   "base": "Unknown"})())
     try:
         data["base_model"] = ll.detect_base(ll.read_safetensors_meta(lora_file), None, lora_file, ll.LIB.settings["bases"])
@@ -729,11 +732,12 @@ def sidecar_after_run(script: str):
     if not info["out_name"] or not final.is_file():
         return
     import lora_library as ll
-    arch = sg.script_home(script) / ll.ARCHIVE_DIR
+    import libsync
+    arch = sd_script.script_home(script) / ll.ARCHIVE_DIR
     tgt = arch / (final.stem + ".metadata.json")
     if tgt.is_file():
         return
-    ll.write_sidecar(tgt, _sidecar(final, script, None) | {"file_path": str(final)})
+    libsync.write_sidecar(tgt, _sidecar(final, script, None) | {"file_path": str(final)})
 
 
 def cleanup(state, ok):
@@ -755,8 +759,8 @@ def cleanup(state, ok):
 def run_again(state):
     if not state or not state.get("script") or not Path(state["script"]).is_file():
         return "The launch script of this run no longer exists."
-    with sg.QLOCK:
-        sg.QUEUE["items"].append({"path": state["script"], "resume": "", "state": "queued", "note": ""})
+    with sdqueue.QLOCK:
+        sdqueue.QUEUE["items"].append({"path": state["script"], "resume": "", "state": "queued", "note": ""})
     return "Added to the queue (the Queue tab)."
 
 
@@ -904,12 +908,12 @@ def compare_settings_html(logs: list[str], show_all: bool = False) -> str:
         info = r["info"]
         d = {"LoRA type": info["type"]}
         try:
-            st = sg.dataset_stats(info["dataset"])
+            st = sd_script.dataset_stats(info["dataset"])
             d["Pictures × repeats (now)"] = " + ".join(f'{x["n"]} × {x["repeats"]}' for x in st["rows"]) or "?"
         except Exception:                                # noqa: BLE001
             d["Pictures × repeats (now)"] = "?"
-        fd = sg.form_dict(info["text"])
-        for name, label in sg.FORM_FIELDS:
+        fd = sd_script.form_dict(info["text"])
+        for name, label in sd_script.FORM_FIELDS:
             if name in ("output_name", "logging_dir"):
                 continue
             d[label] = _short(fd.get(name, ""))

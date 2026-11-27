@@ -551,6 +551,8 @@ def compare_dir(info) -> Path:
 
 def prompts_for(info, n: int) -> list[dict]:
     """The prompts of a run (picked once from the captions, then kept): [{"text", "seed", "from"}]."""
+    import dsfiles
+    import sd_script
     d = compare_dir(info)
     pf = d / "prompts.json"
     try:
@@ -559,16 +561,15 @@ def prompts_for(info, n: int) -> list[dict]:
             return old[:n]
     except Exception:                                    # noqa: BLE001
         pass
-    S = sg()
     caps = []
     imgs = []
     try:
-        for row in S.dataset_stats(info["dataset"])["rows"]:      # the dataset's own repeat folder only
-            imgs += S.list_images(row["folder"])
+        for row in sd_script.dataset_stats(info["dataset"])["rows"]:      # the dataset's own repeat folder only
+            imgs += dsfiles.list_images(row["folder"])
     except Exception:                                    # noqa: BLE001
         imgs = []
     for im in imgs:
-        c = S.read_caption(im) if hasattr(S, "read_caption") else ""
+        c = dsfiles.read_caption(im)
         if c and c.strip():
             caps.append((im.name, c.strip()))
     rnd = random.Random(info["dataset"])                # the same prompts for every version of a dataset

@@ -5,24 +5,20 @@ sdgui.py - the training engine of LoRA Studio, and the shared parts of the launc
 
   runs           Run: one training run (bash on a temporary copy of the launch script, the log streamed and kept in
                  userdata/gui_logs/), its stages (##LS_STAGE markers of the musubi pipelines), loss and NaN watch
-  the queue      QUEUE and _queue_worker: one script after the other, making room in video memory when the model
-                 changes, stop on fail, Completed marks after a run that wrote its final LoRA
+  the queue      in sdqueue.py; the loss of a run in sdloss.py; the dataset folders and files in dsfiles.py
   launch scripts reading and writing their options (the form), the LoRA types (Lora_Datatypes.py) and the
-                 recommendations; split over sd_script.py, sd_prepare.py and sd_settings.py, imported back here
+                 recommendations; in sd_script.py, sd_prepare.py and sd_settings.py (use them directly)
 
 Security: this runs shell text from a web page and edits files. LoRA Studio binds to 127.0.0.1 unless you choose
 otherwise, with a login then (Settings › Start and network).
 """
-__version__ = "1.261126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 import atexit
 import notify
 import codecs
 import glob
-import hashlib
-import importlib.util
 import html
 import json
-import math
 import os
 import re
 import shlex
@@ -381,7 +377,7 @@ def _reader(run: Run):
                 break
             text = dec.decode(chunk)
             if run.secret:
-                text = text.replace(run.secret, mask_token(run.secret))
+                text = text.replace(run.secret, sd_settings.mask_token(run.secret))
             lf.write(text.encode("utf-8"))
             lf.flush()
             with run.lock:
@@ -393,8 +389,8 @@ def _reader(run: Run):
                         mp = PROG_RE.search(run.cur)
                         if mp:
                             run.progress = mp.group(1)
-                            _note_loss(run, mp.group(1))
-                        me = EPOCH_RE.match(run.cur)
+                            sdloss._note_loss(run, mp.group(1))
+                        me = sdloss.EPOCH_RE.match(run.cur)
                         if me:
                             run.epoch, run.epochs_total = int(me.group(1)), int(me.group(2))
                         _note_marker(run, run.cur)
@@ -409,7 +405,7 @@ def _reader(run: Run):
                 mp = PROG_RE.search(run.cur)
                 if mp:
                     run.progress = mp.group(1)
-                    _note_loss(run, mp.group(1))
+                    sdloss._note_loss(run, mp.group(1))
                 if len(run.lines) > MAX_KEPT_LINES:
                     del run.lines[:1000]
                 run.version += 1
@@ -423,7 +419,7 @@ def _reader(run: Run):
         _finish_stages(run, code)
         run.version += 1
     if run.stages or run.nan_at:                 # outside the lock: run_failure takes it itself
-        why = run_failure(run, code)
+        why = sdqueue.run_failure(run, code)
         if why:
             with run.lock:
                 run.lines.append(f"--- FAILED: {why} ---")
@@ -490,7 +486,7 @@ def list_scripts():
     found = {}
 
     def add(p: Path):
-        if not p.name.startswith(".gui_run_") and OLD_RUNS not in p.parts and "_compare" not in p.parts:
+        if not p.name.startswith(".gui_run_") and sd_script.OLD_RUNS not in p.parts and "_compare" not in p.parts:
             found[p.resolve()] = p
 
     if ROOT.is_dir():
@@ -500,14 +496,14 @@ def list_scripts():
         if img.is_dir():
             for top in img.iterdir():
                 # a program folder (lora_library, a git checkout) is no dataset
-                if not top.is_dir() or not is_dataset_dir(top):
+                if not top.is_dir() or not dsfiles.is_dataset_dir(top):
                     continue
                 for dirpath, dirnames, filenames in os.walk(top):
                     depth = len(Path(dirpath).relative_to(top).parts)
                     # never into the picture folders: they hold thousands of files and no launch scripts
                     dirnames[:] = [] if depth >= 2 else [
                         d for d in dirnames if not d.startswith(".") and d.lower() not in IGNORE_DIRS
-                        and not REPEAT_RE.match(d) and d not in ("venv", ".venv", "node_modules", OLD_RUNS, "_compare")]
+                        and not REPEAT_RE.match(d) and d not in ("venv", ".venv", "node_modules", sd_script.OLD_RUNS, "_compare")]
                     for fn in filenames:
                         if fn.endswith(".sh"):
                             add(Path(dirpath) / fn)
@@ -582,7 +578,7 @@ def script_paths(path):
     tensor files (LoRAs, saved states, and the `sample` images), and a `log` folder for TensorBoard."""
     if not path or not Path(path).is_file():
         return None, None
-    base = script_home(path)
+    base = sd_script.script_home(path)
     text = Path(path).read_text(encoding="utf-8", errors="ignore")
     out = script_arg(text, "output_dir", base)
     log = script_arg(text, "logging_dir", base)
@@ -657,7 +653,7 @@ def fix_flags(body: str) -> tuple[str, list]:
             body = drop_arg(body, f)[0]
         if gone:
             notes.append("removed " + ", ".join("--" + f for f in gone) + " (no --sample_prompts: sd-scripts would stop at the first sample)")
-    body, had = scrub_hf(body)                         # the token is passed when the script runs, never stored in it
+    body, had = sd_settings.scrub_hf(body)                         # the token is passed when the script runs, never stored in it
     if had:
         notes.append("took the Hugging Face token out of the script (it is passed when the script runs)")
     return body, notes
@@ -767,7 +763,7 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
     venv_bin = str(Path(sys.executable).parent)   # keep the GUI's venv out of the script's PATH
     env["PATH"] = os.pathsep.join(p for p in env.get("PATH", "").split(os.pathsep) if p != venv_bin)
     env.pop("VIRTUAL_ENV", None)
-    tok = read_hf_token()
+    tok = sd_settings.read_hf_token()
     if tok:                                         # scripts read HF_TOKEN from here; it is never written into them
         env["HF_TOKEN"] = tok
 
@@ -776,7 +772,7 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
     run.script = str(src)
     run.logfile = logfile
     run.tmp = tmp
-    run.secret = read_hf_token()
+    run.secret = sd_settings.read_hf_token()
     run.started = time.time()
     for nm in STAGE_DECL_RE.findall(body):                  # all-in-one script: show the whole pipeline from the start
         run.stages.append({"name": nm, "state": "pending", "t0": None, "t1": None})
@@ -816,8 +812,6 @@ def _start_run(path, workdir, venv, trace, resume, warn, info):
     return True
 
 
-# ---- run settings (Settings tab, stored in settings.txt [general])
-
 
 # ---- the two trainer folders (settings.txt [general]): SDGUI_SD_SCRIPTS (sd-scripts) and SDGUI_MUSUBI (musubi-tuner)
 SD_KEY, MUSUBI_KEY = "SDGUI_SD_SCRIPTS", "SDGUI_MUSUBI"
@@ -826,7 +820,7 @@ DEFAULT_MUSUBI = _HERE_MU if _HERE_MU.is_dir() else HOME / "musubi-tuner"
 
 
 def _general_path(key: str):
-    v = (read_settings().get("general", {}).get(key) or "").strip()
+    v = (sd_settings.read_settings().get("general", {}).get(key) or "").strip()
     return Path(os.path.expanduser(v)).absolute() if v else None
 
 
@@ -859,7 +853,7 @@ def trainer_script_path(script: str, musubi: bool) -> Path:
 
 def runner_settings():
     """(working directory, venv, trace) from settings.txt, falling back to the start-up defaults."""
-    g = read_settings().get("general", {})
+    g = sd_settings.read_settings().get("general", {})
     wd = (g.get("SDGUI_WORKDIR") or "").strip() or str(ROOT)
     venv = (g.get("SDGUI_VENV") or "").strip()
     venv = "" if venv.lower() == "none" else (venv or DEFAULT_VENV)
@@ -868,7 +862,7 @@ def runner_settings():
 
 def runner_load():
     wd, venv, trace = runner_settings()
-    g = read_settings().get("general", {})
+    g = sd_settings.read_settings().get("general", {})
     return wd, venv, trace, (g.get(SD_KEY) or "").strip(), (g.get(MUSUBI_KEY) or "").strip()
 
 
@@ -878,13 +872,13 @@ def runner_save(wd, venv, trace, sd_path="", mu_path=""):
     sd_path, mu_path = (sd_path or "").strip(), (mu_path or "").strip()
     for n, v in (("Working directory", wd), ("Venv", venv), ("sd-scripts path", sd_path), ("musubi-tuner path", mu_path)):
         if "\n" in v:
-            return f"{n}: no line breaks please.", st_raw()
+            return f"{n}: no line breaks please.", sd_settings.st_raw()
     if wd and not Path(os.path.expanduser(wd)).is_dir():
-        return f"Working directory does not exist: `{wd}`. Nothing was saved.", st_raw()
+        return f"Working directory does not exist: `{wd}`. Nothing was saved.", sd_settings.st_raw()
     for n, v in (("sd-scripts path", sd_path), ("musubi-tuner path", mu_path)):
         if v and not Path(os.path.expanduser(v)).is_dir():
-            return f"{n} does not exist: `{v}`. Nothing was saved.", st_raw()
-    data = read_settings()
+            return f"{n} does not exist: `{v}`. Nothing was saved.", sd_settings.st_raw()
+    data = sd_settings.read_settings()
     sec = data.setdefault("general", {})
     sec[SD_KEY] = sd_path                          # empty = use the sd-scripts folder from Settings > Folders
     sec[MUSUBI_KEY] = mu_path                      # empty = ~/musubi-tuner
@@ -892,13 +886,13 @@ def runner_save(wd, venv, trace, sd_path="", mu_path=""):
     sec["SDGUI_VENV"] = venv or "none"            # "none" = deliberately no venv (an empty value would mean 'use default')
     sec["SDGUI_TRACE"] = "1" if trace else "0"
     try:
-        write_settings(data)
+        sd_settings.write_settings(data)
     except OSError as e:
-        return f"Could not write `{settings_path()}`: {e}", st_raw()
-    notify.info(f"Saved {Path(settings_path()).name}")
-    return (f"Saved to `{settings_path()}` (`[general]`): working directory `{sec['SDGUI_WORKDIR']}`, venv "
+        return f"Could not write `{sd_settings.settings_path()}`: {e}", sd_settings.st_raw()
+    notify.info(f"Saved {Path(sd_settings.settings_path()).name}")
+    return (f"Saved to `{sd_settings.settings_path()}` (`[general]`): working directory `{sec['SDGUI_WORKDIR']}`, venv "
             f"`{venv or 'none'}`, trace {'on' if trace else 'off'}; sd-scripts `{sd_root()}`, musubi-tuner `{musubi_root()}`. "
-            "Used by the next Start or queued script, and by new launch scripts."), st_raw()
+            "Used by the next Start or queued script, and by new launch scripts."), sd_settings.st_raw()
 
 
 def dataset_of_script(path) -> str:
@@ -922,7 +916,7 @@ _TYPE_CACHE: dict = {}
 
 def _settings_sig():
     try:
-        st = settings_path().stat()
+        st = sd_settings.settings_path().stat()
         return st.st_mtime_ns, st.st_size
     except OSError:
         return 0, 0
@@ -944,7 +938,7 @@ def script_type(path, text=None) -> str:
         if key not in _TYPE_CACHE:
             if len(_TYPE_CACHE) > 5000:
                 _TYPE_CACHE.clear()
-            _TYPE_CACHE[key] = infer_type(text, merged_presets()[1], "") or ""
+            _TYPE_CACHE[key] = sd_script.infer_type(text, sd_script.merged_presets()[1], "") or ""
         return _TYPE_CACHE[key]
     except Exception:
         return ""
@@ -958,7 +952,7 @@ def script_completed(path, text=None, data=None) -> bool:
         return False
     try:
         text = text if text is not None else Path(path).read_text(encoding="utf-8", errors="ignore")
-        _, out_name = script_args(text, script_home(path))
+        _, out_name = script_args(text, sd_script.script_home(path))
     except Exception:                       # noqa: BLE001
         out_name = ""
     # only the version this script writes counts: a new V4 script is not hidden by V3's mark
@@ -973,10 +967,10 @@ def mark_completed_after_run(run, code) -> str:
     if run.nan_at:
         return f"--- {nan_text(run)}: this dataset + type is NOT marked Completed ---"
     p = Path(run.script)
-    final = final_lora(run.script)
+    final = sdqueue.final_lora(run.script)
     if final is None:
         return ""
-    if not wrote_final(run):
+    if not sdqueue.wrote_final(run):
         return "--- no new final LoRA file found, so this dataset + type is NOT marked Completed ---"
     out_name = final.stem
     t = script_type(p)
@@ -984,297 +978,12 @@ def mark_completed_after_run(run, code) -> str:
         return ""
     ds = dataset_of_script(p)
     COMPLETED.set_done(ds, t, True, how="auto", lora=out_name)
-    label = merged_presets()[1].get(t, {}).get("label", t)
+    label = sd_script.merged_presets()[1].get(t, {}).get("label", t)
     v = COMPLETED.version_of(out_name)
     label += f" V{v}" if v else ""
     return (f"--- {final.name} finished: '{ds} · {label}' is marked Completed. Its launch scripts are hidden on the "
             f"the Queue after Refresh (tick 'show finished' to see them; untick Completed in Collection › "
             f"Details to undo) ---")
-
-
-# --------------------------------------------------------------------------- queue of scripts and states
-QUEUE = {"items": [], "running": False, "stop_flag": False, "stop_on_fail": True, "killed": False}
-QLOCK = threading.Lock()
-
-
-def queue_failstop(v):
-    QUEUE["stop_on_fail"] = bool(v)
-
-
-_Q_DONE_LOGS: list = []
-
-
-# ---- between queue items: the models of each script, and making room when they change
-MODEL_FLAGS = ("pretrained_model_name_or_path", "dit", "vae", "ae", "text_encoder", "clip_l", "clip_g", "t5xxl",
-               "qwen3", "gemma2", "byt5", "base_weights")
-
-
-def script_models(path) -> frozenset:
-    """The model files a launch script trains with (base model / DiT, VAE, text encoders, adapter)."""
-    try:
-        text = Path(path).read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return frozenset()
-    home = script_home(path)
-    out = set()
-    for k in MODEL_FLAGS:
-        v = script_arg(text, k, home)
-        if v:
-            out.add((k, os.path.normpath(os.path.expanduser(v))))
-    for k, v in re.findall(r'^(DIT|VAE|TEXT_ENCODER|BASE_MODEL)="?([^"\n]+)"?', text, re.M):   # musubi scripts
-        out.add((k.lower(), v))
-    return frozenset(out)
-
-
-def vram_used():
-    """(used, total) video memory in bytes of the first card, or None when it cannot be read."""
-    try:
-        if shutil.which("nvidia-smi"):
-            r = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
-                               capture_output=True, text=True, timeout=8)
-            u, t = [float(x) for x in r.stdout.strip().splitlines()[0].split(",")]
-            return u * 2 ** 20, t * 2 ** 20
-        import gpusmi
-        cards = gpusmi.cards()                   # amd-smi (ROCm 10+) or rocm-smi, in bytes
-        if cards and cards[0]["vram_total"]:
-                return float(cards[0]["vram_used"] or 0), float(cards[0]["vram_total"])
-    except Exception:                       # noqa: BLE001
-        pass
-    return None
-
-
-def sweep_run(proc) -> int:
-    """Stop whatever is left of a finished run (helper processes of the trainer that did not end with it, which
-    would keep video memory). Returns 1 when something had to be stopped."""
-    if proc is None:
-        return 0
-    try:
-        os.killpg(proc.pid, 0)              # anything left in the run's process group?
-    except (ProcessLookupError, PermissionError, OSError):
-        return 0
-    _signal(proc, signal.SIGTERM)
-    deadline = time.time() + 8
-    while time.time() < deadline:
-        try:
-            os.killpg(proc.pid, 0)
-        except (ProcessLookupError, PermissionError, OSError):
-            return 1
-        time.sleep(0.5)
-    _signal(proc, signal.SIGKILL)
-    return 1
-
-
-def make_room(note, idle, wait=90) -> str:
-    """The base model changes between two queue items: ComfyUI and Ollama let go of their models, and the queue
-    waits (up to `wait` seconds) until the video memory is back near what it was before the queue started."""
-    bits = []
-    try:
-        import comfytest as CT
-        url = CT.settings()["url"]
-        if CT.alive(url):
-            CT._req(url, "/free", {"unload_models": True, "free_memory": True}, timeout=10)
-            bits.append("ComfyUI unloaded its models")
-    except Exception:                       # noqa: BLE001
-        pass
-    try:
-        import ollamactl
-        ollamactl.stop_all()
-    except Exception:                       # noqa: BLE001
-        pass
-    v = vram_used()
-    if v is None:
-        return "; ".join(bits)
-    used, total = v
-    goal = max((idle or 0) + 768 * 2 ** 20, 0.08 * total)
-    t0 = time.time()
-    while used > goal and time.time() - t0 < wait:
-        note(f"waiting for the video memory to empty: {used / 2 ** 30:.1f} of {total / 2 ** 30:.1f} GB in use")
-        time.sleep(2)
-        v = vram_used()
-        if v is None:
-            break
-        used, total = v
-    bits.append(f"video memory free: {(total - used) / 2 ** 30:.1f} of {total / 2 ** 30:.1f} GB"
-                + ("" if used <= goal else " (some is still in use by another program)"))
-    return "; ".join(bits)
-
-
-def _queue_worker():
-    prev_models, prev_label, idle = None, "", None
-    v0 = vram_used()
-    if v0 is not None and not RUN.running():
-        idle = v0[0]                        # the video memory in use before the queue started (the desktop, ...)
-    try:
-        while True:
-            with QLOCK:
-                if QUEUE["stop_flag"]:
-                    break
-                it = next((i for i in QUEUE["items"] if i["state"] == "queued"), None)
-                if it is None:
-                    break
-                it["state"], it["note"] = "running", ""
-            def warn(msg, it=it):
-                it["note"] = str(msg)
-            try:
-                import features as FT
-                txt = Path(it["path"]).read_text(encoding="utf-8", errors="ignore")
-                if not FT.can_train_text(txt):
-                    it["state"], it["note"] = "failed", ("musubi-tuner" if "MUSUBI_DIR=" in txt else "sd-scripts") + \
-                        " is not installed here (Settings › Start and network)"
-                    continue
-            except OSError:
-                pass
-            if RUN.running():
-                it["state"], it["note"] = "failed", "another run is still active"
-                break
-            models = script_models(it["path"])
-            t_ = script_type(it["path"])
-            label = ((merged_presets()[1].get(t_) or {}).get("label") or t_ or Path(it["path"]).stem).split(" (")[0]
-            room = ""
-            if prev_models is not None and models != prev_models:   # another base model: make room for it first
-                it["note"] = f"another model ({prev_label} → {label}): freeing memory …"
-                room = f"model changed ({prev_label} → {label}): " + (make_room(warn, idle) or "memory freed")
-            workdir, venv, trace = runner_settings()          # read fresh for every item
-            if not _start_run(it["path"], workdir, venv, trace, it.get("resume", ""), warn, lambda m: None):
-                it["state"] = "failed"
-                it["note"] = it["note"] or "could not start"
-                if QUEUE["stop_on_fail"]:
-                    break
-                continue
-            if room:
-                it["note"] = room
-            run = RUN
-            while run.proc.poll() is None:
-                time.sleep(1)
-            time.sleep(1.5)                                   # let the log reader finish
-            code = run.proc.returncode
-            if sweep_run(run.proc):                           # helper processes left behind would keep video memory
-                print(f"[Queue] stopped processes left over from {Path(it['path']).name}", flush=True)
-            prev_models, prev_label = models, label
-            took = fmt((run.ended or time.time()) - run.started)
-            if QUEUE.get("killed"):
-                it["state"], it["note"] = "stopped", f"stopped by you after {took}"
-                break
-            why = run_failure(run, code)
-            if not why and not wrote_final(run):
-                it["state"], it["note"] = "stopped", f"ended after {took} without its final LoRA (stopped early?)"
-            elif not why:
-                it["state"], it["note"] = "done", f"finished in {took}" + (f" · {room}" if room else "")
-                if run.logfile:
-                    _Q_DONE_LOGS.append(Path(run.logfile).name)
-                    try:                                  # test pictures and the LoRA card before the next run
-                        import comfytest
-                        base_note = it["note"]
-                        it["note"] = base_note + " · making the test pictures …"
-                        res = comfytest.after_run(Path(run.logfile).name,
-                                                  lambda t, it=it, b=base_note: it.__setitem__("note", f"{b} · {t}"))
-                        it["note"] = base_note + " · " + res.split(" · ")[0][:160]
-                    except Exception as e:            # noqa: BLE001
-                        it["note"] += f" · test pictures: {e}"
-            else:
-                try:
-                    import failcodes
-                    fc = failcodes.for_log(run.logfile, code) if run.logfile else None
-                except Exception:                     # noqa: BLE001
-                    fc = None
-                it["state"], it["note"] = "failed", ((fc["title"] + " · ") if fc else "") + \
-                    f"{why} after {took}, log: {Path(run.logfile).name if run.logfile else '-'}"
-                if QUEUE["stop_on_fail"]:
-                    break
-            if QUEUE["stop_flag"]:                            # Stop after current
-                break
-    finally:
-        with QLOCK:
-            QUEUE["running"] = False
-            QUEUE["stop_flag"] = False
-            QUEUE["killed"] = False
-        done, _Q_DONE_LOGS[:] = list(_Q_DONE_LOGS), []
-        if done:                                    # Home › Just trained (the test pictures were made after each run)
-            try:
-                import comfytest
-                comfytest.after_queue(done)
-            except Exception:                       # noqa: BLE001
-                pass
-
-
-def final_lora(script) -> Path | None:
-    """The final LoRA file a launch script writes (<output_dir>/<output_name>.safetensors), None when unknown."""
-    try:
-        p = Path(script)
-        text = p.read_text(encoding="utf-8", errors="ignore")
-        out_dir, out_name = script_args(text, script_home(p))
-    except (OSError, TypeError):
-        return None
-    if not out_name:
-        return None
-    return (Path(os.path.expanduser(out_dir)) if out_dir else script_home(p) / "model") / f"{out_name}.safetensors"
-
-
-def wrote_final(run) -> bool:
-    """Did this run write its final LoRA (newer than the start)? A run stopped with Ctrl+C can still end with exit
-    code 0, so the exit code alone does not say it finished."""
-    final = final_lora(run.script)
-    if final is None:
-        return True                                        # nothing to check against
-    try:
-        return final.stat().st_mtime >= run.started - 5
-    except OSError:
-        return False
-
-
-def run_failure(run, code) -> str:
-    """Why a finished run counts as failed ('' = it succeeded): a non-zero exit code, or a Python traceback in the
-    last part of the log (a launch script without 'set -e' can end with exit code 0 after training crashed)."""
-    nan = nan_text(run)
-    if code != 0:
-        why = f"exit code {code}"
-        if fail_where(run):
-            why += f", failed in {fail_where(run)}"
-        return why + (f"; {nan}" if nan else "")
-    if run.fail:
-        return f"failed in {fail_where(run)}: {run.fail['msg']}"
-    if nan:
-        return nan
-    with run.lock:
-        tail = "\n".join(run.lines[-300:])
-    if "Traceback (most recent call last)" in tail or "CalledProcessError" in tail:
-        last = next((l.strip() for l in reversed(tail.splitlines())
-                     if re.match(r"\s*\w+(\.\w+)*(Error|Exception)\b", l)), "")
-        return "crashed" + (f" ({last[:120]})" if last else "")
-    return ""
-
-
-def queue_start(stop_on_fail):
-    if QUEUE["running"]:
-        notify.warning("The queue is already running.")
-        return
-    if RUN.running():
-        notify.warning("A run is in progress. Wait for it to finish (or press Stop now), then start the queue.")
-        return
-    try:
-        import speedjobs
-        if speedjobs.busy():
-            notify.warning("A speed test is running (Settings › Speed test). Start the queue when it has finished, "
-                       "or stop it there.")
-            return
-    except ImportError:
-        pass
-    with QLOCK:
-        if not any(i["state"] == "queued" for i in QUEUE["items"]):
-            notify.warning("No waiting items in the queue.")
-            return
-        QUEUE["running"], QUEUE["stop_flag"], QUEUE["stop_on_fail"] = True, False, bool(stop_on_fail)
-        QUEUE["killed"] = False
-    threading.Thread(target=_queue_worker, daemon=True).start()
-    notify.info("Queue started.")
-
-
-def queue_stop_after_current():
-    if not QUEUE["running"]:
-        notify.info("The queue is not running.")
-        return
-    QUEUE["stop_flag"] = True
-    notify.info("The queue will stop after the current script finishes.")
 
 
 def _signal(proc, sig):
@@ -1296,194 +1005,15 @@ def _escalate(proc):
 
 def stop_run():
     """Stop now: interrupt the running script, mark its queue item stopped and end the queue."""
-    if QUEUE["running"]:
-        QUEUE["stop_flag"] = True
-        QUEUE["killed"] = True
+    if sdqueue.QUEUE["running"]:
+        sdqueue.QUEUE["stop_flag"] = True
+        sdqueue.QUEUE["killed"] = True
     if not RUN.running():
         notify.info("Nothing is running.")
         return
     _signal(RUN.proc, signal.SIGINT)
     threading.Thread(target=_escalate, args=(RUN.proc,), daemon=True).start()
     notify.info("Sent Ctrl+C. Escalates to SIGTERM after 20s and SIGKILL after 10s more if it hangs.")
-
-
-# --------------------------------------------------------------------------- loss indicator
-EPOCH_RE = re.compile(r"\s*epoch\s+(\d+)\s*/\s*(\d+)\s*$")
-LOSS_RE = re.compile(r"\|\s*(\d+)/\d+\s*\[.*?avr_loss=([0-9.eE+\-]+|nan|inf)\s*\]")
-
-
-def _note_loss(run: Run, prog: str):
-    """Record one (step, avr_loss, epoch) sample from a tqdm line. Called with run.lock held."""
-    m = LOSS_RE.search(prog)
-    if not m:
-        return
-    step = int(m.group(1)) + run.step_offset
-    try:
-        val = float(m.group(2))
-    except ValueError:
-        return
-    if not math.isfinite(val) and run.nan_at is None:
-        run.nan_at = {"step": step, "epoch": run.epoch, "stage": run.stage_no}
-    if run.loss and run.loss[-1][0] == step:
-        return
-    run.loss.append((step, val, run.epoch))
-    if len(run.loss) > 40000:
-        del run.loss[1:len(run.loss):2]          # thin out very long runs
-
-
-def _mean(xs):
-    return sum(xs) / len(xs) if xs else float("nan")
-
-
-def loss_analysis(samples):
-    """Plain-language reading of the avr_loss history. Returns dict with epochs, best/worst, verdict.
-    avr_loss is only a smoothed training signal: it does not measure likeness. The verdicts compare the
-    run with itself (its own best so far), not with a fixed number."""
-    import math
-    bad = [x for x in samples if not math.isfinite(x[1])]
-    good = [x for x in samples if math.isfinite(x[1])]
-    out = {"n": len(good), "epochs": [], "best": None, "worst": None, "level": "info", "msgs": []}
-    if bad:
-        out["level"] = "bad"
-        out["msgs"].append("avr_loss is NaN/inf: training has diverged. Stop it, halve the learning rate and restart "
-                           "(or resume from the last good state).")
-    if len(good) < 8:
-        if not bad:
-            out["msgs"].append("Collecting data... (needs a few dozen steps)")
-        return out
-    by_ep = {}
-    for step, v, ep in good:
-        by_ep.setdefault(ep, []).append(v)
-    rows = []
-    for ep in sorted(by_ep):
-        vs = by_ep[ep]
-        rows.append({"epoch": ep, "mean": _mean(vs), "end": vs[-1], "n": len(vs)})
-    out["epochs"] = rows
-    # only epochs with enough samples count for best / worst (the running epoch is judged by its samples so far)
-    full = [r for r in rows if r["n"] >= 5]
-    if full:
-        out["best"] = min(full, key=lambda r: r["mean"])
-        out["worst"] = max(full, key=lambda r: r["mean"])
-    vals = [v for _, v, _ in good]
-    k = max(5, len(vals) // 20)
-    cur = _mean(vals[-k:])
-    sm = [_mean(vals[max(0, i - k + 1):i + 1]) for i in range(len(vals))]
-    warm = max(k, len(vals) // 6)                 # ignore the noisy start when looking for the best point
-    best_i = min(range(warm, len(sm)), key=lambda i: sm[i]) if len(sm) > warm else len(sm) - 1
-    best_sm = sm[best_i]
-    out["best_pt"] = (good[best_i][0], best_sm)
-    out["worst_pt"] = max(((good[i][0], sm[i]) for i in range(warm, len(sm))), key=lambda t: t[1], default=None)
-    msgs = out["msgs"]
-    level = out["level"]
-    rise = (cur - best_sm) / best_sm if best_sm > 0 else 0
-    last20 = vals[-20:]
-    med = sorted(last20)[len(last20) // 2]
-    if len(good) > 40 and vals[-1] > 1.5 * med and med > 0:
-        msgs.append(f"Spike: avr_loss jumped to {vals[-1]:.4f} (typical {med:.4f}). One spike is usually a bad batch; "
-                    "repeated spikes mean the learning rate is too high.")
-        level = max(level, "warn", key=["info", "ok", "warn", "bad"].index)
-    if len(good) > 3 * warm and rise > 0.30:
-        msgs.append(f"**Poor-likeness zone:** avr_loss {cur:.4f} is {rise:.0%} above its best ({best_sm:.4f} at step {good[best_i][0]}). "
-                    "The model is moving away from the data: the learning rate may be too high, or the run is overfitting/unstable. "
-                    "Compare the sample images; the checkpoint from near the best step is the safer pick.")
-        level = max(level, "bad", key=["info", "ok", "warn", "bad"].index)
-    elif len(good) > 3 * warm and rise > 0.12:
-        msgs.append(f"Drifting up: avr_loss {cur:.4f} is {rise:.0%} above its best ({best_sm:.4f} at step {good[best_i][0]}). "
-                    "Watch the next epochs; if it keeps rising, prefer the earlier checkpoint.")
-        level = max(level, "warn", key=["info", "ok", "warn", "bad"].index)
-    tail = vals[-max(20, len(vals) // 4):]
-    if len(good) > 4 * warm and max(tail) > 0 and (max(tail) - min(tail)) / _mean(tail) < 0.04 and rise <= 0.12:
-        msgs.append("Flat: avr_loss has stopped moving. The model has learned most of what it can from this data; "
-                    "extra epochs mostly add overfitting risk.")
-        level = max(level, "ok", key=["info", "ok", "warn", "bad"].index)
-    if len(full) >= 3:
-        a, b, c = full[-3]["mean"], full[-2]["mean"], full[-1]["mean"]
-        if c > b > a and out["best"] is not full[-1]:
-            msgs.append("The last 3 epoch averages are rising; compare the sample images from the best epoch with the latest.")
-            level = max(level, "warn", key=["info", "ok", "warn", "bad"].index)
-    if not msgs:
-        first = vals[: max(5, len(vals) // 10)]
-        drop = (_mean(first) - cur) / _mean(first) if _mean(first) else 0
-        msgs.append(f"Healthy: avr_loss is {cur:.4f}, {drop:.0%} below the start and near its best." if drop > 0.02
-                    else f"avr_loss is {cur:.4f}, steady. Diffusion loss falls only slowly; judge likeness from the sample images.")
-        level = "ok"
-    out["level"] = level
-    return out
-
-
-def _why_best_worst(an):
-    rows = an["epochs"]
-    if not an["best"] or not an["worst"] or len(rows) < 2:
-        return "", ""
-    b, w, f = an["best"], an["worst"], rows[0]
-    last = rows[-1]["epoch"]
-    why_b = f"Lowest epoch average ({b['mean']:.4f}), {100 * (f['mean'] - b['mean']) / f['mean']:.0f}% below epoch {f['epoch']}."
-    if b["epoch"] == last:
-        why_b += " Still improving: nothing later to compare with yet."
-    else:
-        why_b += " Later epochs are not lower, so extra training since then did not reduce the loss."
-    if w["epoch"] == rows[0]["epoch"]:
-        why_w = "Highest average, as expected: the model has not learned the data yet (early epoch)."
-    elif w["epoch"] == last:
-        why_w = "The newest epoch is the highest: loss is rising. Possible instability or overfitting; check the samples."
-    else:
-        why_w = "Highest average although later epochs are lower. Likely an unstable stretch (learning-rate spike or a hard batch)."
-    return why_b, why_w
-
-
-def loss_html() -> str:
-    with RUN.lock:
-        samples = list(RUN.loss)
-    if RUN.proc is None or not samples:
-        return ("<div class='lossbox'><span class='lossmuted'>Loss indicator: waiting for avr_loss values "
-                "(they appear once training prints its progress bar).</span></div>")
-    an = loss_analysis(samples)
-    col = {"ok": "var(--ls-ok)", "info": "var(--ls-info)", "warn": "var(--ls-warn)", "bad": "var(--ls-bad)"}[an["level"]]
-    icon = {"ok": "🟢", "info": "⚪", "warn": "🟠", "bad": "🔴"}[an["level"]]
-    msgs = "".join(f"<div>{html.escape(m).replace('**', '')}</div>" for m in an["msgs"])
-    why_b, why_w = _why_best_worst(an)
-
-    def cell(title, r, why, c):
-        if not r:
-            return f"<div class='losscell'><b>{title}</b><br><span class='lossmuted'>needs at least 2 epochs</span></div>"
-        return (f"<div class='losscell' style='border-left:4px solid {c}'><b>{title}</b>: epoch {r['epoch']}, "
-                f"avg avr_loss <b>{r['mean']:.4f}</b><br><span class='lossmuted'>{html.escape(why)}</span></div>")
-    cells = cell("Best epoch", an["best"], why_b, "var(--ls-ok)") + cell("Worst epoch", an["worst"], why_w, "var(--ls-bad)")
-
-    # chart
-    W, H, P = 600, 120, 8
-    pts = [(s, v) for s, v, _ in samples if v == v and abs(v) != float("inf")]
-    svg = ""
-    if len(pts) >= 2:
-        xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
-        x0, x1 = min(xs), max(xs); y0, y1 = min(ys), max(ys)
-        if x1 == x0: x1 = x0 + 1
-        if y1 == y0: y1 = y0 + 1e-6
-        X = lambda x: P + (W - 2 * P) * (x - x0) / (x1 - x0)
-        Y = lambda y: H - P - (H - 2 * P) * (y - y0) / (y1 - y0)
-        step = max(1, len(pts) // 300)
-        d = " ".join(f"{X(x):.1f},{Y(y):.1f}" for x, y in pts[::step])
-        svg = (f"<svg viewBox='0 0 {W} {H}' width='100%' height='{H}' preserveAspectRatio='none' class='losschart'>"
-               f"<polyline fill='none' stroke='var(--ls-line)' stroke-width='1.6' points='{d}'/>")
-        for key, c in (("best_pt", "var(--ls-ok)"), ("worst_pt", "var(--ls-bad)")):
-            pt = an.get(key)
-            if pt:
-                svg += (f"<line x1='{X(pt[0]):.1f}' x2='{X(pt[0]):.1f}' y1='{P}' y2='{H - P}' stroke='{c}' stroke-width='2' "
-                        f"stroke-dasharray='4 3' vector-effect='non-scaling-stroke'/>")
-        svg += "</svg>"
-        svg += (f"<div class='lossmuted' style='display:flex;justify-content:space-between'><span>step {x0}</span>"
-                f"<span>avr_loss {y0:.4f} to {y1:.4f}; <span style='color:var(--ls-ok)'>┆</span> best point, "
-                f"<span style='color:var(--ls-bad)'>┆</span> worst point (after warm-up)</span><span>step {x1}</span></div>")
-    ep = ""
-    if an["epochs"]:
-        best_e = an["best"]["epoch"] if an["best"] else None
-        ep = "<div class='lossmuted' style='margin-top:6px'>" + " &nbsp;|&nbsp; ".join(
-            (f"<b>ep {r['epoch']}: {r['mean']:.4f}</b>" if r["epoch"] == best_e else f"ep {r['epoch']}: {r['mean']:.4f}")
-            for r in an["epochs"]) + "</div>"
-    note = ("<div class='lossmuted' style='margin-top:6px'>avr_loss is a smoothed training signal, not a likeness score. "
-            "It is compared with this run's own best, so the verdict is a hint. Always confirm with the sample images.</div>")
-    return (f"<div class='lossbox' style='border-left:6px solid {col}'><div style='font-weight:600;margin-bottom:4px'>"
-            f"{icon} Loss indicator</div>{msgs}<div class='losscells'>{cells}</div>{svg}{ep}{note}</div>")
 
 
 # --------------------------------------------------------------------------- monitor
@@ -1533,160 +1063,6 @@ def tb_stop_ui():
 
 
 atexit.register(tb_stop)
-
-
-# --------------------------------------------------------------------------- dataset tab
-DATATYPES_FILE = "Lora_Datatypes.py"   # ALL LoRA types (PRESETS) live in this file
-
-
-def find_scan_script(explicit):
-    """Lora_Datatypes.py: the given path, else next to sdgui.py, in <sd-scripts>, or in your home folder."""
-    cands = []
-    if explicit:
-        cands.append(Path(os.path.expanduser(explicit)))
-    for d in (Path(__file__).resolve().parent, ROOT, HOME):
-        cands.append(d / DATATYPES_FILE)
-    for c in cands:
-        if c.is_file():
-            return c
-    return None
-
-
-_SCAN_MOD: dict = {}
-
-
-def load_scan_module():
-    """Lora_Datatypes.py, read again only when the file changed, so edits to PRESETS apply without a restart
-    (it used to be read on every call: dozens of times for one page)."""
-    if SCAN_SCRIPT is None:
-        raise FileNotFoundError("Lora_Datatypes.py not found. Put it next to sdgui.py or pass --datatypes.")
-    st = Path(SCAN_SCRIPT).stat()
-    key = (str(SCAN_SCRIPT), st.st_mtime_ns, st.st_size)
-    if _SCAN_MOD.get("key") != key:
-        spec = importlib.util.spec_from_file_location("Lora_Datatypes", str(SCAN_SCRIPT))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        _SCAN_MOD.update(key=key, mod=mod)
-    return _SCAN_MOD["mod"]
-
-
-PROGRAM_MARKS = ("lora_studio.py", "sdgui.py", "lora_library.py", "start.sh", "install.sh", "setup.py", "pyproject.toml",
-                 "requirements.txt", ".git")
-
-
-def is_dataset_dir(p: Path) -> bool:
-    """A folder in the dataset folder that is a dataset: pictures (in it or one level down), a repeat folder, launch
-    scripts or LoRA Studio's own notes. Program folders (a copy of LoRA Studio, a git checkout, a venv) are not."""
-    if not p.is_dir() or p.name.startswith(".") or p.name.lower() in IGNORE_DIRS:
-        return False
-    try:
-        names = {c.name for c in p.iterdir()}
-    except OSError:
-        return False
-    if any(m in names for m in PROGRAM_MARKS) or "pyvenv.cfg" in names:
-        return False
-    if ".lsflow" in names or any(n.endswith(".sh") for n in names) or any(REPEAT_RE.match(n) for n in names):
-        return True
-    if any(Path(n).suffix.lower() in IMAGE_EXTS for n in names):
-        return True
-    for c in p.iterdir():                       # pictures one level down (a dataset without a repeat folder yet)
-        if c.is_dir() and not c.name.startswith(".") and c.name.lower() not in IGNORE_DIRS:
-            try:
-                if any(Path(n).suffix.lower() in IMAGE_EXTS for n in os.listdir(c)):
-                    return True
-            except OSError:
-                pass
-    return False
-
-
-def list_lora_dirs():
-    img = images_dir()
-    return sorted(p.name for p in img.iterdir() if is_dataset_dir(p)) if img.is_dir() else []
-
-
-# --------------------------------------------------------------------------- shared dataset helpers
-def lora_path(name) -> Path:
-    return images_dir() / name
-
-
-def repeat_folders(lora_dir: Path):
-    """[(folder, repeats)] using the same rules as the scan script (repeats=None: not a '<N>_name'
-    folder, so sd-scripts ignores it). Skips model/output/sample folders."""
-    m = REPEAT_RE.match(lora_dir.name)
-    if m:
-        return [(lora_dir, int(m.group(1)))]
-    found, loose = [], []
-    for dirpath, dirnames, filenames in os.walk(lora_dir):
-        p = Path(dirpath)
-        mm = REPEAT_RE.match(p.name)
-        if p != lora_dir and mm:
-            found.append((p, int(mm.group(1))))
-            dirnames[:] = []
-            continue
-        dirnames[:] = sorted(d for d in dirnames if d.lower() not in IGNORE_DIRS and not d.startswith(".")
-                             and not ARCHIVE_RENAMED_RE.match(d))
-        if any(Path(f).suffix.lower() in IMAGE_EXTS for f in filenames):
-            loose.append((p, None))
-    return found + loose
-
-
-def renamed_archives(lora_dir: Path):
-    """LoraManager folders (Personal sync: previews / example images) that were renamed to <N>_LoraManager.
-    sd-scripts and musubi would train on those pictures, so they are left out of the plan and reported."""
-    try:
-        return sorted(d for d in lora_dir.iterdir() if d.is_dir() and ARCHIVE_RENAMED_RE.match(d.name))
-    except OSError:
-        return []
-
-
-def list_images(folder: Path):
-    try:
-        return sorted((f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_EXTS),
-                      key=lambda f: f.name.lower())
-    except OSError:
-        return []
-
-
-def caption_file(img: Path) -> Path:
-    for ext in CAPTION_EXTS:
-        c = img.with_name(img.stem + ext)
-        if c.is_file():
-            return c
-    return img.with_name(img.stem + ".txt")
-
-
-def read_caption(img: Path):
-    c = caption_file(img)
-    if not c.is_file():
-        return None
-    return c.read_text(encoding="utf-8", errors="ignore").strip()
-
-
-def thumb(img: Path, size: int = 384) -> str:
-    """Cached JPEG thumbnail (keeps the gallery fast with 1024px PNGs)."""
-    try:
-        from PIL import Image, ImageOps
-    except ImportError:
-        return str(img)
-    try:
-        st = img.stat()
-        key = hashlib.sha1(f"{img}|{st.st_mtime_ns}|{st.st_size}".encode()).hexdigest()[:20]
-        dst = CACHE_DIR / "thumbs" / f"{key}.jpg"
-        if not dst.is_file():
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            with Image.open(img) as im:
-                im = ImageOps.exif_transpose(im)
-                im.thumbnail((size, size))
-                if im.mode != "RGB":
-                    im = im.convert("RGB")
-                im.save(dst, "JPEG", quality=85)
-        return str(dst)
-    except Exception:
-        return str(img)
-
-
-def split_tags(text: str):
-    return [t.strip() for t in (text or "").replace("\n", ",").split(",") if t.strip()]
 
 
 def S_NVIDIA() -> bool:
@@ -1754,104 +1130,14 @@ def gpu_name() -> str:
     return name
 
 
-# ---- the launch script page, preparing a dataset and the trainer settings live in sd_script.py,
-# sd_prepare.py and sd_settings.py (imported back here, so sdgui.<name> works as before)
-from sd_script import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
-    EXTRA_DIR,
-    CHOICE,
-    FORM_FIELDS,
-    FORM_GROUPS,
-    META_KEYS,
-    NEW,
-    OLD_RUNS,
-    PRESETS_ERROR,
-    RESERVED_TYPES,
-    STUDIO_TABLE,
-    SUBTYPE_BASES,
-    _PH,
-    _arg_re,
-    _cs_result,
-    _num,
-    apply_form,
-    archive_all_datasets,
-    archive_old_scripts,
-    builtin_presets,
-    cs_apply_quiet,
-    cs_check,
-    cs_ds_change,
-    cs_read,
-    cs_retype,
-    cs_save_new,
-    cs_save_over,
-    cs_script_change,
-    cs_suggest,
-    custom_subtypes,
-    dataset_stats,
-    ensure_folders,
-    explain_for,
-    find_script,
-    form_dict,
-    form_value,
-    infer_type,
-    load_recs,
-    make_plan,
-    merged_presets,
-    next_script_version,
-    read_form,
-    recs_status,
-    script_home,
-    set_choice,
-    set_script_version,
-    training_command,
-    type_choices,
-    with_virtual_row,
-)
-from sd_prepare import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
-    OC_FAMILY,
-    OC_STOP,
-    _dc_cache_load,
-    _dc_cache_save,
-    _dc_min_side,
-    _oc_check,
-    _oc_family,
-    oc_images,
-    oc_save_settings,
-    oc_settings,
-    record_change,
-)
-from sd_settings import (  # noqa: F401  (also used as sdgui.<name> by the other parts)
-    GFX_VAR,
-    SECTION_NAMES,
-    _type_base,
-    apply_gfx_env,
-    cs_set_epochs,
-    cs_use_settings,
-    detect_gfx,
-    env_saved,
-    vendor_env,
-    scrub_all_scripts,
-    scrub_hf,
-    get_gfx,
-    hf_path,
-    hf_status_text,
-    mask_token,
-    read_hf_token,
-    read_settings,
-    rp_make,
-    rp_refresh,
-    rp_rename,
-    set_arg,
-    settings_models,
-    settings_path,
-    slot_label,
-    st_raw,
-    type_slots,
-    vae_optional,
-    write_settings,
-)
-
-
-# ---- sample images on/off, logging, folder creation (all work on the script text)
+# ---- the launch script page, preparing a dataset and the trainer settings live in sd_script.py, sd_prepare.py and
+# sd_settings.py (callers use those modules directly)
+import sd_script  # noqa: E402  (they import this file: after its names)
+import sd_prepare  # noqa: E402
+import sd_settings  # noqa: E402
+import sdqueue
+import sdloss
+import dsfiles
 
 
 # --------------------------------------------------------------------------- cleanup after a finished run
@@ -1865,7 +1151,7 @@ def cleanup_plan(path, with_samples=True, keep_copied=False):
     model_dir, _ = script_paths(path)
     if not model_dir:
         return None, None, [], [], "Pick a launch script first."
-    base = script_home(path)
+    base = sd_script.script_home(path)
     if RUN.proc is not None and RUN.proc.poll() is None:
         return base, model_dir, [], [], "A run is still in progress. Wait for it to finish (or Stop it) before cleaning up."
     keep = []
@@ -1964,7 +1250,7 @@ def _marks_counts(ds) -> tuple[int, int]:
     if DC is None or not ds:
         return 0, 0
     try:
-        root = lora_path(ds)
+        root = dsfiles.lora_path(ds)
         marks = DC.reconcile(root, DC.marks_load(root))
     except Exception:                       # noqa: BLE001
         return 0, 0
@@ -2025,65 +1311,20 @@ def run_history(limit: int = 100):
 _HIST_CACHE: dict = {}
 
 
-# ---- the queue survives a restart: its list is saved, and waiting items can start again (Launch options)
-QUEUE_FILE = CACHE_DIR / "queue.json"
-_Q_SAVED = {"key": None}
-
-
-def _queue_saver():
-    while True:
-        time.sleep(3)
-        try:
-            with QLOCK:
-                items = [dict(i) for i in QUEUE["items"]]
-            key = json.dumps(items, sort_keys=True)
-            if key != _Q_SAVED["key"]:
-                CACHE_DIR.mkdir(exist_ok=True)
-                QUEUE_FILE.write_text(key, encoding="utf-8")
-                _Q_SAVED["key"] = key
-        except Exception:                   # noqa: BLE001
-            pass
-
-
-def queue_restore(start: bool = False) -> str:
-    """Load the saved queue (once, at start). A run that was cut off by the restart is marked stopped; with
-    `start`, waiting items start again. Returns a one-line note for the log."""
-    try:
-        items = json.loads(QUEUE_FILE.read_text(encoding="utf-8"))
-    except Exception:                       # noqa: BLE001
-        items = []
-    items = [i for i in items if isinstance(i, dict) and i.get("path") and Path(i["path"]).is_file()]
-    for i in items:
-        if i.get("state") == "running":
-            i["state"], i["note"] = "stopped", "cut off by a restart"
-    with QLOCK:
-        if not QUEUE["items"]:
-            QUEUE["items"] = items
-    _Q_SAVED["key"] = json.dumps(items, sort_keys=True)
-    threading.Thread(target=_queue_saver, daemon=True, name="queue-saver").start()
-    waiting = sum(1 for i in items if i.get("state") == "queued")
-    if start and waiting and not RUN.running() and not QUEUE["running"]:
-        with QLOCK:
-            QUEUE["running"], QUEUE["stop_flag"], QUEUE["killed"] = True, False, False
-        threading.Thread(target=_queue_worker, daemon=True).start()
-        return f"queue resumed: {waiting} waiting item(s) started again"
-    return f"queue restored: {waiting} waiting" if items else ""
-
-
 def save_hf_token(tok):
     tok = (tok or "").strip()
     if not tok:
-        return "Paste a token first.", None, hf_status_text()
+        return "Paste a token first.", None, sd_settings.hf_status_text()
     if " " in tok or "\n" in tok:
-        return "That does not look like a token (no spaces).", None, hf_status_text()
-    p = hf_path()
+        return "That does not look like a token (no spaces).", None, sd_settings.hf_status_text()
+    p = sd_settings.hf_path()
     p.write_text("# Put your Hugging Face token (hf_...) on its own line below. Lines starting with # are ignored.\n"
                  + tok + "\n", encoding="utf-8")
     try:
         os.chmod(p, 0o600)
     except OSError:
         pass
-    return f"✔ Saved in `{p}` (readable only by you).", read_hf_token(), hf_status_text()
+    return f"✔ Saved in `{p}` (readable only by you).", sd_settings.read_hf_token(), sd_settings.hf_status_text()
 
 
 def ollama_ctl():
@@ -2101,7 +1342,7 @@ def ai_models_html(url) -> str:
     if not ms:
         return '<p class="ls-empty">Ollama runs, but has no models yet. Download one below, for example qwen2.5vl:7b.</p>'
     now = {m["name"]: m["vram"] for m in (oc.running(url, fresh=True) or [])}
-    _, use = oc_settings()
+    _, use = sd_prepare.oc_settings()
     used = sum(now.values()) / 1024 ** 3
     rows = []
     for m in ms:
@@ -2168,7 +1409,7 @@ def trainer_facts_html() -> str:
     else:
         if not rocm and "+rocm" in tv:
             rocm = tv.partition("+rocm")[2] + " (in the venv)"
-        gfx = get_gfx() or os.environ.get(GFX_VAR, "")
+        gfx = sd_settings.get_gfx() or os.environ.get(sd_settings.GFX_VAR, "")
         gpu_facts = [("ROCm", rocm or "not found"), ("GFX version", gfx or "auto")]
     facts = [("sd-scripts", f'{ok(sd_ok)} {"found" if sd_ok else "not found"} · venv {"found" if sd_venv else "missing"}'),
              ("musubi-tuner", f'{ok(mu_ok)} {"found" if mu_ok else "not installed (only for Z-Image, Qwen-Image, FLUX.2)"}'

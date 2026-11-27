@@ -23,7 +23,7 @@ Everything is read on this computer from what LoRA Studio already has; nothing i
 With few LoRAs these are hints, not rules: every number says how many LoRAs or runs it comes from.
 """
 from __future__ import annotations
-__version__ = "1.131126b"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import re
 import statistics
@@ -80,8 +80,8 @@ def verdict(lib, lora, counts: dict) -> tuple[str, str]:
 def _dataset_facts(ds_name: str, root: Path) -> dict:
     out = {}
     try:
-        import dsflow as F
-        res = F.sort_result(ds_name) or {}
+        import dssort
+        res = dssort.sort_result(ds_name) or {}
         pics = [e for e in (res.get("pics") or {}).values() if e.get("cat") in ("good", "detail", "alike")]
         if pics:
             fr = Counter(e.get("framing") or "" for e in pics if e.get("cat") != "detail")
@@ -256,7 +256,7 @@ def epochs_summary(rows: list[dict]) -> list[dict]:
 # --------------------------------------------------------------------------- 5. how you use your LoRAs
 def usage_rows(lib) -> list[dict]:
     """Per LoRA (all versions together): pictures made with it, the strength you use, when last, file sizes."""
-    import lora_library as LL
+    import libpictures
     import picgallery as PG
     lib.ensure_loaded()
     pics = PG.index()["pics"]
@@ -270,7 +270,7 @@ def usage_rows(lib) -> list[dict]:
         mine = [m for m in members if m.dataset is not None]
         if not mine:
             continue
-        names = {PG.norm(m.stem) for m in mine} | set(LL.picture_aliases(gid))
+        names = {PG.norm(m.stem) for m in mine} | set(libpictures.picture_aliases(gid))
         uses = [u for n in names for u in by_name.get(n, [])]
         per = {m.stem: len(by_name.get(PG.norm(m.stem), [])) for m in mine}
         strengths = [s for s, _ in uses if isinstance(s, (int, float))]
@@ -345,6 +345,7 @@ def _speed(tail: str):
 
 def run_rows() -> list[dict]:
     """One row per run log: {type, label, batch, res, result, why, sps, when, script}."""
+    import sd_script
     sg = _sg()
     d = getattr(sg, "LOG_DIR", None) if sg is not None else None
     if not d or not Path(d).is_dir():
@@ -352,7 +353,7 @@ def run_rows() -> list[dict]:
     import failcodes as FC
     labels = {}
     try:
-        labels = {k: re.sub(r"\s*\[template\]", "", lab) for lab, k in sg.type_choices()}
+        labels = {k: re.sub(r"\s*\[template\]", "", lab) for lab, k in sd_script.type_choices()}
     except Exception:                                  # noqa: BLE001
         pass
     rows = []
@@ -379,7 +380,7 @@ def run_rows() -> list[dict]:
             text = script.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        home = sg.script_home(script)
+        home = sd_script.script_home(script)
         t = sg.script_type(str(script), text)
         batch = _num(sg.script_arg(text, "train_batch_size", home) or sg.script_arg(text, "batch_size", home)) or 1
         res = (sg.script_arg(text, "resolution", home) or "").replace(",", "×")

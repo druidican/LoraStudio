@@ -95,6 +95,7 @@ def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, 
     """Generator of progress lines. `write(img, line)` stores one finished caption. Returns nothing; the last line
     says how it went. `trait_leave` (default: leave_out) is what counts as a character trait for `traits`; with an
     empty leave_out every tag is written (a character's traits are moved to the trigger words afterwards)."""
+    import sd_settings
     import captioner as CAP
     st = status()
     if not st["ok"] and st["need_install"]:
@@ -132,7 +133,7 @@ def tag(images: list[Path], trigger: str, leave_out: str, max_tags: int, write, 
         tok = ""
         sg = _sg()
         try:
-            tok = sg.read_hf_token() if sg is not None else ""
+            tok = sd_settings.read_hf_token() if sg is not None else ""
         except Exception:                        # noqa: BLE001
             pass
         if tok:

@@ -97,8 +97,8 @@ def build(with_files: bool = True, on_use=None, only=None):
                          "SDXL, Illustrious, Pony and NoobAI files look the same inside, so their base models are "
                          "matched by the file name, or the label some files carry inside; a file where neither says which it "
                          "is stays unticked.")
-                    import sdgui as S
-                    _, presets = S.merged_presets()
+                    import sd_script
+                    _, presets = sd_script.merged_presets()
                     for tkey, slots in mp.items():
                         have = cur["files"].get(tkey) or {}
                         lab = (presets.get(tkey) or {}).get("label", tkey)

@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.271126"  # LoRA Studio version, see version.py
+__version__ = "1.271126b"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -85,7 +85,6 @@ def _versions():
 # ---------------------------------------------------------------- every part loads
 SKIP_IMPORT = {"pictools_worker.py", "lora_studio.py", "selftest.py"}   # runs in another venv / starts the program
 try:                                     # an update from the Gradio version tests the new files before start.sh has
-    import nicegui  # noqa: F401          # installed the new packages: the pages are checked at the next self-test
     HAVE_NICEGUI = True
 except ImportError:
     HAVE_NICEGUI = False
@@ -93,7 +92,6 @@ except ImportError:
 
 @check("every part loads")
 def _imports():
-    import sdgui  # noqa: F401  (first: the parts need it)
     n = 0
     for name, _ in version.PARTS:
         if name.endswith(".py") and Path(name).name not in SKIP_IMPORT and (HAVE_NICEGUI or "/UI/" not in name):
@@ -103,6 +101,9 @@ def _imports():
 
 
 import sdgui as G  # noqa: E402
+import dsfiles
+import sdqueue
+import sd_script
 
 TMP = Path(tempfile.mkdtemp(prefix="lorastudio_selftest_"))
 DS = "selftest_set"
@@ -124,43 +125,43 @@ def make_dataset():
     G.CONFIG_DIR = TMP / "cfg"
     G.CONFIG_DIR.mkdir()
     if not G.SCAN_SCRIPT:                      # Lora_Datatypes.py next to the program (lora_studio.py sets this)
-        G.SCAN_SCRIPT = G.find_scan_script(None)
+        G.SCAN_SCRIPT = dsfiles.find_scan_script(None)
     return rep
 
 
 @check("the made-up dataset is found")
 def _dataset():
     make_dataset()
-    need(DS in G.list_lora_dirs(), f"{DS} not in {G.list_lora_dirs()}")
-    st = G.dataset_stats(DS)
+    need(DS in dsfiles.list_lora_dirs(), f"{DS} not in {dsfiles.list_lora_dirs()}")
+    st = sd_script.dataset_stats(DS)
     rows = [r for r in st["rows"] if not r.get("virtual")]
     need(len(rows) == 1 and rows[0]["repeats"] == 10, f"repeat folder rows: {rows}")
-    return f"{len(G.list_images(rows[0]['folder']))} pictures"
+    return f"{len(dsfiles.list_images(rows[0]['folder']))} pictures"
 
 
 # ---------------------------------------------------------------- launch scripts
 @check("a launch script for every LoRA type")
 def _plans():
-    sc, presets = G.merged_presets()
+    sc, presets = sd_script.merged_presets()
     need(sc is not None and presets, "Lora_Datatypes.py did not load")
     done = []
     for tkey in sorted(presets):
-        p = G.make_plan(DS, tkey)
+        p = sd_script.make_plan(DS, tkey)
         t = p["script_text"]
         need(t.strip() and p["filename"].endswith(".sh"), f"{tkey}: empty script or name")
-        vals = G.read_form(t)
+        vals = sd_script.read_form(t)
         need(vals, f"{tkey}: the form could not read the script")
-        again = G.apply_form(t, vals)
+        again = sd_script.apply_form(t, vals)
         again = again[0] if isinstance(again, tuple) else again
-        need(G.read_form(again) == vals, f"{tkey}: form round trip changes the settings")
-        need(G.training_command(t), f"{tkey}: no training command found")
+        need(sd_script.read_form(again) == vals, f"{tkey}: form round trip changes the settings")
+        need(sd_script.training_command(t), f"{tkey}: no training command found")
         done.append(tkey)
     return ", ".join(done)
 
 
 @check("NoobAI: EPS like Illustrious, V-pred with v_parameterization and zero terminal SNR, no noise offset")
 def _noobai():
-    eps, vp = G.make_plan(DS, "noobai")["script_text"], G.make_plan(DS, "noobai_vpred")["script_text"]
+    eps, vp = sd_script.make_plan(DS, "noobai")["script_text"], sd_script.make_plan(DS, "noobai_vpred")["script_text"]
     need("--v_parameterization" not in eps and "--noise_offset" in eps, "EPS script has V-pred flags")
     need("--v_parameterization" in vp and "--zero_terminal_snr" in vp and "--noise_offset" not in vp, "V-pred flags")
     need("masterpiece, best quality, newest" in vp and "--sample_sampler euler" in vp, "V-pred quality words / sampler")
@@ -171,7 +172,7 @@ def _noobai():
 @check("compare settings: one setting changed per run, blind rows, a clear winner offered")
 def _compare():
     import compare as CMP
-    ill = G.make_plan(DS, "illustrious")["script_text"]
+    ill = sd_script.make_plan(DS, "illustrious")["script_text"]
     vs = CMP.variants_for(ill, ["lr", "rank", "te"])
     keys = [v["key"] for v in vs]
     need(keys == ["base", "lr5e5", "lr2e4", "r16x16", "r64x64", "teoff"], keys)
@@ -188,42 +189,43 @@ def _compare():
 
 @check("character defaults: Illustrious as tested, SDXL text encoders, FLUX/Chroma rank 32, Z-Image Base without the adapter")
 def _chardefaults():
-    sc, presets = G.merged_presets()
-    G.set_choice("character", "balanced")
-    ill = G.make_plan(DS, "illustrious")["script_text"]
+    sc, presets = sd_script.merged_presets()
+    sd_script.set_choice("character", "balanced")
+    ill = sd_script.make_plan(DS, "illustrious")["script_text"]
     miss = [f for f in ("--text_encoder_lr 5e-5", "--train_batch_size 1") if f not in ill]
     miss += [f"no {f}" for f in ("--network_train_unet_only", "--clip_skip") if f in ill]
     need(not miss, f"Illustrious: not the owner's tested setup: {miss}")
-    sx = G.make_plan(DS, "sdxl")["script_text"]
+    sx = sd_script.make_plan(DS, "sdxl")["script_text"]
     need("--text_encoder_lr 5e-5" in sx and "--network_train_unet_only" not in sx and "--clip_skip" not in sx,
          "SDXL: text encoders not trained")
     for t in ("flux", "chroma"):
-        need("--network_dim 32 --network_alpha 32" in G.make_plan(DS, t)["script_text"], f"{t}: not rank 32/32")
-    zib, zit = G.make_plan(DS, "zimagebase")["script_text"], G.make_plan(DS, "zimage")["script_text"]
+        need("--network_dim 32 --network_alpha 32" in sd_script.make_plan(DS, t)["script_text"], f"{t}: not rank 32/32")
+    zib, zit = sd_script.make_plan(DS, "zimagebase")["script_text"], sd_script.make_plan(DS, "zimage")["script_text"]
     need("BASE_WEIGHTS" not in zib and "z_image_bf16" in zib, "Z-Image Base: adapter in the script or wrong model")
     need("BASE_WEIGHTS" in zit, "Z-Image Turbo lost its adapter")
-    need(G.infer_type(zib, presets, "") == "zimagebase" and G.infer_type(zit, presets, "") == "zimage",
-         f"type detection: {G.infer_type(zib, presets, '')} / {G.infer_type(zit, presets, '')}")
+    need(sd_script.infer_type(zib, presets, "") == "zimagebase" and sd_script.infer_type(zit, presets, "") == "zimage",
+         f"type detection: {sd_script.infer_type(zib, presets, '')} / {sd_script.infer_type(zit, presets, '')}")
 
 
 @check("each launch script trains on its own caption set; Anima/FLUX/Chroma can have both")
 def _capsets():
     import dsflow as F
+    import dscaptions
     import sd_script as SS
     old = F.meta(DS)
     try:
-        G.set_choice("character", "balanced")
+        sd_script.set_choice("character", "balanced")
         F.meta_save(DS, {**old, "types": ["illustrious", "zimage"], "caption_choice": "auto", "train_style": {}})
-        need([x["ext"] for x in F.caption_sets(DS)] == [".txt", ".sentences.txt"], F.caption_sets(DS))
-        zit = G.make_plan(DS, "zimage")["script_text"]
+        need([x["ext"] for x in dscaptions.caption_sets(DS)] == [".txt", ".sentences.txt"], dscaptions.caption_sets(DS))
+        zit = sd_script.make_plan(DS, "zimage")["script_text"]
         need('CAPTION_EXT=".sentences.txt"' in zit and 'caption_extension = \\".txt\\"' in zit,
              "Z-Image does not train on the sentence set")
-        need('--caption_extension ".txt"' in G.make_plan(DS, "illustrious")["script_text"], "Illustrious lost IMG.txt")
+        need('--caption_extension ".txt"' in sd_script.make_plan(DS, "illustrious")["script_text"], "Illustrious lost IMG.txt")
         F.meta_save(DS, {**F.meta(DS), "types": ["illustrious", "anima"], "caption_choice": "both"})
-        need(len(F.train_sets(DS, "anima")) == 2 and len(F.train_sets(DS, "illustrious")) == 1, "anima should have both")
-        need('--caption_extension ".txt"' in G.make_plan(DS, "anima")["script_text"], "Anima's usual set is the tags")
-        F.set_train_style(DS, "anima", "sentences")
-        t = G.make_plan(DS, "anima")["script_text"]
+        need(len(dscaptions.train_sets(DS, "anima")) == 2 and len(dscaptions.train_sets(DS, "illustrious")) == 1, "anima should have both")
+        need('--caption_extension ".txt"' in sd_script.make_plan(DS, "anima")["script_text"], "Anima's usual set is the tags")
+        dscaptions.set_train_style(DS, "anima", "sentences")
+        t = sd_script.make_plan(DS, "anima")["script_text"]
         need('--caption_extension ".sentences.txt"' in t, "the pick in step 9 is not used")
         need('--caption_extension ".txt"' in SS.set_caption_ext(t, ".txt"), "set_caption_ext")
         need('CAPTION_EXT=".tags.txt"' in SS.set_caption_ext(zit, ".tags.txt"), "set_caption_ext (musubi)")
@@ -350,7 +352,8 @@ def _detailscan():
     from PIL import Image
     import detailscan as DSC
     import dsflow as F
-    old_meta, old_ask, old_sort = F.meta(DS), DSC.ask, F.sort_result(DS)
+    import dssort
+    old_meta, old_ask, old_sort = F.meta(DS), DSC.ask, dssort.sort_result(DS)
     rep = F.root(DS)
     pics = sorted(p for p in rep.rglob("*.png") if "_originals" not in p.parts)[:4]
     try:
@@ -424,9 +427,9 @@ def _stoppedrun():
         sc = d / "pipILLV1.sh"
         sc.write_text(f'accelerate launch sdxl_train_network.py --output_dir "{d / "model"}" --output_name "pipILLV1"\n')
         run = _t.SimpleNamespace(script=str(sc), started=time.time())
-        need(not G.wrote_final(run), "no final LoRA, but counted as written")
+        need(not sdqueue.wrote_final(run), "no final LoRA, but counted as written")
         (d / "model" / "pipILLV1.safetensors").write_bytes(b"x")
-        need(G.wrote_final(run), "final LoRA not seen")
+        need(sdqueue.wrote_final(run), "final LoRA not seen")
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -457,6 +460,7 @@ def _classword():
 @check("fixed features: out of tags and sentences, the class word goes with the gender")
 def _fixed():
     import dsflow as F
+    import dscaptions
     import fixedfeat as FX
     ts = sorted(["orange visor", "goggles", "male", "man", "1boy"], key=lambda t: (-len(t), t))
     need(FX.strip_tags("pip, 1boy, orange visor, standing, woman", ts, "pip") == "pip, standing, woman", "tags")
@@ -474,7 +478,7 @@ def _fixed():
         need(FX.drops_class(DS) and FX.class_word(DS) == "", "class word dropped with the gender")
         need("NEVER name or describe these" in FX.prompt_rule(DS, DS), "prompt rule")
         FX.take_out(DS)
-        cap = F.read_set(F.images(DS)[0], ".txt")
+        cap = dscaptions.read_set(F.images(DS)[0], ".txt")
         need("red background" not in cap and "person" not in cap, cap)
     finally:
         m = F.meta(DS)
@@ -501,15 +505,15 @@ def _export_check():
 
 @check("launch script names count up (V1, V2, ...)")
 def _names():
-    sc, presets = G.merged_presets()
+    sc, presets = sd_script.merged_presets()
     tkey = "sdxl" if "sdxl" in presets else sorted(presets)[0]
-    p = G.make_plan(DS, tkey)
-    lora = G.lora_path(DS)
-    base, n = G.next_script_version(lora, p["script_text"])
+    p = sd_script.make_plan(DS, tkey)
+    lora = dsfiles.lora_path(DS)
+    base, n = sd_script.next_script_version(lora, p["script_text"])
     need(base, "no base name in the script")
     f = lora / p["filename"]
-    f.write_text(G.set_script_version(p["script_text"], base, n))
-    base2, n2 = G.next_script_version(lora, f.read_text())
+    f.write_text(sd_script.set_script_version(p["script_text"], base, n))
+    base2, n2 = sd_script.next_script_version(lora, f.read_text())
     need(n2 == n + 1, f"after V{n} the next is V{n2}")
     f.unlink()
     return f"{base}V{n} → {base2}V{n2}"
@@ -609,11 +613,12 @@ def _shortcut():
 @check("no Hugging Face token in launch scripts; Z-Image Turbo strength 1.3")
 def _token_strength():
     import sdgui as G
+    import sd_settings
     import comfytest as CT
     old = '#!/bin/bash\n# Hugging Face token (fill in if needed)\nexport HF_TOKEN="hf_secret123"\necho x\n'
-    new, had = G.scrub_hf(old)
+    new, had = sd_settings.scrub_hf(old)
     need(had and "hf_secret123" not in new and 'export HF_TOKEN\n' in new, "token not taken out")
-    need(G.scrub_hf(new) == (new, False), "not the same on a second pass")
+    need(sd_settings.scrub_hf(new) == (new, False), "not the same on a second pass")
     need("hf_secret" not in G.fix_flags(old)[0], "fix_flags keeps the token")
     g = CT.graph({"kind": "ckpt", "ckpt": "m", "steps": 8, "cfg": 1, "sampler": "euler", "scheduler": "simple",
                   "width": 64, "height": 64, "lora_strength": CT.lora_strength("zimage")}, "x", "p", 1, "t")
@@ -661,9 +666,9 @@ def _repeats():
     import dsflow as F
     msg = F.rename_repeats(DS, 20)
     need(msg and not msg.startswith("⚠"), f"rename: {msg!r}")
-    need((G.lora_path(DS) / f"20_{DS}").is_dir(), "20_ folder missing")
+    need((dsfiles.lora_path(DS) / f"20_{DS}").is_dir(), "20_ folder missing")
     F.rename_repeats(DS, 10)
-    need((G.lora_path(DS) / f"10_{DS}").is_dir(), "renaming back failed")
+    need((dsfiles.lora_path(DS) / f"10_{DS}").is_dir(), "renaming back failed")
 
 
 # ---------------------------------------------------------------- captions
@@ -756,13 +761,13 @@ def _selfupdate():
 def _onlymain():
     import dsflow as F
     from PIL import Image
-    d = G.lora_path(DS)
+    d = dsfiles.lora_path(DS)
     (d / "5_other").mkdir()
     Image.new("RGB", (512, 512)).save(d / "5_other" / "x.png")
     (d / "_reserve").mkdir(exist_ok=True)
     Image.new("RGB", (512, 512)).save(d / "_reserve" / "y.png")
     try:
-        st = G.dataset_stats(DS)
+        st = sd_script.dataset_stats(DS)
         need([r["folder"].name for r in st["rows"]] == [f"10_{DS}"], f"rows: {[r['folder'].name for r in st['rows']]}")
         need(len(F.images(DS)) == 8 and len(F.extra_pictures(DS)) == 2, "pictures outside the repeat folder counted")
         F.set_include_extra(DS, True)
@@ -890,19 +895,19 @@ def _hfdl():
 
 @check("Personal sync merges .metadata.json both ways (missing and empty fields filled, newer file wins)")
 def _metamerge():
-    import lora_library as LL
+    import libsync
     a = {"notes": "", "tags": ["a"], "civitai": {"trainedWords": ["trig"]}, "favorite": True}
     b = {"notes": "mine", "tags": ["b"], "civitai": {"trainedWords": [], "id": 5}, "extra": 1}
-    m = LL.merge_meta(a, b, a_wins=False)
+    m = libsync.merge_meta(a, b, a_wins=False)
     need(m["notes"] == "mine" and m["civitai"] == {"trainedWords": ["trig"], "id": 5}, f"got {m}")
     need(m["tags"] == ["b"] and m["favorite"] is True and m["extra"] == 1, f"got {m}")
-    need(LL.merge_meta(a, b, a_wins=True)["tags"] == ["a"], "the newer file did not win")
+    need(libsync.merge_meta(a, b, a_wins=True)["tags"] == ["a"], "the newer file did not win")
 
 
 @check("training card: version and clip skip go to LoRA Manager, trigger words come back, old notes text goes")
 def _tcard():
     import json as _j
-    import lora_library as LL
+    import libsync
     import trainingcard as TC
     ls = TC.apply({"notes": "Trained on 2026-10-20 from the dataset x. 10 epochs.\n\nMy note"},
                   {"version": "V1", "trigger": "x", "clip_skip": ""}, "sig")
@@ -910,7 +915,7 @@ def _tcard():
     need(ls["civitai"]["name"] == "V1" and _j.loads(ls["usage_tips"])["clip_skip"] == 1, "version / clip skip not set")
     lm = {"model_name": "mine", "civitai": {"trainedWords": ["a", "b"]}, "usage_tips": '{"strength": 0.8}',
           "modelDescription": ""}
-    m = LL.sync_rules(lm, ls, LL.merge_meta(lm, ls, False))
+    m = libsync.sync_rules(lm, ls, libsync.merge_meta(lm, ls, False))
     need(m["civitai"]["name"] == "V1", "LoRA Studio's version did not win")
     need(m["civitai"]["trainedWords"] == ["a", "b"], "LoRA Manager's trigger words were not taken")
     tips = _j.loads(m["usage_tips"])
@@ -959,6 +964,7 @@ def _desc():
 def _tagmove():
     import tempfile
     import dsflow as F
+    import dscaptions
     d = Path(tempfile.mkdtemp())
     imgs = []
     for i, line in enumerate(["pip, blonde hair, blue eyes, smile, outdoors", "pip, blonde hair, blue eyes, indoors",
@@ -968,29 +974,33 @@ def _tagmove():
         (d / f"{i}.txt").write_text(line + "\n", encoding="utf-8")
         imgs.append(img)
     store = {"m": {"purpose": "character", "types": []}}
-    saved = {k: getattr(F, k) for k in ("images", "meta", "meta_save", "_flow", "set_file")}
+    saved = {k: getattr(F, k) for k in ("images", "meta", "meta_save", "_flow")}
+    saved_set_file = dscaptions.set_file
     F.images, F.meta, F.meta_save = (lambda ds: imgs), (lambda ds: store["m"]), (lambda ds, m: store.update(m=m))
-    F._flow, F.set_file = (lambda ds: d / ".lsflow"), (lambda img, ext: img.with_suffix(ext))
+    F._flow, dscaptions.set_file = (lambda ds: d / ".lsflow"), (lambda img, ext: img.with_suffix(ext))
     try:
-        rows, n = F.tag_counts("pip", ".txt", "pip")
+        rows, n = dscaptions.tag_counts("pip", ".txt", "pip")
         need(n == 3 and rows[0] == ("blonde hair", 3), f"wrong counts: {rows[:3]}")
-        tick = F.default_ticks(rows, n)
+        tick = dscaptions.default_ticks(rows, n)
         need(tick == ["blonde hair", "blue eyes"], f"wrong pre-ticks: {tick}")
-        F.move_tags("pip", tick, ".txt", "pip")
+        dscaptions.move_tags("pip", tick, ".txt", "pip")
         need((d / "0.txt").read_text().strip() == "pip, smile, outdoors", (d / "0.txt").read_text())
-        need(F.description("pip") == "blonde hair, blue eyes", f"description: {F.description('pip')}")
-        F.put_back("pip", ".txt")
+        need(dscaptions.description("pip") == "blonde hair, blue eyes", f"description: {dscaptions.description('pip')}")
+        dscaptions.put_back("pip", ".txt")
         need((d / "0.txt").read_text().strip() == "pip, blonde hair, blue eyes, smile, outdoors", "not put back")
-        need(F.description("pip") == "", f"description not undone: {F.description('pip')}")
+        need(dscaptions.description("pip") == "", f"description not undone: {dscaptions.description('pip')}")
     finally:
         for k, v in saved.items():
             setattr(F, k, v)
+        dscaptions.set_file = saved_set_file
 
 
 @check("worn items: kind and place words made the same, the item's look moved out, the kinds kept")
 def _worn():
     import tempfile
     import dsflow as F
+    import dsworn
+    import dscaptions
     d = Path(tempfile.mkdtemp())
     imgs = []
     for i, line in enumerate(["lsjc, 1girl, gold ring, rings, silver, on finger, brown hair, indoors",
@@ -1001,27 +1011,31 @@ def _worn():
         (d / f"{i}.txt").write_text(line + "\n", encoding="utf-8")
         imgs.append(img)
     store = {"m": {"purpose": "worn", "worn_kind": "jewelry", "types": []}}
-    saved = {k: getattr(F, k) for k in ("images", "meta", "meta_save", "_flow", "set_file", "sg")}
+    import sd_prepare
+    saved = {k: getattr(F, k) for k in ("images", "meta", "meta_save", "_flow")}
+    saved_set_file, saved_record = dscaptions.set_file, sd_prepare.record_change
     F.images, F.meta, F.meta_save = (lambda ds: imgs), (lambda ds: store["m"]), (lambda ds, m: store.update(m=m))
-    F._flow, F.set_file = (lambda ds: d / ".lsflow"), (lambda img, ext: img.with_suffix(ext))
-    F.sg = lambda: type("S", (), {"record_change": staticmethod(lambda *a, **k: None)})()
+    F._flow, dscaptions.set_file = (lambda ds: d / ".lsflow"), (lambda img, ext: img.with_suffix(ext))
+    sd_prepare.record_change = lambda *a, **k: None
     try:
-        k, pl = F.suggest_worn("lsjc", ".txt", "lsjc")
+        k, pl = dsworn.suggest_worn("lsjc", ".txt", "lsjc")
         need("ring = rings" in k and "hair clip = hairclip" in k, f"kinds not suggested: {k!r}")
-        F.set_worn_setup("lsjc", "ring = rings\nhair clip = hairclip", "on finger\nin hair")
-        msg = F.same_words("lsjc", ".txt", "lsjc")
+        dsworn.set_worn_setup("lsjc", "ring = rings\nhair clip = hairclip", "on finger\nin hair")
+        msg = dsworn.same_words("lsjc", ".txt", "lsjc")
         need((d / "0.txt").read_text().startswith("lsjc, ring, on finger, 1girl, gold ring"), (d / "0.txt").read_text())
         need("**ring** 2" in msg and "**hair clip** 2" in msg, f"balance: {msg}")
-        rows, n = F.tag_counts("lsjc", ".txt", "lsjc")
-        tick = F.default_ticks(rows, n, "worn", "jewelry", ["ring", "hair clip"], ["on finger", "in hair"])
+        rows, n = dscaptions.tag_counts("lsjc", ".txt", "lsjc")
+        tick = dscaptions.default_ticks(rows, n, "worn", "jewelry", ["ring", "hair clip"], ["on finger", "in hair"])
         need("silver" in tick and "ring" not in tick and "1girl" not in tick, f"wrong pre-ticks: {tick}")
-        F.move_tags("lsjc", ["silver", "gold ring"], ".txt", "lsjc")
+        dscaptions.move_tags("lsjc", ["silver", "gold ring"], ".txt", "lsjc")
         t0 = (d / "0.txt").read_text()
         need("silver" not in t0 and "gold ring" not in t0 and t0.startswith("lsjc, ring,"), t0)
-        need(F.description("lsjc") == "silver, gold ring", F.description("lsjc"))
+        need(dscaptions.description("lsjc") == "silver, gold ring", dscaptions.description("lsjc"))
     finally:
         for k_, v in saved.items():
             setattr(F, k_, v)
+        dscaptions.set_file = saved_set_file
+        sd_prepare.record_change = saved_record
 
 
 @check("AMD GPU values are read from amd-smi (ROCm 10+) as from rocm-smi")
@@ -1083,8 +1097,8 @@ def _sweep():
     pr = subprocess.Popen(["bash", "-c", "sleep 60 & exit 0"], start_new_session=True)
     pr.wait()
     _t.sleep(0.3)
-    need(G.sweep_run(pr) == 1, "a left-over process was not found")
-    need(G.sweep_run(pr) == 0, "the process group is still there after the sweep")
+    need(sdqueue.sweep_run(pr) == 1, "a left-over process was not found")
+    need(sdqueue.sweep_run(pr) == 0, "the process group is still there after the sweep")
 
 
 @check("step 5 pins win over the rules; the sort leaves out pictures that teach nothing about the subject")
@@ -1120,9 +1134,9 @@ def _pins():
 
 @check("sorting stays valid when pictures move or are removed (only new pictures ask for a new sort)")
 def _sortkeep():
-    import dsflow as F
+    import dssort
     pics = {"/a/10_x/p1.png": {"cat": "good"}, "/a/10_x/p2.png": {"cat": "out"}}
-    find = F.sort_lookup(pics)
+    find = dssort.sort_lookup(pics)
     need(find("/a/20_x/p1.png") is not None, "a renamed repeat folder lost the sort")
     need(find("/a/10_x/p2.webp") is not None, "another format lost the sort")
     need(find("/a/10_x/p9.png") is None, "a new picture was taken as sorted")

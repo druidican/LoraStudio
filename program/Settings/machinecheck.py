@@ -148,12 +148,14 @@ def configure():
     import lora_library as ll
     import lora_studio  # noqa: F401  (apply_folders, use_own_config_folder)
     import sdgui
+    import dsfiles
+    import sd_settings
     s = ll.LIB.settings
     lora_studio.apply_folders(s)
     lora_studio.use_own_config_folder()
     sdgui.DEFAULT_VENV = sdgui.detect_venv()
-    sdgui.SCAN_SCRIPT = sdgui.find_scan_script(None)
-    sdgui.apply_gfx_env()
+    sdgui.SCAN_SCRIPT = dsfiles.find_scan_script(None)
+    sd_settings.apply_gfx_env()
     return sdgui, ll, s
 
 
@@ -179,7 +181,8 @@ def check_folders(R, G, s):
     if not ds or not ds[0].is_dir():
         R.add("bad", "Dataset folder", "not set or missing (Settings › Folders)")
     else:
-        n = len(G.list_lora_dirs())
+        import dsfiles
+        n = len(dsfiles.list_lora_dirs())
         R.add("ok", "Dataset folder", f"{ds[0]} · {n} datasets · {_free_gb(ds[0])} GB free")
     lds = [Path(os.path.expanduser(d)) for d in s.get("lora_dirs") or []]
     if not lds:
@@ -190,6 +193,7 @@ def check_folders(R, G, s):
 
 
 def check_trainers(R, G):
+    import sd_settings
     R.section("Trainers")
     import features as FT
     if not FT.have("sd_scripts") and not FT.have("musubi"):
@@ -208,12 +212,13 @@ def check_trainers(R, G):
     act = Path(os.path.expanduser(venv)) / "bin" / "activate" if venv else None
     R.add("ok" if act and act.is_file() else "bad", "Training venv", f"{venv or 'not set'}"
           + ("" if act and act.is_file() else " · no bin/activate (Settings › Trainers and GPU)"))
-    env = {k: v for k, v in G.env_saved().items()} if hasattr(G, "env_saved") else {}
+    env = {k: v for k, v in sd_settings.env_saved().items()} if hasattr(sd_settings, "env_saved") else {}
     R.add("info", "GPU settings", ", ".join(f"{k}={v}" for k, v in env.items()) or "none saved")
     return venv if act and act.is_file() else ""
 
 
 def check_gpu(R, G, venv):
+    import sd_settings
     R.section("GPU")
     try:
         import statusbar
@@ -226,7 +231,7 @@ def check_gpu(R, G, venv):
     except Exception as e:                               # noqa: BLE001
         R.add("warn", "GPU (amd-smi / rocm-smi / nvidia-smi)", repr(e))
     try:
-        v, msg = G.detect_gfx()
+        v, msg = sd_settings.detect_gfx()
         R.add("info", "GPU architecture", msg or str(v))
     except Exception:                                    # noqa: BLE001
         pass
@@ -268,22 +273,24 @@ def check_gpu(R, G, venv):
 
 
 def check_models(R, G):
+    import sd_script
+    import sd_settings
     R.section("Model files per LoRA type")
-    sc, presets = G.merged_presets()
+    sc, presets = sd_script.merged_presets()
     if sc is None:
-        R.add("bad", "Lora_Datatypes.py", G.PRESETS_ERROR["msg"])
+        R.add("bad", "Lora_Datatypes.py", sd_script.PRESETS_ERROR["msg"])
         return {}
     usable = {}
     for tkey in sorted(presets):
         files = {f.lstrip("-"): v for f, v in presets[tkey].get("model_args", [])}
-        files.update(G.settings_models(tkey))                 # your choices in Settings › Model files win
+        files.update(sd_settings.settings_models(tkey))                 # your choices in Settings › Model files win
         files = {k: v for k, v in files.items() if v}
         label = presets[tkey].get("label", tkey)
-        if not files or all(v.startswith(G._PH) for v in files.values()):
+        if not files or all(v.startswith(sd_script._PH) for v in files.values()):
             R.add("info", label, "no model files chosen")
             continue
-        missing = [f"{k}: {Path(v).name}" + (" (not chosen)" if v.startswith(G._PH) else "")
-                   for k, v in files.items() if v.startswith(G._PH) or not Path(os.path.expanduser(v)).exists()]
+        missing = [f"{k}: {Path(v).name}" + (" (not chosen)" if v.startswith(sd_script._PH) else "")
+                   for k, v in files.items() if v.startswith(sd_script._PH) or not Path(os.path.expanduser(v)).exists()]
         if missing:
             R.add("bad", label, "missing " + ", ".join(missing))
         else:
@@ -341,6 +348,7 @@ def _pictures(folder: Path, n=8):
 
 
 def tiny_training(R, G, usable, venv):
+    import sd_script
     R.section("Tiny training")
     if not venv:
         R.add("bad", "Training", "skipped: no training venv")
@@ -348,7 +356,7 @@ def tiny_training(R, G, usable, venv):
     if getattr(G, "RUN", None) is not None and G.RUN.running():
         R.add("warn", "Training", "skipped: a training run is active in LoRA Studio")
         return
-    _, presets = G.merged_presets()
+    _, presets = sd_script.merged_presets()
 
     def rank(t):
         c = presets.get(t, {})
@@ -371,14 +379,14 @@ def tiny_training(R, G, usable, venv):
         ds = "lscheck"
         _pictures(tmp / ds / f"1_{ds}")
         G.IMAGES_DIR = tmp
-        p = G.make_plan(ds, tkey, samples=False)
+        p = sd_script.make_plan(ds, tkey, samples=False)
         text = p["script_text"]
-        vals = G.read_form(text)
-        names = [n for n, _ in G.FORM_FIELDS]
+        vals = sd_script.read_form(text)
+        names = [n for n, _ in sd_script.FORM_FIELDS]
         want = {"max_train_epochs": "1", "resolution": TRAIN_RES, "save_every_n_epochs": "1",
                 "train_batch_size": "1", "gradient_accumulation_steps": "1", "max_data_loader_n_workers": "0"}
         vals = [want.get(n, v) for n, v in zip(names, vals)]
-        text, _, failed = G.apply_form(text, vals)
+        text, _, failed = sd_script.apply_form(text, vals)
         text, ok = G.append_args(text, f"--max_train_steps {TRAIN_STEPS}")
         if failed or not ok:
             R.add("bad", "Training", f"could not shorten the launch script ({', '.join(failed) or 'max_train_steps'})")
