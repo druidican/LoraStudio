@@ -14,7 +14,7 @@ ComfyUI test-picture graph. Your settings files are only read; the made-up datas
 Exit code 0 = all passed.
 """
 from __future__ import annotations
-__version__ = "1.271126e"  # LoRA Studio version, see version.py
+__version__ = "1.281126"  # LoRA Studio version, see version.py
 
 import importlib
 import json
@@ -85,6 +85,7 @@ def _versions():
 # ---------------------------------------------------------------- every part loads
 SKIP_IMPORT = {"pictools_worker.py", "lora_studio.py", "selftest.py"}   # runs in another venv / starts the program
 try:                                     # an update from the Gradio version tests the new files before start.sh has
+    import nicegui  # noqa: F401          # installed the new packages: the pages are checked at the next self-test
     HAVE_NICEGUI = True
 except ImportError:
     HAVE_NICEGUI = False
@@ -92,6 +93,7 @@ except ImportError:
 
 @check("every part loads")
 def _imports():
+    import sdgui  # noqa: F401  (first: the parts need it)
     n = 0
     for name, _ in version.PARTS:
         if name.endswith(".py") and Path(name).name not in SKIP_IMPORT and (HAVE_NICEGUI or "/UI/" not in name):
@@ -1166,6 +1168,7 @@ def _page():
         return "not yet: NiceGUI is installed by start.sh at the next start"
     import socket
     import subprocess
+    import urllib.error
     import urllib.request
     with socket.socket() as so:
         so.bind(("127.0.0.1", 0))
@@ -1187,6 +1190,12 @@ def _page():
                 err = repr(e)
         need(html, f"no page: {err or 'the program stopped'}")
         need("Collection" in html and "Datasets" in html and "Settings" in html, "the tabs are missing")
+        for path in ("/m", "/m/status"):                 # the phone page (its routes come with its import)
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=30) as r:
+                    need(r.status == 200, f"{path}: {r.status}")
+            except urllib.error.HTTPError as e:
+                need(False, f"the phone page {path} answers {e.code}")
     finally:
         p.terminate()
         try:

@@ -214,7 +214,8 @@ re-exports of sd_script / sd_prepare / sd_settings are gone too). Done with an A
 (machinecheck's `G`, mobile/statusbar's `sg`) were fixed by hand. Lazy `import x` inside functions where the caller
 used a getter (kept: those files avoid importing sdgui at their top). New modules import their source module as `F` /
 `S` / `LL` at the top; sdgui imports sd_script / sd_prepare / sd_settings / sdqueue after its own names (they import
-sdgui). Check after such work: pyflakes on every file, and that every `<module>.<name>` in the repo exists. The tool:
+sdgui). Never remove an import marked `# noqa: F401` (pyflakes ignores noqa): stage 4 did, and the phone page
+(its routes come with `import mobile_page` in lora_studio.py) was gone until 1.281126. Check after such work: pyflakes on every file, and that every `<module>.<name>` in the repo exists. The tool:
 `tools/refactor/` (split.py move / unexport, check_attrs.py, cleanup.py; not shipped).
 
 ## Testing

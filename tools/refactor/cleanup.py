@@ -22,6 +22,8 @@ for _ in range(6):
         dels = set()
         for ln, msg in items:
             L = lines[ln - 1]
+            if "noqa" in L:                  # imported on purpose (it registers routes, loads a module first …)
+                continue
             mv = re.match(r"local variable '(\w+)' is assigned to but never used", msg)
             if mv and re.fullmatch(rf"\s*{mv.group(1)} = _?\w*\(\)\s*(#.*)?\n?", L):
                 dels.add(ln)

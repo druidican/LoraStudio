@@ -14,12 +14,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-__version__ = "1.271126e"
-VERSION = "1.271126e"
+__version__ = "1.281126"
+VERSION = "1.281126"
 # the version each part has in this release (written by the release script; a part not listed: VERSION)
 RELEASE: dict = {
-    "lora_studio.py": "1.231126",
-    "version.py": "1.271126e",
+    "lora_studio.py": "1.281126",
+    "version.py": "1.281126",
     "program/lspaths.py": "1.201126e",
     "program/Training/sdgui.py": "1.271126b",
     "program/Training/sd_script.py": "1.261126b",
@@ -105,7 +105,7 @@ RELEASE: dict = {
     "program/Settings/setup.py": "1.011126",
     "program/Settings/updater.py": "1.131126c",
     "program/Settings/backup.py": "1.201126e",
-    "selftest.py": "1.271126e",
+    "selftest.py": "1.281126",
     "program/Settings/machinecheck.py": "1.221126",
     "program/Settings/selfupdate.py": "1.201126e",
     "program/Training/failcodes.py": "1.131126b",
@@ -123,6 +123,7 @@ RELEASE: dict = {
 }
 # what changed in each update, newest first (shown in Settings › Version)
 CHANGES = [
+    ("1.281126", "The phone page (/m) works again: the clean-up of 1.271126b had removed the line that adds it. The self-test now checks that the phone page answers."),
     ("1.271126e", "Test pictures: a workflow's own model loader keeps all its settings (for example an int8 loader such as OTUNetLoaderW8A8: model type, LoRA mode, quantization …); settings it does not say get ComfyUI's defaults. Read your workflow again in Settings › Test pictures."),
     ("1.271126d", "Test pictures: when ComfyUI refuses the workflow, its reason is shown (for example a model file that is not in its list), not only HTTP Error 400."),
     ("1.271126c", "Test pictures: what happens is now shown. Results and Review and export show while they are being made, when LoRA Studio waits for ComfyUI, and the reason when they could not be made (before, a failure showed nothing). Review and export also opens a run whose first test pictures are still being made."),
